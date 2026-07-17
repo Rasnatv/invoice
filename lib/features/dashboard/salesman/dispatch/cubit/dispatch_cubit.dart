@@ -8,7 +8,7 @@ class DispatchCubit extends Cubit<List<DispatchModel>> {
   DispatchCubit() : super([]) {
     emit([
       DispatchModel(
-        id: 'DB #1256',
+        id: 'DS #1256',
         contractorName: 'ABC Builders',
         siteAddress: 'Trivandrum, Kerala',
         date: DateTime(2025, 5, 20),
@@ -17,7 +17,7 @@ class DispatchCubit extends Cubit<List<DispatchModel>> {
         despatchedBy: 'Anil Kumar',
       ),
       DispatchModel(
-        id: 'DB #1255',
+        id: 'DS #1255',
         contractorName: 'Skyline Constructions',
         siteAddress: 'Kottayam, Kerala',
         date: DateTime(2025, 5, 18),
@@ -26,7 +26,7 @@ class DispatchCubit extends Cubit<List<DispatchModel>> {
         despatchedBy: 'Suresh Nair',
       ),
       DispatchModel(
-        id: 'DB #1254',
+        id: 'DS #1254',
         contractorName: 'Royal Builders',
         siteAddress: 'Ernakulam, Kerala',
         date: DateTime(2025, 5, 17),
@@ -35,7 +35,7 @@ class DispatchCubit extends Cubit<List<DispatchModel>> {
         despatchedBy: 'Anil Kumar',
       ),
       DispatchModel(
-        id: 'DB #1253',
+        id: 'DS #1253',
         contractorName: 'Greenfield Developers',
         siteAddress: 'Calicut, Kerala',
         date: DateTime(2025, 5, 16),

@@ -297,7 +297,7 @@ class _FormCard extends StatelessWidget {
                   SizedBox(height: Responsive.h(8)),
                   _BrandField(
                     focusNode: phoneFocus,
-                    hint: 'you@company.com',
+                    //hint: 'enter your email',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     onChanged: (v) =>
@@ -313,7 +313,7 @@ class _FormCard extends StatelessWidget {
                     builder: (context, s) {
                       return _BrandField(
                         focusNode: passwordFocus,
-                        hint: 'Enter your password',
+                        //hint: 'Enter your password',
                         icon: Icons.lock_outline_rounded,
                         obscureText: s.obscurePassword,
                         onChanged: (v) => context
@@ -401,7 +401,7 @@ class _FieldLabel extends StatelessWidget {
 
 class _BrandField extends StatefulWidget {
   final FocusNode focusNode;
-  final String hint;
+ // final String hint;
   final IconData icon;
   final bool obscureText;
   final TextInputType? keyboardType;
@@ -410,7 +410,7 @@ class _BrandField extends StatefulWidget {
 
   const _BrandField({
     required this.focusNode,
-    required this.hint,
+    //required this.hint,
     required this.icon,
     required this.onChanged,
     this.obscureText = false,
@@ -461,7 +461,7 @@ class _BrandFieldState extends State<_BrandField> {
         cursorColor: AppColors.primary,
         decoration: InputDecoration(
           isDense: true,
-          hintText: widget.hint,
+         // hintText: widget.hint,
           hintStyle: AppTextStyles.body(color: AppColors.textHint),
           prefixIcon: Padding(
             padding: const EdgeInsets.only(left: 4, right: 2),

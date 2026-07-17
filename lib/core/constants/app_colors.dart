@@ -8,12 +8,10 @@ class AppColors {
   static const Color primary =
   //Color(0xFFB87333);
   Color(0xFF770816);
-
-  //Color(0xFFE3121E); // main brand red
   static const Color primaryDark =
   //Color(0xFFB87333);
-  Color(0xFF770816);
-  //Color(0xFFB60F19); // pressed / gradient end
+   Color(0xFF770816);
+
   static const Color primaryLight = Color(0xFFFF4B54); // highlights / hover
   static const Color primarySoft = Color(0xFFDE8E9); // red tint backgrounds
   static const Color primarySoftss = Color(0xFF9AC0DD); // red tint backgrounds

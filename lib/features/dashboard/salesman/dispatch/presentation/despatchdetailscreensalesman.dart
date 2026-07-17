@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../../core/constants/app_colors.dart';
@@ -39,6 +40,7 @@ class SalesDepatchBillDetailScreen extends StatelessWidget {
     const deliveryAddress = 'kanhangad';
     const salesman = 'salesmanname';
     const despatchedAt = '12-10-2026';
+    const driverName = 'driver name';
     const delivered = false;
     const DateTime? deliveredAt = null;
     const grandTotal = 12500;
@@ -92,6 +94,8 @@ class SalesDepatchBillDetailScreen extends StatelessWidget {
                             _infoRow('Salesman', salesman),
                             SizedBox(height: Responsive.h(6)),
                             _infoRow('Despatched At', despatchedAt),
+                            SizedBox(height: Responsive.h(6)),
+                            _infoRow('Driver Name', driverName),
                           ],
                         ),
                       ),
@@ -164,6 +168,8 @@ class SalesDepatchBillDetailScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      SizedBox(height: Responsive.h(20)),
+                      const _SignatureBlock(),
                       SizedBox(height: Responsive.h(12)),
                     ],
                   ),
@@ -216,6 +222,29 @@ class _StatusBanner extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SignatureBlock extends StatelessWidget {
+  const _SignatureBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 60,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        SizedBox(height: Responsive.h(6)),
+        Text('Customer Signature', style: AppTextStyles.caption()),
+      ],
     );
   }
 }

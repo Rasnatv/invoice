@@ -3,6 +3,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../auth/presentation/login_screen.dart';
+import '../../salesman/profile/presentation/changepassword.dart';
 
 class OwnerProfileScreen extends StatelessWidget {
   const OwnerProfileScreen({super.key});
@@ -46,7 +47,11 @@ class OwnerProfileScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: Responsive.h(28)),
-            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'Change Password', onTap: () {}),
+            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'Change Password', onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+              );
+            }),
             _ProfileTile(
               icon: Icons.logout_rounded,
               label: 'Logout',
