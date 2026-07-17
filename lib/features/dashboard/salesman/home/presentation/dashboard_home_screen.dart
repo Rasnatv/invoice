@@ -1,0 +1,641 @@
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+import '../../../../../core/constants/app_colors.dart';
+import '../../../../../core/constants/app_text_styles.dart';
+import '../../../../../core/utils/responsive.dart';
+import '../../approvedbills/approvedbills.dart';
+import '../../contractors/estimates/cubit/estimates_cubit.dart';
+import '../../contractors/estimates/presentation/create_estimate_screen.dart';
+import '../../contractors/estimates/presentation/my_estimates_screen.dart';
+import '../../contractors/estimates/widgets/monthlysalechart.dart';
+import '../../incentive/salesmanincentivescreen.dart';
+import '../../quatation/quatationscreen.dart';
+import '../../quatation/quotationpreview.dart';
+import '../cubit/dashboard_cubit.dart';
+import '../widgets/recent_estimate_tile.dart';
+
+class DashboardHomeScreen extends StatelessWidget {
+  const DashboardHomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => DashboardCubit(),
+      child: const _DashboardHomeView(),
+    );
+  }
+}
+
+class _DashboardHomeView extends StatelessWidget {
+  const _DashboardHomeView();
+
+  void _openCreateEstimate(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => EstimatesCubit(),
+          child: const CreateEstimateScreen(),
+        ),
+      ),
+    );
+  }
+
+  void _openMyEstimates(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MyEstimatesScreen()),
+    );
+  }
+
+  void _openIncentives(BuildContext context, DashboardState state) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SalesmanIncentiveScreen(salesmanName: state.salesmanName),
+      ),
+    );
+  }
+  void _openApprovedBills(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ApprovedBills(),
+      ),
+    );
+  }
+  void _openQuotationBills(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const QuotationListScreen()
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Responsive.init(context);
+    final today = DateFormat('dd MMM yyyy, EEEE').format(DateTime.now());
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good Morning'
+        : hour < 17
+        ? 'Good Afternoon'
+        : 'Good Evening';
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: BlocBuilder<DashboardCubit, DashboardState>(
+        builder: (context, state) {
+          if (state.status == DashboardStatus.loading) {
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => context.read<DashboardCubit>().load(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _DashboardHeader(
+                    greeting: greeting,
+                    name: state.salesmanName,
+                    dateLabel: today,
+                    totalEstimates: state.totalEstimates,
+                    approved: state.approved,
+                    pending: state.pending,
+                    dispatchBills: state.dispatchBills,
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      SizedBox(height: Responsive.h(70)),
+                      _SectionTitle(title: 'Quick Actions'),
+                      SizedBox(height: Responsive.h(14)),
+                      _QuickActionsRow(
+                        onCreateEstimate: () => _openCreateEstimate(context),
+                        onMyEstimates: () => _openMyEstimates(context),
+                        onApprovedBills: () => _openApprovedBills(context),
+                        onIncentives: () => _openIncentives(context, state),
+                      ),
+                      SizedBox(height: Responsive.h(28)),
+                      _SectionTitle(title: 'Sales Overview'),
+                      SizedBox(height: Responsive.h(14)),
+                      _CardWrapper(
+                        child: MonthlySalesChart(data: state.monthlySales),
+                      ),
+                      SizedBox(height: Responsive.h(28)),
+                      _SectionTitle(
+                        title: 'Recent Estimates',
+                        actionLabel: 'View All',
+                        onAction: () => _openMyEstimates(context),
+                      ),
+                      SizedBox(height: Responsive.h(12)),
+                      if (state.recentEstimates.isEmpty)
+                        _EmptyState()
+                      else
+                        _CardWrapper(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: [
+                              for (int i = 0; i < state.recentEstimates.length; i++) ...[
+                                RecentEstimateTile(estimate: state.recentEstimates[i]),
+                                if (i != state.recentEstimates.length - 1)
+                                  Divider(
+                                    height: 1,
+                                    indent: Responsive.w(16),
+                                    endIndent: Responsive.w(16),
+                                    color: AppColors.textSecondary.withOpacity(0.1),
+                                  ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      SizedBox(height: Responsive.h(30)),
+                    ]),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------- HEADER ----------------
+
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({
+    required this.greeting,
+    required this.name,
+    required this.dateLabel,
+    required this.totalEstimates,
+    required this.approved,
+    required this.pending,
+    required this.dispatchBills,
+  });
+
+  final String greeting;
+  final String name;
+  final String dateLabel;
+  final int totalEstimates;
+  final int approved;
+  final int pending;
+  final int dispatchBills;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(
+            Responsive.w(20),
+            Responsive.h(20),
+            Responsive.w(20),
+            Responsive.h(46),
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(32),
+              bottomRight: Radius.circular(32),
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: 18),
+                      ),
+                    ),
+                    SizedBox(width: Responsive.w(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            greeting,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: Responsive.sp(12),
+                            ),
+                          ),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(17)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _HeaderIconButton(icon: Icons.notifications_none_rounded, onTap: () {}),
+                  ],
+                ),
+                SizedBox(height: Responsive.h(14)),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white.withOpacity(0.85)),
+                    SizedBox(width: Responsive.w(6)),
+                    Text(
+                      dateLabel,
+                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: Responsive.sp(12)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Floating stat card strip
+        Positioned(
+          left: Responsive.w(20),
+          right: Responsive.w(20),
+          bottom: -Responsive.h(60),
+          child:
+
+          Container(
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(8)),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.10),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.06),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _MiniStat(
+                    value: '$totalEstimates',
+                    label: 'Total',
+                    color: AppColors.primary,
+                    icon: Icons.description_rounded,
+                  ),
+                ),
+                _statDivider(),
+                Expanded(
+                  child: _MiniStat(
+                    value: '$approved',
+                    label: 'Approved',
+                    color: const Color(0xFF16A34A), // emerald
+                    icon: Icons.check_circle_rounded,
+                  ),
+                ),
+                _statDivider(),
+                Expanded(
+                  child: _MiniStat(
+                    value: '$pending',
+                    label: 'Pending',
+                    color: const Color(0xFFF59E0B), // amber
+                    icon: Icons.hourglass_bottom_rounded,
+                  ),
+                ),
+                _statDivider(),
+                Expanded(
+                  child: _MiniStat(
+                    value: '$dispatchBills',
+                    label: 'Dispatch',
+                    color: const Color(0xFF7C3AED), // violet
+                    icon: Icons.local_shipping_rounded,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statDivider() => Container(
+    width: 1,
+    height: 30,
+    color: AppColors.textSecondary.withOpacity(0.12),
+  );
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withOpacity(0.15),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(9),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.value,
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String value;
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        SizedBox(height: Responsive.h(6)),
+        Text(
+          value,
+          style: AppTextStyles.bodyBold(color: AppColors.black).copyWith(fontSize: Responsive.sp(16)),
+        ),
+        SizedBox(height: Responsive.h(2)),
+        Text(
+          label,
+          style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(10.5)),
+        ),
+      ],
+    );
+  }
+}
+
+
+
+// ---------------- SECTION TITLE ----------------
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title, this.actionLabel, this.onAction});
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.bodyBold(color: AppColors.black).copyWith(fontSize: Responsive.sp(16)),
+        ),
+        if (actionLabel != null)
+          GestureDetector(
+            onTap: onAction,
+            child: Text(
+              actionLabel!,
+              style: TextStyle(color: AppColors.primary, fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w600),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow({
+    required this.onCreateEstimate,
+    required this.onMyEstimates,
+    required this.onApprovedBills,
+    required this.onIncentives,
+  });
+
+  final VoidCallback onCreateEstimate;
+  final VoidCallback onMyEstimates;
+  final VoidCallback onApprovedBills;
+  final VoidCallback onIncentives;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <_QuickActionData>[
+      _QuickActionData(
+        icon: Icons.note_add_rounded,
+        label: 'New\nEstimate',
+        color: AppColors.primary,
+        onTap: onCreateEstimate,
+      ),
+      _QuickActionData(
+        icon: Icons.folder_copy_rounded,
+        label: 'My\nEstimates',
+        color: const Color(0xFF0EA5E9), // blue
+        onTap: onMyEstimates,
+      ),
+      _QuickActionData(
+        icon: Icons.local_shipping_rounded,
+        label: 'Approved\nBills',
+        color: const Color(0xFF16A34A), // green
+        onTap: onApprovedBills,
+      ),
+      _QuickActionData(
+        icon: Icons.receipt_long_rounded,
+        label: 'Quotation\nBills',
+        color: const Color(0xFFF59E0B), // amber
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const QuotationListScreen(),
+            ),
+          );
+        },
+      ),
+      _QuickActionData(
+        icon: Icons.currency_rupee_rounded,
+        label: 'Incentive',
+        color: const Color(0xFF7C3AED), // purple
+        onTap: onIncentives,
+      ),
+    ];
+
+    // A little extra height as headroom so text scaling / smaller devices
+    // don't push the content past the card bounds.
+    return SizedBox(
+      height: Responsive.h(100),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: actions.length,
+        separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
+        itemBuilder: (context, i) => SizedBox(
+          width: Responsive.w(84),
+          child: _QuickActionCard(
+            icon: actions[i].icon,
+            label: actions[i].label,
+            color: actions[i].color,
+            onTap: actions[i].onTap,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionData {
+  const _QuickActionData({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: Responsive.h(10), horizontal: Responsive.w(4)),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.textSecondary.withOpacity(0.10)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              SizedBox(height: Responsive.h(5)),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold(color: AppColors.black)
+                      .copyWith(fontSize: Responsive.sp(10.5), height: 1.1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _CardWrapper extends StatelessWidget {
+  const _CardWrapper({required this.child, this.padding});
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: padding ?? EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+// ---------------- EMPTY STATE ----------------
+
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return _CardWrapper(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: Responsive.h(24)),
+        child: Column(
+          children: [
+            Icon(Icons.description_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
+            Text(
+              'No recent estimates yet',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
