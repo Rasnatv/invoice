@@ -6,7 +6,7 @@
 // import '../../../../core/constants/app_text_styles.dart';
 // import '../../../../core/utils/responsive.dart';
 // import '../../../../core/widgets/primary_button.dart';
-//
+// import 'ownerdespatchsheet.dart';
 //
 // enum _DummyStatus { pending, dispatched, rejected }
 //
@@ -132,29 +132,17 @@
 // double _incentiveAmountFor(_DummyItem item) => item.amount * _dummyIncentivePercent / 100;
 //
 // // Dummy list of salesmen the owner can choose from when sending a
-// // quotation to the despatch sheet. Replace with a real API/cubit call
-// // (e.g. fetch active salesmen for the branch) once available.
+// // quotation to the despatch sheet. "Assigned to Me" lets the owner handle
+// // despatch themselves via OwnerDespatchSheetScreen instead of notifying a
+// // salesman. Replace with a real API/cubit call (e.g. fetch active
+// // salesmen for the branch) once available.
 // const List<String> _dummySalesmen = [
+//   'Assigned to Me',
 //   'Anoop Menon',
 //   'Ravi Kumar',
 //   'Sunitha Nair',
 //   'Vishnu Prasad',
 // ];
-//
-// // Dummy despatch info captured through the "Send to Despatch Sheet" dialog.
-// class _DespatchInfo {
-//   final String driverName;
-//   final String driverPhone;
-//   final DateTime despatchDate;
-//   final String assignedSalesman;
-//
-//   const _DespatchInfo({
-//     required this.driverName,
-//     required this.driverPhone,
-//     required this.despatchDate,
-//     required this.assignedSalesman,
-//   });
-// }
 //
 // class OwnerQuotationDetailsScreen extends StatefulWidget {
 //   const OwnerQuotationDetailsScreen({
@@ -206,8 +194,10 @@
 //     );
 //   }
 //
-//   // Set once the "Send to Despatch Sheet" dialog is confirmed.
-//   _DespatchInfo? _despatchInfo;
+//   // Set once despatch is confirmed — either by picking a salesman in the
+//   // dialog below, or by completing the Owner Despatch Sheet after picking
+//   // "Assigned to Me".
+//   DespatchInfo? _despatchInfo;
 //
 //   double get _incentiveTotal =>
 //       _quotation.items.fold(0.0, (s, item) => s + _incentiveAmountFor(item));
@@ -220,7 +210,9 @@
 //       ..writeln('Date: ${DateFormat('dd MMM yyyy').format(_quotation.date)}')
 //       ..writeln('---');
 //     for (final item in _quotation.items) {
-//       buffer.writeln('${item.name} (${item.company}) x ${item.quantity.toStringAsFixed(0)} ${item.unit} = ${currency.format(item.amount)}');
+//       buffer.writeln(
+//         '${item.name} (${item.company}) x ${item.quantity.toStringAsFixed(0)} ${item.unit} = ${currency.format(item.amount)}',
+//       );
 //     }
 //     buffer
 //       ..writeln('---')
@@ -228,26 +220,29 @@
 //     if (_despatchInfo != null) {
 //       buffer
 //         ..writeln('Despatched: ${DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate)}')
-//         ..writeln('Sent to Salesman: ${_despatchInfo!.assignedSalesman}')
-//         ..writeln('Driver: ${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})');
+//         ..writeln('Sent to Salesman: ${_despatchInfo!.assignedSalesman}');
+//       if (_despatchInfo!.driverName.isNotEmpty) {
+//         buffer.writeln('Driver: ${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})');
+//       }
 //     }
 //     return buffer.toString();
 //   }
 //
-//   // Opens a dialog collecting the salesman to send to, driver name,
-//   // driver phone, and despatch date, then "sends" the quotation to the
-//   // despatch sheet. Wire the TODO below to your real despatch API/cubit call.
+//   // Opens a dialog letting the owner pick who the quotation is sent to for
+//   // despatch. Picking "Assigned to Me" hands off straight to the Owner
+//   // Despatch Sheet (see _openOwnerDespatchSheet). Picking a real salesman
+//   // just records the intent for now — TODO(backend): wire this to a real
+//   // despatch/notification API once the despatch module has its own
+//   // model/cubit, so the chosen salesman actually gets notified and fills
+//   // in their own despatch sheet from their side.
 //   Future<void> _showSendToDespatchDialog() async {
-//     final driverNameController = TextEditingController(text: _despatchInfo?.driverName ?? '');
-//     final driverPhoneController = TextEditingController(text: _despatchInfo?.driverPhone ?? '');
-//     DateTime selectedDate = _despatchInfo?.despatchDate ?? DateTime.now();
 //     String? selectedSalesman = _despatchInfo?.assignedSalesman ?? widget.salesmanName ?? _quotation.salesmanName;
 //     if (!_dummySalesmen.contains(selectedSalesman)) {
 //       selectedSalesman = null;
 //     }
 //     final formKey = GlobalKey<FormState>();
 //
-//     final result = await showDialog<_DespatchInfo>(
+//     final result = await showDialog<String>(
 //       context: context,
 //       builder: (dialogContext) {
 //         return StatefulBuilder(
@@ -282,7 +277,6 @@
 //                         (value == null || value.isEmpty) ? 'Please select a salesman' : null,
 //                       ),
 //                       const SizedBox(height: 12),
-//
 //                     ],
 //                   ),
 //                 ),
@@ -295,14 +289,7 @@
 //                 ElevatedButton(
 //                   onPressed: () {
 //                     if (formKey.currentState!.validate()) {
-//                       Navigator.of(dialogContext).pop(
-//                         _DespatchInfo(
-//                           driverName: driverNameController.text.trim(),
-//                           driverPhone: driverPhoneController.text.trim(),
-//                           despatchDate: selectedDate,
-//                           assignedSalesman: selectedSalesman!,
-//                         ),
-//                       );
+//                       Navigator.of(dialogContext).pop(selectedSalesman);
 //                     }
 //                   },
 //                   child: const Text('Send'),
@@ -314,11 +301,62 @@
 //       },
 //     );
 //
+//     if (result == null) return;
+//
+//     if (result == 'Assigned to Me') {
+//       await _openOwnerDespatchSheet();
+//       return;
+//     }
+//
+//     // Sent to an actual salesman — just notify locally for now.
+//     setState(() {
+//       _despatchInfo =
+//
+//           DespatchInfo(
+//         driverName: '',
+//         driverPhone: '',
+//         despatchDate: DateTime.now(),
+//         assignedSalesman: result,
+//         deliveryAddress: _quotation.siteAddress,
+//       );
+//     });
+//     if (mounted) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Sent to $result for despatch')),
+//       );
+//     }
+//   }
+//
+//   // Pushes the owner's own, separate despatch sheet screen — distinct from
+//   // the salesman's DespatchSheetScreen (which is keyed off EstimateModel).
+//   // Passes the quotation's own data straight in, so no EstimateModel is
+//   // needed here.
+//   Future<void> _openOwnerDespatchSheet() async {
+//     final result = await Navigator.of(context).push<DespatchInfo>(
+//       MaterialPageRoute(
+//         builder: (_) => OwnerDespatchSheetScreen(
+//           quotationId: _quotation.id,
+//           contractorName: _quotation.contractorName,
+//           phone: _quotation.phone,
+//           siteAddress: _quotation.siteAddress,
+//           items: _quotation.items
+//               .map((i) => OwnerDespatchItem(
+//             name: i.name,
+//             company: i.company,
+//             size: i.size,
+//             quantity: i.quantity,
+//             unit: i.unit,
+//           ))
+//               .toList(),
+//         ),
+//       ),
+//     );
+//
 //     if (result != null) {
 //       setState(() => _despatchInfo = result);
 //       if (mounted) {
 //         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Sent to ${result.assignedSalesman} for despatch')),
+//           const SnackBar(content: Text('Despatch sheet completed')),
 //         );
 //       }
 //     }
@@ -380,7 +418,15 @@
 //                           _InfoRow(label: 'Salesman', value: _quotation.salesmanName),
 //                         if (_despatchInfo != null) ...[
 //                           _InfoRow(label: 'Sent To', value: _despatchInfo!.assignedSalesman),
-//                           _InfoRow(label: 'Driver', value: '${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})'),
+//                           if (_despatchInfo!.driverName.isNotEmpty)
+//                             _InfoRow(
+//                               label: 'Driver',
+//                               value: _despatchInfo!.driverPhone.isEmpty
+//                                   ? _despatchInfo!.driverName
+//                                   : '${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})',
+//                             ),
+//                           if (_despatchInfo!.deliveryAddress.isNotEmpty)
+//                             _InfoRow(label: 'Delivery Address', value: _despatchInfo!.deliveryAddress),
 //                           _InfoRow(
 //                             label: 'Despatch Date',
 //                             value: DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate),
@@ -576,7 +622,7 @@
 //                   Expanded(
 //                     child: PrimaryButton(
 //                       label: _despatchInfo == null
-//                           ? 'Send to Despatch Sheet'
+//                           ? 'Approve & Send to Despatch '
 //                           : 'Sent to ${_despatchInfo!.assignedSalesman}',
 //                       height: 48,
 //                       onPressed: _showSendToDespatchDialog,
@@ -700,6 +746,10 @@ class _DummyItem {
 
 class _DummyQuotation {
   final String id;
+  // NEW: Party Name / Address — the top "Party Name" + "Address" block on
+  // the sheet, separate from the Contractor block further down.
+  final String partyName;
+  final String partyAddress;
   final String contractorName;
   final String siteAddress;
   final String phone;
@@ -707,10 +757,14 @@ class _DummyQuotation {
   final DateTime date;
   final _DummyStatus status;
   final double handlingCharge;
+  // NEW: total square footage — shown as "Total Sqrft" on the sheet.
+  final double totalSqrft;
   final List<_DummyItem> items;
 
   const _DummyQuotation({
     required this.id,
+    required this.partyName,
+    required this.partyAddress,
     required this.contractorName,
     required this.siteAddress,
     required this.phone,
@@ -718,6 +772,7 @@ class _DummyQuotation {
     required this.date,
     required this.status,
     required this.handlingCharge,
+    required this.totalSqrft,
     required this.items,
   });
 
@@ -728,6 +783,8 @@ class _DummyQuotation {
   static _DummyQuotation sample() {
     return _DummyQuotation(
       id: 'QUO-2087',
+      partyName: 'Ramesh Constructions',
+      partyAddress: 'No. 24, Palace Road, Kanhangad',
       contractorName: 'Ramesh Constructions',
       siteAddress: 'No. 24, Palace Road, Kanhangad',
       phone: '+91 98765 43210',
@@ -735,6 +792,7 @@ class _DummyQuotation {
       date: DateTime.now(),
       status: _DummyStatus.pending,
       handlingCharge: 250,
+      totalSqrft: 1000,
       items: const [
         _DummyItem(
           name: 'PVC Pipe',
@@ -768,16 +826,10 @@ class _DummyQuotation {
   }
 }
 
-// Placeholder incentive % — same dummy pattern used elsewhere in the app.
 const double _dummyIncentivePercent = 5.0;
 
 double _incentiveAmountFor(_DummyItem item) => item.amount * _dummyIncentivePercent / 100;
 
-// Dummy list of salesmen the owner can choose from when sending a
-// quotation to the despatch sheet. "Assigned to Me" lets the owner handle
-// despatch themselves via OwnerDespatchSheetScreen instead of notifying a
-// salesman. Replace with a real API/cubit call (e.g. fetch active
-// salesmen for the branch) once available.
 const List<String> _dummySalesmen = [
   'Assigned to Me',
   'Anoop Menon',
@@ -811,9 +863,6 @@ class OwnerQuotationDetailsScreen extends StatefulWidget {
 class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScreen> {
   late final _quotation = _buildQuotation();
 
-  // Merges whatever was passed in from the list screen on top of the
-  // sample data. Once a real "get quotation by id" call exists, replace
-  // this whole method with that API/cubit call keyed on widget.quotationId.
   _DummyQuotation _buildQuotation() {
     final base = _DummyQuotation.sample();
     if (widget.quotationId == null) return base;
@@ -825,6 +874,8 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
 
     return _DummyQuotation(
       id: widget.quotationId!,
+      partyName: widget.customerName ?? base.partyName,
+      partyAddress: base.partyAddress,
       contractorName: widget.customerName ?? base.contractorName,
       siteAddress: base.siteAddress,
       phone: widget.customerPhone ?? base.phone,
@@ -832,6 +883,7 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
       date: widget.date ?? base.date,
       status: base.status,
       handlingCharge: targetHandling,
+      totalSqrft: base.totalSqrft,
       items: base.items,
     );
   }
@@ -844,11 +896,13 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
   double get _incentiveTotal =>
       _quotation.items.fold(0.0, (s, item) => s + _incentiveAmountFor(item));
 
-  String _buildShareText(NumberFormat currency) {
+  String _buildShareText(NumberFormat currency, NumberFormat number) {
     final buffer = StringBuffer()
       ..writeln('Quotation ${_quotation.id}')
-      ..writeln('Party: ${_quotation.contractorName}')
-      ..writeln('Address: ${_quotation.siteAddress}')
+      ..writeln('Party Name: ${_quotation.partyName}')
+      ..writeln('Party Address: ${_quotation.partyAddress}')
+      ..writeln('Contractor: ${_quotation.contractorName}')
+      ..writeln('Site Address: ${_quotation.siteAddress}')
       ..writeln('Date: ${DateFormat('dd MMM yyyy').format(_quotation.date)}')
       ..writeln('---');
     for (final item in _quotation.items) {
@@ -859,6 +913,11 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
     buffer
       ..writeln('---')
       ..writeln('Total: ${currency.format(_quotation.totalAmount)}');
+    if (_quotation.salesmanName.isNotEmpty) {
+      buffer.writeln('Salesman: ${_quotation.salesmanName}');
+    }
+    // NEW: total sqrft in the shared summary.
+    buffer.writeln('Total Sqrft: ${number.format(_quotation.totalSqrft)}');
     if (_despatchInfo != null) {
       buffer
         ..writeln('Despatched: ${DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate)}')
@@ -870,13 +929,7 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
     return buffer.toString();
   }
 
-  // Opens a dialog letting the owner pick who the quotation is sent to for
-  // despatch. Picking "Assigned to Me" hands off straight to the Owner
-  // Despatch Sheet (see _openOwnerDespatchSheet). Picking a real salesman
-  // just records the intent for now — TODO(backend): wire this to a real
-  // despatch/notification API once the despatch module has its own
-  // model/cubit, so the chosen salesman actually gets notified and fills
-  // in their own despatch sheet from their side.
+
   Future<void> _showSendToDespatchDialog() async {
     String? selectedSalesman = _despatchInfo?.assignedSalesman ?? widget.salesmanName ?? _quotation.salesmanName;
     if (!_dummySalesmen.contains(selectedSalesman)) {
@@ -955,12 +1008,12 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
       _despatchInfo =
 
           DespatchInfo(
-        driverName: '',
-        driverPhone: '',
-        despatchDate: DateTime.now(),
-        assignedSalesman: result,
-        deliveryAddress: _quotation.siteAddress,
-      );
+            driverName: '',
+            driverPhone: '',
+            despatchDate: DateTime.now(),
+            assignedSalesman: result,
+            deliveryAddress: _quotation.siteAddress,
+          );
     });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -969,10 +1022,7 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
     }
   }
 
-  // Pushes the owner's own, separate despatch sheet screen — distinct from
-  // the salesman's DespatchSheetScreen (which is keyed off EstimateModel).
-  // Passes the quotation's own data straight in, so no EstimateModel is
-  // needed here.
+
   Future<void> _openOwnerDespatchSheet() async {
     final result = await Navigator.of(context).push<DespatchInfo>(
       MaterialPageRoute(
@@ -1053,11 +1103,16 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
                         SizedBox(height: Responsive.h(4)),
                         Text(date, style: AppTextStyles.caption()),
                         const Divider(height: 28),
+                        // NEW: Party Name / Address block.
+                        _InfoRow(label: 'Party Name', value: _quotation.partyName),
+                        _InfoRow(label: 'Party Address', value: _quotation.partyAddress),
                         _InfoRow(label: 'Contractor', value: _quotation.contractorName),
                         _InfoRow(label: 'Site Address', value: _quotation.siteAddress),
-                        _InfoRow(label: 'Phone', value: _quotation.phone),
+                        _InfoRow(label: 'Contractor Phone', value: _quotation.phone),
                         if (_quotation.salesmanName.isNotEmpty)
                           _InfoRow(label: 'Salesman', value: _quotation.salesmanName),
+                        // NEW: total square footage ("Total Sqrft" on the sheet).
+                        // _InfoRow(label: 'Total Sqrft', value: number.format(_quotation.totalSqrft)),
                         if (_despatchInfo != null) ...[
                           _InfoRow(label: 'Sent To', value: _despatchInfo!.assignedSalesman),
                           if (_despatchInfo!.driverName.isNotEmpty)
@@ -1182,6 +1237,15 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
                             Text(currency.format(_quotation.handlingCharge), style: AppTextStyles.body()),
                           ],
                         ),
+                        SizedBox(height: Responsive.h(6)),
+                        // NEW: Total Sqrft also shown in the bottom summary.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Total Sqrft', style: AppTextStyles.body()),
+                            Text(number.format(_quotation.totalSqrft), style: AppTextStyles.body()),
+                          ],
+                        ),
                         const Divider(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1252,7 +1316,7 @@ class _OwnerQuotationDetailsScreenState extends State<OwnerQuotationDetailsScree
                     icon: Icons.share_outlined,
                     tooltip: 'Share',
                     onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: _buildShareText(currency)));
+                      await Clipboard.setData(ClipboardData(text: _buildShareText(currency, number)));
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Quotation summary copied to clipboard')),

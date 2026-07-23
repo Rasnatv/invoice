@@ -5,6 +5,7 @@ import '../../../../../core/constants/app_text_styles.dart';
 import '../../../../../core/utils/responsive.dart';
 import '../../../../auth/presentation/login_screen.dart';
 import 'changepassword.dart';
+import 'mybills.dart';
 
 
 class ProfileScreen extends StatelessWidget {
@@ -57,6 +58,11 @@ class ProfileScreen extends StatelessWidget {
             _ProfileTile(icon: Icons.lock_outline_rounded, label: 'Change Password', onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+              );
+            },),
+            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'My Bills', onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MyBills()),
               );
             },),
             _ProfileTile(

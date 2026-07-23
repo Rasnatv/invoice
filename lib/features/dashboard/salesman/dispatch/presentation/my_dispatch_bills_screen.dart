@@ -32,11 +32,6 @@ class _DispatchView extends StatelessWidget {
         title:  Text('My Dispatch Bills',style: AppTextStyles.h6()),
         actions: [IconButton(onPressed: () {}, icon: const Icon(Icons.filter_list_rounded))],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        onPressed: () {},
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
       body: SafeArea(
         child: Column(
           children: [

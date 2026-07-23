@@ -5,14 +5,13 @@ import '../../../../../../core/model/estimate_model.dart';
 import '../../../../../../models/estimate_model.dart';
 
 
-const kEstimateFilters = ['All', 'Pending', 'Approved', 'Rejected', 'My bills'];
 
-class EstimatesState extends Equatable {
+class billEstimatesState extends Equatable {
   final List<EstimateModel> all;
   final String activeFilter;
   final String query;
 
-  const EstimatesState({this.all = const [], this.activeFilter = 'All', this.query = ''});
+  const billEstimatesState({this.all = const [], this.activeFilter = 'All', this.query = ''});
 
   List<EstimateModel> get filtered {
     var list = all;
@@ -30,8 +29,8 @@ class EstimatesState extends Equatable {
     return list;
   }
 
-  EstimatesState copyWith({List<EstimateModel>? all, String? activeFilter, String? query}) {
-    return EstimatesState(
+  billEstimatesState copyWith({List<EstimateModel>? all, String? activeFilter, String? query}) {
+    return billEstimatesState(
       all: all ?? this.all,
       activeFilter: activeFilter ?? this.activeFilter,
       query: query ?? this.query,
@@ -42,22 +41,21 @@ class EstimatesState extends Equatable {
   List<Object?> get props => [all, activeFilter, query];
 }
 
-class EstimatesCubit extends Cubit<EstimatesState> {
-  EstimatesCubit() : super(const EstimatesState()) {
+class billEstimatesCubit extends Cubit<billEstimatesState> {
+  billEstimatesCubit() : super(const billEstimatesState()) {
     _loadMock();
   }
 
   void _loadMock() {
     emit(state.copyWith(all: [
       EstimateModel(
-        id: '#2546',
+        id: 'EstNo.001',
         contractorName: 'ABC Builders',
         siteAddress: 'Trivandrum, Kerala',
         phone: '+91 98765 43210',
         salesmanName: 'Rahul Kumar',
         salesmanMobile: '+91 90000 11122',
         date: DateTime(2025, 5, 20),
-        status: 'Pending',
         billType: EstimateBillType.billed,
         handlingCharge: 2000,
         items: const [
@@ -84,33 +82,31 @@ class EstimatesCubit extends Cubit<EstimatesState> {
         ],
       ),
       EstimateModel(
-        id: '#2545',
+        id: 'EstNo.002',
         contractorName: 'Skyline Constructions',
         siteAddress: 'Kottayam, Kerala',
         phone: '+91 87654 32109',
         salesmanName: 'Rahul Kumar',
         date: DateTime(2025, 5, 19),
-        status: 'Approved',
         billType: EstimateBillType.billed,
       ),
       EstimateModel(
-        id: '#2544',
+        id: 'EstNo.003',
         contractorName: 'Royal Builders',
         siteAddress: 'Ernakulam, Kerala',
         phone: '+91 76543 21098',
         salesmanName: 'Rahul Kumar',
         date: DateTime(2025, 5, 18),
-        status: 'Rejected',
         billType: EstimateBillType.billed,
       ),
       EstimateModel(
-        id: '#2543',
+        id: 'EstNo.004',
         contractorName: 'Greenfield Developers',
         siteAddress: 'Calicut, Kerala',
         phone: '+91 65432 10987',
         salesmanName: 'Rahul Kumar',
         date: DateTime(2025, 5, 17),
-        status: 'Draft',
+
         billType: EstimateBillType.quotation,
       ),
     ]));
@@ -138,9 +134,6 @@ class EstimatesCubit extends Cubit<EstimatesState> {
       all: state.all.map((e) => e.id == updated.id ? updated : e).toList(),
     ));
   }
-
-  /// Called from the estimate preview when the user sends a saved
-  /// Quotation on to Admin for approval.
   void sendForApproval(String estimateId) {
     emit(state.copyWith(
       all: state.all.map((e) {

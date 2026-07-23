@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
-import '../contractors/estimates/cubit/estimates_cubit.dart';
+import '../estimates/cubit/estimates_cubit.dart';
 import '../home/widgets/recent_estimate_tile.dart';
 import 'approved detailpage.dart';
 

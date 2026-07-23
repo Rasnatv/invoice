@@ -349,7 +349,7 @@ class _FormCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Enter verification code', style: AppTextStyles.h1()),
+          Text('Enter verification code', style: AppTextStyles.h2()),
           SizedBox(height: Responsive.h(4)),
           Text(
             'Enter the 6-digit code we sent to your email.',

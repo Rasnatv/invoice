@@ -1,9 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../models/dispatch_model.dart';
 
-
-/// Holds the "My Dispatch Bills" list. Mocked here; swap for a
-/// repository fetch when a backend is available.
 class DispatchCubit extends Cubit<List<DispatchModel>> {
   DispatchCubit() : super([]) {
     emit([

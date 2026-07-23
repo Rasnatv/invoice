@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../core/utils/responsive.dart';
-import '../../../home/widgets/recent_estimate_tile.dart';
+import '../../home/widgets/recent_estimate_tile.dart';
 import '../cubit/estimates_cubit.dart';
 import 'create_estimate_screen.dart';
 import 'estimate_details_screen.dart';
@@ -30,20 +30,8 @@ class _MyEstimatesView extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title:  Text('My Estimates',style: AppTextStyles.h6(),),
-        actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.filter_list_rounded)),
-        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        onPressed: () async {
-          final cubit = context.read<EstimatesCubit>();
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => BlocProvider.value(value: cubit, child: const CreateEstimateScreen())),
-          );
-        },
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+
       body: SafeArea(
         child: Column(
           children: [

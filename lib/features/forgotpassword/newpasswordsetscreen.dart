@@ -3,13 +3,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 
-/// Shown after a successful password reset. Mirrors the brand header/card
-/// language of LoginScreen and OtpVerificationScreen, with a check-mark
-/// badge and a single CTA back to sign-in.
-///
-/// By default the CTA pops every route back to the first one on the stack
-/// (typically LoginScreen). Pass [onContinue] to override that behavior,
-/// e.g. `Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false)`.
 class ResetSuccessScreen extends StatefulWidget {
   final VoidCallback? onContinue;
 
@@ -131,8 +124,6 @@ class _ResetSuccessScreenState extends State<ResetSuccessScreen>
   }
 }
 
-/// Circular gradient badge with a check mark and a soft glow — the
-/// screen's focal point.
 class _SuccessBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -164,7 +155,6 @@ class _SuccessBadge extends StatelessWidget {
   }
 }
 
-/// Primary CTA — matches LoginScreen's button.
 class _BrandButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;

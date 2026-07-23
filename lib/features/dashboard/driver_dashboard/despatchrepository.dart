@@ -1,12 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'driverdespatchbillmodel.dart';
 
-/// In-memory store of despatched bills, shared by the Driver Dashboard and
-/// (eventually) the Owner/Salesman despatch flow.
-///
-/// TODO(backend): replace this whole class with a real repository backed by
-/// your API/DB once the despatch module exists. Everything below is dummy
-/// data purely so the Driver Dashboard UI has something to render.
 class DespatchRepository extends ChangeNotifier {
   DespatchRepository._internal() {
     _seedDummyData();

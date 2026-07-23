@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -6,9 +7,6 @@ import 'newpasswordsetscreen.dart';
 import 'otpverficationscreen.dart';
 
 
-/// Forgot-password screen — same brand header + elevated card language as
-/// LoginScreen. Collects an email/phone and (in this UI-only version)
-/// simulates sending a reset code before pushing OtpVerificationScreen.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -268,12 +266,13 @@ class _FormCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Reset your password', style: AppTextStyles.h1()),
+            Text('Reset your password', style: AppTextStyles.h2()),
             SizedBox(height: Responsive.h(4)),
             Text(
-              'Enter the email linked to your account and '
-                  "we'll send you a 6-digit verification code.",
+              "Enter your email to get a reset code.",
               style: AppTextStyles.subtitle(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             SizedBox(height: Responsive.h(26)),
 
@@ -286,12 +285,10 @@ class _FormCard extends StatelessWidget {
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return 'Email is required';
-                }
+                final value = v?.trim() ?? '';
                 final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                if (!emailRegex.hasMatch(v.trim())) {
-                  return 'Enter a valid email address';
+                if (value.isEmpty || !emailRegex.hasMatch(value)) {
+                  return 'Invalid email';
                 }
                 return null;
               },
@@ -374,50 +371,79 @@ class _BrandFieldState extends State<_BrandField> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _focused ? AppColors.primary : AppColors.border,
-          width: _focused ? 1.6 : 1.2,
-        ),
-      ),
-      child: TextFormField(
-        controller: widget.controller,
-        focusNode: widget.focusNode,
-        obscureText: widget.obscureText,
-        keyboardType: widget.keyboardType,
-        onChanged: widget.onChanged,
-        validator: widget.validator,
-        style: AppTextStyles.body(color: AppColors.textPrimary),
-        cursorColor: AppColors.primary,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: widget.hint,
-          hintStyle: AppTextStyles.body(color: AppColors.textHint),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 4, right: 2),
-            child: Icon(
-              widget.icon,
-              color: _focused ? AppColors.primary : AppColors.textHint,
-              size: 19,
+    // FormField manages only the validation state here — the red border
+    // wraps just the input box, and the error message is rendered as a
+    // separate line underneath it (outside the border), not inside it.
+    return FormField<String>(
+      initialValue: widget.controller?.text ?? '',
+      validator: widget.validator,
+      builder: (field) {
+        final hasError = field.hasError;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: hasError
+                      ? AppColors.error
+                      : (_focused ? AppColors.primary : AppColors.border),
+                  width: (_focused || hasError) ? 1.6 : 1.2,
+                ),
+              ),
+              child: TextField(
+                controller: widget.controller,
+                focusNode: widget.focusNode,
+                obscureText: widget.obscureText,
+                keyboardType: widget.keyboardType,
+                onChanged: (v) {
+                  field.didChange(v);
+                  widget.onChanged?.call(v);
+                },
+                style: AppTextStyles.body(color: AppColors.textPrimary),
+                cursorColor: AppColors.primary,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: widget.hint,
+                  hintStyle: AppTextStyles.body(color: AppColors.textHint),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 4, right: 2),
+                    child: Icon(
+                      widget.icon,
+                      color: hasError
+                          ? AppColors.error
+                          : (_focused ? AppColors.primary : AppColors.textHint),
+                      size: 19,
+                    ),
+                  ),
+                  prefixIconConstraints:
+                  const BoxConstraints(minWidth: 40, minHeight: 20),
+                  suffixIcon: widget.suffix,
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding:
+                  const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
+                ),
+              ),
             ),
-          ),
-          prefixIconConstraints:
-          const BoxConstraints(minWidth: 40, minHeight: 20),
-          suffixIcon: widget.suffix,
-          filled: false,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          errorStyle: AppTextStyles.caption(color: AppColors.error),
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
-        ),
-      ),
+            if (hasError) ...[
+              SizedBox(height: Responsive.h(6)),
+              Text(
+                field.errorText!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption(color: AppColors.error),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

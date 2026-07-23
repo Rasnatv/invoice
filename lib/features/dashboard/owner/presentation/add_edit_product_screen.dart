@@ -22,10 +22,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   late final _mrpCtrl = TextEditingController(text: widget.product?.mrp.toStringAsFixed(0) ?? '');
   late final _rateCtrl = TextEditingController(text: widget.product?.rate.toStringAsFixed(0) ?? '');
   late final _incentiveCtrl = TextEditingController(text: widget.product?.incentivePercent.toStringAsFixed(1) ?? '');
-  late final _tier1TargetCtrl = TextEditingController(text: widget.product?.tier1AnnualTarget.toStringAsFixed(0) ?? '100000');
-  late final _tier1BonusCtrl = TextEditingController(text: widget.product?.tier1BonusPercent.toStringAsFixed(1) ?? '1');
-  late final _tier2TargetCtrl = TextEditingController(text: widget.product?.tier2AnnualTarget.toStringAsFixed(0) ?? '200000');
-  late final _tier2BonusCtrl = TextEditingController(text: widget.product?.tier2BonusPercent.toStringAsFixed(1) ?? '2');
+
 
   bool get _isEditing => widget.product != null;
 
@@ -37,10 +34,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       _mrpCtrl,
       _rateCtrl,
       _incentiveCtrl,
-      _tier1TargetCtrl,
-      _tier1BonusCtrl,
-      _tier2TargetCtrl,
-      _tier2BonusCtrl,
+
     ]) {
       c.dispose();
     }
@@ -60,10 +54,6 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       mrp: double.tryParse(_mrpCtrl.text) ?? 0,
       rate: double.tryParse(_rateCtrl.text) ?? 0,
       incentivePercent: double.tryParse(_incentiveCtrl.text) ?? 0,
-      tier1AnnualTarget: double.tryParse(_tier1TargetCtrl.text) ?? 100000,
-      tier1BonusPercent: double.tryParse(_tier1BonusCtrl.text) ?? 1,
-      tier2AnnualTarget: double.tryParse(_tier2TargetCtrl.text) ?? 200000,
-      tier2BonusPercent: double.tryParse(_tier2BonusCtrl.text) ?? 2,
     );
     if (_isEditing) {
       context.read<OwnerCubit>().updateProduct(product);
@@ -148,40 +138,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             style: AppTextStyles.caption(),
           ),
           SizedBox(height: Responsive.h(10)),
-          Row(
-            children: [
-              Expanded(
-                child: LabeledField(
-                  label: 'Tier 1 Target (₹)',
-                  field: CustomTextField(hint: '1,00,000', icon: Icons.flag_outlined, keyboardType: TextInputType.number, controller: _tier1TargetCtrl),
-                ),
-              ),
-              SizedBox(width: Responsive.w(10)),
-              Expanded(
-                child: LabeledField(
-                  label: 'Tier 1 Bonus %',
-                  field: CustomTextField(hint: '1', icon: Icons.add_chart, keyboardType: TextInputType.number, controller: _tier1BonusCtrl),
-                ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: LabeledField(
-                  label: 'Tier 2 Target (₹)',
-                  field: CustomTextField(hint: '2,00,000', icon: Icons.flag_circle_outlined, keyboardType: TextInputType.number, controller: _tier2TargetCtrl),
-                ),
-              ),
-              SizedBox(width: Responsive.w(10)),
-              Expanded(
-                child: LabeledField(
-                  label: 'Tier 2 Bonus %',
-                  field: CustomTextField(hint: '2', icon: Icons.add_chart, keyboardType: TextInputType.number, controller: _tier2BonusCtrl),
-                ),
-              ),
-            ],
-          ),
+
           SizedBox(height: Responsive.h(20)),
           PrimaryButton(label: _isEditing ? 'Update Product' : 'Save Product', height: 48, onPressed: _save),
           SizedBox(height: Responsive.h(20)),

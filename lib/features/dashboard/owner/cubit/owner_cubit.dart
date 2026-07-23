@@ -216,10 +216,6 @@ final List<ProductIncentiveModel> _dummyProducts = [
     mrp: 65,
     rate: 55,
     incentivePercent: 5,
-    tier1AnnualTarget: 100000,
-    tier1BonusPercent: 1,
-    tier2AnnualTarget: 200000,
-    tier2BonusPercent: 2,
   ),
   const ProductIncentiveModel(
     id: 'p2',
@@ -228,10 +224,7 @@ final List<ProductIncentiveModel> _dummyProducts = [
     mrp: 48,
     rate: 40,
     incentivePercent: 4,
-    tier1AnnualTarget: 100000,
-    tier1BonusPercent: 1,
-    tier2AnnualTarget: 200000,
-    tier2BonusPercent: 1.5,
+
   ),
   const ProductIncentiveModel(
     id: 'p3',
@@ -240,10 +233,7 @@ final List<ProductIncentiveModel> _dummyProducts = [
     mrp: 320,
     rate: 280,
     incentivePercent: 3,
-    tier1AnnualTarget: 100000,
-    tier1BonusPercent: 0.5,
-    tier2AnnualTarget: 200000,
-    tier2BonusPercent: 1,
+
   ),
 ];
 

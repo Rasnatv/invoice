@@ -6,7 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../models/estimate_model.dart';
-import '../../salesman/contractors/estimates/cubit/estimates_cubit.dart';
+import '../../salesman/estimates/cubit/estimates_cubit.dart';
 import '../cubit/owner_cubit.dart';
 import '../widgets/monthlysale.dart';
 import 'owner_driverpage.dart';

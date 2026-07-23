@@ -19,15 +19,7 @@ class DriverDashboardScreen extends StatefulWidget {
 
   final String driverName;
 
-  /// TODO(auth): wire this to the real sign-out flow (clear session/token)
-  /// once auth exists. If not provided, this defaults to navigating to
-  /// LoginScreen and clearing the nav stack.
   final VoidCallback? onLogout;
-
-  /// TODO(auth): wire this to the real "change password" API call once auth
-  /// exists. Receives (currentPassword, newPassword) and should return/throw
-  /// to signal success/failure. If not provided, the dialog simulates a
-  /// successful update locally.
   final Future<void> Function(String currentPassword, String newPassword)?
   onChangePassword;
 

@@ -115,34 +115,121 @@ class _SalesmanIncentiveScreenState extends State<SalesmanIncentiveScreen> {
   double get _totalIncentiveEarned => _dummyProductIncentives.fold(0.0, (s, p) => s + p.incentiveEarned);
   double get _totalIncentiveTarget => _totalIncentiveEarned + _dummyPendingIncentive;
 
-  bool _isSameMonth(DateTime a, DateTime b) => a.year == b.year && a.month == b.month;
-
+  /// Opens a Year + Month picker.
+  /// - Defaults to the currently selected month/year (today, initially).
+  /// - Year is changed with arrows (no giant scrolling list of months).
+  /// - Months for the current year that are in the future are disabled.
   Future<void> _pickMonth() async {
     final now = DateTime.now();
-    final months = List.generate(12, (i) => DateTime(now.year, now.month - i, 1));
+    int pickedYear = _selectedMonth.year;
+
     final picked = await showModalBottomSheet<DateTime>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: months
-              .map(
-                (m) => ListTile(
-              title: Text(DateFormat('MMMM yyyy').format(m)),
-              trailing: _isSameMonth(m, _selectedMonth)
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () => Navigator.of(context).pop(m),
-            ),
-          )
-              .toList(),
-        ),
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final isCurrentYear = pickedYear == now.year;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Little drag handle
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+
+                    // ---- Year selector ----
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left_rounded),
+                          onPressed: () => setModalState(() => pickedYear--),
+                        ),
+                        SizedBox(
+                          width: 90,
+                          child: Text(
+                            '$pickedYear',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(18)),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right_rounded),
+                          onPressed: isCurrentYear ? null : () => setModalState(() => pickedYear++),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: Responsive.h(14)),
+
+                    // ---- Month grid for the selected year ----
+                    GridView.count(
+                      crossAxisCount: 3,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 2.4,
+                      children: List.generate(12, (i) {
+                        final m = i + 1;
+                        final isFuture = isCurrentYear && m > now.month;
+                        final isSelected = pickedYear == _selectedMonth.year && m == _selectedMonth.month;
+                        final label = DateFormat('MMM').format(DateTime(pickedYear, m));
+
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: isFuture ? null : () => Navigator.of(ctx).pop(DateTime(pickedYear, m, 1)),
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : isFuture
+                                  ? AppColors.border.withOpacity(0.25)
+                                  : AppColors.border.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: isSelected
+                                  ? null
+                                  : Border.all(color: AppColors.border.withOpacity(0.6)),
+                            ),
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: Responsive.sp(13.5),
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : isFuture
+                                    ? AppColors.textSecondary.withOpacity(0.4)
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
+
     if (picked != null) setState(() => _selectedMonth = picked);
   }
 
@@ -248,9 +335,6 @@ class _SalesmanIncentiveScreenState extends State<SalesmanIncentiveScreen> {
   }
 }
 
-// =====================================================================
-// HEADER + FLOATING SUMMARY CARD
-// =====================================================================
 
 class _IncentiveHeader extends StatelessWidget {
   const _IncentiveHeader({
@@ -651,8 +735,7 @@ class _TargetProgressCard extends StatelessWidget {
                     ),
                     SizedBox(width: Responsive.w(8)),
                     Text(
-                      '${(fraction * 100).toStringAsFixed(fraction * 100 == fraction * 100 ~/ 1 ? 0 : 2)}%',
-                      style: AppTextStyles.h3(color: color),
+                      'Rs:8000'
                     ),
                   ],
                 ),

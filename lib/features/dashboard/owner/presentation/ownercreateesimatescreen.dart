@@ -7,7 +7,8 @@ import '../../../../core/utils/responsive.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../models/estimate_model.dart';
-import '../../salesman/contractors/estimates/cubit/estimates_cubit.dart';
+import '../../salesman/estimates/cubit/estimates_cubit.dart';
+
 
 /// One added item in the estimate. Plain data (not controllers) since items
 /// are added one at a time via a form, then shown as a read-only list.

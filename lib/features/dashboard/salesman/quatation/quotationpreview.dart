@@ -11,9 +11,6 @@ class QuotationPreviewScreen extends StatelessWidget {
 
   final EstimateModel estimate;
 
-  // TODO(admin-config): incentive % is a hardcoded dummy value for UI
-  // purposes only, same placeholder used across Create Estimate. Replace
-  // once the backend/admin panel exposes a real per-product incentive %.
   static const double _dummyIncentivePercent = 5.0;
 
   double _itemIncentive(EstimateItem item) =>
@@ -217,6 +214,8 @@ class QuotationPreviewScreen extends StatelessWidget {
                         _totalRow('Total Qty', number.format(estimate.totalQuantity)),
                         SizedBox(height: Responsive.h(6)),
                         _totalRow('MRP Total', currency.format(estimate.mrpTotal)),
+                        SizedBox(height: Responsive.h(6)),
+                        _totalRow('Total Sqrft', currency.format(estimate.handlingCharge)),
                         SizedBox(height: Responsive.h(6)),
                         _totalRow('Handling Charge', currency.format(estimate.handlingCharge)),
                         const Divider(height: 20),

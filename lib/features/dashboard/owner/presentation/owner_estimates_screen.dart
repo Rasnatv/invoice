@@ -286,17 +286,6 @@ class _OwnerEstimatesScreenState extends State<OwnerEstimatesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Estimates', style: AppTextStyles.h6())),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const OwnerCreateEstimateScreen(),
-            ),
-          );
-        },
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
       body: SafeArea(
         child: Column(
           children: [

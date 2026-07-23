@@ -1,9 +1,5 @@
 import '../../../../models/estimate_model.dart';
 
-/// Dummy quotations for UI development only.
-/// Swap this out for real data from EstimatesCubit once the API is wired
-/// up — every place that uses this should then read `context.watch<
-/// EstimatesCubit>().state.all` (or similar) instead.
 final List<EstimateModel> dummyQuotations = [
   EstimateModel(
     id: '#2543',

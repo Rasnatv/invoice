@@ -7,12 +7,6 @@ import '../../../../core/utils/responsive.dart';
 import '../../../../models/estimate_model.dart';
 import 'dummy quotation.dart';
 
-/// Lists saved quotations. Tapping a tile opens QuotationPreviewScreen.
-///
-/// UI-only for now: pulls from `dummyQuotations` in dummy_estimates.dart.
-/// Once the API/cubit is ready, swap `dummyQuotations` for
-/// `context.watch<EstimatesCubit>().state.all.where((e) => e.billType ==
-/// EstimateBillType.quotation)` and this screen's layout stays the same.
 class QuotationListScreen extends StatelessWidget {
   const QuotationListScreen({super.key});
 

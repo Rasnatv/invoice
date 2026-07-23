@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
 import 'connectivitystate.dart';
 import 'network_service.dart';
-
 
 class ConnectivityCubit extends Cubit<ConnectivityState> {
   final NetworkService networkService;
@@ -36,16 +34,13 @@ class ConnectivityCubit extends Cubit<ConnectivityState> {
     final wasOffline = state.isOffline;
 
     if (wasOffline == offline) {
-      // no change, but still emit if isClosed check needed
       return;
     }
 
-    // ✅ Only trigger when coming back online
     if (wasOffline && !offline) {
       final newCount = state.reconnectCount + 1;
       emit(state.copyWith(isOffline: offline, reconnectCount: newCount));
 
-      // ✅ Delay to stabilize internet (IMPORTANT)
       Future.delayed(const Duration(seconds: 2), () {
         networkService.onReconnected();
       });
