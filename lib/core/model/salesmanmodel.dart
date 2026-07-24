@@ -1,9 +1,4 @@
-/// Simple data model for a salesman managed by the owner.
-///
-/// `designation` represents the salesman's post/level — e.g. "Junior
-/// Sales Executive", "Sales Executive", "Senior Sales Executive",
-/// "Team Lead" — shown on the salesman list and set from the
-/// Add/Edit Salesman form.
+
 class SalesmanModel {
   const SalesmanModel({
     required this.id,
