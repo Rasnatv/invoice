@@ -18,7 +18,17 @@ class _OwnerSalesmenScreenState extends State<OwnerSalesmenScreen> {
   String _filter = 'All';
   final _searchCtrl = TextEditingController();
 
-  static const _filters = ['All', ];
+  static const _filters = ['All'];
+
+  // Available posts / designations. Owner can add new ones via the
+  // "Add Post" icon; this list then flows into the badges, the filter
+  // chips and the Add/Edit Salesman screen's designation dropdown.
+  final List<String> _posts = [
+    'Senior Sales Executive',
+    'Sales Executive',
+    'Junior Sales Executive',
+    'Team Lead',
+  ];
 
   final List<SalesmanModel> _salesmen = [
     SalesmanModel(
@@ -72,7 +82,9 @@ class _OwnerSalesmenScreenState extends State<OwnerSalesmenScreen> {
 
   Future<void> _openAddSalesman() async {
     final created = await Navigator.of(context).push<SalesmanModel>(
-      MaterialPageRoute(builder: (_) => const OwnerAddSalesmanScreen()),
+      MaterialPageRoute(
+        builder: (_) => const OwnerAddSalesmanScreen(),
+      ),
     );
     if (created != null) {
       setState(() => _salesmen.add(created));
@@ -81,7 +93,9 @@ class _OwnerSalesmenScreenState extends State<OwnerSalesmenScreen> {
 
   Future<void> _openEditSalesman(SalesmanModel salesman) async {
     final updated = await Navigator.of(context).push<SalesmanModel>(
-      MaterialPageRoute(builder: (_) => OwnerAddSalesmanScreen(salesman: salesman)),
+      MaterialPageRoute(
+        builder: (_) => OwnerAddSalesmanScreen(salesman: salesman),
+      ),
     );
     if (updated != null) {
       setState(() {
@@ -118,6 +132,131 @@ class _OwnerSalesmenScreenState extends State<OwnerSalesmenScreen> {
     }
   }
 
+  // Returns how many salesmen currently hold this post, so deletion
+  // can be blocked/warned instead of silently orphaning their data.
+  int _postUsageCount(String post) =>
+      _salesmen.where((s) => s.designation == post).length;
+
+  void _addPost(String rawValue, StateSetter dialogSetState) {
+    final value = rawValue.trim();
+    if (value.isEmpty) return;
+    final alreadyExists =
+    _posts.any((p) => p.toLowerCase() == value.toLowerCase());
+    if (alreadyExists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"$value" already exists')),
+      );
+      return;
+    }
+    setState(() => _posts.add(value));
+    dialogSetState(() {});
+  }
+
+  void _deletePost(String post, StateSetter dialogSetState) {
+    final usage = _postUsageCount(post);
+    if (usage > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '"$post" is assigned to $usage salesman${usage == 1 ? '' : 'men'} and can\'t be deleted',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => _posts.remove(post));
+    dialogSetState(() {});
+  }
+
+  // Opens the Manage Posts view: add new posts and delete existing
+  // ones (blocked if a salesman is still assigned to that post).
+  // Both actions update the badges, filters, and the Add/Edit
+  // Salesman screen's designation dropdown right away.
+  Future<void> _openManagePostsDialog() async {
+    final ctrl = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, dialogSetState) => AlertDialog(
+          title: Text('Manage Posts', style: AppTextStyles.bodyBold()),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: ctrl,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. Area Manager',
+                            labelText: 'Post / Designation',
+                          ),
+                          onSubmitted: (v) {
+                            _addPost(v, dialogSetState);
+                            ctrl.clear();
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, color: AppColors.primary),
+                        onPressed: () {
+                          _addPost(ctrl.text, dialogSetState);
+                          ctrl.clear();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_posts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text('No posts yet', style: AppTextStyles.caption()),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _posts.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
+                        itemBuilder: (context, i) {
+                          final post = _posts[i];
+                          final usage = _postUsageCount(post);
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(post, style: AppTextStyles.bodyBold()),
+                            subtitle: usage > 0
+                                ? Text('$usage assigned', style: AppTextStyles.caption())
+                                : null,
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                              tooltip: 'Delete',
+                              onPressed: () => _deletePost(post, dialogSetState),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -125,7 +264,16 @@ class _OwnerSalesmenScreenState extends State<OwnerSalesmenScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Salesmen', style: AppTextStyles.h6())),
+      appBar: AppBar(
+        title: Text('Salesmen', style: AppTextStyles.h6()),
+        actions: [
+          IconButton(
+            tooltip: 'Manage Posts',
+            icon: const Icon(Icons.add_moderator_outlined),
+            onPressed: _openManagePostsDialog,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primary,
         onPressed: _openAddSalesman,
@@ -202,6 +350,9 @@ class _OwnerSalesmanCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   // Distinct accent per post so the level is scannable at a glance.
+  // Falls back to a deterministic color for any newly added post so
+  // custom posts still look intentional instead of all defaulting
+  // to the same gray.
   Color get _designationColor {
     switch (salesman.designation) {
       case 'Senior Sales Executive':
@@ -210,8 +361,18 @@ class _OwnerSalesmanCard extends StatelessWidget {
         return const Color(0xFF6A1B9A);
       case 'Junior Sales Executive':
         return const Color(0xFFEF6C00);
-      default:
+      case 'Sales Executive':
         return AppColors.info;
+      default:
+        const palette = [
+          Color(0xFF1565C0),
+          Color(0xFFAD1457),
+          Color(0xFF00838F),
+          Color(0xFF6D4C41),
+          Color(0xFF558B2F),
+        ];
+        final index = salesman.designation.hashCode.abs() % palette.length;
+        return palette[index];
     }
   }
 
@@ -233,7 +394,6 @@ class _OwnerSalesmanCard extends StatelessWidget {
               Expanded(
                 child: Text(salesman.name, style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
-              StatusBadge(status: salesman.status),
               SizedBox(width: Responsive.w(4)),
               PopupMenuButton<String>(
                 padding: EdgeInsets.zero,
@@ -279,8 +439,6 @@ class _OwnerSalesmanCard extends StatelessWidget {
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _designationColor),
             ),
           ),
-          SizedBox(height: Responsive.h(8)),
-          Text('ID: ${salesman.id}', style: AppTextStyles.caption()),
           SizedBox(height: Responsive.h(4)),
           Row(
             children: [

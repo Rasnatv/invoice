@@ -638,8 +638,6 @@ class _DriverTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: Responsive.h(3)),
-                Text(driver.id, style: AppTextStyles.caption()),
                 SizedBox(height: Responsive.h(4)),
                 InkWell(
                   onTap: () {
