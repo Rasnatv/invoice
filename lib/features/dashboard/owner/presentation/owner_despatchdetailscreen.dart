@@ -65,6 +65,7 @@ class OwnerDispatchDetailScreen extends StatelessWidget {
                 _infoRow('Despatched At', dateFmt.format(dispatch.date)),
                 SizedBox(height: Responsive.h(6)),
                 _infoRow('Driver Name', dispatch.driverName),
+                _infoRow('Driver ContactNo.', "+91 9633215632"),
               ],
             ),
           ),

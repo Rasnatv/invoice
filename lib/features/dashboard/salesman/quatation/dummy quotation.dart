@@ -2,7 +2,7 @@ import '../../../../models/estimate_model.dart';
 
 final List<EstimateModel> dummyQuotations = [
   EstimateModel(
-    id: '#2543',
+    id: 'EsNo.001',
     contractorName: 'Greenfield Developers',
     siteAddress: 'Calicut, Kerala',
     phone: '+91 65432 10987',
@@ -36,7 +36,7 @@ final List<EstimateModel> dummyQuotations = [
     ],
   ),
   EstimateModel(
-    id: '#2540',
+    id: 'EsNo.002',
     contractorName: 'Nila Constructions',
     siteAddress: 'Thrissur, Kerala',
     phone: '+91 99887 66554',
@@ -60,7 +60,7 @@ final List<EstimateModel> dummyQuotations = [
     ],
   ),
   EstimateModel(
-    id: '#2538',
+    id: 'EsNo.003',
     contractorName: 'Coastal Builders',
     siteAddress: 'Alappuzha, Kerala',
     phone: '+91 91234 56789',

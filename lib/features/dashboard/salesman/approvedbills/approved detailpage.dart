@@ -140,7 +140,7 @@ class ApprovedDetailsScreen extends StatelessWidget {
                     rows: [
                       _Row('Contractor Name', estimate.contractorName, icon: Icons.engineering_outlined),
                       _Row('Contact No.', estimate.phone.isEmpty ? '-' : estimate.phone, icon: Icons.phone_outlined),
-                      _Row('Address', estimate.siteAddress, icon: Icons.location_on_outlined),
+
                     ],
                   ),
                   SizedBox(height: Responsive.h(14)),
@@ -148,7 +148,6 @@ class ApprovedDetailsScreen extends StatelessWidget {
                     title: 'Salesman',
                     rows: [
                       _Row('Name', estimate.salesmanName.isEmpty ? '-' : estimate.salesmanName, icon: Icons.badge_outlined),
-                      _Row('Mob.', estimate.salesmanMobile.isEmpty ? '-' : estimate.salesmanMobile, icon: Icons.phone_iphone_outlined),
                     ],
                   ),
                   SizedBox(height: Responsive.h(20)),

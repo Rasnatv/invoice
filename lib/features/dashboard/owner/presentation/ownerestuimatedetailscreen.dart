@@ -66,21 +66,20 @@
 //
 // class _DummyEstimate {
 //   final String id;
-//   // NEW: Party Name / Address — the top "Party Name" + "Address" block on
-//   // the sheet, separate from the Contractor block further down.
+//   // Party Name / Address / Phone — the top "Party Name" block on the
+//   // sheet, separate from the Contractor block further down.
 //   final String partyName;
 //   final String partyAddress;
+//   final String partyPhone;
 //   final String contractorName;
 //   final String siteAddress;
 //   final String phone;
 //   final String salesmanName;
-//   // NEW: salesman's mobile number — shown in the "Mob" field on the sheet.
-//   final String salesmanMobile;
 //   final DateTime date;
 //   final _DummyBillType billType;
 //   final _DummyStatus status;
 //   final double handlingCharge;
-//   // NEW: total square footage — shown as "Total Sqrft" on the sheet.
+//   // Total square footage — shown as "Total Sqrft" on the sheet.
 //   final double totalSqrft;
 //   final List<_DummyItem> items;
 //
@@ -92,11 +91,11 @@
 //     required this.id,
 //     required this.partyName,
 //     required this.partyAddress,
+//     required this.partyPhone,
 //     required this.contractorName,
 //     required this.siteAddress,
 //     required this.phone,
 //     required this.salesmanName,
-//     required this.salesmanMobile,
 //     required this.date,
 //     required this.billType,
 //     required this.status,
@@ -115,11 +114,11 @@
 //       id: 'EST-1042',
 //       partyName: 'Ramesh Constructions',
 //       partyAddress: 'No. 24, Palace Road, Kanhangad',
+//       partyPhone: '+91 90000 12345',
 //       contractorName: 'Ramesh Constructions',
 //       siteAddress: 'No. 24, Palace Road, Kanhangad',
 //       phone: '+91 98765 43210',
 //       salesmanName: 'Anoop Menon',
-//       salesmanMobile: '+91 90000 00000',
 //       date: DateTime.now(),
 //       billType: _DummyBillType.quotation,
 //       status: _DummyStatus.pending,
@@ -177,7 +176,15 @@
 // ];
 //
 // class OwnerEstimateDetailsScreen extends StatefulWidget {
-//   const OwnerEstimateDetailsScreen({super.key});
+//   const OwnerEstimateDetailsScreen({super.key, this.initialStatus});
+//
+//   // Status of the estimate that was tapped to get here (e.g. 'Approved',
+//   // 'Pending', 'Rejected', 'Dispatched') — passed in from the Estimates
+//   // list so this screen opens already reflecting that status instead of
+//   // always defaulting to the dummy sample's Pending state. When it's
+//   // 'Approved' (or 'Dispatched'), the Send to Despatch section in the
+//   // bottom action bar shows immediately, same as before.
+//   final String? initialStatus;
 //
 //   @override
 //   State<OwnerEstimateDetailsScreen> createState() => _OwnerEstimateDetailsScreenState();
@@ -188,7 +195,24 @@
 //
 //   // Local mutable status so Approve/Reject can visibly flip the badge —
 //   // swap for cubit/bloc state once wired to the real API.
-//   late _DummyStatus _currentStatus = _estimate.status;
+//   late _DummyStatus _currentStatus = _statusFromLabel(widget.initialStatus) ?? _estimate.status;
+//
+//   _DummyStatus? _statusFromLabel(String? label) {
+//     switch (label) {
+//       case 'Approved':
+//       case 'Dispatched':
+//       // Dispatched also lands on the Approved bucket here since this
+//       // dummy screen doesn't yet track a separate "already dispatched"
+//       // state — it still shows the Send to Despatch section.
+//         return _DummyStatus.approved;
+//       case 'Rejected':
+//         return _DummyStatus.rejected;
+//       case 'Pending':
+//         return _DummyStatus.pending;
+//       default:
+//         return null;
+//     }
+//   }
 //
 //   // Tracks who approved/rejected it, and why (for reject), filled in
 //   // through the dialogs below.
@@ -203,11 +227,14 @@
 //   double get _incentiveTotal =>
 //       _estimate.items.fold(0.0, (s, item) => s + _incentiveAmountFor(item));
 //
+//   Color _statusColor(_DummyStatus status) => status.color;
+//
 //   String _buildShareText(NumberFormat currency, NumberFormat number) {
 //     final buffer = StringBuffer()
 //       ..writeln('Estimate ${_estimate.id}')
 //       ..writeln('Party Name: ${_estimate.partyName}')
 //       ..writeln('Party Address: ${_estimate.partyAddress}')
+//       ..writeln('Party Phone: ${_estimate.partyPhone}')
 //       ..writeln('Contractor: ${_estimate.contractorName}')
 //       ..writeln('Site Address: ${_estimate.siteAddress}')
 //       ..writeln('Date: ${DateFormat('dd MMM yyyy').format(_estimate.date)}')
@@ -222,20 +249,18 @@
 //       ..writeln('Status: ${_currentStatus.label}');
 //     if (_estimate.createdBySalesman) {
 //       buffer.writeln('Salesman: ${_estimate.salesmanName}');
-//       // NEW: salesman mobile in the shared summary.
-//       buffer.writeln('Salesman Mob: ${_estimate.salesmanMobile}');
 //     }
-//     // NEW: total sqrft in the shared summary.
+//     // Total sqrft in the shared summary.
 //     buffer.writeln('Total Sqrft: ${number.format(_estimate.totalSqrft)}');
 //     if (_approvedByAdmin != null) {
 //       buffer.writeln('Approved by: $_approvedByAdmin');
 //     }
-//     if (_rejectedByAdmin != null) {
-//       buffer.writeln('Rejected by: $_rejectedByAdmin');
-//       if (_rejectionReason != null && _rejectionReason!.isNotEmpty) {
-//         buffer.writeln('Reason: $_rejectionReason');
-//       }
-//     }
+//     // if (_rejectedByAdmin != null) {
+//     //   buffer.writeln('Rejected by: $_rejectedByAdmin');
+//     //   if (_rejectionReason != null && _rejectionReason!.isNotEmpty) {
+//     //     buffer.writeln('Reason: $_rejectionReason');
+//     //   }
+//     // }
 //     if (_despatchInfo != null) {
 //       buffer
 //         ..writeln('Despatched: ${DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate)}')
@@ -246,34 +271,73 @@
 //     }
 //     return buffer.toString();
 //   }
-//
-//   // Opens a small dialog with a text field so the owner can type the admin
-//   // name that is approving this estimate. Confirming sets `_approvedByAdmin`
-//   // and shows a confirmation snackbar — wire this to your real "approve"
-//   // API call / cubit method where indicated below.
+//   // Approve now just confirms, sets status, and returns to the home screen.
 //   Future<void> _showApproveDialog() async {
-//     final controller = TextEditingController(text: _approvedByAdmin ?? '');
+//     final confirmed = await showDialog<bool>(
+//       context: context,
+//       builder: (dialogContext) {
+//         return AlertDialog(
+//           title: const Text('Approve Estimate'),
+//           content: const Text('Are you sure you want to approve this estimate?'),
+//           actions: [
+//             TextButton(
+//               onPressed: () => Navigator.of(dialogContext).pop(false),
+//               child: const Text('Cancel'),
+//             ),
+//             ElevatedButton(
+//               onPressed: () => Navigator.of(dialogContext).pop(true),
+//               child: const Text('Approve'),
+//             ),
+//           ],
+//         );
+//       },
+//     );
+//
+//     if (confirmed == true) {
+//       setState(() {
+//         _approvedByAdmin = 'Approved';
+//         _rejectedByAdmin = null;
+//         _rejectionReason = null;
+//         _currentStatus = _DummyStatus.approved;
+//       });
+//
+//       // TODO(owner-approval): replace this with the real API/cubit call,
+//       // e.g. context.read<OwnerEstimatesCubit>().approve(_estimate.id);
+//
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(content: Text('Estimate approved')),
+//         );
+//         // Return to the home screen after approving.
+//         Navigator.of(context).popUntil((route) => route.isFirst);
+//       }
+//     }
+//   }
+// // Reject now only asks for a reason — no admin name required.
+//   Future<void> _showRejectDialog() async {
+//     final reasonController = TextEditingController(text: _rejectionReason ?? '');
 //     final formKey = GlobalKey<FormState>();
 //
 //     final result = await showDialog<String>(
 //       context: context,
 //       builder: (dialogContext) {
 //         return AlertDialog(
-//           title: const Text('Approve Estimate'),
+//           title: const Text('Reject Estimate'),
 //           content: Form(
 //             key: formKey,
 //             child: TextFormField(
-//               controller: controller,
+//               controller: reasonController,
 //               autofocus: true,
-//               textCapitalization: TextCapitalization.words,
+//               minLines: 2,
+//               maxLines: 4,
 //               decoration: const InputDecoration(
-//                 labelText: 'Admin name',
-//                 hintText: 'Enter approving admin\'s name',
+//                 labelText: 'Reason',
+//                 hintText: 'Why is this estimate being rejected?',
 //                 border: OutlineInputBorder(),
 //               ),
 //               validator: (value) {
 //                 if (value == null || value.trim().isEmpty) {
-//                   return 'Admin name is required';
+//                   return 'Reason is required';
 //                 }
 //                 return null;
 //               },
@@ -285,98 +349,10 @@
 //               child: const Text('Cancel'),
 //             ),
 //             ElevatedButton(
-//               onPressed: () {
-//                 if (formKey.currentState!.validate()) {
-//                   Navigator.of(dialogContext).pop(controller.text.trim());
-//                 }
-//               },
-//               child: const Text('Approve'),
-//             ),
-//           ],
-//         );
-//       },
-//     );
-//
-//     if (result != null && result.isNotEmpty) {
-//       setState(() {
-//         _approvedByAdmin = result;
-//         _rejectedByAdmin = null;
-//         _rejectionReason = null;
-//         _currentStatus = _DummyStatus.approved;
-//       });
-//
-//       // TODO(owner-approval): replace this with the real API/cubit call,
-//       // e.g. context.read<OwnerEstimatesCubit>().approve(_estimate.id, adminName: result);
-//
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Estimate approved by $result')),
-//         );
-//       }
-//     }
-//   }
-//
-//   // Same pattern as approve, but also asks for a rejection reason so the
-//   // salesman/contractor knows why the estimate was declined. Confirming
-//   // sets `_rejectedByAdmin` / `_rejectionReason` and flips the status.
-//   Future<void> _showRejectDialog() async {
-//     final nameController = TextEditingController(text: _rejectedByAdmin ?? '');
-//     final reasonController = TextEditingController(text: _rejectionReason ?? '');
-//     final formKey = GlobalKey<FormState>();
-//
-//     final result = await showDialog<Map<String, String>>(
-//       context: context,
-//       builder: (dialogContext) {
-//         return AlertDialog(
-//           title: const Text('Reject Estimate'),
-//           content: Form(
-//             key: formKey,
-//             child: Column(
-//               mainAxisSize: MainAxisSize.min,
-//               children: [
-//                 TextFormField(
-//                   controller: nameController,
-//                   autofocus: true,
-//                   textCapitalization: TextCapitalization.words,
-//                   decoration: const InputDecoration(
-//                     labelText: 'Admin name',
-//                     hintText: 'Enter rejecting admin\'s name',
-//                     border: OutlineInputBorder(),
-//                   ),
-//                   validator: (value) {
-//                     if (value == null || value.trim().isEmpty) {
-//                       return 'Admin name is required';
-//                     }
-//                     return null;
-//                   },
-//                 ),
-//                 const SizedBox(height: 12),
-//                 TextFormField(
-//                   controller: reasonController,
-//                   minLines: 2,
-//                   maxLines: 4,
-//                   decoration: const InputDecoration(
-//                     labelText: 'Reason (optional)',
-//                     hintText: 'Why is this estimate being rejected?',
-//                     border: OutlineInputBorder(),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           actions: [
-//             TextButton(
-//               onPressed: () => Navigator.of(dialogContext).pop(),
-//               child: const Text('Cancel'),
-//             ),
-//             ElevatedButton(
 //               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
 //               onPressed: () {
 //                 if (formKey.currentState!.validate()) {
-//                   Navigator.of(dialogContext).pop({
-//                     'name': nameController.text.trim(),
-//                     'reason': reasonController.text.trim(),
-//                   });
+//                   Navigator.of(dialogContext).pop(reasonController.text.trim());
 //                 }
 //               },
 //               child: const Text('Reject'),
@@ -386,34 +362,26 @@
 //       },
 //     );
 //
-//     if (result != null && (result['name']?.isNotEmpty ?? false)) {
+//     if (result != null && result.isNotEmpty) {
 //       setState(() {
-//         _rejectedByAdmin = result['name'];
-//         _rejectionReason = result['reason'];
+//         _rejectionReason = result;
+//         _rejectedByAdmin = null; // no admin name captured anymore
 //         _approvedByAdmin = null;
 //         _currentStatus = _DummyStatus.rejected;
 //       });
 //
 //       // TODO(owner-rejection): replace this with the real API/cubit call,
 //       // e.g. context.read<OwnerEstimatesCubit>().reject(
-//       //   _estimate.id, adminName: result['name']!, reason: result['reason'],
+//       //   _estimate.id, reason: result,
 //       // );
 //
 //       if (mounted) {
 //         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Estimate rejected by ${result['name']}')),
+//           const SnackBar(content: Text('Estimate rejected')),
 //         );
 //       }
 //     }
 //   }
-//
-//   // Opens a bottom sheet listing salesmen to despatch this estimate to.
-//   // "Assigned to Me" hands off to the owner's own despatch sheet
-//   // (OwnerDespatchSheetScreen). Tapping a real salesman just records the
-//   // intent for now.
-//   // TODO(despatch-flow): wire the "notify salesman" branch to a real
-//   // despatch/notification API once the despatch module has its own
-//   // model/cubit.
 //   Future<void> _showSendToDespatchDialog() async {
 //     final currentSelection = _despatchInfo?.assignedSalesman ?? _estimate.salesmanName;
 //
@@ -558,7 +526,6 @@
 //     Responsive.init(context);
 //     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 //     final number = NumberFormat.decimalPattern('en_IN');
-//     final date = DateFormat('dd MMM yyyy').format(_estimate.date);
 //
 //     return Scaffold(
 //       backgroundColor: AppColors.background,
@@ -570,91 +537,126 @@
 //               child: ListView(
 //                 padding: EdgeInsets.all(Responsive.w(18)),
 //                 children: [
+//                   // Top summary card — Estimate No. / Date, plus bill-type
+//                   // chip, matching the Owner Quotation Details layout.
 //                   Container(
-//                     padding: EdgeInsets.all(Responsive.w(16)),
+//                     padding: EdgeInsets.all(Responsive.w(14)),
 //                     decoration: BoxDecoration(
-//                       color: AppColors.surface,
-//                       borderRadius: BorderRadius.circular(16),
-//                       border: Border.all(color: AppColors.border),
+//                       color: AppColors.surfaceAlt,
+//                       borderRadius: BorderRadius.circular(14),
 //                     ),
-//                     child: Column(
-//                       crossAxisAlignment: CrossAxisAlignment.start,
+//                     child: Row(
+//                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //                       children: [
-//                         Row(
-//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                         Column(
+//                           crossAxisAlignment: CrossAxisAlignment.start,
 //                           children: [
-//                             Text(_estimate.id, style: AppTextStyles.h2()),
-//                             Row(
-//                               children: [
-//                                 Container(
-//                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//                                   decoration: BoxDecoration(
-//                                     color: AppColors.surfaceAlt,
-//                                     borderRadius: BorderRadius.circular(8),
-//                                   ),
-//                                   child: Text(_estimate.billType.label, style: AppTextStyles.caption()),
-//                                 ),
-//                                 const SizedBox(width: 6),
-//                                 Container(
-//                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//                                   decoration: BoxDecoration(
-//                                     color: _currentStatus.color.withOpacity(0.12),
-//                                     borderRadius: BorderRadius.circular(8),
-//                                     border: Border.all(color: _currentStatus.color.withOpacity(0.4)),
-//                                   ),
-//                                   child: Text(
-//                                     _currentStatus.label,
-//                                     style: AppTextStyles.caption(color: _currentStatus.color),
-//                                   ),
-//                                 ),
-//                               ],
-//                             ),
+//                             Text('Estimate No.', style: AppTextStyles.caption()),
+//                             Text(_estimate.id, style: AppTextStyles.h3()),
 //                           ],
 //                         ),
-//                         SizedBox(height: Responsive.h(4)),
-//                         Text(date, style: AppTextStyles.caption()),
-//                         const Divider(height: 28),
-//                         // NEW: Party Name / Address block.
-//                         _InfoRow(label: 'Party Name', value: _estimate.partyName),
-//                         _InfoRow(label: 'Party Address', value: _estimate.partyAddress),
-//                         _InfoRow(label: 'Contractor', value: _estimate.contractorName),
-//                         _InfoRow(label: 'Site Address', value: _estimate.siteAddress),
-//                         _InfoRow(label: 'Phone', value: _estimate.phone),
-//                         _InfoRow(
-//                           label: 'Submitted By',
-//                           value: _estimate.createdBySalesman
-//                               ? (_estimate.salesmanName.isEmpty ? 'Salesman' : '${_estimate.salesmanName} (Salesman)')
-//                               : 'Owner',
+//                         Column(
+//                           crossAxisAlignment: CrossAxisAlignment.end,
+//                           children: [
+//                             Text('Date', style: AppTextStyles.caption()),
+//                             Text(DateFormat('dd-MM-yyyy').format(_estimate.date), style: AppTextStyles.h3()),
+//                           ],
 //                         ),
-//                         // NEW: salesman mobile number ("Mob" on the sheet) —
-//                         // only relevant when a salesman actually submitted this.
-//                         if (_estimate.createdBySalesman)
-//                           _InfoRow(label: 'Contractor Mob.no', value: _estimate.salesmanMobile),
-//                         // NEW: total square footage ("Total Sqrft" on the sheet).
-//                         _InfoRow(label: 'Total Sqrft', value: number.format(_estimate.totalSqrft)),
-//                         if (_approvedByAdmin != null)
-//                           _InfoRow(label: 'Approved By', value: _approvedByAdmin!),
-//                         if (_rejectedByAdmin != null)
-//                           _InfoRow(label: 'Rejected By', value: _rejectedByAdmin!),
-//                         if (_rejectionReason != null && _rejectionReason!.isNotEmpty)
-//                           _InfoRow(label: 'Reject Reason', value: _rejectionReason!),
-//                         if (_despatchInfo != null) ...[
-//                           _InfoRow(label: 'Sent To', value: _despatchInfo!.assignedSalesman),
-//                           if (_despatchInfo!.driverName.isNotEmpty)
-//                             _InfoRow(
-//                               label: 'Driver',
-//                               value: _despatchInfo!.driverPhone.isEmpty
-//                                   ? _despatchInfo!.driverName
-//                                   : '${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})',
-//                             ),
-//                           _InfoRow(
-//                             label: 'Despatch Date',
-//                             value: DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate),
-//                           ),
-//                         ],
 //                       ],
 //                     ),
 //                   ),
+//                   SizedBox(height: Responsive.h(10)),
+//                   Row(
+//                     children: [
+//                       Container(
+//                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+//                         decoration: BoxDecoration(
+//                           color: AppColors.surfaceAlt,
+//                           borderRadius: BorderRadius.circular(20),
+//                         ),
+//                         child: Text(_estimate.billType.label, style: AppTextStyles.bodyBold()),
+//                       ),
+//                       SizedBox(width: Responsive.w(8)),
+//                       Container(
+//                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+//                         decoration: BoxDecoration(
+//                           color: _statusColor(_currentStatus).withOpacity(0.12),
+//                           borderRadius: BorderRadius.circular(20),
+//                         ),
+//                         child: Text(
+//                           _currentStatus.label,
+//                           style: AppTextStyles.bodyBold(color: _statusColor(_currentStatus)),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                   SizedBox(height: Responsive.h(16)),
+//
+//                   _DetailSection(
+//                     title: 'Party Details',
+//                     rows: [
+//                       _Row('Party Name', _estimate.partyName, icon: Icons.groups_2_outlined),
+//                       _Row('Party Address', _estimate.partyAddress, icon: Icons.location_on_outlined),
+//                       _Row('Phone Number', _estimate.partyPhone, icon: Icons.phone_outlined),
+//                     ],
+//                   ),
+//                   SizedBox(height: Responsive.h(14)),
+//                   _DetailSection(
+//                     title: 'Contractor Details',
+//                     rows: [
+//                       _Row('Contractor Name', _estimate.contractorName, icon: Icons.engineering_outlined),
+//                       _Row('Contact No.', _estimate.phone.isEmpty ? '-' : _estimate.phone, icon: Icons.phone_outlined),
+//                     ],
+//                   ),
+//                   SizedBox(height: Responsive.h(14)),
+//                   _DetailSection(
+//                     title: 'Submitted By',
+//                     rows: [
+//                       _Row(
+//                         _estimate.createdBySalesman ? 'Salesman' : 'Owner',
+//                         _estimate.createdBySalesman
+//                             ? (_estimate.salesmanName.isEmpty ? '-' : _estimate.salesmanName)
+//                             : 'Created by Owner',
+//                         icon: Icons.badge_outlined,
+//                       ),
+//                     ],
+//                   ),
+//                   if (_approvedByAdmin != null || _rejectedByAdmin != null) ...[
+//                     SizedBox(height: Responsive.h(14)),
+//                     _DetailSection(
+//                       title: 'Approval',
+//                       rows: [
+//                         if (_approvedByAdmin != null)
+//                           _Row('Approved By', _approvedByAdmin!, icon: Icons.check_circle_outline),
+//                         if (_rejectedByAdmin != null)
+//                           _Row('Rejected By', _rejectedByAdmin!, icon: Icons.cancel_outlined),
+//                         if (_rejectionReason != null && _rejectionReason!.isNotEmpty)
+//                           _Row('Reject Reason', _rejectionReason!, icon: Icons.info_outline),
+//                       ],
+//                     ),
+//                   ],
+//                   if (_despatchInfo != null) ...[
+//                     SizedBox(height: Responsive.h(14)),
+//                     _DetailSection(
+//                       title: 'Despatch',
+//                       rows: [
+//                         _Row('Sent To', _despatchInfo!.assignedSalesman, icon: Icons.local_shipping_outlined),
+//                         if (_despatchInfo!.driverName.isNotEmpty)
+//                           _Row(
+//                             'Driver',
+//                             _despatchInfo!.driverPhone.isEmpty
+//                                 ? _despatchInfo!.driverName
+//                                 : '${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})',
+//                             icon: Icons.badge_outlined,
+//                           ),
+//                         _Row(
+//                           'Despatch Date',
+//                           DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate),
+//                           icon: Icons.event_outlined,
+//                         ),
+//                       ],
+//                     ),
+//                   ],
 //                   SizedBox(height: Responsive.h(20)),
 //
 //                   Row(
@@ -762,6 +764,15 @@
 //                           children: [
 //                             Text('Handling Charge', style: AppTextStyles.body()),
 //                             Text(currency.format(_estimate.handlingCharge), style: AppTextStyles.body()),
+//                           ],
+//                         ),
+//                         SizedBox(height: Responsive.h(6)),
+//                         // Total Sqrft also shown in the bottom summary.
+//                         Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             Text('Total Sqrft', style: AppTextStyles.body()),
+//                             Text(number.format(_estimate.totalSqrft), style: AppTextStyles.body()),
 //                           ],
 //                         ),
 //                         const Divider(height: 20),
@@ -954,19 +965,55 @@
 //   }
 // }
 //
-// class _InfoRow extends StatelessWidget {
+// class _Row {
 //   final String label;
 //   final String value;
-//   const _InfoRow({required this.label, required this.value});
+//   final IconData? icon;
+//   _Row(this.label, this.value, {this.icon});
+// }
+//
+// class _DetailSection extends StatelessWidget {
+//   const _DetailSection({required this.title, required this.rows});
+//   final String title;
+//   final List<_Row> rows;
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(vertical: 4),
-//       child: Row(
+//     return Container(
+//       width: double.infinity,
+//       padding: EdgeInsets.all(Responsive.w(14)),
+//       decoration: BoxDecoration(
+//         color: AppColors.surface,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: AppColors.border),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
-//           SizedBox(width: 110, child: Text(label, style: AppTextStyles.caption())),
-//           Expanded(child: Text(value, style: AppTextStyles.bodyBold())),
+//           Text(title, style: AppTextStyles.bodyBold(color: AppColors.primary)),
+//           SizedBox(height: Responsive.h(10)),
+//           ...rows.map((r) => Padding(
+//             padding: EdgeInsets.only(bottom: Responsive.h(10)),
+//             child: Row(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 if (r.icon != null) ...[
+//                   Icon(r.icon, size: 16, color: AppColors.textHint),
+//                   SizedBox(width: Responsive.w(8)),
+//                 ],
+//                 SizedBox(
+//                   width: r.icon != null ? 88 : 100,
+//                   child: Text(r.label, style: AppTextStyles.caption()),
+//                 ),
+//                 Expanded(
+//                   child: Text(
+//                     r.value.isEmpty ? '-' : r.value,
+//                     style: AppTextStyles.bodyBold(),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           )),
 //         ],
 //       ),
 //     );
@@ -1039,10 +1086,11 @@ class _DummyItem {
 
 class _DummyEstimate {
   final String id;
-  // NEW: Party Name / Address — the top "Party Name" + "Address" block on
-  // the sheet, separate from the Contractor block further down.
+  // Party Name / Address / Phone — the top "Party Name" block on the
+  // sheet, separate from the Contractor block further down.
   final String partyName;
   final String partyAddress;
+  final String partyPhone;
   final String contractorName;
   final String siteAddress;
   final String phone;
@@ -1051,7 +1099,7 @@ class _DummyEstimate {
   final _DummyBillType billType;
   final _DummyStatus status;
   final double handlingCharge;
-  // NEW: total square footage — shown as "Total Sqrft" on the sheet.
+  // Total square footage — shown as "Total Sqrft" on the sheet.
   final double totalSqrft;
   final List<_DummyItem> items;
 
@@ -1063,6 +1111,7 @@ class _DummyEstimate {
     required this.id,
     required this.partyName,
     required this.partyAddress,
+    required this.partyPhone,
     required this.contractorName,
     required this.siteAddress,
     required this.phone,
@@ -1085,6 +1134,7 @@ class _DummyEstimate {
       id: 'EST-1042',
       partyName: 'Ramesh Constructions',
       partyAddress: 'No. 24, Palace Road, Kanhangad',
+      partyPhone: '+91 90000 12345',
       contractorName: 'Ramesh Constructions',
       siteAddress: 'No. 24, Palace Road, Kanhangad',
       phone: '+91 98765 43210',
@@ -1146,7 +1196,15 @@ const List<String> _dummySalesmen = [
 ];
 
 class OwnerEstimateDetailsScreen extends StatefulWidget {
-  const OwnerEstimateDetailsScreen({super.key});
+  const OwnerEstimateDetailsScreen({super.key, this.initialStatus});
+
+  // Status of the estimate that was tapped to get here (e.g. 'Approved',
+  // 'Pending', 'Rejected', 'Dispatched') — passed in from the Estimates
+  // list so this screen opens already reflecting that status instead of
+  // always defaulting to the dummy sample's Pending state. When it's
+  // 'Approved' (or 'Dispatched'), the Send to Despatch section in the
+  // bottom action bar shows immediately, same as before.
+  final String? initialStatus;
 
   @override
   State<OwnerEstimateDetailsScreen> createState() => _OwnerEstimateDetailsScreenState();
@@ -1157,7 +1215,24 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
 
   // Local mutable status so Approve/Reject can visibly flip the badge —
   // swap for cubit/bloc state once wired to the real API.
-  late _DummyStatus _currentStatus = _estimate.status;
+  late _DummyStatus _currentStatus = _statusFromLabel(widget.initialStatus) ?? _estimate.status;
+
+  _DummyStatus? _statusFromLabel(String? label) {
+    switch (label) {
+      case 'Approved':
+      case 'Dispatched':
+      // Dispatched also lands on the Approved bucket here since this
+      // dummy screen doesn't yet track a separate "already dispatched"
+      // state — it still shows the Send to Despatch section.
+        return _DummyStatus.approved;
+      case 'Rejected':
+        return _DummyStatus.rejected;
+      case 'Pending':
+        return _DummyStatus.pending;
+      default:
+        return null;
+    }
+  }
 
   // Tracks who approved/rejected it, and why (for reject), filled in
   // through the dialogs below.
@@ -1172,11 +1247,14 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
   double get _incentiveTotal =>
       _estimate.items.fold(0.0, (s, item) => s + _incentiveAmountFor(item));
 
+  Color _statusColor(_DummyStatus status) => status.color;
+
   String _buildShareText(NumberFormat currency, NumberFormat number) {
     final buffer = StringBuffer()
       ..writeln('Estimate ${_estimate.id}')
       ..writeln('Party Name: ${_estimate.partyName}')
       ..writeln('Party Address: ${_estimate.partyAddress}')
+      ..writeln('Party Phone: ${_estimate.partyPhone}')
       ..writeln('Contractor: ${_estimate.contractorName}')
       ..writeln('Site Address: ${_estimate.siteAddress}')
       ..writeln('Date: ${DateFormat('dd MMM yyyy').format(_estimate.date)}')
@@ -1192,17 +1270,17 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
     if (_estimate.createdBySalesman) {
       buffer.writeln('Salesman: ${_estimate.salesmanName}');
     }
-    // NEW: total sqrft in the shared summary.
+    // Total sqrft in the shared summary.
     buffer.writeln('Total Sqrft: ${number.format(_estimate.totalSqrft)}');
     if (_approvedByAdmin != null) {
       buffer.writeln('Approved by: $_approvedByAdmin');
     }
-    if (_rejectedByAdmin != null) {
-      buffer.writeln('Rejected by: $_rejectedByAdmin');
-      if (_rejectionReason != null && _rejectionReason!.isNotEmpty) {
-        buffer.writeln('Reason: $_rejectionReason');
-      }
-    }
+    // if (_rejectedByAdmin != null) {
+    //   buffer.writeln('Rejected by: $_rejectedByAdmin');
+    //   if (_rejectionReason != null && _rejectionReason!.isNotEmpty) {
+    //     buffer.writeln('Reason: $_rejectionReason');
+    //   }
+    // }
     if (_despatchInfo != null) {
       buffer
         ..writeln('Despatched: ${DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate)}')
@@ -1213,34 +1291,73 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
     }
     return buffer.toString();
   }
-
-  // Opens a small dialog with a text field so the owner can type the admin
-  // name that is approving this estimate. Confirming sets `_approvedByAdmin`
-  // and shows a confirmation snackbar — wire this to your real "approve"
-  // API call / cubit method where indicated below.
+  // Approve now just confirms, sets status, and returns to the home screen.
   Future<void> _showApproveDialog() async {
-    final controller = TextEditingController(text: _approvedByAdmin ?? '');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Approve Estimate'),
+          content: const Text('Are you sure you want to approve this estimate?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Approve'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _approvedByAdmin = 'Approved';
+        _rejectedByAdmin = null;
+        _rejectionReason = null;
+        _currentStatus = _DummyStatus.approved;
+      });
+
+      // TODO(owner-approval): replace this with the real API/cubit call,
+      // e.g. context.read<OwnerEstimatesCubit>().approve(_estimate.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Estimate approved')),
+        );
+        // Return to the home screen after approving.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    }
+  }
+// Reject now only asks for a reason — no admin name required.
+  Future<void> _showRejectDialog() async {
+    final reasonController = TextEditingController(text: _rejectionReason ?? '');
     final formKey = GlobalKey<FormState>();
 
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Approve Estimate'),
+          title: const Text('Reject Estimate'),
           content: Form(
             key: formKey,
             child: TextFormField(
-              controller: controller,
+              controller: reasonController,
               autofocus: true,
-              textCapitalization: TextCapitalization.words,
+              minLines: 2,
+              maxLines: 4,
               decoration: const InputDecoration(
-                labelText: 'Admin name',
-                hintText: 'Enter approving admin\'s name',
+                labelText: 'Reason',
+                hintText: 'Why is this estimate being rejected?',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Admin name is required';
+                  return 'Reason is required';
                 }
                 return null;
               },
@@ -1252,98 +1369,10 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.of(dialogContext).pop(controller.text.trim());
-                }
-              },
-              child: const Text('Approve'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _approvedByAdmin = result;
-        _rejectedByAdmin = null;
-        _rejectionReason = null;
-        _currentStatus = _DummyStatus.approved;
-      });
-
-      // TODO(owner-approval): replace this with the real API/cubit call,
-      // e.g. context.read<OwnerEstimatesCubit>().approve(_estimate.id, adminName: result);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Estimate approved by $result')),
-        );
-      }
-    }
-  }
-
-  // Same pattern as approve, but also asks for a rejection reason so the
-  // salesman/contractor knows why the estimate was declined. Confirming
-  // sets `_rejectedByAdmin` / `_rejectionReason` and flips the status.
-  Future<void> _showRejectDialog() async {
-    final nameController = TextEditingController(text: _rejectedByAdmin ?? '');
-    final reasonController = TextEditingController(text: _rejectionReason ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Reject Estimate'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Admin name',
-                    hintText: 'Enter rejecting admin\'s name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Admin name is required';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: reasonController,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Reason (optional)',
-                    hintText: 'Why is this estimate being rejected?',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
                 if (formKey.currentState!.validate()) {
-                  Navigator.of(dialogContext).pop({
-                    'name': nameController.text.trim(),
-                    'reason': reasonController.text.trim(),
-                  });
+                  Navigator.of(dialogContext).pop(reasonController.text.trim());
                 }
               },
               child: const Text('Reject'),
@@ -1353,34 +1382,26 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
       },
     );
 
-    if (result != null && (result['name']?.isNotEmpty ?? false)) {
+    if (result != null && result.isNotEmpty) {
       setState(() {
-        _rejectedByAdmin = result['name'];
-        _rejectionReason = result['reason'];
+        _rejectionReason = result;
+        _rejectedByAdmin = null; // no admin name captured anymore
         _approvedByAdmin = null;
         _currentStatus = _DummyStatus.rejected;
       });
 
       // TODO(owner-rejection): replace this with the real API/cubit call,
       // e.g. context.read<OwnerEstimatesCubit>().reject(
-      //   _estimate.id, adminName: result['name']!, reason: result['reason'],
+      //   _estimate.id, reason: result,
       // );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Estimate rejected by ${result['name']}')),
+          const SnackBar(content: Text('Estimate rejected')),
         );
       }
     }
   }
-
-  // Opens a bottom sheet listing salesmen to despatch this estimate to.
-  // "Assigned to Me" hands off to the owner's own despatch sheet
-  // (OwnerDespatchSheetScreen). Tapping a real salesman just records the
-  // intent for now.
-  // TODO(despatch-flow): wire the "notify salesman" branch to a real
-  // despatch/notification API once the despatch module has its own
-  // model/cubit.
   Future<void> _showSendToDespatchDialog() async {
     final currentSelection = _despatchInfo?.assignedSalesman ?? _estimate.salesmanName;
 
@@ -1489,6 +1510,12 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
   // Pushes the owner's own, separate despatch sheet screen — distinct
   // from the salesman's DespatchSheetScreen (which is keyed off
   // EstimateModel). Passes this estimate's own data straight in.
+  //
+  // If this estimate was already despatched before (i.e. _despatchInfo
+  // is already set with a driver name/phone, e.g. the owner re-opens
+  // "Assigned to Me" a second time), that driver's name/phone is passed
+  // in as initial values so the despatch sheet auto-fills them instead
+  // of starting blank again.
   Future<void> _openOwnerDespatchSheet() async {
     final result = await Navigator.of(context).push<DespatchInfo>(
       MaterialPageRoute(
@@ -1497,6 +1524,12 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
           contractorName: _estimate.contractorName,
           phone: _estimate.phone,
           siteAddress: _estimate.siteAddress,
+          initialDriverName: (_despatchInfo?.driverName.isNotEmpty ?? false)
+              ? _despatchInfo!.driverName
+              : null,
+          initialDriverPhone: (_despatchInfo?.driverPhone.isNotEmpty ?? false)
+              ? _despatchInfo!.driverPhone
+              : null,
           items: _estimate.items
               .map((i) => OwnerDespatchItem(
             name: i.name,
@@ -1525,7 +1558,6 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
-    final date = DateFormat('dd MMM yyyy').format(_estimate.date);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -1537,88 +1569,126 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
               child: ListView(
                 padding: EdgeInsets.all(Responsive.w(18)),
                 children: [
+                  // Top summary card — Estimate No. / Date, plus bill-type
+                  // chip, matching the Owner Quotation Details layout.
                   Container(
-                    padding: EdgeInsets.all(Responsive.w(16)),
+                    padding: EdgeInsets.all(Responsive.w(14)),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_estimate.id, style: AppTextStyles.h2()),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceAlt,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(_estimate.billType.label, style: AppTextStyles.caption()),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: _currentStatus.color.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: _currentStatus.color.withOpacity(0.4)),
-                                  ),
-                                  child: Text(
-                                    _currentStatus.label,
-                                    style: AppTextStyles.caption(color: _currentStatus.color),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            Text('Estimate No.', style: AppTextStyles.caption()),
+                            Text(_estimate.id, style: AppTextStyles.h3()),
                           ],
                         ),
-                        SizedBox(height: Responsive.h(4)),
-                        Text(date, style: AppTextStyles.caption()),
-                        const Divider(height: 28),
-                        // NEW: Party Name / Address block.
-                        _InfoRow(label: 'Party Name', value: _estimate.partyName),
-                        _InfoRow(label: 'Party Address', value: _estimate.partyAddress),
-                        _InfoRow(label: 'Phonenumber', value: _estimate.phone),
-                        _InfoRow(label: 'Contractor', value: _estimate.contractorName),
-                        _InfoRow(label: 'Site Address', value: _estimate.siteAddress),
-                        _InfoRow(label: 'Contractor Phone', value: _estimate.phone),
-                        _InfoRow(
-                          label: 'Submitted By',
-                          value: _estimate.createdBySalesman
-                              ? (_estimate.salesmanName.isEmpty ? 'Salesman' : '${_estimate.salesmanName} (Salesman)')
-                              : 'Owner',
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Date', style: AppTextStyles.caption()),
+                            Text(DateFormat('dd-MM-yyyy').format(_estimate.date), style: AppTextStyles.h3()),
+                          ],
                         ),
-                        // Total square footage ("Total Sqrft" on the sheet).
-
-                        if (_approvedByAdmin != null)
-                          _InfoRow(label: 'Approved By', value: _approvedByAdmin!),
-                        if (_rejectedByAdmin != null)
-                          _InfoRow(label: 'Rejected By', value: _rejectedByAdmin!),
-                        if (_rejectionReason != null && _rejectionReason!.isNotEmpty)
-                          _InfoRow(label: 'Reject Reason', value: _rejectionReason!),
-                        if (_despatchInfo != null) ...[
-                          _InfoRow(label: 'Sent To', value: _despatchInfo!.assignedSalesman),
-                          if (_despatchInfo!.driverName.isNotEmpty)
-                            _InfoRow(
-                              label: 'Driver',
-                              value: _despatchInfo!.driverPhone.isEmpty
-                                  ? _despatchInfo!.driverName
-                                  : '${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})',
-                            ),
-                          _InfoRow(
-                            label: 'Despatch Date',
-                            value: DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate),
-                          ),
-                        ],
                       ],
                     ),
                   ),
+                  SizedBox(height: Responsive.h(10)),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(_estimate.billType.label, style: AppTextStyles.bodyBold()),
+                      ),
+                      SizedBox(width: Responsive.w(8)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _statusColor(_currentStatus).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _currentStatus.label,
+                          style: AppTextStyles.bodyBold(color: _statusColor(_currentStatus)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(16)),
+
+                  _DetailSection(
+                    title: 'Party Details',
+                    rows: [
+                      _Row('Party Name', _estimate.partyName, icon: Icons.groups_2_outlined),
+                      _Row('Party Address', _estimate.partyAddress, icon: Icons.location_on_outlined),
+                      _Row('Phone Number', _estimate.partyPhone, icon: Icons.phone_outlined),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(14)),
+                  _DetailSection(
+                    title: 'Contractor Details',
+                    rows: [
+                      _Row('Contractor Name', _estimate.contractorName, icon: Icons.engineering_outlined),
+                      _Row('Contact No.', _estimate.phone.isEmpty ? '-' : _estimate.phone, icon: Icons.phone_outlined),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(14)),
+                  _DetailSection(
+                    title: 'Submitted By',
+                    rows: [
+                      _Row(
+                        _estimate.createdBySalesman ? 'Salesman' : 'Owner',
+                        _estimate.createdBySalesman
+                            ? (_estimate.salesmanName.isEmpty ? '-' : _estimate.salesmanName)
+                            : 'Created by Owner',
+                        icon: Icons.badge_outlined,
+                      ),
+                    ],
+                  ),
+                  if (_approvedByAdmin != null || _rejectedByAdmin != null) ...[
+                    SizedBox(height: Responsive.h(14)),
+                    _DetailSection(
+                      title: 'Approval',
+                      rows: [
+                        if (_approvedByAdmin != null)
+                          _Row('Approved By', _approvedByAdmin!, icon: Icons.check_circle_outline),
+                        if (_rejectedByAdmin != null)
+                          _Row('Rejected By', _rejectedByAdmin!, icon: Icons.cancel_outlined),
+                        if (_rejectionReason != null && _rejectionReason!.isNotEmpty)
+                          _Row('Reject Reason', _rejectionReason!, icon: Icons.info_outline),
+                      ],
+                    ),
+                  ],
+                  if (_despatchInfo != null) ...[
+                    SizedBox(height: Responsive.h(14)),
+                    _DetailSection(
+                      title: 'Despatch',
+                      rows: [
+                        _Row('Sent To', _despatchInfo!.assignedSalesman, icon: Icons.local_shipping_outlined),
+                        if (_despatchInfo!.driverName.isNotEmpty)
+                          _Row(
+                            'Driver',
+                            _despatchInfo!.driverPhone.isEmpty
+                                ? _despatchInfo!.driverName
+                                : '${_despatchInfo!.driverName} (${_despatchInfo!.driverPhone})',
+                            icon: Icons.badge_outlined,
+                          ),
+                        _Row(
+                          'Despatch Date',
+                          DateFormat('dd MMM yyyy').format(_despatchInfo!.despatchDate),
+                          icon: Icons.event_outlined,
+                        ),
+                      ],
+                    ),
+                  ],
                   SizedBox(height: Responsive.h(20)),
 
                   Row(
@@ -1927,19 +1997,55 @@ class _RoundIconButton extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
+class _Row {
   final String label;
   final String value;
-  const _InfoRow({required this.label, required this.value});
+  final IconData? icon;
+  _Row(this.label, this.value, {this.icon});
+}
+
+class _DetailSection extends StatelessWidget {
+  const _DetailSection({required this.title, required this.rows});
+  final String title;
+  final List<_Row> rows;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 110, child: Text(label, style: AppTextStyles.caption())),
-          Expanded(child: Text(value, style: AppTextStyles.bodyBold())),
+          Text(title, style: AppTextStyles.bodyBold(color: AppColors.primary)),
+          SizedBox(height: Responsive.h(10)),
+          ...rows.map((r) => Padding(
+            padding: EdgeInsets.only(bottom: Responsive.h(10)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (r.icon != null) ...[
+                  Icon(r.icon, size: 16, color: AppColors.textHint),
+                  SizedBox(width: Responsive.w(8)),
+                ],
+                SizedBox(
+                  width: r.icon != null ? 88 : 100,
+                  child: Text(r.label, style: AppTextStyles.caption()),
+                ),
+                Expanded(
+                  child: Text(
+                    r.value.isEmpty ? '-' : r.value,
+                    style: AppTextStyles.bodyBold(),
+                  ),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
     );

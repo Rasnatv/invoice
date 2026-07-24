@@ -23,6 +23,8 @@
 //       id: 'p1',
 //       name: 'Vitrified Tile 600x600',
 //       company: 'Kajaria',
+//       size: '600x600',
+//       unit: 'box',
 //       mrp: 65,
 //       rate: 55,
 //       incentivePercent: 5,
@@ -31,6 +33,8 @@
 //       id: 'p2',
 //       name: 'Wall Tile 300x450',
 //       company: 'Somany',
+//       size: '300x450',
+//       unit: 'box',
 //       mrp: 48,
 //       rate: 40,
 //       incentivePercent: 4,
@@ -39,6 +43,8 @@
 //       id: 'p3',
 //       name: 'PVC Pipe 4"',
 //       company: 'Supreme',
+//       size: '4"',
+//       unit: 'piece',
 //       mrp: 320,
 //       rate: 280,
 //       incentivePercent: 3,
@@ -279,11 +285,6 @@
 //         child: ListView(
 //           padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(16), Responsive.h(20)),
 //           children: [
-//             _SummaryCard(
-//               totalSales: _currency.format(totalAchievedSales),
-//               totalIncentive: _currency.format(totalProductIncentive),
-//               productCount: _products.length,
-//             ),
 //             SizedBox(height: Responsive.h(14)),
 //             _MonthlySalesCard(
 //               enabled: _monthlyIncentiveEnabled,
@@ -333,38 +334,6 @@
 //   }
 // }
 //
-// class _SummaryCard extends StatelessWidget {
-//   const _SummaryCard({required this.totalSales, required this.totalIncentive, required this.productCount});
-//   final String totalSales;
-//   final String totalIncentive;
-//   final int productCount;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(16)),
-//       decoration: BoxDecoration(
-//         gradient: LinearGradient(
-//           begin: Alignment.topLeft,
-//           end: Alignment.bottomRight,
-//           colors: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
-//         ),
-//         borderRadius: BorderRadius.circular(18),
-//       ),
-//       child: Row(
-//         children: [
-//           Expanded(child: _SummaryStat(label: 'Products', value: '$productCount')),
-//           _summaryDivider(),
-//           Expanded(child: _SummaryStat(label: 'This Month Sales', value: totalSales)),
-//           _summaryDivider(),
-//           Expanded(child: _SummaryStat(label: 'Total Payable', value: totalIncentive)),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _summaryDivider() => Container(width: 1, height: 34, color: Colors.white.withOpacity(0.25));
-// }
 //
 // class _SummaryStat extends StatelessWidget {
 //   const _SummaryStat({required this.label, required this.value});
@@ -388,16 +357,6 @@
 //   }
 // }
 //
-// /// Company-wide monthly sales bonus — separate from per-product incentive.
-// ///
-// /// Three visible states, in order of what the owner sees:
-// ///  1. `enabled == false` -> plain empty-state card: "No incentive set for
-// ///     this month" + a single "Add Monthly Incentive" button. Nothing else
-// ///     to read or configure.
-// ///  2. `enabled == true, hasTarget == true` -> progress bar + "Target
-// ///     Reached / Not Reached" + bonus only paid if crossed.
-// ///  3. `enabled == true, hasTarget == false` -> flat bonus % shown directly
-// ///     against total sales, always "earned", no progress bar.
 // class _MonthlySalesCard extends StatelessWidget {
 //   const _MonthlySalesCard({
 //     required this.enabled,
@@ -564,6 +523,8 @@
 //   @override
 //   Widget build(BuildContext context) {
 //     final hasSales = achieved > 0;
+//     final hasSizeOrUnit = (product.size != null && product.size!.isNotEmpty) ||
+//         (product.unit != null && product.unit!.isNotEmpty);
 //
 //     return Container(
 //       padding: EdgeInsets.all(Responsive.w(14)),
@@ -626,7 +587,32 @@
 //             ],
 //           ),
 //           SizedBox(height: Responsive.h(3)),
-//           Text(product.company, style: AppTextStyles.caption()),
+//           Row(
+//             children: [
+//               Flexible(
+//                 child: Text(
+//                   product.company,
+//                   style: AppTextStyles.caption(),
+//                   maxLines: 1,
+//                   overflow: TextOverflow.ellipsis,
+//                 ),
+//               ),
+//               if (hasSizeOrUnit) ...[
+//                 Text('  •  ', style: AppTextStyles.caption()),
+//                 Flexible(
+//                   child: Text(
+//                     [
+//                       if (product.size != null && product.size!.isNotEmpty) product.size,
+//                       if (product.unit != null && product.unit!.isNotEmpty) product.unit,
+//                     ].join(' '),
+//                     style: AppTextStyles.caption(),
+//                     maxLines: 1,
+//                     overflow: TextOverflow.ellipsis,
+//                   ),
+//                 ),
+//               ],
+//             ],
+//           ),
 //           SizedBox(height: Responsive.h(6)),
 //           Row(
 //             children: [
@@ -635,45 +621,12 @@
 //               Text('Rate ${currency.format(product.rate)}', style: AppTextStyles.caption()),
 //             ],
 //           ),
+//
 //           SizedBox(height: Responsive.h(10)),
-//           const Divider(height: 1, color: AppColors.border),
-//           SizedBox(height: Responsive.h(10)),
-//           if (!hasSales)
-//             Row(
-//               children: [
-//                 Icon(Icons.info_outline, size: 14, color: AppColors.textSecondary),
-//                 SizedBox(width: Responsive.w(6)),
-//                 Text('No sales recorded yet', style: AppTextStyles.caption()),
-//               ],
-//             )
-//           else
-//             Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//               children: [
-//                 Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     Text('Achieved Sales', style: AppTextStyles.caption()),
-//                     SizedBox(height: Responsive.h(2)),
-//                     Text(currency.format(achieved), style: AppTextStyles.bodyBold()),
+//
 //                   ],
-//                 ),
-//                 Column(
-//                   crossAxisAlignment: CrossAxisAlignment.end,
-//                   children: [
-//                     Text('Incentive Earned', style: AppTextStyles.caption()),
-//                     SizedBox(height: Responsive.h(2)),
-//                     Text(
-//                       currency.format(incentiveEarned),
-//                       style: AppTextStyles.bodyBold().copyWith(color: AppColors.primary),
-//                     ),
-//                   ],
-//                 ),
-//               ],
-//             ),
-//         ],
-//       ),
-//     );
+//                 ),);
+//
 //   }
 // }
 import 'package:flutter/material.dart';
@@ -739,11 +692,17 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
   double? _monthlyTarget;
   double _monthlyBonusPercent = 0;
 
+  // NEW: which month + year this bonus setup applies to.
+  // Defaults to the current month/year.
+  int _monthlyMonth = DateTime.now().month;
+  int _monthlyYear = DateTime.now().year;
+
   final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
   bool get _hasMonthlyTarget => _monthlyTarget != null && _monthlyTarget! > 0;
 
-
+  String get _monthlyPeriodLabel =>
+      DateFormat('MMMM yyyy').format(DateTime(_monthlyYear, _monthlyMonth));
 
   double _achievedFor(ProductIncentiveModel p) => _achievedSales[p.id] ?? 0;
 
@@ -818,10 +777,13 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
 
   /// One simple flow: first choice is just "does this month have a bonus?".
   /// - If the owner turns it OFF -> save immediately, no other fields shown.
-  /// - If ON -> owner can optionally add a target, and sets the bonus %.
+  /// - If ON -> owner picks the month + year it applies to, can optionally
+  ///   add a target, and sets the bonus %.
   Future<void> _editMonthlyTarget() async {
     bool enabled = _monthlyIncentiveEnabled;
     bool useTarget = _hasMonthlyTarget;
+    int month = _monthlyMonth;
+    int year = _monthlyYear;
     final targetCtrl = TextEditingController(
       text: _hasMonthlyTarget ? _monthlyTarget!.toStringAsFixed(0) : '',
     );
@@ -829,6 +791,11 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
       text: _monthlyBonusPercent == 0 ? '' : _monthlyBonusPercent.toString(),
     );
     final formKey = GlobalKey<FormState>();
+
+    // Years available: a couple back, current, and a couple ahead —
+    // covers correcting a past month or planning an upcoming one.
+    final currentYear = DateTime.now().year;
+    final years = [for (int y = currentYear - 1; y <= currentYear + 2; y++) y];
 
     final result = await showDialog<bool>(
       context: context,
@@ -842,22 +809,66 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Step 1: simple yes/no for this month.
+                  // Step 1: simple yes/no.
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: enabled,
                     onChanged: (v) => setDialogState(() => enabled = v),
-                    title: Text('Bonus this month?', style: AppTextStyles.bodyBold()),
+                    title: Text('Bonus for a month?', style: AppTextStyles.bodyBold()),
                     subtitle: Text(
                       enabled
-                          ? 'Yes — set it up below.'
-                          : 'No bonus this month. Nothing else to fill in.',
+                          ? 'Yes — choose the month below.'
+                          : 'No bonus set up. Nothing else to fill in.',
                       style: AppTextStyles.caption(),
                     ),
                   ),
                   // Step 2: only shown once the owner says "yes".
                   if (enabled) ...[
                     const Divider(height: 20, color: AppColors.border),
+
+                    // NEW: month + year picker
+                    Text('Applies to', style: AppTextStyles.caption()),
+                    SizedBox(height: Responsive.h(6)),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<int>(
+                            value: month,
+                            isExpanded: true,
+                            decoration: const InputDecoration(hintText: 'Month'),
+                            items: [
+                              for (int m = 1; m <= 12; m++)
+                                DropdownMenuItem(
+                                  value: m,
+                                  child: Text(DateFormat('MMMM').format(DateTime(0, m))),
+                                ),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setDialogState(() => month = v);
+                            },
+                          ),
+                        ),
+                        SizedBox(width: Responsive.w(10)),
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<int>(
+                            value: year,
+                            isExpanded: true,
+                            decoration: const InputDecoration(hintText: 'Year'),
+                            items: [
+                              for (final y in years)
+                                DropdownMenuItem(value: y, child: Text('$y')),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setDialogState(() => year = v);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: Responsive.h(14)),
+
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       value: useTarget,
@@ -935,6 +946,8 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
           // target doesn't silently reappear next time it's turned on.
           _monthlyTarget = null;
         } else {
+          _monthlyMonth = month;
+          _monthlyYear = year;
           _monthlyTarget = useTarget ? double.parse(targetCtrl.text.trim()) : null;
           _monthlyBonusPercent = double.parse(bonusCtrl.text.trim());
         }
@@ -962,17 +975,13 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(16), Responsive.h(20)),
           children: [
-            _SummaryCard(
-              totalSales: _currency.format(totalAchievedSales),
-              totalIncentive: _currency.format(totalProductIncentive),
-              productCount: _products.length,
-            ),
             SizedBox(height: Responsive.h(14)),
             _MonthlySalesCard(
               enabled: _monthlyIncentiveEnabled,
               hasTarget: _hasMonthlyTarget,
               target: _monthlyTarget,
               bonusPercent: _monthlyBonusPercent,
+              periodLabel: _monthlyPeriodLabel,
               currency: _currency,
               onEdit: _editMonthlyTarget,
             ),
@@ -1016,38 +1025,6 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.totalSales, required this.totalIncentive, required this.productCount});
-  final String totalSales;
-  final String totalIncentive;
-  final int productCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(16)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _SummaryStat(label: 'Products', value: '$productCount')),
-          _summaryDivider(),
-          Expanded(child: _SummaryStat(label: 'This Month Sales', value: totalSales)),
-          _summaryDivider(),
-          Expanded(child: _SummaryStat(label: 'Total Payable', value: totalIncentive)),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryDivider() => Container(width: 1, height: 34, color: Colors.white.withOpacity(0.25));
-}
 
 class _SummaryStat extends StatelessWidget {
   const _SummaryStat({required this.label, required this.value});
@@ -1071,23 +1048,13 @@ class _SummaryStat extends StatelessWidget {
   }
 }
 
-/// Company-wide monthly sales bonus — separate from per-product incentive.
-///
-/// Three visible states, in order of what the owner sees:
-///  1. `enabled == false` -> plain empty-state card: "No incentive set for
-///     this month" + a single "Add Monthly Incentive" button. Nothing else
-///     to read or configure.
-///  2. `enabled == true, hasTarget == true` -> progress bar + "Target
-///     Reached / Not Reached" + bonus only paid if crossed.
-///  3. `enabled == true, hasTarget == false` -> flat bonus % shown directly
-///     against total sales, always "earned", no progress bar.
 class _MonthlySalesCard extends StatelessWidget {
   const _MonthlySalesCard({
     required this.enabled,
     required this.hasTarget,
     required this.target,
-
     required this.bonusPercent,
+    required this.periodLabel,
     required this.currency,
     required this.onEdit,
   });
@@ -1096,6 +1063,7 @@ class _MonthlySalesCard extends StatelessWidget {
   final bool hasTarget;
   final double? target;
   final double bonusPercent;
+  final String periodLabel;
   final NumberFormat currency;
   final VoidCallback onEdit;
 
@@ -1104,8 +1072,6 @@ class _MonthlySalesCard extends StatelessWidget {
     if (!enabled) {
       return _EmptyMonthlyBonusCard(onAdd: onEdit);
     }
-
-
 
     return Container(
       padding: EdgeInsets.all(Responsive.w(14)),
@@ -1122,7 +1088,7 @@ class _MonthlySalesCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.emoji_events_outlined, size: 18, color: Colors.black),
+                  const Icon(Icons.emoji_events_outlined, size: 18, color: Colors.black),
                   SizedBox(width: Responsive.w(6)),
                   Text('Monthly Sales Bonus', style: AppTextStyles.bodyBold()),
                 ],
@@ -1138,10 +1104,32 @@ class _MonthlySalesCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: Responsive.h(4)),
+
+          // NEW: shows exactly which month + year this bonus is for.
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(4)),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.primary),
+                SizedBox(width: Responsive.w(4)),
+                Text(
+                  periodLabel,
+                  style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: Responsive.h(8)),
+
           Text(
             hasTarget
-                ? 'Applies once, on top of product incentives — only if total monthly sales cross the target.'
-                : 'No target set — bonus % applies directly to total monthly sales.',
+                ? 'Applies once, on top of product incentives — only if total sales this period cross the target.'
+                : 'No target set — bonus % applies directly to total sales this period.',
             style: AppTextStyles.caption(),
           ),
           SizedBox(height: Responsive.h(12)),
@@ -1150,11 +1138,8 @@ class _MonthlySalesCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Target: ${currency.format(target)}', style: AppTextStyles.caption()),
-
               ],
             ),
-            SizedBox(height: Responsive.h(8)),
-
             SizedBox(height: Responsive.h(8)),
           ],
           Row(
@@ -1166,14 +1151,13 @@ class _MonthlySalesCard extends StatelessWidget {
           SizedBox(height: Responsive.h(10)),
           const Divider(height: 1, color: AppColors.border),
           SizedBox(height: Responsive.h(10)),
-
         ],
       ),
     );
   }
 }
 
-/// Shown when the owner has not set up a bonus for the current month.
+/// Shown when the owner has not set up a bonus.
 /// Deliberately minimal — one line + one button, no fields, no confusion.
 class _EmptyMonthlyBonusCard extends StatelessWidget {
   const _EmptyMonthlyBonusCard({required this.onAdd});
@@ -1203,10 +1187,10 @@ class _EmptyMonthlyBonusCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('No incentive set for this month', style: AppTextStyles.bodyBold()),
+                Text('No incentive set up', style: AppTextStyles.bodyBold()),
                 SizedBox(height: Responsive.h(2)),
                 Text(
-                  'Turn it on only for months you want to give a bonus.',
+                  'Turn it on and pick the month + year you want to give a bonus for.',
                   style: AppTextStyles.caption(),
                 ),
               ],
@@ -1345,11 +1329,24 @@ class _ProductIncentiveCard extends StatelessWidget {
               Text('Rate ${currency.format(product.rate)}', style: AppTextStyles.caption()),
             ],
           ),
-
           SizedBox(height: Responsive.h(10)),
-
-                  ],
-                ),);
-
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                hasSales ? 'Achieved: ${currency.format(achieved)}' : 'No sales yet',
+                style: AppTextStyles.caption(),
+              ),
+              Text(
+                'Incentive: ${currency.format(incentiveEarned)}',
+                style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(fontSize: Responsive.sp(13)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -410,7 +410,7 @@ class _IncentiveHeader extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Hello, ${salesmanName.isEmpty ? '-' : salesmanName}',
+                             '${salesmanName.isEmpty ? '-' : salesmanName}' ,
                               style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(19)),
                             ),
                             SizedBox(height: Responsive.h(2)),
@@ -775,3 +775,4 @@ class _TargetProgressCard extends StatelessWidget {
     );
   }
 }
+

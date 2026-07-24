@@ -9,7 +9,6 @@ import '../../../../models/estimate_model.dart';
 import '../widgets/owner_widgets.dart';
 import 'estimate_detail_screen.dart';
 import 'ownercreateesimatescreen.dart';
-import 'ownerdespatchsheet.dart';
 import 'ownerestuimatedetailscreen.dart';
 
 class OwnerEstimatesScreen extends StatefulWidget {
@@ -25,17 +24,6 @@ class _OwnerEstimatesScreenState extends State<OwnerEstimatesScreen> {
   final _searchCtrl = TextEditingController();
 
   static const _filters = ['All', 'Pending', 'Approved', 'Rejected', 'Dispatched'];
-
-  // Dummy list of salesmen the owner can choose from when sending an
-  // approved estimate to despatch. "Assigned to Me" opens the owner's own
-  // despatch sheet instead of just notifying a salesman.
-  static const List<String> _dummySalesmen = [
-    'Assigned to Me',
-    'Anoop Menon',
-    'Ravi Kumar',
-    'Sunitha Nair',
-    'Vishnu Prasad',
-  ];
 
   // ---- DUMMY DATA for UI design purposes only ----
   final List<EstimateModel> _dummyEstimates = [
@@ -130,151 +118,16 @@ class _OwnerEstimatesScreenState extends State<OwnerEstimatesScreen> {
     }).toList();
   }
 
-  // Tapping a card:
-  // - Approved  -> jump straight to the "send to despatch" bottom sheet.
-  // - Anything else -> open the normal details screen.
+  // Tapping any card — regardless of status, including Approved — opens
+  // the estimate details screen. "Send to Despatch" for approved estimates
+  // now lives inside OwnerEstimateDetailsScreen's action bar instead of
+  // popping straight to a bottom sheet from here.
   void _onCardTap(EstimateModel estimate) {
-    if (estimate.status == 'Approved') {
-      _showSendToDespatchSheet(estimate);
-    } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => OwnerEstimateDetailsScreen(),
-        ),
-      );
-    }
-  }
-
-  // Bottom sheet listing salesmen to despatch an approved estimate to.
-  // "Assigned to Me" hands off to the owner's own despatch sheet
-  // (OwnerDespatchSheetScreen). Picking a real salesman just records the
-  // intent for now.
-  // TODO(despatch-flow): wire the "notify salesman" branch to a real
-  // despatch/notification API, and persist the resulting DespatchInfo
-  // against `estimate` once the despatch module has its own model/cubit.
-  Future<void> _showSendToDespatchSheet(EstimateModel estimate) async {
-    final currentSelection = estimate.salesmanName;
-
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Container(
-            margin: EdgeInsets.only(
-              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: Responsive.h(10)),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                SizedBox(height: Responsive.h(16)),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(18)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.local_shipping_outlined, color: AppColors.primary),
-                      SizedBox(width: Responsive.w(8)),
-                      Text('Send to Despatch Sheet', style: AppTextStyles.h3()),
-                    ],
-                  ),
-                ),
-                SizedBox(height: Responsive.h(4)),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(18)),
-                  child: Text(
-                    'Choose who should handle despatch for ${estimate.id}',
-                    style: AppTextStyles.caption(),
-                  ),
-                ),
-                SizedBox(height: Responsive.h(10)),
-                const Divider(height: 1),
-                ..._dummySalesmen.map((name) {
-                  final isMe = name == 'Assigned to Me';
-                  final isCurrent = name == currentSelection;
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: isMe
-                          ? AppColors.primary.withOpacity(0.12)
-                          : AppColors.surfaceAlt,
-                      child: Icon(
-                        isMe ? Icons.person_pin_circle_outlined : Icons.person_outline,
-                        color: isMe ? AppColors.primary : AppColors.textSecondary,
-                      ),
-                    ),
-                    title: Text(name, style: AppTextStyles.bodyBold()),
-                    subtitle: isMe ? const Text('Opens your own despatch sheet') : null,
-                    trailing: isCurrent
-                        ? Icon(Icons.check_circle, color: AppColors.primary)
-                        : const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(sheetContext).pop(name),
-                  );
-                }),
-                SizedBox(height: Responsive.h(10)),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (result == null) return;
-
-    if (result == 'Assigned to Me') {
-      await _openOwnerDespatchSheet(estimate);
-      return;
-    }
-
-    // TODO(despatch-flow): persist `DespatchInfo(assignedSalesman: result, ...)`
-    // against this estimate once despatch state is wired to a real cubit.
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sent to $result for despatch')),
-      );
-    }
-  }
-
-  // Pushes the owner's own despatch sheet screen, pre-filled with this
-  // estimate's data.
-  Future<void> _openOwnerDespatchSheet(EstimateModel estimate) async {
-    final result = await Navigator.of(context).push<DespatchInfo>(
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OwnerDespatchSheetScreen(
-          quotationId: estimate.id,
-          contractorName: estimate.contractorName,
-          phone: estimate.phone,
-          siteAddress: estimate.siteAddress,
-          items: estimate.items
-              .map((i) => OwnerDespatchItem(
-            name: i.name,
-            company: i.company,
-            size: i.size,
-            quantity: i.quantity,
-            unit: i.unit,
-          ))
-              .toList(),
-        ),
+        builder: (_) => OwnerEstimateDetailsScreen(initialStatus: estimate.status),
       ),
     );
-
-    if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Despatch sheet completed')),
-      );
-    }
   }
 
   @override

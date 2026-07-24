@@ -1,30 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../salesman/incentive/salesmanincentivescreen.dart';
-/// UI-only screen — no cubit dependency, since ReportsScreen is opened
-/// directly from the dashboard (no BlocProvider.value).
-///
-/// Lets the owner pick a Salesman OR an Engineer/Contractor, a date
-/// range, and see: no. of bills, no. of quotations, total sqft, and
-/// total sale for that period.
-///
-/// Engineer/Contractor doesn't raise bills/quotations directly, so those
-/// two stat tiles are hidden for that person type — only Sqft + Sale show.
-/// For Salesman, the Bills / Quotations tiles are tappable and open a
-/// date-wise list of that person's documents for the selected range,
-/// which in turn opens a full detail screen per document.
-///
-/// Incentive breakdown is NOT shown inline here anymore — it now lives on
-/// its own dedicated [SalesmanIncentiveScreen], reachable via the
-/// "View Incentive Details" card below (Salesman only). That screen shows
-/// product-wise incentive with a per-product, date-wise sales drill-down.
-///
-/// TODO(backend): replace `_salesmen`, `_contractors`, `_buildReport()`'s
-/// dummy numbers, and `_generateDocuments()` with real aggregation over
-/// OwnerCubit's estimates for the selected person + date range.
+
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -61,19 +42,25 @@ class _DocumentItem {
     required this.date,
     required this.customerName,
     required this.customerMobile,
+    required this.customerAddress,
     required this.sqft,
     required this.amount,
     required this.type,
     required this.products,
+    this.approvedBy,
   });
   final String id;
   final DateTime date;
   final String customerName;
   final String customerMobile;
+  final String customerAddress;
   final double sqft;
   final double amount;
   final _DocType type;
   final List<_DocProductLine> products;
+  // Only set for Bills — a bill exists because its estimate was approved.
+  // Quotations never carry this.
+  final String? approvedBy;
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
@@ -115,7 +102,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final count = type == _DocType.bill ? _noOfBills : _noOfQuotations;
     final totalSpan = _toDate.difference(_fromDate).inDays.clamp(1, 100000);
     final seed = _selectedPerson.name.length + _selectedPerson.mobile.hashCode.abs();
-    final prefix = type == _DocType.bill ? 'BILL' : 'QTN';
+    final prefix = type == _DocType.bill ? 'Est.No' : 'DS';
 
     final customers = [
       'Anil Nair',
@@ -126,10 +113,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'Geetha Pillai',
     ];
 
+    final addresses = [
+      'No. 12, MG Road, Kozhikode',
+      'Near Bus Stand, Kanhangad',
+      'Beach Road, Kasaragod',
+      'Palace Road, Kanhangad',
+      'Hosdurg, Kasaragod',
+      'Bekal Road, Kanhangad',
+    ];
+
+    // Bills exist because their estimate was approved by an owner/admin.
+
     return List.generate(count, (i) {
       final dayOffset = ((seed + i * 13) % totalSpan);
       final date = _fromDate.add(Duration(days: dayOffset));
       final customer = customers[(seed + i) % customers.length];
+      final address = addresses[(seed + i) % addresses.length];
       final sqft = 80.0 + ((seed + i * 17) % 220);
       final rate1 = 55.0 + ((seed + i * 3) % 40);
       final rate2 = 40.0 + ((seed + i * 5) % 25);
@@ -142,9 +141,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         date: date,
         customerName: customer,
         customerMobile: '9${(700000000 + (seed + i) * 137) % 100000000}',
+        customerAddress: address,
         sqft: sqft,
         amount: amount1 + amount2,
         type: type,
+        approvedBy: type == _DocType.bill ? 'Nitheesh' : null,
         products: [
           _DocProductLine(
             name: 'Vitrified Tile 600x600',
@@ -229,8 +230,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
             SizedBox(height: Responsive.h(18)),
             Text('Summary', style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(15))),
             SizedBox(height: Responsive.h(10)),
+            // Bills / Quotations / Sqft / Sale are now shown for BOTH
+            // Salesman and Engineer/Contractor (previously contractor only
+            // saw Sqft + Total Sale).
             _StatsGrid(
-              isSalesman: _isSalesman,
               noOfBills: _noOfBills,
               noOfQuotations: _noOfQuotations,
               totalSqft: _totalSqft,
@@ -399,12 +402,11 @@ class _DatePickField extends StatelessWidget {
 
 // ---------------- STATS GRID ----------------
 
-/// For a Salesman, shows all 4 tiles (Bills + Quotations are tappable and
-/// open a date-wise document list). For an Engineer/Contractor — who
-/// doesn't raise bills/quotations directly — only Sqft + Total Sale show.
+/// Shows all 4 tiles for BOTH Salesman and Engineer/Contractor: No. of
+/// Bills and No. of Quotations (tappable, opens a date-wise document
+/// list) plus Total Sqft and Total Sale.
 class _StatsGrid extends StatelessWidget {
   const _StatsGrid({
-    required this.isSalesman,
     required this.noOfBills,
     required this.noOfQuotations,
     required this.totalSqft,
@@ -413,7 +415,6 @@ class _StatsGrid extends StatelessWidget {
     required this.onTapQuotations,
   });
 
-  final bool isSalesman;
   final int noOfBills;
   final int noOfQuotations;
   final double totalSqft;
@@ -423,31 +424,6 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!isSalesman) {
-      // Engineer/Contractor: no bills/quotations, just sqft + sale.
-      return Row(
-        children: [
-          Expanded(
-            child: _StatTile(
-              icon: Icons.square_foot_rounded,
-              label: 'Total Sqft',
-              value: totalSqft.toStringAsFixed(0),
-              color: AppColors.warning,
-            ),
-          ),
-          SizedBox(width: Responsive.w(10)),
-          Expanded(
-            child: _StatTile(
-              icon: Icons.currency_rupee_rounded,
-              label: 'Total Sale',
-              value: totalSale,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      );
-    }
-
     return Row(
       children: [
         Expanded(
@@ -590,12 +566,13 @@ class _IncentiveEntryCard extends StatelessWidget {
   }
 }
 
-// ---------------- DATE-WISE DOCUMENT LIST SCREEN ----------------
+// ---------------- BILLS / QUOTATIONS LIST SCREEN ----------------
 
-/// Shows every Bill / Quotation raised by [person] between [fromDate] and
-/// [toDate], grouped date-wise (most recent first). Tapping a row opens
+/// Lists every Bill / Quotation raised by [person] between [fromDate] and
+/// [toDate]. Styled the same way as the Owner Estimates screen: a search
+/// bar and cards. No status is shown or filtered on. Tapping a card opens
 /// [_DocumentDetailScreen].
-class _DocumentListScreen extends StatelessWidget {
+class _DocumentListScreen extends StatefulWidget {
   const _DocumentListScreen({
     required this.type,
     required this.person,
@@ -612,100 +589,113 @@ class _DocumentListScreen extends StatelessWidget {
   final List<_DocumentItem> documents;
   final NumberFormat currency;
 
-  String get _title => type == _DocType.bill ? 'Bills' : 'Quotations';
+  @override
+  State<_DocumentListScreen> createState() => _DocumentListScreenState();
+}
+
+class _DocumentListScreenState extends State<_DocumentListScreen> {
+  final _searchCtrl = TextEditingController();
+
+  String get _title => widget.type == _DocType.bill ? 'Bills' : 'Quotations';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<_DocumentItem> get _filtered {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    return widget.documents.where((d) {
+      final matchesSearch = q.isEmpty ||
+          d.customerName.toLowerCase().contains(q) ||
+          d.customerMobile.contains(q) ||
+          d.id.toLowerCase().contains(q);
+      return matchesSearch;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
     final dateFmt = DateFormat('dd-MM-yyyy');
-    final groupFmt = DateFormat('dd MMM, yyyy');
-
-    // group date-wise, newest date first (documents already sorted desc).
-    final Map<String, List<_DocumentItem>> grouped = {};
-    for (final doc in documents) {
-      final key = groupFmt.format(doc.date);
-      grouped.putIfAbsent(key, () => []).add(doc);
-    }
+    final items = _filtered;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(_title, style: AppTextStyles.h6()),
-      ),
+      appBar: AppBar(title: Text(_title, style: AppTextStyles.h6())),
       body: SafeArea(
-        child: documents.isEmpty
-            ? Center(
-          child: Text('No $_title found in this period', style: AppTextStyles.caption()),
-        )
-            : ListView(
-          padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(16), Responsive.h(24)),
+        child: Column(
           children: [
-            Container(
-              padding: EdgeInsets.all(Responsive.w(12)),
-              margin: EdgeInsets.only(bottom: Responsive.h(16)),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
+            Padding(
+              padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(person.name, style: AppTextStyles.bodyBold()),
-                        Text(person.mobile, style: AppTextStyles.caption()),
-                      ],
+                  TextField(
+                    controller: _searchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Search customer or ID',
+                      prefixIcon: Icon(Icons.search_rounded),
                     ),
                   ),
-                  Text(
-                    '${dateFmt.format(fromDate)} – ${dateFmt.format(toDate)}',
-                    style: AppTextStyles.caption(),
+                  SizedBox(height: Responsive.h(10)),
+                  Container(
+                    padding: EdgeInsets.all(Responsive.w(12)),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(widget.person.name, style: AppTextStyles.bodyBold()),
+                              Text(widget.person.mobile, style: AppTextStyles.caption()),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${dateFmt.format(widget.fromDate)} – ${dateFmt.format(widget.toDate)}',
+                          style: AppTextStyles.caption(),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            for (final entry in grouped.entries) ...[
-              Padding(
-                padding: EdgeInsets.only(bottom: Responsive.h(8), top: Responsive.h(4)),
-                child: Text(
-                  entry.key,
-                  style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(13), color: AppColors.textSecondary),
-                ),
-              ),
-              Container(
-                margin: EdgeInsets.only(bottom: Responsive.h(16)),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    for (int i = 0; i < entry.value.length; i++) ...[
-                      _DocumentTile(
-                        doc: entry.value[i],
-                        currency: currency,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => _DocumentDetailScreen(
-                                doc: entry.value[i],
-                                person: person,
-                                currency: currency,
-                              ),
-                            ),
-                          );
-                        },
+            SizedBox(height: Responsive.h(12)),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                child: Text('No $_title found', style: AppTextStyles.subtitle()),
+              )
+                  : ListView.separated(
+                padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(20)),
+                itemCount: items.length,
+                separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                itemBuilder: (context, i) {
+                  final doc = items[i];
+                  return _DocumentCard(
+                    doc: doc,
+                    currency: widget.currency,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => _DocumentDetailScreen(
+                          doc: doc,
+                          person: widget.person,
+                          currency: widget.currency,
+                        ),
                       ),
-                      if (i != entry.value.length - 1)
-                        Divider(height: 1, indent: Responsive.w(14), endIndent: Responsive.w(14), color: AppColors.border),
-                    ],
-                  ],
-                ),
+                    ),
+                  );
+                },
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -713,8 +703,11 @@ class _DocumentListScreen extends StatelessWidget {
   }
 }
 
-class _DocumentTile extends StatelessWidget {
-  const _DocumentTile({required this.doc, required this.currency, required this.onTap});
+/// Card styled the same way as the Owner Estimates `_OwnerEstimateCard`,
+/// minus the status badge — just customer, ID, contact/sqft, date and
+/// amount.
+class _DocumentCard extends StatelessWidget {
+  const _DocumentCard({required this.doc, required this.currency, required this.onTap});
   final _DocumentItem doc;
   final NumberFormat currency;
   final VoidCallback onTap;
@@ -722,41 +715,64 @@ class _DocumentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBill = doc.type == _DocType.bill;
+
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-        child: Row(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: EdgeInsets.all(Responsive.w(14)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (isBill ? AppColors.primary : AppColors.info).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isBill ? Icons.receipt_long_rounded : Icons.request_quote_outlined,
-                color: isBill ? AppColors.primary : AppColors.info,
-                size: 18,
-              ),
+            Text(doc.customerName, style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
+            SizedBox(height: Responsive.h(4)),
+            Text(
+              '${isBill ? 'Bill' : 'Quotation'} No: ${doc.id}',
+              style: AppTextStyles.caption(),
             ),
-            SizedBox(width: Responsive.w(10)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            SizedBox(height: Responsive.h(4)),
+            Row(
+              children: [
+                const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+                SizedBox(width: Responsive.w(4)),
+                Expanded(
+                  child: Text(
+                    '${doc.customerMobile} · ${doc.sqft.toStringAsFixed(0)} sqft',
+                    style: AppTextStyles.caption(),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            if (doc.approvedBy != null) ...[
+              SizedBox(height: Responsive.h(4)),
+              Row(
                 children: [
-                  Text(doc.id, style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  SizedBox(height: Responsive.h(2)),
-                  Text('${doc.customerName} · ${doc.sqft.toStringAsFixed(0)} sqft', style: AppTextStyles.caption()),
+                  const Icon(Icons.verified_outlined, size: 14, color: AppColors.primary),
+                  SizedBox(width: Responsive.w(4)),
+                  Expanded(
+                    child: Text(
+                      'Approved by ${doc.approvedBy}',
+                      style: AppTextStyles.caption(color: AppColors.primary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            ],
+            SizedBox(height: Responsive.h(8)),
+            const Divider(height: 1, color: AppColors.border),
+            SizedBox(height: Responsive.h(8)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Text(DateFormat('dd-MM-yyyy').format(doc.date), style: AppTextStyles.caption()),
                 Text(currency.format(doc.amount), style: AppTextStyles.bodyBold(color: AppColors.primary)),
-                SizedBox(height: Responsive.h(2)),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 16),
               ],
             ),
           ],
@@ -767,6 +783,17 @@ class _DocumentTile extends StatelessWidget {
 }
 
 // ---------------- DOCUMENT DETAIL SCREEN ----------------
+// Styled the same way as OwnerEstimateDetailsScreen: a summary card with
+// ID/date, a type chip, detail sections, an items DataTable, a totals
+// box, and round edit/share icon buttons at the bottom. No status shown.
+
+// Same placeholder incentive % pattern used on the salesman Estimate
+// Details screen — replace with real per-product incentive % once
+// admin-config exposes it.
+const double _dummyDocIncentivePercent = 5.0;
+
+double _incentiveAmountForDoc(_DocProductLine item) =>
+    item.amount * _dummyDocIncentivePercent / 100;
 
 class _DocumentDetailScreen extends StatelessWidget {
   const _DocumentDetailScreen({required this.doc, required this.person, required this.currency});
@@ -774,144 +801,387 @@ class _DocumentDetailScreen extends StatelessWidget {
   final _PersonOption person;
   final NumberFormat currency;
 
+  bool get _isBill => doc.type == _DocType.bill;
+
+  double get _incentiveTotal =>
+      doc.products.fold(0.0, (s, item) => s + _incentiveAmountForDoc(item));
+
+  String _buildShareText(NumberFormat currency, NumberFormat number) {
+    final buffer = StringBuffer()
+      ..writeln('${_isBill ? 'Bill' : 'Quotation'} ${doc.id}')
+      ..writeln('Party Name: ${doc.customerName}')
+      ..writeln('Party Address: ${doc.customerAddress}')
+      ..writeln('Phone: ${doc.customerMobile}')
+      ..writeln('Date: ${DateFormat('dd MMM yyyy').format(doc.date)}')
+      ..writeln('---');
+    for (final item in doc.products) {
+      buffer.writeln('${item.name} (${item.company}) x ${item.sqft.toStringAsFixed(0)} sqft = ${currency.format(item.amount)}');
+    }
+    buffer
+      ..writeln('---')
+      ..writeln('Total Sqft: ${number.format(doc.sqft)}')
+      ..writeln('Total: ${currency.format(doc.amount)}')
+      ..writeln('Salesman: ${person.name}');
+    if (doc.approvedBy != null) {
+      buffer.writeln('Approved By: ${doc.approvedBy}');
+    }
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final isBill = doc.type == _DocType.bill;
-    final dateFmt = DateFormat('dd MMM, yyyy');
+    final number = NumberFormat.decimalPattern('en_IN');
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(isBill ? 'Bill Details' : 'Quotation Details', style: AppTextStyles.h6())),
+      appBar: AppBar(title: Text(_isBill ? 'Bill Details' : 'Quotation Details', style: AppTextStyles.h6())),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(16), Responsive.h(24)),
+        child: Column(
           children: [
-            Container(
-              padding: EdgeInsets.all(Responsive.w(14)),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.all(Responsive.w(18)),
                 children: [
+                  // Top summary card — Bill/Quotation No. + Date, matching
+                  // the Owner Estimate Details layout.
+                  Container(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_isBill ? 'Bill No.' : 'Quotation No.', style: AppTextStyles.caption()),
+                            Text(doc.id, style: AppTextStyles.h3()),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Date', style: AppTextStyles.caption()),
+                            Text(DateFormat('dd-MM-yyyy').format(doc.date), style: AppTextStyles.h3()),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(10)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(_isBill ? 'Bill' : 'Quotation', style: AppTextStyles.bodyBold()),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
+
+                  _DetailSection(
+                    title: 'Party Details',
+                    rows: [
+                      _Row('Party Name', doc.customerName, icon: Icons.groups_2_outlined),
+                      _Row('Party Address', doc.customerAddress, icon: Icons.location_on_outlined),
+                      _Row('Phone Number', doc.customerMobile, icon: Icons.phone_outlined),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(14)),
+                  _DetailSection(
+                    title: 'Contractor Details',
+                    rows: [
+                      _Row('Contractor Name', doc.customerName, icon: Icons.engineering_outlined),
+                      _Row('Contact No.', doc.customerMobile, icon: Icons.phone_outlined),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(14)),
+                  _DetailSection(
+                    title: 'Salesman',
+                    rows: [
+                      _Row('Name', person.name, icon: Icons.badge_outlined),
+                    ],
+                  ),
+                  if (doc.approvedBy != null) ...[
+                    SizedBox(height: Responsive.h(14)),
+                    _DetailSection(
+                      title: 'Approval',
+                      rows: [
+                        _Row('Approved By', doc.approvedBy!, icon: Icons.check_circle_outline),
+                      ],
+                    ),
+                  ],
+                  SizedBox(height: Responsive.h(20)),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(doc.id, style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(16))),
+                      Text('Products', style: AppTextStyles.h3()),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(4)),
                         decoration: BoxDecoration(
-                          color: (isBill ? AppColors.primary : AppColors.info).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          isBill ? 'BILL' : 'QUOTATION',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: isBill ? AppColors.primary : AppColors.info,
-                          ),
+                          'Total Items: ${doc.products.length}',
+                          style: AppTextStyles.bodyBold(color: AppColors.primary),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(dateFmt.format(doc.date), style: AppTextStyles.caption()),
-                  SizedBox(height: Responsive.h(14)),
-                  const Divider(height: 1, color: AppColors.border),
-                  SizedBox(height: Responsive.h(14)),
-                  Text('Customer', style: AppTextStyles.caption()),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(doc.customerName, style: AppTextStyles.bodyBold()),
-                  Text(doc.customerMobile, style: AppTextStyles.caption()),
-                  SizedBox(height: Responsive.h(14)),
-                  const Divider(height: 1, color: AppColors.border),
-                  SizedBox(height: Responsive.h(14)),
-                  Text(
-                    isBill ? 'Billed By' : 'Prepared By',
-                    style: AppTextStyles.caption(),
-                  ),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(person.name, style: AppTextStyles.bodyBold()),
-                  Text(person.mobile, style: AppTextStyles.caption()),
-                ],
-              ),
-            ),
-            SizedBox(height: Responsive.h(20)),
-            Text('Products', style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(15))),
-            SizedBox(height: Responsive.h(10)),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
-                  for (int i = 0; i < doc.products.length; i++) ...[
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(doc.products[i].name, style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                SizedBox(height: Responsive.h(2)),
-                                Text(
-                                  '${doc.products[i].company} · ${doc.products[i].sqft.toStringAsFixed(0)} sqft × ${currency.format(doc.products[i].rate)}',
-                                  style: AppTextStyles.caption(),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(currency.format(doc.products[i].amount), style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                  SizedBox(height: Responsive.h(12)),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor: MaterialStateProperty.all(AppColors.surfaceAlt),
+                        headingTextStyle: AppTextStyles.bodyBold(),
+                        dataTextStyle: AppTextStyles.body(),
+                        columnSpacing: 18,
+                        columns: const [
+                          DataColumn(label: Text('Sl.No')),
+                          DataColumn(label: Text('Item')),
+                          DataColumn(label: Text('Company')),
+                          DataColumn(label: Text('Sqft'), numeric: true),
+                          DataColumn(label: Text('Rate'), numeric: true),
+                          DataColumn(label: Text('Amount'), numeric: true),
+                          DataColumn(label: Text('Incentive'), numeric: true),
                         ],
+                        rows: doc.products.asMap().entries.map((entry) {
+                          final i = entry.key;
+                          final item = entry.value;
+                          return DataRow(cells: [
+                            DataCell(Text('${i + 1}')),
+                            DataCell(Text(item.name)),
+                            DataCell(Text(item.company.isEmpty ? '-' : item.company)),
+                            DataCell(Text(number.format(item.sqft))),
+                            DataCell(Text(number.format(item.rate))),
+                            DataCell(Text(
+                              currency.format(item.amount),
+                              style: AppTextStyles.bodyBold(),
+                            )),
+                            DataCell(Text(
+                              currency.format(_incentiveAmountForDoc(item)),
+                              style: AppTextStyles.bodyBold(color: AppColors.success),
+                            )),
+                          ]);
+                        }).toList(),
                       ),
                     ),
-                    if (i != doc.products.length - 1)
-                      Divider(height: 1, indent: Responsive.w(14), endIndent: Responsive.w(14), color: AppColors.border),
-                  ],
+                  ),
+                  SizedBox(height: Responsive.h(16)),
+
+                  Container(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Total Items', style: AppTextStyles.body()),
+                            Text('${doc.products.length}', style: AppTextStyles.body()),
+                          ],
+                        ),
+                        SizedBox(height: Responsive.h(6)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Total Sqft', style: AppTextStyles.body()),
+                            Text(number.format(doc.sqft), style: AppTextStyles.body()),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(_isBill ? 'Total Amount' : 'Quoted Amount', style: AppTextStyles.h3()),
+                            Text(currency.format(doc.amount), style: AppTextStyles.h2(color: AppColors.primary)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(12)),
+
+                  // Separate, visually distinct box for incentive so it's
+                  // clear this is internal/salesman info, not part of the
+                  // customer's total above. Values are dummy (5%) until
+                  // admin-configured incentive data is wired up.
+                  Container(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.percent, size: 18, color: AppColors.success),
+                            SizedBox(width: Responsive.w(8)),
+                            Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                            SizedBox(width: Responsive.w(6)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${_dummyDocIncentivePercent.toStringAsFixed(0)}% · dummy',
+                                style: AppTextStyles.caption(color: AppColors.success),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          currency.format(_incentiveTotal),
+                          style: AppTextStyles.h3(color: AppColors.success),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-            SizedBox(height: Responsive.h(20)),
-            Container(
-              padding: EdgeInsets.all(Responsive.w(14)),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
+            Padding(
+              padding: EdgeInsets.fromLTRB(Responsive.w(18), 0, Responsive.w(18), Responsive.h(18)),
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Total Sqft', style: AppTextStyles.caption()),
-                      Text(doc.sqft.toStringAsFixed(0), style: AppTextStyles.bodyBold()),
-                    ],
+                  _RoundIconButton(
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Edit',
+                    onPressed: () {
+                      // Hand this document off to your edit flow (e.g.
+                      // re-open the create/edit screen pre-filled).
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Wire this up to your edit flow')),
+                      );
+                    },
                   ),
-                  SizedBox(height: Responsive.h(8)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(isBill ? 'Total Amount' : 'Quoted Amount', style: AppTextStyles.bodyBold()),
-                      Text(
-                        currency.format(doc.amount),
-                        style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(fontSize: 16),
-                      ),
-                    ],
+                  SizedBox(width: Responsive.w(10)),
+                  _RoundIconButton(
+                    icon: Icons.share_outlined,
+                    tooltip: 'Share',
+                    onPressed: () async {
+                      // Swap for `Share.share(...)` (share_plus package)
+                      // once it's added to pubspec.yaml.
+                      await Clipboard.setData(ClipboardData(text: _buildShareText(currency, number)));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Summary copied to clipboard')),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(icon, size: 20, color: AppColors.primary),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+class _Row {
+  final String label;
+  final String value;
+  final IconData? icon;
+  _Row(this.label, this.value, {this.icon});
+}
+
+class _DetailSection extends StatelessWidget {
+  const _DetailSection({required this.title, required this.rows});
+  final String title;
+  final List<_Row> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTextStyles.bodyBold(color: AppColors.primary)),
+          SizedBox(height: Responsive.h(10)),
+          ...rows.map((r) => Padding(
+            padding: EdgeInsets.only(bottom: Responsive.h(10)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (r.icon != null) ...[
+                  Icon(r.icon, size: 16, color: AppColors.textHint),
+                  SizedBox(width: Responsive.w(8)),
+                ],
+                SizedBox(
+                  width: r.icon != null ? 88 : 100,
+                  child: Text(r.label, style: AppTextStyles.caption()),
+                ),
+                Expanded(
+                  child: Text(
+                    r.value.isEmpty ? '-' : r.value,
+                    style: AppTextStyles.bodyBold(),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }

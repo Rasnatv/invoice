@@ -96,7 +96,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       ],
       recentEstimates: [
         EstimateModel(
-          id: '#2546',
+          id: 'Est.No.001',
           contractorName: 'ABC Builders',
           siteAddress: 'Trivandrum, Kerala',
           phone: '+91 98765 43210',
@@ -108,7 +108,7 @@ class DashboardCubit extends Cubit<DashboardState> {
           ],
         ),
         EstimateModel(
-          id: '#2545',
+          id: 'Est.No.002',
           contractorName: 'Skyline Constructions',
           siteAddress: 'Kottayam, Kerala',
           phone: '+91 87654 32109',
@@ -120,7 +120,7 @@ class DashboardCubit extends Cubit<DashboardState> {
           ],
         ),
         EstimateModel(
-          id: '#2544',
+          id: 'Est.No.003',
           contractorName: 'Royal Builders',
           siteAddress: 'Ernakulam, Kerala',
           phone: '+91 76543 21098',

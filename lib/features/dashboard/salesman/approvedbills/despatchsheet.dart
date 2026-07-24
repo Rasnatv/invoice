@@ -40,6 +40,16 @@ class _DespatchRow {
   }
 }
 
+/// TODO(backend): replace with real driver list from OwnerCubit / repository
+/// (see OwnerDriverScreen's DriverModel list once that's backed by data).
+/// Holds a driver's name + phone number so the number can auto-fill when
+/// a driver is selected from the dropdown.
+class _DriverOption {
+  final String name;
+  final String number;
+  const _DriverOption(this.name, this.number);
+}
+
 class DespatchSheetScreen extends StatefulWidget {
   const DespatchSheetScreen({super.key, required this.estimate});
 
@@ -63,13 +73,18 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
 
   // TODO(backend): replace with real driver list from OwnerCubit / repository
   // (see OwnerDriverScreen's DriverModel list once that's backed by data).
-  final List<String> _driverOptions = const [
-    'Ramesh Kumar',
-    'Suresh Nair',
-    'Anil Varma',
+  final List<_DriverOption> _driverOptions = const [
+    _DriverOption('Ramesh Kumar', '9876543210'),
+    _DriverOption('Suresh Nair', '9876501234'),
+    _DriverOption('Anil Varma', '9812345678'),
   ];
   String? _selectedDriverName;
   bool _driverError = false;
+
+  // Auto-filled from the selected driver's record (see _driverOptions).
+  // Currently read-only; flip readOnly to false below if drivers should
+  // be able to override the number on-screen.
+  late final TextEditingController _driverNumberCtrl;
 
   late final List<_DespatchRow> _rows;
 
@@ -81,6 +96,7 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
     _dsNumber = 'DS-${widget.estimate.id}';
     _refNo = widget.estimate.id;
     _deliveryAddressCtrl = TextEditingController();
+    _driverNumberCtrl = TextEditingController();
     _rows = widget.estimate.items
         .map((item) => _DespatchRow(
       item: item.name,
@@ -100,6 +116,7 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
       r.dispose();
     }
     _deliveryAddressCtrl.dispose();
+    _driverNumberCtrl.dispose();
     super.dispose();
   }
 
@@ -113,6 +130,21 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
     final ok = _deliveryAddressCtrl.text.trim().isNotEmpty;
     setState(() => _deliveryAddressError = !ok);
     return ok;
+  }
+
+  /// Called when a driver is picked from the dropdown. Auto-fills the
+  /// driver number field from _driverOptions; falls back to blank if
+  /// somehow no match is found.
+  void _onDriverSelected(String? value) {
+    setState(() {
+      _selectedDriverName = value;
+      _driverError = false;
+      final match = _driverOptions.firstWhere(
+            (d) => d.name == value,
+        orElse: () => const _DriverOption('', ''),
+      );
+      _driverNumberCtrl.text = match.number;
+    });
   }
 
   void _shareOnWhatsApp() {
@@ -144,7 +176,8 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
     }
     buffer
       ..writeln('')
-      ..writeln('Driver Name: ${_selectedDriverName ?? '-'}');
+      ..writeln('Driver Name: ${_selectedDriverName ?? '-'}')
+      ..writeln('Driver Number: ${_driverNumberCtrl.text.isEmpty ? '-' : _driverNumberCtrl.text}');
     Share.share(buffer.toString(), subject: 'Despatch Sheet $_dsNumber');
   }
 
@@ -206,6 +239,9 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
               ),
               pw.SizedBox(height: 28),
               pw.Text('Driver Name: ${_selectedDriverName ?? '_______________________'}'),
+              pw.Text(
+                'Driver Number: ${_driverNumberCtrl.text.isEmpty ? '_______________________' : _driverNumberCtrl.text}',
+              ),
               pw.SizedBox(height: 24),
               pw.Text('Customer Signature: _______________________'),
             ],
@@ -271,6 +307,10 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
     sheet.appendRow([
       xls.TextCellValue('Driver Name:'),
       xls.TextCellValue(_selectedDriverName ?? '-'),
+    ]);
+    sheet.appendRow([
+      xls.TextCellValue('Driver Number:'),
+      xls.TextCellValue(_driverNumberCtrl.text.isEmpty ? '-' : _driverNumberCtrl.text),
     ]);
     sheet.appendRow([xls.TextCellValue('Customer Signature:')]);
 
@@ -558,15 +598,47 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
                       ),
                     ),
                     items: _driverOptions
-                        .map((name) => DropdownMenuItem<String>(
-                      value: name,
-                      child: Text(name, style: AppTextStyles.body()),
+                        .map((d) => DropdownMenuItem<String>(
+                      value: d.name,
+                      child: Text(d.name, style: AppTextStyles.body()),
                     ))
                         .toList(),
-                    onChanged: (value) => setState(() {
-                      _selectedDriverName = value;
-                      _driverError = false;
-                    }),
+                    onChanged: _onDriverSelected,
+                  ),
+                  SizedBox(height: Responsive.h(12)),
+
+                  Text('Driver Number', style: AppTextStyles.h3()),
+                  SizedBox(height: Responsive.h(8)),
+                  TextField(
+                    controller: _driverNumberCtrl,
+                    // Auto-filled from the selected driver; kept read-only
+                    // so it always matches the chosen driver's record.
+                    // TODO(backend): once driver data has a real editable
+                    // phone source, decide whether to allow overrides here.
+                    readOnly: true,
+                    style: AppTextStyles.body(),
+                    decoration: InputDecoration(
+                      hintText: 'Driver number',
+                      prefixIcon: const Icon(Icons.call_outlined),
+                      filled: true,
+                      fillColor: AppColors.surfaceAlt,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: Responsive.w(14),
+                        vertical: Responsive.h(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: AppColors.border),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: AppColors.border),
+                      ),
+                    ),
                   ),
                   SizedBox(height: Responsive.h(24)),
 

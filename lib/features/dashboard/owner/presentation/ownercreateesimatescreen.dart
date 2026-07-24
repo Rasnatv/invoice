@@ -1,3 +1,4 @@
+
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,11 +10,75 @@ import '../../../../core/widgets/primary_button.dart';
 import '../../../../models/estimate_model.dart';
 import '../../salesman/estimates/cubit/estimates_cubit.dart';
 
+// =====================================================================
+// PRODUCT CATALOG
+//
+// TODO(admin-config): This mirrors the demo list in
+// IncentiveManagementScreen. Once products are shared through a real
+// ProductsCubit / backend, replace `_productCatalog` with that source so
+// owner-added products show up here automatically.
+// =====================================================================
+
+class _ProductCatalogItem {
+  final String id;
+  final String name;
+  final String company;
+  final String size;
+  final String unit;
+  final double mrp;
+  final double rate;
+  final double incentivePercent;
+
+  const _ProductCatalogItem({
+    required this.id,
+    required this.name,
+    required this.company,
+    required this.size,
+    required this.unit,
+    required this.mrp,
+    required this.rate,
+    required this.incentivePercent,
+  });
+}
+
+const List<_ProductCatalogItem> _productCatalog = [
+  _ProductCatalogItem(
+    id: 'p1',
+    name: 'Vitrified Tile 600x600',
+    company: 'Kajaria',
+    size: '600x600',
+    unit: 'box',
+    mrp: 65,
+    rate: 55,
+    incentivePercent: 5,
+  ),
+  _ProductCatalogItem(
+    id: 'p2',
+    name: 'Wall Tile 300x450',
+    company: 'Somany',
+    size: '300x450',
+    unit: 'box',
+    mrp: 48,
+    rate: 40,
+    incentivePercent: 4,
+  ),
+  _ProductCatalogItem(
+    id: 'p3',
+    name: 'PVC Pipe 4"',
+    company: 'Supreme',
+    size: '4"',
+    unit: 'piece',
+    mrp: 320,
+    rate: 280,
+    incentivePercent: 3,
+  ),
+];
 
 /// One added item in the estimate. Plain data (not controllers) since items
 /// are added one at a time via a form, then shown as a read-only list.
 class _AddedItem {
   final String id;
+  final String productId;
   final String name;
   final String company;
   final String size;
@@ -22,14 +87,13 @@ class _AddedItem {
   final double mrp;
   final double rate;
 
-  // TODO(admin-config): incentive % is currently a hardcoded dummy value for
-  // UI purposes only. Once the backend/admin panel exposes a per-product
-  // incentive %, replace `_dummyIncentivePercent` with the real value passed
-  // in from the product/master data and remove this constant.
+  /// Real incentive % pulled from the selected product in the catalog at
+  /// the time this item was added.
   final double incentivePercent;
 
-  _AddedItem({
+  const _AddedItem({
     required this.id,
+    required this.productId,
     required this.name,
     required this.company,
     required this.size,
@@ -37,10 +101,8 @@ class _AddedItem {
     required this.quantity,
     required this.mrp,
     required this.rate,
-    double? incentivePercent,
-  }) : incentivePercent = incentivePercent ?? _dummyIncentivePercent;
-
-  static const double _dummyIncentivePercent = 5.0;
+    required this.incentivePercent,
+  });
 
   double get amount => quantity * rate;
   double get mrpValue => quantity * mrp;
@@ -61,9 +123,16 @@ class _AddedItem {
 enum _Step { details, addItems, preview }
 
 /// Owner-side estimate creation. Functionally identical to the salesman
-/// flow (details -> add items -> preview) except the final action creates
-/// the estimate directly as an approved bill, since the owner IS the
-/// approver and doesn't need to route it through a pending-approval queue.
+/// flow (details -> add items -> preview) except:
+///  - the final action creates the estimate directly as an approved bill,
+///    since the owner IS the approver and doesn't need to route it through
+///    a pending-approval queue.
+///  - the "Salesman" section is relabeled "Owner".
+///  - items are picked from a product dropdown (like the salesman flow),
+///    so company/size/unit/MRP/rate auto-fill and the incentive % used is
+///    the real per-product value instead of a hardcoded dummy.
+///  - the final "Approved" button shows a confirmation dialog first,
+///    where the owner types their name before the estimate is created.
 class OwnerCreateEstimateScreen extends StatefulWidget {
   const OwnerCreateEstimateScreen({super.key});
 
@@ -74,7 +143,7 @@ class OwnerCreateEstimateScreen extends StatefulWidget {
 class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
   _Step _step = _Step.details;
 
-  // --- Step 1: Party / Contractor / Salesman ---
+  // --- Step 1: Party / Contractor / Owner ---
   final _partyNameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -83,6 +152,9 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
   final _salesmanCtrl = TextEditingController();
   final _salesmanMobCtrl = TextEditingController();
   final _handlingChargeCtrl = TextEditingController(text: '0');
+
+  // Name typed into the "Approve Estimate" confirmation dialog.
+  final _approverNameCtrl = TextEditingController();
 
   DateTime _date = DateTime.now();
   late final String _estimateNo;
@@ -95,6 +167,11 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
   final _itemQtyCtrl = TextEditingController();
   final _itemMrpCtrl = TextEditingController();
   final _itemRateCtrl = TextEditingController();
+
+  // Currently selected product from the dropdown. Drives
+  // company/size/unit/MRP/rate auto-fill and the real incentive % used
+  // when the item is added.
+  _ProductCatalogItem? _selectedProduct;
 
   final List<_AddedItem> _items = [];
   int _itemCounter = 0;
@@ -116,6 +193,7 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
     _salesmanCtrl.dispose();
     _salesmanMobCtrl.dispose();
     _handlingChargeCtrl.dispose();
+    _approverNameCtrl.dispose();
     _itemNameCtrl.dispose();
     _itemCompanyCtrl.dispose();
     _itemSizeCtrl.dispose();
@@ -135,8 +213,8 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
   double get _totalQty => _items.fold(0.0, (s, r) => s + r.quantity);
   int get _totalItems => _items.length;
 
-  // Sum of all items' dummy incentive amounts (salesman-facing only, not
-  // part of the customer's grand total).
+  // Sum of all items' incentive amounts (internal-facing only, not part of
+  // the customer's grand total).
   double get _incentiveTotal => _items.fold(0.0, (s, r) => s + r.incentiveAmount);
 
   double get _currentItemAmount {
@@ -145,9 +223,12 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
     return qty * rate;
   }
 
-  // Dummy incentive preview for the item currently being entered, using the
-  // same placeholder % as _AddedItem. Replace once admin data is wired up.
-  double get _currentItemIncentive => _currentItemAmount * 0.05;
+  // Incentive preview for the item currently being entered, using the real
+  // % from whichever product is selected in the dropdown.
+  double get _currentItemIncentive {
+    final percent = _selectedProduct?.incentivePercent ?? 0;
+    return _currentItemAmount * percent / 100;
+  }
 
   // ---------------- Validation ----------------
 
@@ -165,8 +246,8 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
   }
 
   bool _validateCurrentItemFields() {
-    if (_itemNameCtrl.text.trim().isEmpty) {
-      _showError('Please enter the item name');
+    if (_selectedProduct == null) {
+      _showError('Please select a product');
       return false;
     }
     if ((double.tryParse(_itemQtyCtrl.text) ?? 0) <= 0) {
@@ -183,38 +264,72 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
     setState(() => _step = _Step.addItems);
   }
 
+  /// Called when the owner picks a product from the dropdown. Auto-fills
+  /// name/company/size/unit/MRP/rate straight from the catalog so nothing
+  /// needs to be typed by hand, and the correct incentive % rides along
+  /// with it. Size/unit stay editable afterwards (e.g. a custom cut size)
+  /// since the fields stay unlocked.
+  void _onProductSelected(_ProductCatalogItem? product) {
+    setState(() {
+      _selectedProduct = product;
+      if (product != null) {
+        _itemNameCtrl.text = product.name;
+        _itemCompanyCtrl.text = product.company;
+        _itemSizeCtrl.text = product.size;
+        _itemUnitCtrl.text = product.unit;
+        _itemMrpCtrl.text = product.mrp == product.mrp.roundToDouble()
+            ? product.mrp.toStringAsFixed(0)
+            : product.mrp.toString();
+        _itemRateCtrl.text = product.rate == product.rate.roundToDouble()
+            ? product.rate.toStringAsFixed(0)
+            : product.rate.toString();
+      } else {
+        _itemNameCtrl.clear();
+        _itemCompanyCtrl.clear();
+        _itemSizeCtrl.clear();
+        _itemUnitCtrl.text = 'sqft';
+        _itemMrpCtrl.clear();
+        _itemRateCtrl.clear();
+      }
+    });
+  }
+
   void _addItemToList() {
     if (!_validateCurrentItemFields()) return;
+    final product = _selectedProduct!;
     setState(() {
       final editingIndex = _editingItemIndex;
       if (editingIndex != null) {
-        // Update the existing item in place, keeping its original id and
-        // incentive %.
+        // Update the existing item in place, keeping its original id.
         final existing = _items[editingIndex];
         _items[editingIndex] = _AddedItem(
           id: existing.id,
-          name: _itemNameCtrl.text.trim(),
-          company: _itemCompanyCtrl.text.trim(),
+          productId: product.id,
+          name: product.name,
+          company: product.company,
           size: _itemSizeCtrl.text.trim(),
           unit: _itemUnitCtrl.text.trim().isEmpty ? 'sqft' : _itemUnitCtrl.text.trim(),
           quantity: double.tryParse(_itemQtyCtrl.text) ?? 0,
           mrp: double.tryParse(_itemMrpCtrl.text) ?? 0,
           rate: double.tryParse(_itemRateCtrl.text) ?? 0,
-          incentivePercent: existing.incentivePercent,
+          incentivePercent: product.incentivePercent,
         );
         _editingItemIndex = null;
       } else {
         _items.add(_AddedItem(
           id: 'item_${_itemCounter++}',
-          name: _itemNameCtrl.text.trim(),
-          company: _itemCompanyCtrl.text.trim(),
+          productId: product.id,
+          name: product.name,
+          company: product.company,
           size: _itemSizeCtrl.text.trim(),
           unit: _itemUnitCtrl.text.trim().isEmpty ? 'sqft' : _itemUnitCtrl.text.trim(),
           quantity: double.tryParse(_itemQtyCtrl.text) ?? 0,
           mrp: double.tryParse(_itemMrpCtrl.text) ?? 0,
           rate: double.tryParse(_itemRateCtrl.text) ?? 0,
+          incentivePercent: product.incentivePercent,
         ));
       }
+      _selectedProduct = null;
       _itemNameCtrl.clear();
       _itemCompanyCtrl.clear();
       _itemSizeCtrl.clear();
@@ -229,6 +344,12 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
     final item = _items[index];
     setState(() {
       _editingItemIndex = index;
+      // Re-select the matching catalog product so the dropdown reflects
+      // what's being edited (falls back to null if it was ever removed
+      // from the catalog).
+      _selectedProduct = _productCatalog
+          .cast<_ProductCatalogItem?>()
+          .firstWhere((p) => p?.id == item.productId, orElse: () => null);
       _itemNameCtrl.text = item.name;
       _itemCompanyCtrl.text = item.company;
       _itemSizeCtrl.text = item.size;
@@ -248,6 +369,7 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
   void _cancelEditItem() {
     setState(() {
       _editingItemIndex = null;
+      _selectedProduct = null;
       _itemNameCtrl.clear();
       _itemCompanyCtrl.clear();
       _itemSizeCtrl.clear();
@@ -266,6 +388,7 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
       if (_editingItemIndex != null) {
         if (_editingItemIndex == index) {
           _editingItemIndex = null;
+          _selectedProduct = null;
           _itemNameCtrl.clear();
           _itemCompanyCtrl.clear();
           _itemSizeCtrl.clear();
@@ -325,6 +448,62 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Estimate created and approved')),
     );
+  }
+
+  /// Shows a confirmation dialog before finalizing the estimate. The owner
+  /// must type their name in the dialog; that name is used as the "Owner"
+  /// name on the estimate (overwriting whatever was on the Details step,
+  /// since this is who is actually approving it right now). Only after
+  /// confirming does `_createEstimate()` run.
+  Future<void> _showApproveDialog() async {
+    _approverNameCtrl.clear();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Approve Estimate'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Are you sure you want to approve this estimate?'),
+                  SizedBox(height: Responsive.h(16)),
+
+            ]),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_approverNameCtrl.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Please enter your name')),
+                      );
+                      return;
+                    }
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text('Approve'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      // Use the name entered in the dialog as the Owner name on the estimate.
+      setState(() {
+        _salesmanCtrl.text = _approverNameCtrl.text.trim();
+      });
+      _createEstimate();
+    }
   }
 
   // ---------------- Back handling between steps ----------------
@@ -401,6 +580,9 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
                     onNext: _goToAddItems,
                   ),
                   _Step.addItems => _AddItemsStep(
+                    catalog: _productCatalog,
+                    selectedProduct: _selectedProduct,
+                    onProductSelected: _onProductSelected,
                     itemNameCtrl: _itemNameCtrl,
                     itemCompanyCtrl: _itemCompanyCtrl,
                     itemSizeCtrl: _itemSizeCtrl,
@@ -432,13 +614,15 @@ class _OwnerCreateEstimateScreenState extends State<OwnerCreateEstimateScreen> {
                     items: _items,
                     mrpTotal: _mrpTotal,
                     itemsTotal: _itemsTotal,
-                    handlingCharge: _handlingCharge,
+                    handlingChargeCtrl: _handlingChargeCtrl,
                     grandTotal: _grandTotal,
                     totalQty: _totalQty,
                     totalItems: _totalItems,
-                    incentiveTotal: _incentiveTotal,
+                    onHandlingChargeChanged: () => setState(() {}),
                     onSaveDraft: _saveDraft,
-                    onCreateEstimate: _createEstimate,
+                    // Route through the confirmation dialog instead of
+                    // creating the estimate directly.
+                    onCreateEstimate: _showApproveDialog,
                   ),
                 },
               ),
@@ -622,13 +806,12 @@ class _DetailsStep extends StatelessWidget {
               ),
               SizedBox(height: Responsive.h(16)),
 
-              Text('owner', style: AppTextStyles.h3()),
+              Text('Owner', style: AppTextStyles.h3()),
               SizedBox(height: Responsive.h(12)),
               LabeledField(
                 label: 'Name',
-                field: CustomTextField(hint: 'owner name', icon: Icons.badge_outlined, controller: salesmanCtrl),
+                field: CustomTextField(hint: 'Owner name', icon: Icons.badge_outlined, controller: salesmanCtrl),
               ),
-
               SizedBox(height: Responsive.h(12)),
             ],
           ),
@@ -647,6 +830,9 @@ class _DetailsStep extends StatelessWidget {
 
 class _AddItemsStep extends StatelessWidget {
   const _AddItemsStep({
+    required this.catalog,
+    required this.selectedProduct,
+    required this.onProductSelected,
     required this.itemNameCtrl,
     required this.itemCompanyCtrl,
     required this.itemSizeCtrl,
@@ -666,6 +852,9 @@ class _AddItemsStep extends StatelessWidget {
     required this.onSaveItems,
   });
 
+  final List<_ProductCatalogItem> catalog;
+  final _ProductCatalogItem? selectedProduct;
+  final ValueChanged<_ProductCatalogItem?> onProductSelected;
   final TextEditingController itemNameCtrl;
   final TextEditingController itemCompanyCtrl;
   final TextEditingController itemSizeCtrl;
@@ -697,30 +886,74 @@ class _AddItemsStep extends StatelessWidget {
                 padding: EdgeInsets.all(Responsive.w(18)),
                 children: [
                   LabeledField(
-                    label: 'Item',
-                    field: CustomTextField(
-                      hint: 'Select or enter item',
-                      icon: Icons.inventory_2_outlined,
-                      controller: itemNameCtrl,
+                    label: 'Select Product',
+                    field: DropdownButtonFormField<_ProductCatalogItem>(
+                      value: selectedProduct,
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down),
+                      decoration: InputDecoration(
+                        hintText: 'Choose a product',
+                        prefixIcon: const Icon(Icons.inventory_2_outlined),
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                      items: catalog
+                          .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(
+                          '${p.name} — ${p.company}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ))
+                          .toList(),
+                      onChanged: (p) {
+                        onProductSelected(p);
+                        setLocalState(() {});
+                      },
                     ),
                   ),
+
+                  SizedBox(height: Responsive.h(10)),
                   LabeledField(
-                    label: 'Company',
-                    field: CustomTextField(hint: 'Enter company', icon: Icons.factory_outlined, controller: itemCompanyCtrl),
+                    label: 'Company (auto)',
+                    field: IgnorePointer(
+                      child: CustomTextField(
+                        hint: 'Select a product first',
+                        icon: Icons.factory_outlined,
+                        controller: itemCompanyCtrl,
+                      ),
+                    ),
                   ),
                   Row(
                     children: [
                       Expanded(
                         child: LabeledField(
-                          label: 'Size',
-                          field: CustomTextField(hint: 'e.g. 600x1200', icon: Icons.straighten_outlined, controller: itemSizeCtrl),
+                          label: 'Size (auto)',
+                          field: CustomTextField(
+                            hint: 'e.g. 600x1200',
+                            icon: Icons.straighten_outlined,
+                            controller: itemSizeCtrl,
+                          ),
                         ),
                       ),
                       SizedBox(width: Responsive.w(10)),
                       Expanded(
                         child: LabeledField(
-                          label: 'Unit',
-                          field: CustomTextField(hint: 'sqft', icon: Icons.square_foot_outlined, controller: itemUnitCtrl),
+                          label: 'Unit (auto)',
+                          field: CustomTextField(
+                            hint: 'sqft',
+                            icon: Icons.square_foot_outlined,
+                            controller: itemUnitCtrl,
+                          ),
                         ),
                       ),
                     ],
@@ -739,13 +972,14 @@ class _AddItemsStep extends StatelessWidget {
                     children: [
                       Expanded(
                         child: LabeledField(
-                          label: 'MRP',
-                          field: CustomTextField(
-                            hint: '0',
-                            icon: Icons.currency_rupee,
-                            keyboardType: TextInputType.number,
-                            controller: itemMrpCtrl,
-                            onChanged: (_) => setLocalState(() {}),
+                          label: 'MRP (auto)',
+                          field: IgnorePointer(
+                            child: CustomTextField(
+                              hint: '0',
+                              icon: Icons.currency_rupee,
+                              keyboardType: TextInputType.number,
+                              controller: itemMrpCtrl,
+                            ),
                           ),
                         ),
                       ),
@@ -771,20 +1005,15 @@ class _AddItemsStep extends StatelessWidget {
                       color: AppColors.surfaceAlt,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Column(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Amount', style: AppTextStyles.bodyBold()),
-                            Text(currency.format(currentAmount), style: AppTextStyles.bodyBold(color: AppColors.primary)),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(6)),
-
-
-                  ])
+                        Text('Amount', style: AppTextStyles.bodyBold()),
+                        Text(currency.format(currentAmount), style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                      ],
+                    ),
                   ),
+
                   SizedBox(height: Responsive.h(14)),
 
                   if (editingIndex != null) ...[
@@ -1002,11 +1231,11 @@ class _PreviewStep extends StatelessWidget {
     required this.items,
     required this.mrpTotal,
     required this.itemsTotal,
-    required this.handlingCharge,
+    required this.handlingChargeCtrl,
     required this.grandTotal,
     required this.totalQty,
     required this.totalItems,
-    required this.incentiveTotal,
+    required this.onHandlingChargeChanged,
     required this.onSaveDraft,
     required this.onCreateEstimate,
   });
@@ -1023,11 +1252,12 @@ class _PreviewStep extends StatelessWidget {
   final List<_AddedItem> items;
   final double mrpTotal;
   final double itemsTotal;
-  final double handlingCharge;
+  final TextEditingController handlingChargeCtrl;
   final double grandTotal;
   final double totalQty;
   final int totalItems;
-  final double incentiveTotal;
+
+  final VoidCallback onHandlingChargeChanged;
   final VoidCallback onSaveDraft;
   final VoidCallback onCreateEstimate;
 
@@ -1090,10 +1320,9 @@ class _PreviewStep extends StatelessWidget {
               SizedBox(height: Responsive.h(14)),
 
               _PreviewSection(
-                title: 'Salesman',
+                title: 'Owner',
                 rows: [
                   _PreviewRow('Name', salesmanName.isEmpty ? 'Owner' : salesmanName),
-                  _PreviewRow('Mob.', salesmanMobile.isEmpty ? '-' : salesmanMobile),
                 ],
               ),
               SizedBox(height: Responsive.h(20)),
@@ -1119,8 +1348,7 @@ class _PreviewStep extends StatelessWidget {
 
               // Full itemized table matching the estimate sheet layout,
               // scrollable horizontally so every column (Sl No, Item,
-              // Company, Size, Qty, Unit, MRP, Rate, Amount, Incentive)
-              // stays visible. Incentive column is dummy/admin-configured.
+              // Company, Size, Qty, Unit, MRP, Rate, Amount) stays visible.
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
@@ -1162,13 +1390,24 @@ class _PreviewStep extends StatelessWidget {
                           currency.format(item.amount),
                           style: AppTextStyles.bodyBold(),
                         )),
-
                       ]);
                     }).toList(),
                   ),
                 ),
               ),
               SizedBox(height: Responsive.h(16)),
+
+              LabeledField(
+                label: 'Handling Charge',
+                field: CustomTextField(
+                  hint: 'Enter handling charge',
+                  icon: Icons.currency_rupee,
+                  keyboardType: TextInputType.number,
+                  controller: handlingChargeCtrl,
+                  onChanged: (_) => onHandlingChargeChanged(),
+                ),
+              ),
+              SizedBox(height: Responsive.h(10)),
 
               Container(
                 padding: EdgeInsets.all(Responsive.w(14)),
@@ -1184,7 +1423,7 @@ class _PreviewStep extends StatelessWidget {
                     SizedBox(height: Responsive.h(6)),
                     _totalRow('MRP Total', currency.format(mrpTotal)),
                     SizedBox(height: Responsive.h(6)),
-                    _totalRow('Handling Charge', currency.format(handlingCharge)),
+                    _totalRow('Handling Charge', currency.format(double.tryParse(handlingChargeCtrl.text) ?? 0)),
                     const Divider(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1197,8 +1436,9 @@ class _PreviewStep extends StatelessWidget {
                 ),
               ),
               SizedBox(height: Responsive.h(12)),
-
-
+            ],
+          ),
+        ),
         _BottomActionBar(
           left: OutlinedButton.icon(
             onPressed: onSaveDraft,
@@ -1209,12 +1449,12 @@ class _PreviewStep extends StatelessWidget {
             icon: const Icon(Icons.request_quote_outlined, size: 18),
             label: const Text('Save as Quotation'),
           ),
-          // Owner creates the estimate directly — approved on creation,
-          // no separate "submit for approval" step needed here.
+          // Tapping this opens the "Approve Estimate" dialog (name +
+          // confirm) before the estimate is actually created.
           right: PrimaryButton(label: 'Approved', height: 48, onPressed: onCreateEstimate),
         ),
       ],
-    ))]);
+    );
   }
 
   Widget _totalRow(String label, String value) {

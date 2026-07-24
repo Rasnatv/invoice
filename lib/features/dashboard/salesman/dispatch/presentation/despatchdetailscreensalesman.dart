@@ -38,7 +38,7 @@ class SalesDepatchBillDetailScreen extends StatelessWidget {
     const partyName = 'aju';
     const contactNumber = '7925005014';
     const deliveryAddress = 'kanhangad';
-    const salesman = 'salesmanname';
+    const Despatchedby = 'Suneesh';
     const despatchedAt = '12-10-2026';
     const driverName = 'driver name';
     const delivered = false;
@@ -91,11 +91,13 @@ class SalesDepatchBillDetailScreen extends StatelessWidget {
                             SizedBox(height: Responsive.h(6)),
                             _infoRow('Delivery Address', deliveryAddress),
                             SizedBox(height: Responsive.h(6)),
-                            _infoRow('Salesman', salesman),
+                            _infoRow('Despatched by',"Ajay" ),
                             SizedBox(height: Responsive.h(6)),
                             _infoRow('Despatched At', despatchedAt),
                             SizedBox(height: Responsive.h(6)),
                             _infoRow('Driver Name', driverName),
+                            SizedBox(height: Responsive.h(6)),
+                            _infoRow('Driver Contact No', driverName),
                           ],
                         ),
                       ),

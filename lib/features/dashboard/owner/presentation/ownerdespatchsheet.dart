@@ -1,3 +1,4 @@
+
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -63,6 +64,12 @@ class OwnerDespatchSheetScreen extends StatefulWidget {
     required this.phone,
     required this.siteAddress,
     required this.items,
+    // Pre-fill the driver name/phone when re-opening this screen for an
+    // estimate that was already despatched before (e.g. the owner comes
+    // back via "Assigned to Me" a second time). Left null on first-ever
+    // despatch, in which case the fields start empty as before.
+    this.initialDriverName,
+    this.initialDriverPhone,
   });
 
   final String quotationId;
@@ -70,6 +77,8 @@ class OwnerDespatchSheetScreen extends StatefulWidget {
   final String phone;
   final String siteAddress;
   final List<OwnerDespatchItem> items;
+  final String? initialDriverName;
+  final String? initialDriverPhone;
 
   @override
   State<OwnerDespatchSheetScreen> createState() => _OwnerDespatchSheetScreenState();
@@ -88,6 +97,15 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
     'Suresh Nair',
     'Anil Varma',
   ];
+
+  // TODO(backend): replace with real driver phone numbers from
+  // OwnerCubit / repository, keyed the same way as _driverOptions.
+  // Used to auto-fill the phone field the moment a driver is picked.
+  static const Map<String, String> _dummyDriverPhones = {
+    'Ramesh Kumar': '+91 90001 11111',
+    'Suresh Nair': '+91 90002 22222',
+    'Anil Varma': '+91 90003 33333',
+  };
   String? _selectedDriverName;
   final TextEditingController _driverPhoneCtrl = TextEditingController();
   bool _driverError = false;
@@ -102,6 +120,21 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
     _dsNumber = 'DS-${widget.quotationId}';
     _refNo = widget.quotationId;
     _deliveryAddressCtrl = TextEditingController(text: widget.siteAddress);
+
+    // Auto-fill driver name/phone from a previous despatch on this same
+    // estimate, if one was passed in. Guard against a saved name that
+    // isn't in _driverOptions (e.g. once wired to a real, changing list)
+    // since DropdownButtonFormField throws if its value isn't in items.
+    if (widget.initialDriverName != null &&
+        _driverOptions.contains(widget.initialDriverName)) {
+      _selectedDriverName = widget.initialDriverName;
+    }
+    // Prefer an explicitly passed-in phone (e.g. a previously despatched
+    // number); otherwise fall back to the dummy lookup for the selected
+    // driver so the field isn't left blank.
+    _driverPhoneCtrl.text = widget.initialDriverPhone ??
+        (_selectedDriverName != null ? _dummyDriverPhones[_selectedDriverName!] ?? '' : '');
+
     _rows = widget.items
         .map((item) => _Row(
       item: item.name,
@@ -626,6 +659,12 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
                     onChanged: (value) => setState(() {
                       _selectedDriverName = value;
                       _driverError = false;
+                      // Auto-fill the dummy phone number for this driver.
+                      // TODO(backend): replace _dummyDriverPhones with a
+                      // real lookup once driver phone numbers come from
+                      // the API.
+                      _driverPhoneCtrl.text =
+                      value != null ? (_dummyDriverPhones[value] ?? '') : '';
                     }),
                   ),
                   SizedBox(height: Responsive.h(12)),

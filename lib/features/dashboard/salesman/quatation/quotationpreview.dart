@@ -115,7 +115,7 @@ class QuotationPreviewScreen extends StatelessWidget {
                     rows: [
                       _PreviewRow('Contractor Name', estimate.contractorName, icon: Icons.engineering_outlined),
                       _PreviewRow('Contact No.', estimate.phone.isEmpty ? '-' : estimate.phone, icon: Icons.phone_outlined),
-                      _PreviewRow('Address', estimate.siteAddress, icon: Icons.location_on_outlined),
+
                     ],
                   ),
                   SizedBox(height: Responsive.h(14)),
@@ -124,7 +124,6 @@ class QuotationPreviewScreen extends StatelessWidget {
                     title: 'Salesman',
                     rows: [
                       _PreviewRow('Name', estimate.salesmanName.isEmpty ? '-' : estimate.salesmanName, icon: Icons.badge_outlined),
-                      _PreviewRow('Mob.', estimate.salesmanMobile.isEmpty ? '-' : estimate.salesmanMobile, icon: Icons.phone_iphone_outlined),
                     ],
                   ),
                   SizedBox(height: Responsive.h(20)),

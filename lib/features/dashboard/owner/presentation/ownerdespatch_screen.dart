@@ -21,9 +21,6 @@ class OwnerdespatchScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('My Dispatch Bills', style: AppTextStyles.h6()),
-        actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.filter_list_rounded)),
-        ],
       ),
 
       body: SafeArea(
