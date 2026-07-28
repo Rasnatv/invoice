@@ -207,7 +207,7 @@ class _OwnerDashboardView extends StatelessWidget {
                         ),
                         _QuickActionData(
                           icon: Icons.inventory_2_outlined,
-                          label: 'Incentive\nSetup',
+                          label: 'Product &Incentive\nSetup',
                           color: const Color(0xFF7C3AED), // violet
                           onTap: () => _open(context, const IncentiveManagementScreen()),
                         ),
@@ -606,7 +606,7 @@ class _QuickActionCard extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.bodyBold(color: AppColors.black)
                       .copyWith(fontSize: Responsive.sp(10.5), height: 1.1),

@@ -7,12 +7,12 @@ abstract class AuthEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class AuthPhoneChanged extends AuthEvent {
-  final String phone;
-  const AuthPhoneChanged(this.phone);
+class AuthEmailChanged extends AuthEvent {
+  final String email;
+  const AuthEmailChanged(this.email);
 
   @override
-  List<Object?> get props => [phone];
+  List<Object?> get props => [email];
 }
 
 class AuthPasswordChanged extends AuthEvent {

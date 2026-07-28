@@ -47,6 +47,7 @@ dependencies:
   path_provider: ^2.1.1
   connectivity_plus: ^7.3.0
   lottie: ^3.0.0
+  dio: ^5.11.0
 
 
 dev_dependencies:

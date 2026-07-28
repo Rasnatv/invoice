@@ -296,7 +296,7 @@ class QuotationPreviewScreen extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: PrimaryButton(
-                      label: 'Send for Approval',
+                      label: 'Submit for Approval',
                       height: 48,
                       onPressed: () => _sendForApproval(context),
                     ),

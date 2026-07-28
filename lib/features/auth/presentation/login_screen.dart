@@ -1,15 +1,15 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tileshop/features/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/widgets/appsnackbar.dart';
 import '../../dashboard/driver_dashboard/driver_dashboard.dart';
 import '../../dashboard/owner/widgets/ownerDashboardshell.dart';
 import '../../dashboard/salesman/presentation/dashboard_shell.dart';
 import '../../forgotpassword/forgotpswd.dart';
 import '../bloc/auth_bloc.dart';
+import '../data/auth_repository.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -17,7 +17,7 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => AuthBloc(),
+      create: (_) => AuthBloc(authRepository: AuthRepository()),
       child: const _LoginView(),
     );
   }
@@ -62,6 +62,8 @@ class _LoginViewState extends State<_LoginView>
     super.dispose();
   }
 
+  // Single login page, routing decided entirely by the role the API
+  // returns (mapped from `designation` in AuthBloc via roleFromDesignation).
   Widget _destinationFor(UserRole role) {
     switch (role) {
       case UserRole.owner:
@@ -85,6 +87,8 @@ class _LoginViewState extends State<_LoginView>
         listenWhen: (p, c) => p.status != c.status,
         listener: (context, state) {
           if (state.status == AuthStatus.success) {
+            AppSnackbar.success('Welcome back, ${state.name ?? ''}'.trim());
+
             final destination = _destinationFor(state.role);
 
             Navigator.of(context).pushReplacement(
@@ -97,24 +101,7 @@ class _LoginViewState extends State<_LoginView>
             );
           } else if (state.status == AuthStatus.failure &&
               state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: Colors.white, size: 20),
-                    SizedBox(width: Responsive.w(10)),
-                    Expanded(child: Text(state.errorMessage!)),
-                  ],
-                ),
-                backgroundColor: AppColors.error,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                margin: EdgeInsets.all(Responsive.w(16)),
-              ),
-            );
+            AppSnackbar.error(state.errorMessage!);
           }
         },
         child: CustomScrollView(
@@ -177,7 +164,6 @@ class _LoginViewState extends State<_LoginView>
   }
 }
 
-/// Curved bottom edge for the header band.
 class _HeaderClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
@@ -297,11 +283,10 @@ class _FormCard extends StatelessWidget {
                   SizedBox(height: Responsive.h(8)),
                   _BrandField(
                     focusNode: phoneFocus,
-                    //hint: 'enter your email',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     onChanged: (v) =>
-                        context.read<AuthBloc>().add(AuthPhoneChanged(v)),
+                        context.read<AuthBloc>().add(AuthEmailChanged(v)),
                   ),
                   SizedBox(height: Responsive.h(18)),
 
@@ -313,7 +298,6 @@ class _FormCard extends StatelessWidget {
                     builder: (context, s) {
                       return _BrandField(
                         focusNode: passwordFocus,
-                        //hint: 'Enter your password',
                         icon: Icons.lock_outline_rounded,
                         obscureText: s.obscurePassword,
                         onChanged: (v) => context
@@ -380,7 +364,7 @@ class _FormCard extends StatelessWidget {
   }
 }
 
-/// Small uppercase field label — quiet, steady, enterprise-form convention.
+/// Small uppercase field label.
 class _FieldLabel extends StatelessWidget {
   final String text;
   const _FieldLabel(this.text);
@@ -398,10 +382,8 @@ class _FieldLabel extends StatelessWidget {
   }
 }
 
-
 class _BrandField extends StatefulWidget {
   final FocusNode focusNode;
- // final String hint;
   final IconData icon;
   final bool obscureText;
   final TextInputType? keyboardType;
@@ -410,7 +392,6 @@ class _BrandField extends StatefulWidget {
 
   const _BrandField({
     required this.focusNode,
-    //required this.hint,
     required this.icon,
     required this.onChanged,
     this.obscureText = false,
@@ -461,7 +442,6 @@ class _BrandFieldState extends State<_BrandField> {
         cursorColor: AppColors.primary,
         decoration: InputDecoration(
           isDense: true,
-         // hintText: widget.hint,
           hintStyle: AppTextStyles.body(color: AppColors.textHint),
           prefixIcon: Padding(
             padding: const EdgeInsets.only(left: 4, right: 2),
@@ -487,7 +467,7 @@ class _BrandFieldState extends State<_BrandField> {
 }
 
 /// Primary CTA — brand-red gradient fill with a soft red glow shadow and a
-/// loading spinner, replacing the flat PrimaryButton.
+/// loading spinner.
 class _BrandButton extends StatelessWidget {
   final String label;
   final bool isLoading;
