@@ -4,8 +4,6 @@ class DValidator {
   /// Max character limit for all text fields
   static const int maxTextLength = 100;
 
-  static const int minNeet = 0;
-  static const int maxNeet = 720;
 
   /// Default expected length for a plain (no country code) mobile number.
   static const int defaultPhoneLength = 10;
@@ -120,41 +118,7 @@ class DValidator {
     LengthLimitingTextInputFormatter(defaultPhoneLength),
   ];
 
-  // ── Pincode / Postal Code ─────────────────────────────────
-  /// Required, alphanumeric, 3–10 chars (supports international postal codes)
-  static String? validatePincode(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Postal code is required';
-    }
-    final postalCode = value.trim();
 
-    if (postalCode.length < 3) {
-      return 'Min 3 characters';
-    }
-    if (postalCode.length > 10) {
-      return 'Max 10 characters';
-    }
-    if (!RegExp(r'^[a-zA-Z0-9\s-]+$').hasMatch(postalCode)) {
-      return 'Invalid postal code';
-    }
-    return null;
-  }
-
-  // ── NEET Score ────────────────────────────────────────────
-  /// Mandatory, numeric only, range 0–720
-  static String? validateNeetScore(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'NEET score is required';
-    }
-    final score = int.tryParse(value.trim());
-    if (score == null) {
-      return 'Enter a valid numeric score';
-    }
-    if (score < minNeet || score > maxNeet) {
-      return 'Score must be between $minNeet and $maxNeet';
-    }
-    return null;
-  }
 
   // ── Dropdown / selection ──────────────────────────────────
   static String? validateDropdown<T>(String? fieldName, T? value) {

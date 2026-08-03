@@ -10,6 +10,8 @@ import '../../salesman/estimates/cubit/estimates_cubit.dart';
 import '../cubit/owner_cubit.dart';
 import '../widgets/monthlysale.dart';
 import '../widgets/owner_widgets.dart'; // StatusBadge
+import 'addfieldstaffscreen.dart';
+import 'owner_designationlist.dart';
 import 'owner_driverpage.dart';
 import 'owner_estimates_screen.dart';
 import 'ownercreateesimatescreen.dart';
@@ -160,7 +162,7 @@ class _OwnerDashboardView extends StatelessWidget {
                   height: Responsive.h(100),
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: 7,
+                    itemCount: 8,
                     separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
                     itemBuilder: (context, i) {
                       final actions = <_QuickActionData>[
@@ -215,13 +217,21 @@ class _OwnerDashboardView extends StatelessWidget {
                           icon: Icons.groups_2_outlined,
                           label: 'Salesmen',
                           color: const Color(0xFFEC4899), // pink
-                          onTap: () => _open(context, const OwnerSalesmenScreen()),
-                        ),
+                          onTap: () =>
+                              _open(context,
+                              const OwnerSalesmenScreen()),),
+
                         _QuickActionData(
-                          icon: Icons.person_add_alt_1_sharp,
+                          icon: Icons.local_shipping_rounded,
                           label: 'Driver',
                           color: const Color(0xFF06B6D4), // cyan
                           onTap: () => _open(context, const OwnerDriverScreen()),
+                        ),
+                        _QuickActionData(
+                          icon: Icons.assignment_ind_rounded,
+                          label: 'Field Staff',
+                          color: const Color(0xFF0B4718), // pink
+                          onTap: () => _open(context, const OwnerAddFieldStaffScreen (),)
                         ),
                       ];
                       final a = actions[i];

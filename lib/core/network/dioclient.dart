@@ -1,10 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:tileshop/core/network/tokenstorage.dart';
 import 'api_constants.dart';
 
-/// Single shared Dio instance for the whole app. If you later need to
-/// attach the auth token to every request, add an Interceptor here
-/// (e.g. reading it from secure storage) instead of setting headers
-/// per-repository.
 class DioClient {
   DioClient._();
 
@@ -16,6 +13,20 @@ class DioClient {
       headers: const {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+      },
+    ),
+  )..interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final token = await TokenStorage.readToken();
+        final tokenType = await TokenStorage.readTokenType();
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = '${tokenType ?? 'Bearer'} $token';
+        }
+        handler.next(options);
+      },
+      onError: (error, handler) async {
+        handler.next(error);
       },
     ),
   );

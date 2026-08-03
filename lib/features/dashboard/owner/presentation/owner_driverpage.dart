@@ -1,169 +1,236 @@
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../../core/widgets/appsnackbar.dart';
+import '../bloc/driver/driver_bloc.dart';
+import '../bloc/driver/driver_event.dart';
+import '../bloc/driver/driver_state.dart';
+import '../data/model/get_drivermodel.dart';
+import '../data/repository/driver_repository.dart';
 
-class DriverModel {
-  DriverModel({
-    required this.id,
-    required this.name,
-    required this.phone,
-  });
+/// Public entry point — provides the bloc and loads the drivers list.
+/// Drop this into your router in place of the old dummy screen.
+class OwnerDriverScreen extends StatelessWidget {
+  const OwnerDriverScreen({super.key});
 
-  final String id;
-  final String name;
-  final String phone;
-
-  DriverModel copyWith({String? name, String? phone}) {
-    return DriverModel(
-      id: id,
-      name: name ?? this.name,
-      phone: phone ?? this.phone,
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => DriverBloc(repository: DriverRepository())..add(const LoadDrivers()),
+      child: const _OwnerDriverView(),
     );
   }
 }
 
-class OwnerDriverScreen extends StatefulWidget {
-  const OwnerDriverScreen({super.key});
+class _OwnerDriverView extends StatefulWidget {
+  const _OwnerDriverView();
 
   @override
-  State<OwnerDriverScreen> createState() => _OwnerDriverScreenState();
+  State<_OwnerDriverView> createState() => _OwnerDriverViewState();
 }
 
-class _OwnerDriverScreenState extends State<OwnerDriverScreen> {
-  // ---- Dummy data (replace with real cubit/repo later) ----
-  final List<DriverModel> _drivers = [
-    DriverModel(id: 'DRV001', name: 'Ramesh Kumar', phone: '9876543210'),
-    DriverModel(id: 'DRV002', name: 'Suresh Nair', phone: '9845123456'),
-    DriverModel(id: 'DRV003', name: 'Anil Varma', phone: '9998887771'),
-  ];
-
+class _OwnerDriverViewState extends State<_OwnerDriverView> {
   // ---- Add / Edit sheet (shared) ----
-  void _openDriverSheet({DriverModel? existing}) {
+  void _openDriverSheet({DriverGetModel? existing}) {
+    final bloc = context.read<DriverBloc>();
     final isEdit = existing != null;
+
     final nameController = TextEditingController(text: existing?.name ?? '');
-    final phoneController = TextEditingController(text: existing?.phone ?? '');
+    final emailController = TextEditingController(text: existing?.email ?? '');
+    final mobileController = TextEditingController(text: existing?.mobile ?? '');
+    final licenseController = TextEditingController(text: existing?.licenseNumber ?? '');
+    final vehicleController = TextEditingController(text: existing?.vehicleNumber ?? '');
+    final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+
+    DateTime joiningDate = existing?.joiningDate != null &&
+        existing!.joiningDate.isNotEmpty
+        ? DateTime.tryParse(existing.joiningDate) ?? DateTime.now()
+        : DateTime.now();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: EdgeInsets.fromLTRB(
-              Responsive.w(20),
-              Responsive.h(20),
-              Responsive.w(20),
-              Responsive.h(24),
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
               ),
-            ),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.textSecondary.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.w(20),
+                  Responsive.h(20),
+                  Responsive.w(20),
+                  Responsive.h(24),
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
                   ),
-                  SizedBox(height: Responsive.h(16)),
-                  Text(
-                    isEdit ? 'Edit Driver' : 'Add Driver',
-                    style: AppTextStyles.bodyBold(color: AppColors.black)
-                        .copyWith(fontSize: Responsive.sp(17)),
-                  ),
-                  SizedBox(height: Responsive.h(18)),
-                  TextFormField(
-                    controller: nameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: _inputDecoration('Driver Name', Icons.person_outline),
-                    validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Enter driver name' : null,
-                  ),
-                  SizedBox(height: Responsive.h(14)),
-                  TextFormField(
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    maxLength: 10,
-                    decoration: _inputDecoration('Phone Number', Icons.call_outlined),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Enter phone number';
-                      if (v.trim().length != 10) return 'Enter a valid 10-digit number';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: Responsive.h(10)),
-                  SizedBox(
-                    width: double.infinity,
-                    height: Responsive.h(48),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                ),
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.textSecondary.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
                         ),
-                      ),
-                      onPressed: () {
-                        if (!formKey.currentState!.validate()) return;
+                        SizedBox(height: Responsive.h(16)),
+                        Text(
+                          isEdit ? 'Edit Driver' : 'Add Driver',
+                          style: AppTextStyles.bodyBold(color: AppColors.black)
+                              .copyWith(fontSize: Responsive.sp(17)),
+                        ),
+                        SizedBox(height: Responsive.h(18)),
+                        TextFormField(
+                          controller: nameController,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: _inputDecoration('Driver Name', Icons.person_outline),
+                          validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Enter driver name' : null,
+                        ),
+                        SizedBox(height: Responsive.h(14)),
+                        TextFormField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _inputDecoration('Email', Icons.mail_outline),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Enter email';
+                            if (!v.contains('@')) return 'Enter a valid email';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: Responsive.h(14)),
+                        TextFormField(
+                          controller: mobileController,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          decoration: _inputDecoration('Phone Number', Icons.call_outlined),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Enter phone number';
+                            if (v.trim().length != 10) return 'Enter a valid 10-digit number';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: Responsive.h(14)),
+                        TextFormField(
+                          controller: licenseController,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration:
+                          _inputDecoration('License Number', Icons.badge_outlined),
+                          validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Enter license number' : null,
+                        ),
+                        SizedBox(height: Responsive.h(14)),
+                        TextFormField(
+                          controller: vehicleController,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: _inputDecoration(
+                              'Vehicle Number', Icons.local_shipping_outlined),
+                          validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Enter vehicle number' : null,
+                        ),
+                        SizedBox(height: Responsive.h(14)),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: sheetContext,
+                              initialDate: joiningDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setSheetState(() => joiningDate = picked);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration:
+                            _inputDecoration('Joining Date', Icons.event_outlined),
+                            child: Text(_formatDate(joiningDate)),
+                          ),
+                        ),
 
-                        if (isEdit) {
-                          final updatedDriver = existing.copyWith(
-                            name: nameController.text.trim(),
-                            phone: phoneController.text.trim(),
-                          );
-                          final index =
-                          _drivers.indexWhere((d) => d.id == existing.id);
-                          if (index != -1) {
-                            setState(() => _drivers[index] = updatedDriver);
-                          }
-                        } else {
-                          final newDriver = DriverModel(
-                            id: 'DRV${(_drivers.length + 1).toString().padLeft(3, '0')}',
-                            name: nameController.text.trim(),
-                            phone: phoneController.text.trim(),
-                          );
-                          setState(() => _drivers.insert(0, newDriver));
-                        }
+                        SizedBox(height: Responsive.h(10)),
+                        SizedBox(
+                          width: double.infinity,
+                          height: Responsive.h(48),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () {
+                              if (!formKey.currentState!.validate()) return;
 
-                        Navigator.pop(sheetContext);
-                      },
-                      child: Text(
-                        isEdit ? 'Save Changes' : 'Add Driver',
-                        style: AppTextStyles.bodyBold(color: Colors.white)
-                            .copyWith(fontSize: Responsive.sp(14)),
-                      ),
+                              if (isEdit) {
+                                bloc.add(UpdateDriver(
+                                  id: existing.id,
+                                  name: nameController.text.trim(),
+                                  email: emailController.text.trim(),
+                                  mobile: mobileController.text.trim(),
+                                  licenseNumber: licenseController.text.trim(),
+                                  vehicleNumber: vehicleController.text.trim(),
+                                  joiningDate: _formatDate(joiningDate),
+                                  password: passwordController.text.trim().isEmpty
+                                      ? null
+                                      : passwordController.text.trim(),
+                                ));
+                              } else {
+                                bloc.add(AddDriver(
+                                  name: nameController.text.trim(),
+                                  email: emailController.text.trim(),
+                                  mobile: mobileController.text.trim(),
+                                  licenseNumber: licenseController.text.trim(),
+                                  vehicleNumber: vehicleController.text.trim(),
+                                  joiningDate: _formatDate(joiningDate),
+                                ));
+                              }
+
+                              Navigator.pop(sheetContext);
+                            },
+                            child: Text(
+                              isEdit ? 'Save Changes' : 'Add Driver',
+                              style: AppTextStyles.bodyBold(color: Colors.white)
+                                  .copyWith(fontSize: Responsive.sp(14)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 
   // ---- Delete confirmation ----
-  void _confirmDeleteDriver(DriverModel driver) {
+  void _confirmDeleteDriver(DriverGetModel driver) {
+    final bloc = context.read<DriverBloc>();
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -191,11 +258,8 @@ class _OwnerDriverScreenState extends State<OwnerDriverScreen> {
             ),
             TextButton(
               onPressed: () {
-                setState(() => _drivers.removeWhere((d) => d.id == driver.id));
+                bloc.add(DeleteDriver(driver.id));
                 Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${driver.name} removed')),
-                );
               },
               child: const Text(
                 'Remove',
@@ -206,6 +270,12 @@ class _OwnerDriverScreenState extends State<OwnerDriverScreen> {
         );
       },
     );
+  }
+
+  static String _formatDate(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
   }
 
   InputDecoration _inputDecoration(String hint, IconData icon) {
@@ -234,10 +304,7 @@ class _OwnerDriverScreenState extends State<OwnerDriverScreen> {
         backgroundColor: AppColors.primary,
         elevation: 0,
         centerTitle: true,
-        title: Text(
-            'Drivers',
-            style: AppTextStyles.h6()
-        ),
+        title: Text('Drivers', style: AppTextStyles.h6()),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -246,27 +313,60 @@ class _OwnerDriverScreenState extends State<OwnerDriverScreen> {
         icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
         label: Text(
           'Add Driver',
-          style: AppTextStyles.bodyBold(color: Colors.white)
-              .copyWith(fontSize: Responsive.sp(13)),
+          style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
         ),
       ),
-      body: _drivers.isEmpty
-          ? _EmptyDriverState(onAdd: () => _openDriverSheet())
-          : ListView.separated(
-        padding: EdgeInsets.fromLTRB(
-          Responsive.w(20),
-          Responsive.h(16),
-          Responsive.w(20),
-          Responsive.h(100),
-        ),
-        itemCount: _drivers.length,
-        separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
-        itemBuilder: (context, index) {
-          final driver = _drivers[index];
-          return _DriverTile(
-            driver: driver,
-            onEdit: () => _openDriverSheet(existing: driver),
-            onDelete: () => _confirmDeleteDriver(driver),
+      body: BlocConsumer<DriverBloc, DriverState>(
+        listener: (context, state) {
+          if (state.successMessage != null) {
+            AppSnackbar.success(state.successMessage!);
+            context.read<DriverBloc>().add(const ClearDriverFeedback());
+          } else if (state.errorMessage != null) {
+            AppSnackbar.error(state.errorMessage!);
+            context.read<DriverBloc>().add(const ClearDriverFeedback());
+          }
+        },
+        builder: (context, state) {
+          if (state.status == DriverStatus.loading && state.drivers.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state.isUnauthorized) {
+            // Redirect to /login is already in flight — don't flash
+            // an error screen behind it.
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state.status == DriverStatus.error && state.drivers.isEmpty) {
+            return _ErrorState(
+              onRetry: () => context.read<DriverBloc>().add(const LoadDrivers()),
+            );
+          }
+
+          if (state.drivers.isEmpty) {
+            return _EmptyDriverState(onAdd: () => _openDriverSheet());
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async => context.read<DriverBloc>().add(const LoadDrivers()),
+            child: ListView.separated(
+              padding: EdgeInsets.fromLTRB(
+                Responsive.w(20),
+                Responsive.h(16),
+                Responsive.w(20),
+                Responsive.h(100),
+              ),
+              itemCount: state.drivers.length,
+              separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
+              itemBuilder: (context, index) {
+                final driver = state.drivers[index];
+                return _DriverTile(
+                  driver: driver,
+                  onEdit: () => _openDriverSheet(existing: driver),
+                  onDelete: () => _confirmDeleteDriver(driver),
+                );
+              },
+            ),
           );
         },
       ),
@@ -281,7 +381,7 @@ class _DriverTile extends StatelessWidget {
     required this.onDelete,
   });
 
-  final DriverModel driver;
+  final DriverGetModel driver;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -322,6 +422,16 @@ class _DriverTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                SizedBox(height: Responsive.h(2)),
+                Text(
+                  '${driver.vehicleNumber} • ${driver.licenseNumber}',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: Responsive.sp(11.5),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 SizedBox(height: Responsive.h(4)),
                 InkWell(
                   onTap: () {
@@ -334,7 +444,7 @@ class _DriverTile extends StatelessWidget {
                       Icon(Icons.call_outlined, size: 15, color: AppColors.primary),
                       SizedBox(width: Responsive.w(4)),
                       Text(
-                        driver.phone,
+                        driver.mobile,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontSize: Responsive.sp(12.5),
@@ -419,6 +529,40 @@ class _EmptyDriverState extends StatelessWidget {
                 style: AppTextStyles.bodyBold(color: Colors.white)
                     .copyWith(fontSize: Responsive.sp(13)),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(12)),
+            Text(
+              'Could not load drivers',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
+            ),
+            SizedBox(height: Responsive.h(16)),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: onRetry,
+              child: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),

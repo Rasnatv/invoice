@@ -3,23 +3,18 @@ part of 'auth_bloc.dart';
 enum AuthStatus { initial, submitting, success, failure }
 
 /// Who logged in — LoginScreen routes to a different dashboard based on
-/// this. `none` is the default/unset value before a successful login,
-/// or when the API returns a designation we don't recognize.
-enum UserRole { none, owner, salesman, driver }
+/// this. Only real roles live here; "not logged in yet" or "backend sent
+/// an unrecognized designation" is represented by `role == null`.
+enum UserRole { owner, salesman, driver, fieldStaff }
 
-UserRole roleFromDesignation(String designation) {
-  switch (designation.trim().toLowerCase()) {
-    case 'owner':
-      return UserRole.owner;
-    case 'salesman':
-    case 'salesperson':
-    case 'sales':
-      return UserRole.salesman;
-    case 'driver':
-      return UserRole.driver;
-    default:
-      return UserRole.none;
-  }
+/// Returns null if the designation doesn't match any known role.
+UserRole? roleFromDesignation(String designation) {
+  final d = designation.trim().toLowerCase();
+  if (d.contains('owner')) return UserRole.owner;
+  if (d.contains('driver_features')) return UserRole.driver;
+  if (d.contains('sales')) return UserRole.salesman;
+  if (d.contains('field')) return UserRole.fieldStaff;
+  return null;
 }
 
 class AuthState extends Equatable {
@@ -31,7 +26,7 @@ class AuthState extends Equatable {
   final bool obscurePassword;
   final AuthStatus status;
   final String? errorMessage;
-  final UserRole role;
+  final UserRole? role;
 
   // Populated on a successful login — useful for a profile header,
   // and for attaching the token to future authenticated requests.
@@ -47,7 +42,7 @@ class AuthState extends Equatable {
     this.obscurePassword = true,
     this.status = AuthStatus.initial,
     this.errorMessage,
-    this.role = UserRole.none,
+    this.role,
     this.name,
     this.empId,
     this.mobile,
@@ -69,6 +64,7 @@ class AuthState extends Equatable {
     AuthStatus? status,
     String? errorMessage,
     UserRole? role,
+    bool clearRole = false, // pass true to explicitly reset role to null
     String? name,
     String? empId,
     String? mobile,
@@ -81,7 +77,7 @@ class AuthState extends Equatable {
       obscurePassword: obscurePassword ?? this.obscurePassword,
       status: status ?? this.status,
       errorMessage: errorMessage,
-      role: role ?? this.role,
+      role: clearRole ? null : (role ?? this.role),
       name: name ?? this.name,
       empId: empId ?? this.empId,
       mobile: mobile ?? this.mobile,

@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:tileshop/features/auth/presentation/login_screen.dart';
+
+import '../network/tokenstorage.dart';
+import '../utils/approuter.dart';
 
 class ApiErrorHandler {
-  static String handleDioError(DioException error) {
+  static Future<String> handleDioError(DioException error) async {
     final statusCode = error.response?.statusCode;
     final responseData = error.response?.data;
     final message = _extractErrorMessage(responseData);
@@ -16,45 +20,62 @@ class ApiErrorHandler {
         case 400:
           errorMsg = message ?? "Bad request. Please try again.";
           break;
+
         case 401:
-          errorMsg = message ?? "Authentication failed.";
-          // _handleUnauthorizedIfLoggedIn();
+          errorMsg = message ?? "Session expired. Please log in again.";
+          await _handleUnauthorized();
           break;
+
         case 403:
           errorMsg = message ?? "Access denied.";
           break;
+
         case 404:
           errorMsg = message ?? "Not found.";
           break;
+
         case 422:
           errorMsg = message ?? "Validation error. Please check your input.";
           break;
+
         case 429:
-          errorMsg = message ?? "Too many requests. Please try again!";
+          errorMsg = message ?? "Too many requests. Please try again.";
           break;
+
         case 500:
           errorMsg = message ?? "Server error. Try again later.";
           break;
+
         default:
           errorMsg = message ?? "Something went wrong.";
       }
     } else {
-      // Handle connection errors
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
           errorMsg = "Request timed out. Check your internet connection.";
           break;
+
         case DioExceptionType.connectionError:
           errorMsg = "Could not connect. Check your internet connection.";
           break;
+
         case DioExceptionType.cancel:
           errorMsg = "Request cancelled.";
           break;
+
+        case DioExceptionType.badCertificate:
+          errorMsg = "Certificate verification failed.";
+          break;
+
+        case DioExceptionType.badResponse:
+          errorMsg = message ?? "Server returned an invalid response.";
+          break;
+
         case DioExceptionType.unknown:
         default:
-          errorMsg = _handleException(error);
+          errorMsg = _handleException(error.error);
       }
     }
 
@@ -65,68 +86,71 @@ class ApiErrorHandler {
     try {
       if (responseData == null) return null;
 
-      // If already a Map
       if (responseData is Map<String, dynamic>) {
-        // First priority: 'message' key
-        if (responseData.containsKey('message')) {
-          return responseData['message']?.toString();
+        if (responseData['message'] != null) {
+          return responseData['message'].toString();
         }
 
-        // Second priority: 'error' key
-        if (responseData.containsKey('error')) {
-          return responseData['error']?.toString();
+        if (responseData['error'] != null) {
+          return responseData['error'].toString();
         }
 
-        // Third priority: 'errors' array
-        if (responseData.containsKey('errors')) {
-          final errors = responseData['errors'];
-          if (errors is Map<String, dynamic> && errors.isNotEmpty) {
-            final firstKey = errors.keys.first;
-            final firstError = errors[firstKey];
-            if (firstError is List && firstError.isNotEmpty) {
-              return firstError[0].toString();
+        if (responseData['errors'] is Map<String, dynamic>) {
+          final errors = responseData['errors'] as Map<String, dynamic>;
+
+          if (errors.isNotEmpty) {
+            final firstValue = errors.values.first;
+
+            if (firstValue is List && firstValue.isNotEmpty) {
+              return firstValue.first.toString();
             }
+
+            return firstValue.toString();
           }
         }
       }
 
-      // If it's a JSON string, decode it
       if (responseData is String) {
         try {
-          final decoded = Map<String, dynamic>.from(jsonDecode(responseData));
-          if (decoded.containsKey('message')) {
-            return decoded['message']?.toString();
+          final decoded = jsonDecode(responseData);
+
+          if (decoded is Map<String, dynamic>) {
+            return decoded['message']?.toString() ??
+                decoded['error']?.toString();
           }
-          if (decoded.containsKey('error')) {
-            return decoded['error']?.toString();
-          }
+
+          return responseData;
         } catch (_) {
-          // Not a JSON string, just return the raw text if meaningful
           return responseData.isNotEmpty ? responseData : null;
         }
       }
+    } catch (_) {}
 
-      return null;
-    } catch (_) {
-      return null;
+    return null;
+  }
+
+  static Future<void> _handleUnauthorized() async {
+    final token = await TokenStorage.readToken();
+
+    if (token != null && token.isNotEmpty) {
+      await TokenStorage.clear();
+
+      // Drive the actual imperative Navigator stack directly, since most
+      // screens in this app are pushed with Navigator.push (not GoRoutes),
+      // so AppRouter.router.go('/login') alone can't clear them.
+      final navState = AppRouter.navigatorKey.currentState;
+      navState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+      );
     }
   }
 
-  static String _handleException(Object error) {
+  static String _handleException(Object? error) {
     if (error is SocketException) {
-      return 'No internet connection.';
-    } else {
-      return 'Unexpected error occurred.';
+      return "No internet connection.";
     }
-  }
 
-// static Future<void> _handleUnauthorizedIfLoggedIn() async {
-//   final storage = AuthLocalStorage();
-//   final token = await storage.getToken();
-//
-//   if (token != null && token.isNotEmpty) {
-//     await storage.clearUser();
-//     AppRouter.router.go('/login');
-//   }
-// }
+    return "Unexpected error occurred.";
+  }
 }

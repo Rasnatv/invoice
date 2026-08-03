@@ -64,7 +64,7 @@ class OwnerDespatchSheetScreen extends StatefulWidget {
     required this.phone,
     required this.siteAddress,
     required this.items,
-    // Pre-fill the driver name/phone when re-opening this screen for an
+    // Pre-fill the driver_features name/phone when re-opening this screen for an
     // estimate that was already despatched before (e.g. the owner comes
     // back via "Assigned to Me" a second time). Left null on first-ever
     // despatch, in which case the fields start empty as before.
@@ -91,16 +91,16 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
   late final TextEditingController _deliveryAddressCtrl;
   bool _deliveryAddressError = false;
 
-  // TODO(backend): replace with real driver list from OwnerCubit / repository
+  // TODO(backend): replace with real driver_features list from OwnerCubit / repository
   final List<String> _driverOptions = const [
     'Ramesh Kumar',
     'Suresh Nair',
     'Anil Varma',
   ];
 
-  // TODO(backend): replace with real driver phone numbers from
+  // TODO(backend): replace with real driver_features phone numbers from
   // OwnerCubit / repository, keyed the same way as _driverOptions.
-  // Used to auto-fill the phone field the moment a driver is picked.
+  // Used to auto-fill the phone field the moment a driver_features is picked.
   static const Map<String, String> _dummyDriverPhones = {
     'Ramesh Kumar': '+91 90001 11111',
     'Suresh Nair': '+91 90002 22222',
@@ -121,7 +121,7 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
     _refNo = widget.quotationId;
     _deliveryAddressCtrl = TextEditingController(text: widget.siteAddress);
 
-    // Auto-fill driver name/phone from a previous despatch on this same
+    // Auto-fill driver_features name/phone from a previous despatch on this same
     // estimate, if one was passed in. Guard against a saved name that
     // isn't in _driverOptions (e.g. once wired to a real, changing list)
     // since DropdownButtonFormField throws if its value isn't in items.
@@ -131,7 +131,7 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
     }
     // Prefer an explicitly passed-in phone (e.g. a previously despatched
     // number); otherwise fall back to the dummy lookup for the selected
-    // driver so the field isn't left blank.
+    // driver_features so the field isn't left blank.
     _driverPhoneCtrl.text = widget.initialDriverPhone ??
         (_selectedDriverName != null ? _dummyDriverPhones[_selectedDriverName!] ?? '' : '');
 
@@ -173,7 +173,7 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
   void _shareOnWhatsApp() {
     if (!_validateDriverSelected()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a driver first')),
+        const SnackBar(content: Text('Please select a driver_features first')),
       );
       return;
     }
@@ -371,12 +371,12 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
   // Confirms despatch and pops this screen, returning a DespatchInfo to
   // Owner Quotation Details so it can update its status/UI.
   // TODO(backend): once the despatch module has its own status/cubit,
-  // persist this despatch record (driver, address, items, timestamps)
+  // persist this despatch record (driver_features, address, items, timestamps)
   // instead of just returning it locally.
   void _confirmDespatch() {
     if (!_validateDriverSelected()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a driver first')),
+        const SnackBar(content: Text('Please select a driver_features first')),
       );
       return;
     }
@@ -624,9 +624,9 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
                     isExpanded: true,
                     icon: const Icon(Icons.keyboard_arrow_down_rounded),
                     decoration: InputDecoration(
-                      hintText: 'Select driver',
+                      hintText: 'Select driver_features',
                       prefixIcon: const Icon(Icons.person_outline),
-                      errorText: _driverError ? 'Please select a driver' : null,
+                      errorText: _driverError ? 'Please select a driver_features' : null,
                       filled: true,
                       fillColor: AppColors.surface,
                       contentPadding: EdgeInsets.symmetric(
@@ -676,7 +676,7 @@ class _OwnerDespatchSheetScreenState extends State<OwnerDespatchSheetScreen> {
                     keyboardType: TextInputType.phone,
                     style: AppTextStyles.body(),
                     decoration: InputDecoration(
-                      hintText: 'Enter driver phone number',
+                      hintText: 'Enter driver_features phone number',
                       prefixIcon: const Icon(Icons.call_outlined),
                       filled: true,
                       fillColor: AppColors.surface,

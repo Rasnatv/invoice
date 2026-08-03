@@ -30,7 +30,10 @@ class AuthRepository {
     try {
       final response = await _dio.post(
         ApiConstants.login,
-        data: {'email': email, 'password': password},
+        data: {
+          'email': email,
+          'password': password,
+        },
       );
 
       final loginResponse = LoginResponse.fromJson(
@@ -42,10 +45,13 @@ class AuthRepository {
       }
 
       throw AuthException(
-        loginResponse.message.isNotEmpty ? loginResponse.message : 'Login failed',
+        loginResponse.message.isNotEmpty
+            ? loginResponse.message
+            : 'Login failed',
       );
     } on DioException catch (e) {
-      throw AuthException(ApiErrorHandler.handleDioError(e));
+      final message = await ApiErrorHandler.handleDioError(e);
+      throw AuthException(message);
     } on AuthException {
       rethrow;
     } catch (_) {

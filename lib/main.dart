@@ -1,7 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/approuter.dart';
 import 'core/utils/responsive.dart';
-import 'features/splash/presentation/splash_screen.dart';
+import 'core/widgets/appsnackbar.dart';
 
 void main() {
   runApp(const DreamsCeramicApp());
@@ -12,12 +14,12 @@ class DreamsCeramicApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Dreams Ceramic',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: AppSnackbar.messengerKey,
       theme: AppTheme.light,
-      // Initializes the Responsive helper once per rebuild so every
-      // descendant screen can immediately call Responsive.w/h/sp.
+      routerConfig: AppRouter.router,
       builder: (context, child) {
         Responsive.init(context);
         return MediaQuery(
@@ -25,7 +27,6 @@ class DreamsCeramicApp extends StatelessWidget {
           child: child!,
         );
       },
-      home: const SplashScreen(),
     );
   }
 }

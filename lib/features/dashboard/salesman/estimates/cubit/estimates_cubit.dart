@@ -50,7 +50,7 @@ class EstimatesCubit extends Cubit<EstimatesState> {
   void _loadMock() {
     emit(state.copyWith(all: [
       EstimateModel(
-        id: 'Esno.001',
+        id: 'Ref001-01-26',
         contractorName: 'ABC Builders',
         siteAddress: 'Trivandrum, Kerala',
         phone: '+91 98765 43210',
@@ -84,7 +84,7 @@ class EstimatesCubit extends Cubit<EstimatesState> {
         ],
       ),
       EstimateModel(
-        id: 'Esno.002',
+        id: 'Ref002-01-26',
         contractorName: 'Skyline Constructions',
         siteAddress: 'Kottayam, Kerala',
         phone: '+91 87654 32109',
@@ -94,7 +94,7 @@ class EstimatesCubit extends Cubit<EstimatesState> {
         billType: EstimateBillType.billed,
       ),
       EstimateModel(
-        id: 'Esno.003',
+        id: 'Ref003-01-26',
         contractorName: 'Royal Builders',
         siteAddress: 'Ernakulam, Kerala',
         phone: '+91 76543 21098',
@@ -104,7 +104,7 @@ class EstimatesCubit extends Cubit<EstimatesState> {
         billType: EstimateBillType.billed,
       ),
       EstimateModel(
-        id: 'Esno.004',
+        id: 'Ref004-01-26',
         contractorName: 'Greenfield Developers',
         siteAddress: 'Calicut, Kerala',
         phone: '+91 65432 10987',

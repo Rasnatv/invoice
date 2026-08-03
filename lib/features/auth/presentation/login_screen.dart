@@ -1,12 +1,11 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/dashboardrouter.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/appsnackbar.dart';
-import '../../dashboard/driver_dashboard/driver_dashboard.dart';
-import '../../dashboard/owner/widgets/ownerDashboardshell.dart';
-import '../../dashboard/salesman/presentation/dashboard_shell.dart';
 import '../../forgotpassword/forgotpswd.dart';
 import '../bloc/auth_bloc.dart';
 import '../data/auth_repository.dart';
@@ -62,20 +61,6 @@ class _LoginViewState extends State<_LoginView>
     super.dispose();
   }
 
-  // Single login page, routing decided entirely by the role the API
-  // returns (mapped from `designation` in AuthBloc via roleFromDesignation).
-  Widget _destinationFor(UserRole role) {
-    switch (role) {
-      case UserRole.owner:
-        return const Ownerdashboardshell();
-      case UserRole.driver:
-        return const DriverDashboardScreen(driverName: 'Rajesh');
-      case UserRole.salesman:
-      case UserRole.none:
-        return const DashboardShell();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -86,10 +71,12 @@ class _LoginViewState extends State<_LoginView>
       body: BlocListener<AuthBloc, AuthState>(
         listenWhen: (p, c) => p.status != c.status,
         listener: (context, state) {
-          if (state.status == AuthStatus.success) {
+          if (state.status == AuthStatus.success && state.role != null) {
             AppSnackbar.success('Welcome back, ${state.name ?? ''}'.trim());
 
-            final destination = _destinationFor(state.role);
+            // Single source of truth for role -> dashboard mapping,
+            // shared with SplashScreen's auto-login path.
+            final destination = destinationForRole(state.role!);
 
             Navigator.of(context).pushReplacement(
               PageRouteBuilder(

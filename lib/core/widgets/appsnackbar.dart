@@ -1,16 +1,6 @@
+
 import 'package:flutter/material.dart';
 
-/// Native-Flutter snackbar utility — no GetX dependency.
-///
-/// SETUP (one-time, in main.dart):
-///   MaterialApp(
-///     scaffoldMessengerKey: AppSnackbar.messengerKey,
-///     ...
-///   )
-///
-/// Once that's set, call AppSnackbar.success/error/warning(...) from
-/// anywhere — including inside a BlocListener — without needing to pass
-/// BuildContext at every call site.
 class AppSnackbar {
   AppSnackbar._();
 
@@ -20,8 +10,8 @@ class AppSnackbar {
   static void success(String message) => _show(
     message: message,
     icon: Icons.check_circle_rounded,
-    backgroundColor: const Color(0xFF094521),
-    shadowColor: const Color(0xFF09371B),
+    backgroundColor: const Color(0xFFBC7878),
+    shadowColor: const Color(0xFFBC7878),
   );
 
   static void error(String message) => _show(

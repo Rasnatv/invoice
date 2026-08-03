@@ -17,11 +17,11 @@ class DriverBillItemModel {
 }
 
 /// A despatch bill/sheet that a salesman has despatched and assigned to a
-/// driver. This is the model the Driver Dashboard reads from.
+/// driver_features. This is the model the Driver Dashboard reads from.
 ///
 /// TODO(backend): once the despatch module has a real model/cubit, this
 /// should be built from the actual EstimateModel + DespatchSheet data
-/// (DS number, driver, delivery address, items, etc.) instead of dummy data.
+/// (DS number, driver_features, delivery address, items, etc.) instead of dummy data.
 class DriverDespatchedBillModel {
   final String id;
   final String dsNumber;

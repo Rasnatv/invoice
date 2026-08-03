@@ -40,7 +40,7 @@ class SalesDepatchBillDetailScreen extends StatelessWidget {
     const deliveryAddress = 'kanhangad';
     const Despatchedby = 'Suneesh';
     const despatchedAt = '12-10-2026';
-    const driverName = 'driver name';
+    const driverName = 'driver_features name';
     const delivered = false;
     const DateTime? deliveredAt = null;
     const grandTotal = 12500;

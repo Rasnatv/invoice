@@ -78,7 +78,11 @@
 //   final DateTime date;
 //   final _DummyBillType billType;
 //   final _DummyStatus status;
-//   final double handlingCharge;
+//   // Handling charge — entered by the salesman while creating the
+//   // estimate. It's optional: not every estimate has one, so this is
+//   // nullable rather than defaulting to 0. When null, the UI shows "-"
+//   // instead of a fabricated amount.
+//   final double? handlingCharge;
 //   // Total square footage — shown as "Total Sqrft" on the sheet.
 //   final double totalSqrft;
 //   final List<_DummyItem> items;
@@ -99,7 +103,7 @@
 //     required this.date,
 //     required this.billType,
 //     required this.status,
-//     required this.handlingCharge,
+//     this.handlingCharge,
 //     required this.totalSqrft,
 //     required this.items,
 //     this.createdBySalesman = true,
@@ -107,7 +111,7 @@
 //
 //   double get mrpTotal => items.fold(0.0, (s, i) => s + i.mrp * i.quantity);
 //   double get itemsTotal => items.fold(0.0, (s, i) => s + i.amount);
-//   double get totalAmount => itemsTotal + handlingCharge;
+//   double get totalAmount => itemsTotal + (handlingCharge ?? 0);
 //
 //   static _DummyEstimate sample() {
 //     return _DummyEstimate(
@@ -122,6 +126,8 @@
 //       date: DateTime.now(),
 //       billType: _DummyBillType.quotation,
 //       status: _DummyStatus.pending,
+//       // Set this to null to preview the "salesman didn't add a handling
+//       // charge" empty state — the summary card will show "-" instead.
 //       handlingCharge: 250,
 //       totalSqrft: 1000,
 //       createdBySalesman: true, // set false to preview the "owner created, no incentive" case
@@ -224,6 +230,26 @@
 //   // to Me" via OwnerDespatchSheetScreen, or notifying a salesman).
 //   DespatchInfo? _despatchInfo;
 //
+//   // Extra discount the owner can grant on top of the estimate total,
+//   // entered through the "Give Additional Discount" button below. Null
+//   // until the owner actually adds one.
+//   double? _additionalDiscount;
+//
+//   // Amount already received from the party against this estimate,
+//   // entered through the "Add Payment" button below. Null until the
+//   // owner records a payment.
+//   double? _paymentReceived;
+//
+//   // What's left to collect after discount and payments received.
+//   // Clamped at 0 so it never shows a negative balance if the owner
+//   // over-records a payment or discount.
+//   double get _balanceAmount {
+//     final discount = _additionalDiscount ?? 0;
+//     final paid = _paymentReceived ?? 0;
+//     final remaining = _estimate.totalAmount - discount - paid;
+//     return remaining < 0 ? 0 : remaining;
+//   }
+//
 //   double get _incentiveTotal =>
 //       _estimate.items.fold(0.0, (s, item) => s + _incentiveAmountFor(item));
 //
@@ -244,7 +270,16 @@
 //     }
 //     buffer
 //       ..writeln('---')
-//       ..writeln('Total: ${currency.format(_estimate.totalAmount)}')
+//       ..writeln('Handling Charge: ${_estimate.handlingCharge == null ? '-' : currency.format(_estimate.handlingCharge)}')
+//       ..writeln('Total: ${currency.format(_estimate.totalAmount)}');
+//     if (_additionalDiscount != null) {
+//       buffer.writeln('Additional Discount: -${currency.format(_additionalDiscount!)}');
+//     }
+//     if (_paymentReceived != null) {
+//       buffer.writeln('Payment Received: ${currency.format(_paymentReceived!)}');
+//     }
+//     buffer
+//       ..writeln('Balance Amount: ${currency.format(_balanceAmount)}')
 //       ..writeln('Type: ${_estimate.billType.label}')
 //       ..writeln('Status: ${_currentStatus.label}');
 //     if (_estimate.createdBySalesman) {
@@ -382,6 +417,110 @@
 //       }
 //     }
 //   }
+//
+//   // Shared numeric-amount prompt used by both the discount and payment
+//   // dialogs below — keeps the validation/formatting logic in one place.
+//   Future<double?> _showAmountInputDialog({
+//     required String title,
+//     required String label,
+//     String? initialValue,
+//   }) async {
+//     final controller = TextEditingController(text: initialValue ?? '');
+//     final formKey = GlobalKey<FormState>();
+//
+//     final result = await showDialog<String>(
+//       context: context,
+//       builder: (dialogContext) {
+//         return AlertDialog(
+//           title: Text(title),
+//           content: Form(
+//             key: formKey,
+//             child: TextFormField(
+//               controller: controller,
+//               autofocus: true,
+//               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+//               inputFormatters: [
+//                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+//               ],
+//               decoration: InputDecoration(
+//                 labelText: label,
+//                 prefixText: '₹ ',
+//                 border: const OutlineInputBorder(),
+//               ),
+//               validator: (value) {
+//                 if (value == null || value.trim().isEmpty) {
+//                   return 'Amount is required';
+//                 }
+//                 final parsed = double.tryParse(value.trim());
+//                 if (parsed == null || parsed < 0) {
+//                   return 'Enter a valid amount';
+//                 }
+//                 return null;
+//               },
+//             ),
+//           ),
+//           actions: [
+//             TextButton(
+//               onPressed: () => Navigator.of(dialogContext).pop(),
+//               child: const Text('Cancel'),
+//             ),
+//             ElevatedButton(
+//               onPressed: () {
+//                 if (formKey.currentState!.validate()) {
+//                   Navigator.of(dialogContext).pop(controller.text.trim());
+//                 }
+//               },
+//               child: const Text('Save'),
+//             ),
+//           ],
+//         );
+//       },
+//     );
+//
+//     if (result == null) return null;
+//     return double.tryParse(result);
+//   }
+//
+//   Future<void> _showAddDiscountDialog() async {
+//     final amount = await _showAmountInputDialog(
+//       title: 'Additional Discount',
+//       label: 'Discount Amount',
+//       initialValue: _additionalDiscount?.toStringAsFixed(0),
+//     );
+//     if (amount == null) return;
+//
+//     setState(() => _additionalDiscount = amount);
+//
+//     // TODO(owner-discount): replace this with the real API/cubit call,
+//     // e.g. context.read<OwnerEstimatesCubit>().addDiscount(_estimate.id, amount);
+//
+//     if (mounted) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Additional discount added')),
+//       );
+//     }
+//   }
+//
+//   Future<void> _showAddPaymentDialog() async {
+//     final amount = await _showAmountInputDialog(
+//       title: 'Payment Received',
+//       label: 'Amount Received',
+//       initialValue: _paymentReceived?.toStringAsFixed(0),
+//     );
+//     if (amount == null) return;
+//
+//     setState(() => _paymentReceived = amount);
+//
+//     // TODO(owner-payment): replace this with the real API/cubit call,
+//     // e.g. context.read<OwnerEstimatesCubit>().recordPayment(_estimate.id, amount);
+//
+//     if (mounted) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Payment recorded')),
+//       );
+//     }
+//   }
+//
 //   Future<void> _showSendToDespatchDialog() async {
 //     final currentSelection = _despatchInfo?.assignedSalesman ?? _estimate.salesmanName;
 //
@@ -490,6 +629,12 @@
 //   // Pushes the owner's own, separate despatch sheet screen — distinct
 //   // from the salesman's DespatchSheetScreen (which is keyed off
 //   // EstimateModel). Passes this estimate's own data straight in.
+//   //
+//   // If this estimate was already despatched before (i.e. _despatchInfo
+//   // is already set with a driver_features name/phone, e.g. the owner re-opens
+//   // "Assigned to Me" a second time), that driver_features's name/phone is passed
+//   // in as initial values so the despatch sheet auto-fills them instead
+//   // of starting blank again.
 //   Future<void> _openOwnerDespatchSheet() async {
 //     final result = await Navigator.of(context).push<DespatchInfo>(
 //       MaterialPageRoute(
@@ -498,6 +643,12 @@
 //           contractorName: _estimate.contractorName,
 //           phone: _estimate.phone,
 //           siteAddress: _estimate.siteAddress,
+//           initialDriverName: (_despatchInfo?.driverName.isNotEmpty ?? false)
+//               ? _despatchInfo!.driverName
+//               : null,
+//           initialDriverPhone: (_despatchInfo?.driverPhone.isNotEmpty ?? false)
+//               ? _despatchInfo!.driverPhone
+//               : null,
 //           items: _estimate.items
 //               .map((i) => OwnerDespatchItem(
 //             name: i.name,
@@ -763,7 +914,14 @@
 //                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //                           children: [
 //                             Text('Handling Charge', style: AppTextStyles.body()),
-//                             Text(currency.format(_estimate.handlingCharge), style: AppTextStyles.body()),
+//                             // Shows "-" when the salesman never added a
+//                             // handling charge, instead of a fabricated 0/₹0.
+//                             Text(
+//                               _estimate.handlingCharge == null
+//                                   ? '-'
+//                                   : currency.format(_estimate.handlingCharge!),
+//                               style: AppTextStyles.body(),
+//                             ),
 //                           ],
 //                         ),
 //                         SizedBox(height: Responsive.h(6)),
@@ -781,6 +939,98 @@
 //                           children: [
 //                             Text('Total Amount', style: AppTextStyles.h3()),
 //                             Text(currency.format(_estimate.totalAmount), style: AppTextStyles.h2(color: AppColors.primary)),
+//                           ],
+//                         ),
+//                         SizedBox(height: Responsive.h(12)),
+//
+//                         // Additional Discount — the owner can grant this on
+//                         // top of the estimate total. Shows a "Give
+//                         // Additional Discount" button until one is added,
+//                         // then shows the amount with a small edit affordance.
+//                         Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             Row(
+//                               children: [
+//                                 Text('Additional Discount', style: AppTextStyles.body()),
+//                                 if (_additionalDiscount != null) ...[
+//                                   SizedBox(width: Responsive.w(6)),
+//                                   InkWell(
+//                                     onTap: _showAddDiscountDialog,
+//                                     child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
+//                                   ),
+//                                 ],
+//                               ],
+//                             ),
+//                             _additionalDiscount == null
+//                                 ? TextButton.icon(
+//                               onPressed: _showAddDiscountDialog,
+//                               icon: const Icon(Icons.local_offer_outlined, size: 16),
+//                               label: const Text('Give Additional Discount'),
+//                               style: TextButton.styleFrom(
+//                                 padding: EdgeInsets.zero,
+//                                 minimumSize: Size.zero,
+//                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+//                               ),
+//                             )
+//                                 : Text(
+//                               '- ${currency.format(_additionalDiscount!)}',
+//                               style: AppTextStyles.bodyBold(color: Colors.red),
+//                             ),
+//                           ],
+//                         ),
+//                         SizedBox(height: Responsive.h(10)),
+//
+//                         // Payment Received — what the party has already
+//                         // paid against this estimate. Same add/edit
+//                         // pattern as the discount row above.
+//                         Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             Row(
+//                               children: [
+//                                 Text('Payment Received', style: AppTextStyles.body()),
+//                                 if (_paymentReceived != null) ...[
+//                                   SizedBox(width: Responsive.w(6)),
+//                                   InkWell(
+//                                     onTap: _showAddPaymentDialog,
+//                                     child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
+//                                   ),
+//                                 ],
+//                               ],
+//                             ),
+//                             _paymentReceived == null
+//                                 ? TextButton.icon(
+//                               onPressed: _showAddPaymentDialog,
+//                               icon: const Icon(Icons.payments_outlined, size: 16),
+//                               label: const Text('Add Payment'),
+//                               style: TextButton.styleFrom(
+//                                 padding: EdgeInsets.zero,
+//                                 minimumSize: Size.zero,
+//                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+//                               ),
+//                             )
+//                                 : Text(
+//                               currency.format(_paymentReceived!),
+//                               style: AppTextStyles.bodyBold(color: AppColors.success),
+//                             ),
+//                           ],
+//                         ),
+//                         const Divider(height: 20),
+//
+//                         // Balance Amount — Total minus discount and
+//                         // payments received. Red while still owed, green
+//                         // once fully settled.
+//                         Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             Text('Balance Amount', style: AppTextStyles.h3()),
+//                             Text(
+//                               currency.format(_balanceAmount),
+//                               style: AppTextStyles.h2(
+//                                 color: _balanceAmount > 0 ? Colors.red : AppColors.success,
+//                               ),
+//                             ),
 //                           ],
 //                         ),
 //                       ],
@@ -1098,7 +1348,11 @@ class _DummyEstimate {
   final DateTime date;
   final _DummyBillType billType;
   final _DummyStatus status;
-  final double handlingCharge;
+  // Handling charge — entered by the salesman while creating the
+  // estimate. It's optional: not every estimate has one, so this is
+  // nullable rather than defaulting to 0. When null, the UI shows "-"
+  // instead of a fabricated amount.
+  final double? handlingCharge;
   // Total square footage — shown as "Total Sqrft" on the sheet.
   final double totalSqrft;
   final List<_DummyItem> items;
@@ -1119,7 +1373,7 @@ class _DummyEstimate {
     required this.date,
     required this.billType,
     required this.status,
-    required this.handlingCharge,
+    this.handlingCharge,
     required this.totalSqrft,
     required this.items,
     this.createdBySalesman = true,
@@ -1127,7 +1381,7 @@ class _DummyEstimate {
 
   double get mrpTotal => items.fold(0.0, (s, i) => s + i.mrp * i.quantity);
   double get itemsTotal => items.fold(0.0, (s, i) => s + i.amount);
-  double get totalAmount => itemsTotal + handlingCharge;
+  double get totalAmount => itemsTotal + (handlingCharge ?? 0);
 
   static _DummyEstimate sample() {
     return _DummyEstimate(
@@ -1142,6 +1396,8 @@ class _DummyEstimate {
       date: DateTime.now(),
       billType: _DummyBillType.quotation,
       status: _DummyStatus.pending,
+      // Set this to null to preview the "salesman didn't add a handling
+      // charge" empty state — the summary card will show "-" instead.
       handlingCharge: 250,
       totalSqrft: 1000,
       createdBySalesman: true, // set false to preview the "owner created, no incentive" case
@@ -1244,6 +1500,37 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
   // to Me" via OwnerDespatchSheetScreen, or notifying a salesman).
   DespatchInfo? _despatchInfo;
 
+  // --- Discount / Payment / Balance ---
+  //
+  // Discount is now entered as a PERCENTAGE (e.g. "5" = 5% off the total)
+  // rather than a flat rupee amount, since that's how the owner usually
+  // thinks about it ("give him 5% off"). The rupee amount is derived from
+  // the percentage automatically wherever it's shown.
+  //
+  // DUMMY DEFAULTS: both discount % and payment received start pre-filled
+  // below (instead of null) purely so this screen shows a fully populated
+  // UI on first look. Set either back to `null` to preview the empty
+  // "Give Additional Discount" / "Add Payment" button states instead.
+  double? _additionalDiscountPercent = 5; // dummy: 5% off
+  double? _paymentReceived = 3000; // dummy: ₹3,000 already received
+
+  // Rupee value of the discount, derived from the percentage above.
+  double get _additionalDiscountAmount {
+    final percent = _additionalDiscountPercent;
+    if (percent == null) return 0;
+    return _estimate.totalAmount * percent / 100;
+  }
+
+  // What's left to collect after discount and payments received.
+  // Clamped at 0 so it never shows a negative balance if the owner
+  // over-records a payment or discount.
+  double get _balanceAmount {
+    final discount = _additionalDiscountAmount;
+    final paid = _paymentReceived ?? 0;
+    final remaining = _estimate.totalAmount - discount - paid;
+    return remaining < 0 ? 0 : remaining;
+  }
+
   double get _incentiveTotal =>
       _estimate.items.fold(0.0, (s, item) => s + _incentiveAmountFor(item));
 
@@ -1264,7 +1551,18 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
     }
     buffer
       ..writeln('---')
-      ..writeln('Total: ${currency.format(_estimate.totalAmount)}')
+      ..writeln('Handling Charge: ${_estimate.handlingCharge == null ? '-' : currency.format(_estimate.handlingCharge)}')
+      ..writeln('Total: ${currency.format(_estimate.totalAmount)}');
+    if (_additionalDiscountPercent != null) {
+      buffer.writeln(
+        'Additional Discount: ${_additionalDiscountPercent!.toStringAsFixed(0)}% (-${currency.format(_additionalDiscountAmount)})',
+      );
+    }
+    if (_paymentReceived != null) {
+      buffer.writeln('Payment Received: ${currency.format(_paymentReceived!)}');
+    }
+    buffer
+      ..writeln('Balance Amount: ${currency.format(_balanceAmount)}')
       ..writeln('Type: ${_estimate.billType.label}')
       ..writeln('Status: ${_currentStatus.label}');
     if (_estimate.createdBySalesman) {
@@ -1402,6 +1700,166 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
       }
     }
   }
+
+  // Shared numeric-amount prompt used by the payment dialog — keeps the
+  // validation/formatting logic in one place.
+  Future<double?> _showAmountInputDialog({
+    required String title,
+    required String label,
+    String? initialValue,
+    String prefixText = '₹ ',
+  }) async {
+    final controller = TextEditingController(text: initialValue ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
+              decoration: InputDecoration(
+                labelText: label,
+                prefixText: prefixText,
+                border: const OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Amount is required';
+                }
+                final parsed = double.tryParse(value.trim());
+                if (parsed == null || parsed < 0) {
+                  return 'Enter a valid amount';
+                }
+                return null;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(dialogContext).pop(controller.text.trim());
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) return null;
+    return double.tryParse(result);
+  }
+
+  // Discount is captured as a PERCENTAGE (0-100). The dialog validates
+  // the range and the rupee amount is derived automatically wherever
+  // it's displayed (see _additionalDiscountAmount above).
+  Future<void> _showAddDiscountDialog() async {
+    final controller = TextEditingController(
+      text: _additionalDiscountPercent?.toStringAsFixed(0) ?? '',
+    );
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Additional Discount'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Discount %',
+                suffixText: '%',
+                helperText: 'Enter a value between 0 and 100',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Discount % is required';
+                }
+                final parsed = double.tryParse(value.trim());
+                if (parsed == null || parsed < 0 || parsed > 100) {
+                  return 'Enter a value between 0 and 100';
+                }
+                return null;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(dialogContext).pop(controller.text.trim());
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) return;
+    final percent = double.tryParse(result);
+    if (percent == null) return;
+
+    setState(() => _additionalDiscountPercent = percent);
+
+    // TODO(owner-discount): replace this with the real API/cubit call,
+    // e.g. context.read<OwnerEstimatesCubit>().addDiscountPercent(_estimate.id, percent);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Additional discount added')),
+      );
+    }
+  }
+
+  Future<void> _showAddPaymentDialog() async {
+    final amount = await _showAmountInputDialog(
+      title: 'Payment Received',
+      label: 'Amount Received',
+      initialValue: _paymentReceived?.toStringAsFixed(0),
+    );
+    if (amount == null) return;
+
+    setState(() => _paymentReceived = amount);
+
+    // TODO(owner-payment): replace this with the real API/cubit call,
+    // e.g. context.read<OwnerEstimatesCubit>().recordPayment(_estimate.id, amount);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment recorded')),
+      );
+    }
+  }
+
   Future<void> _showSendToDespatchDialog() async {
     final currentSelection = _despatchInfo?.assignedSalesman ?? _estimate.salesmanName;
 
@@ -1512,8 +1970,8 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
   // EstimateModel). Passes this estimate's own data straight in.
   //
   // If this estimate was already despatched before (i.e. _despatchInfo
-  // is already set with a driver name/phone, e.g. the owner re-opens
-  // "Assigned to Me" a second time), that driver's name/phone is passed
+  // is already set with a driver_features name/phone, e.g. the owner re-opens
+  // "Assigned to Me" a second time), that driver_features's name/phone is passed
   // in as initial values so the despatch sheet auto-fills them instead
   // of starting blank again.
   Future<void> _openOwnerDespatchSheet() async {
@@ -1795,7 +2253,14 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Handling Charge', style: AppTextStyles.body()),
-                            Text(currency.format(_estimate.handlingCharge), style: AppTextStyles.body()),
+                            // Shows "-" when the salesman never added a
+                            // handling charge, instead of a fabricated 0/₹0.
+                            Text(
+                              _estimate.handlingCharge == null
+                                  ? '-'
+                                  : currency.format(_estimate.handlingCharge!),
+                              style: AppTextStyles.body(),
+                            ),
                           ],
                         ),
                         SizedBox(height: Responsive.h(6)),
@@ -1813,6 +2278,104 @@ class _OwnerEstimateDetailsScreenState extends State<OwnerEstimateDetailsScreen>
                           children: [
                             Text('Total Amount', style: AppTextStyles.h3()),
                             Text(currency.format(_estimate.totalAmount), style: AppTextStyles.h2(color: AppColors.primary)),
+                          ],
+                        ),
+                        SizedBox(height: Responsive.h(12)),
+
+                        // Additional Discount — entered as a %, shown here
+                        // with both the percentage and the rupee amount it
+                        // works out to. Dummy-populated (5%) by default;
+                        // tap the edit icon to change it.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  _additionalDiscountPercent == null
+                                      ? 'Additional Discount'
+                                      : 'Additional Discount (${_additionalDiscountPercent!.toStringAsFixed(0)}%)',
+                                  style: AppTextStyles.body(),
+                                ),
+                                if (_additionalDiscountPercent != null) ...[
+                                  SizedBox(width: Responsive.w(6)),
+                                  InkWell(
+                                    onTap: _showAddDiscountDialog,
+                                    child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            _additionalDiscountPercent == null
+                                ? TextButton.icon(
+                              onPressed: _showAddDiscountDialog,
+                              icon: const Icon(Icons.local_offer_outlined, size: 16),
+                              label: const Text('Give Additional Discount'),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            )
+                                : Text(
+                              '- ${currency.format(_additionalDiscountAmount)}',
+                              style: AppTextStyles.bodyBold(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: Responsive.h(10)),
+
+                        // Payment Received — what the party has already
+                        // paid against this estimate. Same add/edit
+                        // pattern as the discount row above. Dummy-populated
+                        // (₹3,000) by default.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Payment Received', style: AppTextStyles.body()),
+                                if (_paymentReceived != null) ...[
+                                  SizedBox(width: Responsive.w(6)),
+                                  InkWell(
+                                    onTap: _showAddPaymentDialog,
+                                    child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            _paymentReceived == null
+                                ? TextButton.icon(
+                              onPressed: _showAddPaymentDialog,
+                              icon: const Icon(Icons.payments_outlined, size: 16),
+                              label: const Text('Add Payment'),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            )
+                                : Text(
+                              currency.format(_paymentReceived!),
+                              style: AppTextStyles.bodyBold(color: AppColors.success),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+
+                        // Balance Amount — Total minus discount and
+                        // payments received. Red while still owed, green
+                        // once fully settled.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Balance Amount', style: AppTextStyles.h3()),
+                            Text(
+                              currency.format(_balanceAmount),
+                              style: AppTextStyles.h2(
+                                color: _balanceAmount > 0 ? Colors.red : AppColors.success,
+                              ),
+                            ),
                           ],
                         ),
                       ],

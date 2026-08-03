@@ -40,10 +40,10 @@ class _DespatchRow {
   }
 }
 
-/// TODO(backend): replace with real driver list from OwnerCubit / repository
+/// TODO(backend): replace with real driver_features list from OwnerCubit / repository
 /// (see OwnerDriverScreen's DriverModel list once that's backed by data).
-/// Holds a driver's name + phone number so the number can auto-fill when
-/// a driver is selected from the dropdown.
+/// Holds a driver_features's name + phone number so the number can auto-fill when
+/// a driver_features is selected from the dropdown.
 class _DriverOption {
   final String name;
   final String number;
@@ -71,7 +71,7 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
   late final TextEditingController _deliveryAddressCtrl;
   bool _deliveryAddressError = false;
 
-  // TODO(backend): replace with real driver list from OwnerCubit / repository
+  // TODO(backend): replace with real driver_features list from OwnerCubit / repository
   // (see OwnerDriverScreen's DriverModel list once that's backed by data).
   final List<_DriverOption> _driverOptions = const [
     _DriverOption('Ramesh Kumar', '9876543210'),
@@ -81,7 +81,7 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
   String? _selectedDriverName;
   bool _driverError = false;
 
-  // Auto-filled from the selected driver's record (see _driverOptions).
+  // Auto-filled from the selected driver_features's record (see _driverOptions).
   // Currently read-only; flip readOnly to false below if drivers should
   // be able to override the number on-screen.
   late final TextEditingController _driverNumberCtrl;
@@ -132,8 +132,8 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
     return ok;
   }
 
-  /// Called when a driver is picked from the dropdown. Auto-fills the
-  /// driver number field from _driverOptions; falls back to blank if
+  /// Called when a driver_features is picked from the dropdown. Auto-fills the
+  /// driver_features number field from _driverOptions; falls back to blank if
   /// somehow no match is found.
   void _onDriverSelected(String? value) {
     setState(() {
@@ -150,7 +150,7 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
   void _shareOnWhatsApp() {
     if (!_validateDriverSelected()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a driver first')),
+        const SnackBar(content: Text('Please select a driver_features first')),
       );
       return;
     }
@@ -571,9 +571,9 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
                     isExpanded: true,
                     icon: const Icon(Icons.keyboard_arrow_down_rounded),
                     decoration: InputDecoration(
-                      hintText: 'Select driver',
+                      hintText: 'Select driver_features',
                       prefixIcon: const Icon(Icons.person_outline),
-                      errorText: _driverError ? 'Please select a driver' : null,
+                      errorText: _driverError ? 'Please select a driver_features' : null,
                       filled: true,
                       fillColor: AppColors.surface,
                       contentPadding: EdgeInsets.symmetric(
@@ -681,7 +681,7 @@ class _DespatchSheetScreenState extends State<DespatchSheetScreen> {
                       onPressed: () {
                         if (!_validateDriverSelected()) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please select a driver first')),
+                            const SnackBar(content: Text('Please select a driver_features first')),
                           );
                           return;
                         }

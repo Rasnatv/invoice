@@ -1,8 +1,12 @@
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/dashboardrouter.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/network/tokenstorage.dart';
+import '../../auth/presentation/login_screen.dart';
 import '../../onboarding/presentation/onboarding_screen.dart';
 
 /// Splash / brand loading screen — modern, elegant look for Dreams Ceramic.
@@ -43,17 +47,35 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    Timer(const Duration(milliseconds: 2600), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            transitionDuration: const Duration(milliseconds: 500),
-            pageBuilder: (_, anim, __) => const OnboardingScreen(),
-            transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-          ),
-        );
-      }
-    });
+    Timer(const Duration(milliseconds: 2600), _navigateNext);
+  }
+
+  /// Decides where to go after the splash delay:
+  /// 1. Valid saved session (token + role)  -> straight to that role's dashboard.
+  /// 2. No session, but onboarding was seen before -> LoginScreen.
+  /// 3. No session, onboarding never seen -> OnboardingScreen (shown once, ever).
+  Future<void> _navigateNext() async {
+    if (!mounted) return;
+
+    final token = await TokenStorage.readToken();
+    final role = roleFromStoredString(await TokenStorage.readRole());
+
+    Widget destination;
+    if (token != null && token.isNotEmpty && role != null) {
+      destination = destinationForRole(role);
+    } else {
+      final seenOnboarding = await TokenStorage.hasSeenOnboarding();
+      destination = seenOnboarding ? const LoginScreen() : const OnboardingScreen();
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 500),
+        pageBuilder: (_, anim, __) => destination,
+        transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+      ),
+    );
   }
 
   @override
@@ -81,7 +103,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         ),
         child: Stack(
           children: [
-            // Soft ambient glow blobs — subtle, not sharp diagonals
             Positioned(
               top: -Responsive.w(80),
               right: -Responsive.w(60),
@@ -92,8 +113,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               left: -Responsive.w(70),
               child: _SoftGlow(color: AppColors.black.withOpacity(0.06), size: Responsive.w(280)),
             ),
-
-            // Center content
             Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -151,7 +170,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             ),
                           ),
                           SizedBox(height: Responsive.h(8)),
-
                         ],
                       ),
                     ),
@@ -159,8 +177,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-
-            // Minimal loading indicator, bottom
             Positioned(
               left: 0,
               right: 0,
@@ -186,7 +202,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 }
 
-/// Soft blurred circular glow used for ambient background depth.
 class _SoftGlow extends StatelessWidget {
   final Color color;
   final double size;

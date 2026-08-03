@@ -43,6 +43,7 @@ class AppColors {
   static const Color errorBg = Color(0xFFFDE8E9);
   static const Color info = Color(0xFF2E8CFF); // In Transit
   static const Color infoBg = Color(0xFFE7F1FF);
+  static const Color infoBge = Color(0xFFA6DAAF);
 
   // ---------------- Socials ----------------
   static const Color google = Color(0xFFEA4335);

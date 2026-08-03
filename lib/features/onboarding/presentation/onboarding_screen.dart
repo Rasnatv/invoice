@@ -1,15 +1,22 @@
+
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/network/tokenstorage.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../auth/presentation/login_screen.dart';
 
-/// Single onboarding page — no PageView needed since there's only one screen.
+/// Single onboarding page — shown only once, ever, on first launch.
+/// After this, TokenStorage remembers it's been seen and Splash skips
+/// straight to LoginScreen (or a dashboard, if a session exists) on
+/// every future launch.
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
 
-  void _goNext(BuildContext context) {
+  Future<void> _goNext(BuildContext context) async {
+    await TokenStorage.setOnboardingSeen();
+    if (!context.mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
@@ -29,7 +36,6 @@ class OnboardingScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     SizedBox(height: Responsive.h(100)),
-                    // Illustration image — replace the old mock UI entirely
                     Image.asset(
                       'assets/images/landingview.png',
                       width: double.infinity,

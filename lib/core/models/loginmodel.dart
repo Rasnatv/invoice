@@ -1,6 +1,6 @@
 /// The `data` object inside a successful login response.
-/// `empId` and `mobile` are only present for staff logins (salesman/driver);
-/// owners may not have them, so both are nullable.
+/// `empId` and `mobile` are only present for staff logins (salesman/driver_features/
+/// field staff); owners may not have them, so both stay nullable.
 class LoginData {
   final String name;
   final String email;
@@ -24,12 +24,24 @@ class LoginData {
     return LoginData(
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
-      designation: json['designation'] as String? ?? '',
+      designation: _parseDesignation(json['designation']),
       empId: json['emp_id'] as String?,
       mobile: json['mobile'] as String?,
       token: json['token'] as String? ?? '',
       tokenType: json['token_type'] as String? ?? 'Bearer',
     );
+  }
+
+  /// `designation` is a plain string for Owner/Driver/Field Staff logins,
+  /// but a nested object (id, name, code, ...) for Salesman logins. Both
+  /// shapes get normalized to a single string here so nothing downstream
+  /// (roleFromDesignation, the UI) needs to know which shape it got.
+  static String _parseDesignation(dynamic raw) {
+    if (raw is String) return raw;
+    if (raw is Map<String, dynamic>) {
+      return (raw['name'] as String?) ?? (raw['code'] as String?) ?? '';
+    }
+    return '';
   }
 
   Map<String, dynamic> toJson() => {

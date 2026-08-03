@@ -12,21 +12,18 @@ import 'driverdetailscreen.dart';
 class DriverDashboardScreen extends StatefulWidget {
   const DriverDashboardScreen({
     super.key,
-    required this.driverName,
+    this.driverName = 'Rajesh',
     this.onLogout,
     this.onChangePassword,
   });
 
   final String driverName;
-
   final VoidCallback? onLogout;
-  final Future<void> Function(String currentPassword, String newPassword)?
-  onChangePassword;
+  final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
 
   @override
   State<DriverDashboardScreen> createState() => _DriverDashboardScreenState();
 }
-
 class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
@@ -46,9 +43,9 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     super.dispose();
   }
 
-  /// Bills despatched to this driver specifically.
+  /// Bills despatched to this driver_features specifically.
   /// TODO(backend): filter server-side once despatch sheets carry a real
-  /// driver ID instead of a plain name match.
+  /// driver_features ID instead of a plain name match.
   List<DriverDespatchedBillModel> _myBills(List<DriverDespatchedBillModel> all) =>
       all.where((b) => b.driverName == widget.driverName).toList();
 
