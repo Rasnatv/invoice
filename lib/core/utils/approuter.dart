@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:tileshop/features/auth/presentation/login_screen.dart';
-import 'package:tileshop/features/splash/presentation/splash_screen.dart';
-import '../../features/dashboard/owner/presentation/addfieldstaffscreen.dart';
+
+import '../../ui/auth/owner/presentation/addDesignationpage.dart';
+import '../../ui/auth/owner/presentation/addfieldstaffscreen.dart';
+import '../../ui/auth/login_screen.dart';
+import '../../ui/splash/presentation/splash_screen.dart';
+
 
 class AppRouter {
   AppRouter._();
@@ -28,7 +31,10 @@ class AppRouter {
         path: '/field-staff',
         builder: (context, state) => const OwnerAddFieldStaffScreen(),
       ),
-
+      GoRoute(
+        path: '/designations',
+        builder: (context, state) => const AddDesignationPage(),
+      ),
     ],
   );
 }

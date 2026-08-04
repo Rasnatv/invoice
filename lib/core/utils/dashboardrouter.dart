@@ -1,31 +1,52 @@
-import 'package:flutter/material.dart';
-import '../../features/auth/bloc/auth_bloc.dart';
-import '../../features/dashboard/driver_dashboard/driver_dashboard.dart';
-import '../../features/dashboard/owner/widgets/ownerDashboardshell.dart';
-import '../../features/dashboard/salesman/presentation/dashboard_shell.dart';
-import '../../features/fieldstaff/fieldstaff_dashboard.dart';
 
-/// Single source of truth for "which dashboard does this role open".
-/// Used by LoginScreen (fresh login) and SplashScreen (auto-login from a
-/// saved session) so both paths can never drift apart.
+import 'package:flutter/material.dart';
+import 'package:tileshop/ui/driver_dashboard/driver_dashboard.dart';
+import 'package:tileshop/ui/fieldstaff/fieldstaff_dashboard.dart';
+
+import '../../ui/auth/owner/widgets/ownerDashboardshell.dart';
+import '../../ui/salesman/presentation/dashboard_shell.dart';
+
+enum UserRole { owner, salesman, driver, fieldStaff }
+
+UserRole? roleFromStoredString(String? value) {
+  switch (value) {
+    case '2':
+      return UserRole.owner;
+    case '3':
+      return UserRole.salesman;
+    case '4':
+      return UserRole.driver;
+    case '5':
+      return UserRole.fieldStaff;
+    default:
+      return null;
+  }
+}
+
+
 Widget destinationForRole(UserRole role) {
   switch (role) {
     case UserRole.owner:
-      return const Ownerdashboardshell();
-    case UserRole.driver:
-      return const DriverDashboardScreen();
+      return const  Ownerdashboardshell();
     case UserRole.salesman:
       return const DashboardShell();
+    case UserRole.driver:
+      return const  DriverDashboardScreen();
     case UserRole.fieldStaff:
       return const FieldStaffDashboardScreen();
   }
 }
 
-/// Turns the string saved by TokenStorage.saveRole back into a UserRole.
-UserRole? roleFromStoredString(String? value) {
-  if (value == null) return null;
-  for (final role in UserRole.values) {
-    if (role.name == value) return role;
+// TEMP — swap this out for your actual dashboard widgets.
+class _PlaceholderDashboard extends StatelessWidget {
+  final String title;
+  const _PlaceholderDashboard({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(child: Text(title)),
+    );
   }
-  return null;
 }
