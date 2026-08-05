@@ -116,7 +116,7 @@
 //   ];
 // }
 import 'package:equatable/equatable.dart';
-import 'package:tileshop/core/utils/dashboardrouter.dart'; // UserRole
+import 'package:tileshop/router/dashboardrouter.dart'; // UserRole
 
 enum AuthStatus { initial, submitting, success, failure }
 

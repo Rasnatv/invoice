@@ -78,8 +78,9 @@ import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_text_styles.dart';
 import '../../../../../core/utils/responsive.dart';
-import '../../../../../core/widgets/status_badge.dart';
-import '../../../../dummymodels/dispatch_model.dart';
+import '../../../../core/dummymodel/dispatch_model.dart';
+import '../../../../widgets/status_badge.dart';
+
 
 
 class DispatchCard extends StatelessWidget {

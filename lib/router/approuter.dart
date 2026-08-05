@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../ui/auth/owner/presentation/addDesignationpage.dart';
-import '../../ui/auth/owner/presentation/addfieldstaffscreen.dart';
-import '../../ui/auth/login_screen.dart';
-import '../../ui/splash/presentation/splash_screen.dart';
+import '../ui/auth/login_screen.dart';
+import '../ui/owner/addDesignationpage.dart';
+import '../ui/owner/addfieldstaffscreen.dart';
+import '../ui/splash/splash_screen.dart';
 
 
 class AppRouter {

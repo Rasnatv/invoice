@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/utils/responsive.dart';
-import '../../../../dummymodels/contractor_model.dart';
+import '../../../../core/dummymodel/contractor_model.dart';
 import '../cubit/contractors_cubit.dart';
 import '../widgets/contractor_card.dart';
 import 'add_contractor_screen.dart';

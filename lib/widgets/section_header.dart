@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
-import '../constants/app_text_styles.dart';
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_text_styles.dart';
 
 /// "My Estimates", "Recent Estimates  View All" style row header used
 /// throughout the dashboard list screens.

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
-import '../constants/app_text_styles.dart';
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_text_styles.dart';
 
 /// Big red rounded CTA button used on Onboarding, Login, Create Estimate,
 /// Add Contractor, Send to Admin, etc. Matches the "Get Started" /

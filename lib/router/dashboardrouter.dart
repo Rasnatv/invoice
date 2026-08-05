@@ -2,9 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:tileshop/ui/driver_dashboard/driver_dashboard.dart';
 import 'package:tileshop/ui/fieldstaff/fieldstaff_dashboard.dart';
-
-import '../../ui/auth/owner/widgets/ownerDashboardshell.dart';
-import '../../ui/salesman/presentation/dashboard_shell.dart';
+import '../widgets/ownerDashboardshell.dart';
+import '../ui/salesman/presentation/dashboard_shell.dart';
 
 enum UserRole { owner, salesman, driver, fieldStaff }
 
@@ -34,19 +33,5 @@ Widget destinationForRole(UserRole role) {
       return const  DriverDashboardScreen();
     case UserRole.fieldStaff:
       return const FieldStaffDashboardScreen();
-  }
-}
-
-// TEMP — swap this out for your actual dashboard widgets.
-class _PlaceholderDashboard extends StatelessWidget {
-  final String title;
-  const _PlaceholderDashboard({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(child: Text(title)),
-    );
   }
 }

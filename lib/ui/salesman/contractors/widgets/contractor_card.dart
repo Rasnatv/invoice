@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_text_styles.dart';
 import '../../../../../core/utils/responsive.dart';
-import '../../../../dummymodels/contractor_model.dart';
+import '../../../../core/dummymodel/contractor_model.dart';
 
 class ContractorCard extends StatelessWidget {
   final ContractorModel contractor;

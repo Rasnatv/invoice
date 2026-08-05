@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
-import '../core/models/loginrequestmodel.dart';
-import '../core/network/api_client.dart';
-import 'package:tileshop/core/models/loginresponsemodel.dart';
+import '../core/apiclient/api_client.dart';
+
+import '../models/loginrequestmodel.dart';
+import '../models/loginresponsemodel.dart';
 
 /// Simple success/failure wrapper so the bloc doesn't need to know about
 /// Dio or exceptions at all.

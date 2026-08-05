@@ -5,7 +5,7 @@ import '../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../core/utils/responsive.dart';
 import '../../../../dummymodels/estimate_model.dart';
 import '../widgets/biltypebadge.dart';
-import '../../../../../../core/widgets/status_badge.dart';
+import '../../../../widgets/status_badge.dart';
 
 const double _dummyIncentivePercent = 5.0;
 

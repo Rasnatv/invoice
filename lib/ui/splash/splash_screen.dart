@@ -1,13 +1,13 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_text_styles.dart';
-import '../../../core/utils/dashboardrouter.dart';
-import '../../../core/utils/responsive.dart';
-import '../../../core/network/tokenstorage.dart';
-import '../../auth/login_screen.dart';
-import '../../onboarding/presentation/onboarding_screen.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+import '../../router/dashboardrouter.dart';
+import '../../core/utils/responsive.dart';
+import '../../core/network/tokenstorage.dart';
+import '../auth/login_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 
 /// Splash / brand loading screen — modern, elegant look for Dreams Ceramic.
 /// Soft gradient backdrop, glowing logo mark, refined typography.

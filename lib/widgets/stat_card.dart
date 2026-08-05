@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
-import '../constants/app_text_styles.dart';
-import '../utils/responsive.dart';
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_text_styles.dart';
+import '../core/utils/responsive.dart';
 
 /// The small red stat tiles seen on the Dashboard Home screen —
 /// "Total Estimates", "Approved", "Pending", "Dispatch Bills".

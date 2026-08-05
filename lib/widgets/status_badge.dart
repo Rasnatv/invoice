@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
-import '../constants/app_text_styles.dart';
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_text_styles.dart';
 
 /// Small pill used everywhere a status is shown: "Pending", "Approved",
 /// "Rejected", "Delivered", "In Transit".

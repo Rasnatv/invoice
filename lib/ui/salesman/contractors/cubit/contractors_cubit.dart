@@ -1,5 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../dummymodels/contractor_model.dart';
+import '../../../../core/dummymodel/contractor_model.dart';
 
 class ContractorsCubit extends Cubit<List<ContractorModel>> {
   ContractorsCubit() : super([]) {

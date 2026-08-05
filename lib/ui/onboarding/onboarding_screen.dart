@@ -1,11 +1,11 @@
 
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_text_styles.dart';
-import '../../../core/network/tokenstorage.dart';
-import '../../../core/utils/responsive.dart';
-import '../../../core/widgets/primary_button.dart';
-import '../../auth/login_screen.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+import '../../core/network/tokenstorage.dart';
+import '../../core/utils/responsive.dart';
+import '../../widgets/primary_button.dart';
+import '../auth/login_screen.dart';
 
 /// Single onboarding page — shown only once, ever, on first launch.
 /// After this, TokenStorage remembers it's been seen and Splash skips

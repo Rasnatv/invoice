@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
-import '../../../../core/widgets/primary_button.dart';
+import '../../../widgets/primary_button.dart';
 import '../../../dummymodels/estimate_model.dart';
 
 class QuotationPreviewScreen extends StatelessWidget {

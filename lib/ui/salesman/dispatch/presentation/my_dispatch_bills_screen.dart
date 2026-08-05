@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_text_styles.dart';
 import '../../../../../core/utils/responsive.dart';
-import '../../../../dummymodels/dispatch_model.dart';
+import '../../../../core/dummymodel/dispatch_model.dart';
 import '../cubit/dispatch_cubit.dart';
 import '../widgets/dispatch_card.dart';
 import 'despatchdetailscreensalesman.dart';

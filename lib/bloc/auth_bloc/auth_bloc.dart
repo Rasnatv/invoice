@@ -1,12 +1,11 @@
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../Apiprovider/authprovider.dart';
-import '../../../core/models/loginrequestmodel.dart';
+import '../../Apiprovider/authprovider.dart';
+import '../../models/loginrequestmodel.dart';
+import '../../models/loginresponsemodel.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
-
-import 'package:tileshop/core/models/loginresponsemodel.dart'; // LoginData, LoginResponse
-import 'package:tileshop/core/utils/dashboardrouter.dart'; // roleFromStoredString
+import 'package:tileshop/router/dashboardrouter.dart'; // roleFromStoredString
 import 'package:tileshop/core/network/tokenstorage.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
@@ -86,9 +85,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  /// Call this from Splash to silently restore a session — mirrors what
-  /// SplashScreen already does with TokenStorage + roleFromStoredString,
-  /// just exposed through the bloc too in case you want Splash on AuthBloc.
   Future<void> _onAuthCheckRequested(
       AuthCheckRequested event,
       Emitter<AuthState> emit,

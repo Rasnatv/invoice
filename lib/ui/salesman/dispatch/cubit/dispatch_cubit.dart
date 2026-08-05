@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../dummymodels/dispatch_model.dart';
+import '../../../../core/dummymodel/dispatch_model.dart';
+
 
 class DispatchCubit extends Cubit<List<DispatchModel>> {
   DispatchCubit() : super([]) {

@@ -1,9 +1,9 @@
 
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'core/utils/approuter.dart';
+import 'router/approuter.dart';
 import 'core/utils/responsive.dart';
-import 'core/widgets/appsnackbar.dart';
+import 'widgets/appsnackbar.dart';
 
 void main() {
   runApp(const DreamsCeramicApp());

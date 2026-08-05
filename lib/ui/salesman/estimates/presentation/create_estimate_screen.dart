@@ -4,8 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../core/constants/app_colors.dart';
 import '../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../core/utils/responsive.dart';
-import '../../../../../../core/widgets/custom_text_field.dart';
-import '../../../../../../core/widgets/primary_button.dart';
+import '../../../../widgets/custom_text_field.dart';
+import '../../../../widgets/primary_button.dart';
 import '../../../../dummymodels/estimate_model.dart';
 import '../cubit/estimates_cubit.dart';
 

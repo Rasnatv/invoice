@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_text_styles.dart';
 import '../../../../../core/utils/responsive.dart';
-import '../../../../../core/widgets/status_badge.dart';
+import '../../../../widgets/status_badge.dart';
 import '../../../../dummymodels/estimate_model.dart';
 
 
