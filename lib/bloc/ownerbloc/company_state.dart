@@ -1,5 +1,3 @@
-
-
 import '../../models/owner_models/addcompanymodel.dart';
 
 enum CompanyStatus { initial, loading, loaded, failure }
@@ -38,8 +36,7 @@ class CompanyState {
       companies: companies ?? this.companies,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      successMessage:
-      clearSuccess ? null : (successMessage ?? this.successMessage),
+      successMessage: clearSuccess ? null : (successMessage ?? this.successMessage),
     );
   }
 }

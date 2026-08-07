@@ -7,12 +7,12 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/salesmanprovider.dart';
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/salesmanmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/salesman_bloc.dart';
 import '../../bloc/ownerbloc/salesman_event.dart';
 import '../../bloc/ownerbloc/salesman_state.dart';
-import 'data/repository/salesman_repository.dart';
 import 'owneraddsalesmanscreen.dart';
 
 
@@ -90,35 +90,16 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
 
   Future<void> _confirmDeleteSalesman(HSalesmanModel salesman) async {
     final bloc = context.read<SalesmanBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Delete Salesman?', style: AppTextStyles.bodyBold()),
-        content: Text(
-          'This will remove "${salesman.name}" from your salesman list. This cannot be undone.',
-          style: AppTextStyles.caption(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete Salesman?',
+      message: 'This will remove "${salesman.name}" from your salesman list. This cannot be undone.',
+      confirmText: 'Delete',
+      confirmColor: AppColors.error,
     );
-    if (confirmed == true) {
+    if (confirmed) {
       bloc.add(DeleteSalesman(salesman.id));
     }
-  }
-
-  void _openDesignations() {
-    // Registered in AppRouter as GoRoute(path: '/designations', ...).
-    context.push('/designations');
   }
 
   @override

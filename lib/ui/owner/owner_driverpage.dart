@@ -6,6 +6,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/validator/validationfile.dart';
 import '../../Apiprovider/driverprovider.dart';
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/get_drivermodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/driver_bloc.dart';
@@ -246,59 +247,25 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
   }
 
   // ---- Delete confirmation ----
-  void _confirmDeleteDriver(DriverGetModel driver) {
+  Future<void> _confirmDeleteDriver(DriverGetModel driver) async {
     final bloc = context.read<DriverBloc>();
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Remove Driver',
-            style: AppTextStyles.bodyBold(color: AppColors.black)
-                .copyWith(fontSize: Responsive.sp(16)),
-          ),
-          content: Text(
-            'Are you sure you want to remove ${driver.name} from your drivers list?',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: Responsive.sp(13),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                bloc.add(DeleteDriver(driver.id));
-                Navigator.pop(dialogContext);
-              },
-              child: const Text(
-                'Remove',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        );
-      },
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Remove Driver',
+      message: 'Are you sure you want to remove ${driver.name} from your drivers list?',
+      confirmText: 'Remove',
     );
+    if (confirmed) {
+      bloc.add(DeleteDriver(driver.id));
+    }
   }
-
   static String _formatDate(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// Display helper for dates coming back from the API. `DriverGetModel`
-  /// already normalizes `joining_date` to "yyyy-MM-dd" (see
-  /// get_drivermodel.dart), so this just guards against an empty string
-  /// so the UI never shows a blank or stray time fragment.
+
   static String _displayDate(String raw) {
     if (raw.isEmpty) return '—';
     return raw;

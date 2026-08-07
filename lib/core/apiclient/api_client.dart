@@ -177,18 +177,13 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /units — kept on the SAME path as the list, not
-  /// ApiConstants.unitscreate ('/units/create'), because your confirmed
-  /// real response showed create hitting this exact URL. `data` comes back
-  /// empty on success, so callers only use status/message from this response.
+
   Future<Response> addUnit(Map<String, dynamic> data) async => dio.post(
     ApiConstants.units,
     data: data,
     options: await _authOptions(),
   );
 
-  /// Fixed back to POST — your confirmed real response showed
-  /// /units/update working via POST, not PUT.
   Future<Response> updateUnit(Map<String, dynamic> data) async => dio.post(
     ApiConstants.updateUnit,
     data: data,
@@ -217,15 +212,93 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  Future<Response> updateCompany(Map<String, dynamic> data) async => dio.post(
+  Future<Response> updateCompany(Map<String, dynamic> data) async => dio.put(
     ApiConstants.updateCompany,
     data: data,
     options: await _authOptions(),
   );
 
-  Future<Response> deleteCompany(Map<String, dynamic> data) async => dio.post(
+  Future<Response> deleteCompany(Map<String, dynamic> data) async => dio.delete(
     ApiConstants.deleteCompany,
     data: data,
     options: await _authOptions(),
   );
-}
+
+  //--------------------------------------FieldstaffSection---------------------
+
+  // =================== SITE VISITS ===================
+
+  /// POST /site-visits/create
+  Future<Response> createSiteVisit(Map<String, dynamic> data,) async => dio.post(
+        ApiConstants.siteVisitCreate,
+        data: data,
+        options: await _authOptions(),
+      );
+
+  /// GET /site-visits/my
+  Future<Response> mySiteVisits() async => dio.get(
+    ApiConstants.siteVisitsMy,
+    options: await _authOptions(),
+  );
+
+  /// POST /site-visits/show
+  Future<Response> showSiteVisit(Map<String, dynamic> data,) async => dio.post(
+        ApiConstants.siteVisitShow,
+        data: data,
+        options: await _authOptions(),
+      );
+
+  /// POST /site-visits/update
+  Future<Response> updateSiteVisit(Map<String, dynamic> data,
+      ) async => dio.put(
+        ApiConstants.siteVisitUpdate,
+        data: data,
+        options: await _authOptions(),
+      );
+
+  /// POST /site-visits/delete
+  Future<Response> deleteSiteVisit(Map<String, dynamic> data,) async => dio.delete(
+        ApiConstants.siteVisitDelete,
+        data: data,
+        options: await _authOptions(),
+      );
+
+
+  // =================== PRODUCTS ===================
+  Future<Response> products({int page = 1, int perPage = 10}) async => dio.get(
+    '${ApiConstants.products}?page=$page&per_page=$perPage',
+    options: await _authOptions(),
+  );
+
+  /// POST /products/create
+  Future<Response> addProduct(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.productsCreate,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /products/update
+  Future<Response> updateProduct(Map<String, dynamic> data) async => dio.put(
+    ApiConstants.productsUpdate,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /products/delete
+  Future<Response> deleteProduct(Map<String, dynamic> data) async => dio.delete(
+    ApiConstants.productsDelete,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  // =================== COMPANIES (active — for dropdown) ===================
+  Future<Response> activeCompanies() async => dio.get(
+    ApiConstants.companiesActive,
+    options: await _authOptions(),
+  );
+
+  // =================== UNITS (active — for dropdown) ===================
+  Future<Response> activeUnits() async => dio.get(
+    ApiConstants.unitsActive,
+    options: await _authOptions(),
+  );}

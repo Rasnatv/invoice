@@ -1,58 +1,84 @@
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
-import 'addfieldstaff.dart';
-import 'fieldstaff repository.dart';
-import 'fieldstaffvisitmodel.dart';
+import '../../bloc/sitevist/sitevisit_bloc.dart';
+import '../../bloc/sitevist/sitevisit_event.dart';
+import '../../bloc/sitevist/sitevisit_state.dart';
+import '../../core/utils/confirmation_dialogue.dart';
+import '../../models/fieldstaffmodels/sitevisitdeletemodel.dart';
+import '../../models/fieldstaffmodels/fieldstaffshowsitevisitmodel.dart';
+import '../../widgets/appsnackbar.dart';
+import 'addsite.dart';
 
-/// Full detail view of a single logged party visit.
-class FieldStaffVisitDetailScreen extends StatelessWidget {
-  const FieldStaffVisitDetailScreen({super.key, required this.visit});
+class FieldStaffVisitDetailScreen extends StatefulWidget {
+  const FieldStaffVisitDetailScreen({super.key, required this.visitId});
 
-  final FieldStaffVisitModel visit;
+  final String visitId;
+
+  @override
+  State<FieldStaffVisitDetailScreen> createState() => _FieldStaffVisitDetailScreenState();
+}
+
+class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<SiteVisitBloc>().add(
+      ShowSiteVisitDetail(SiteVisitShowRequestModel(id: widget.visitId)),
+    );
+  }
 
   Future<void> _callNumber(BuildContext context, String phone) async {
     final uri = Uri(scheme: 'tel', path: phone);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not start a call on this device')),
-      );
+      AppSnackbar.error('Could not start a call on this device');
     }
   }
 
-  Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Visit'),
-        content: Text('Remove the visit to "${visit.partyName}"? This cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+  // ---------------- EDIT (this IS your "update" screen — it reuses
+  // AddFieldVisitScreen with `existing` set) ----------------
+
+  void _openEdit(BuildContext context, SiteVisitDetailModel visit) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<SiteVisitBloc>(),
+          child: AddFieldVisitScreen(existing: visit),
+        ),
       ),
     );
-    if (confirmed == true) {
-      FieldStaffRepository.instance.deleteVisit(visit.id);
-      if (context.mounted) Navigator.of(context).pop();
-    }
   }
+
+  // ---------------- DELETE ----------------
+  Future<void> _confirmDelete(BuildContext context, String customerName) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete Visit',
+      message: 'Remove the visit to "$customerName"? This cannot be undone.',
+      confirmText: 'Delete',
+    );
+    if (confirmed && context.mounted) {
+      context.read<SiteVisitBloc>().add(
+        DeleteSiteVisit(SiteVisitDeleteRequestModel(id: widget.visitId)),
+    );
+    if (confirmed == true && context.mounted) {
+      context.read<SiteVisitBloc>().add(
+        DeleteSiteVisit(SiteVisitDeleteRequestModel(id: widget.visitId)),
+      );
+    }
+  }}
 
   @override
   Widget build(BuildContext context) {
-    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final dateLabel = DateFormat('dd MMM yyyy, EEEE').format(visit.visitDate);
-
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -60,63 +86,192 @@ class FieldStaffVisitDetailScreen extends StatelessWidget {
         elevation: 0,
         title: const Text('Visit Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_rounded),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => AddFieldVisitScreen(staffName: visit.staffName, existing: visit),
+          BlocBuilder<SiteVisitBloc, SiteVisitState>(
+            buildWhen: (prev, curr) => prev.detail != curr.detail,
+            builder: (context, state) {
+              return IconButton(
+                icon: const Icon(Icons.edit_rounded),
+                onPressed: state.detail == null ? null : () => _openEdit(context, state.detail!),
+              );
+            },
+          ),
+          BlocBuilder<SiteVisitBloc, SiteVisitState>(
+            buildWhen: (prev, curr) =>
+            prev.detail != curr.detail || prev.actionStatus != curr.actionStatus,
+            builder: (context, state) {
+              final busy = state.actionStatus == SiteVisitActionStatus.inProgress;
+              return IconButton(
+                icon: busy
+                    ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                )
+                    : const Icon(Icons.delete_outline_rounded),
+                onPressed: (state.detail == null || busy)
+                    ? null
+                    : () => _confirmDelete(context, state.detail!.customerName),
+              );
+            },
+          ),
+        ],
+      ),
+      body: BlocConsumer<SiteVisitBloc, SiteVisitState>(
+        listenWhen: (prev, curr) =>
+        curr.actionStatus != prev.actionStatus &&
+            (curr.actionStatus == SiteVisitActionStatus.success ||
+                curr.actionStatus == SiteVisitActionStatus.failure),
+        listener: (context, state) {
+          if (state.actionStatus == SiteVisitActionStatus.success) {
+            Navigator.of(context).pop();
+            AppSnackbar.success(state.actionMessage ?? 'Visit deleted');
+            context.read<SiteVisitBloc>().add(const ResetSiteVisitActionStatus());
+          } else if (state.actionStatus == SiteVisitActionStatus.failure) {
+            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
+            if (state.actionUnauthorized) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+            context.read<SiteVisitBloc>().add(const ResetSiteVisitActionStatus());
+          }
+        },
+        builder: (context, state) {
+          if (state.isDetailLoading && state.detail == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state.detailError != null && state.detail == null) {
+            return Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: 34, color: AppColors.textSecondary.withOpacity(0.5)),
+                    SizedBox(height: Responsive.h(10)),
+                    Text(
+                      state.detailError!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5)),
+                    ),
+                    SizedBox(height: Responsive.h(14)),
+                    TextButton(
+                      onPressed: () => context.read<SiteVisitBloc>().add(
+                        ShowSiteVisitDetail(SiteVisitShowRequestModel(id: widget.visitId)),
+                      ),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final visit = state.detail;
+          if (visit == null) return const SizedBox.shrink();
+
+          final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+          final parsedDate = DateTime.tryParse(visit.visitDate);
+          final dateLabel = parsedDate != null
+              ? DateFormat('dd MMM yyyy, EEEE').format(parsedDate)
+              : visit.visitDate;
+          final incentive = double.tryParse(visit.incentiveEarned) ?? 0;
+
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () async => context.read<SiteVisitBloc>().add(
+              ShowSiteVisitDetail(SiteVisitShowRequestModel(id: widget.visitId)),
+            ),
+            child: SafeArea(
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(Responsive.w(20)),
+                children: [
+                  _photoGallery(visit.images),
+                  SizedBox(height: Responsive.h(18)),
+                  _infoCard(context, visit: visit, dateLabel: dateLabel, currency: currency, incentive: incentive),
+                  if (visit.notes.isNotEmpty) ...[
+                    SizedBox(height: Responsive.h(14)),
+                    _notesCard(visit.notes),
+                  ],
+                ],
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded),
-            onPressed: () => _confirmDelete(context),
-          ),
-        ],
+          );
+        },
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.all(Responsive.w(20)),
+    ));
+  }
+
+  Widget _photoGallery(List<SiteVisitImageModel> images) {
+    if (images.isEmpty) {
+      return Container(
+        height: 220,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceAlt,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _photoCard(),
-            SizedBox(height: Responsive.h(18)),
-            _infoCard(context, dateLabel: dateLabel, currency: currency),
-            if (visit.notes != null) ...[
-              SizedBox(height: Responsive.h(14)),
-              _notesCard(),
-            ],
+            Icon(Icons.image_not_supported_outlined, size: 34, color: AppColors.textSecondary.withOpacity(0.5)),
+            SizedBox(height: Responsive.h(8)),
+            Text('No photo attached', style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12))),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _photoCard() {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(20),
-        image: visit.hasImage
-            ? DecorationImage(image: FileImage(visit.imageFile!), fit: BoxFit.cover)
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: !visit.hasImage
-          ? Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.image_not_supported_outlined, size: 34, color: AppColors.textSecondary.withOpacity(0.5)),
+    return Column(
+      children: [
+        SizedBox(
+          height: 220,
+          child: PageView.builder(
+            itemCount: images.length,
+            itemBuilder: (context, i) {
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.network(
+                  images[i].imageUrl,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: AppColors.surfaceAlt,
+                    alignment: Alignment.center,
+                    child: Icon(Icons.broken_image_outlined, size: 30, color: AppColors.textSecondary.withOpacity(0.5)),
+                  ),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      color: AppColors.surfaceAlt,
+                      alignment: Alignment.center,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        if (images.length > 1) ...[
           SizedBox(height: Responsive.h(8)),
-          Text('No photo attached', style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12))),
+          Text(
+            '${images.length} photos • swipe to view',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(11)),
+          ),
         ],
-      )
-          : null,
+      ],
     );
   }
 
-  Widget _infoCard(BuildContext context, {required String dateLabel, required NumberFormat currency}) {
+  Widget _infoCard(
+      BuildContext context, {
+        required SiteVisitDetailModel visit,
+        required String dateLabel,
+        required NumberFormat currency,
+        required double incentive,
+      }) {
     return Container(
       padding: EdgeInsets.all(Responsive.w(16)),
       decoration: BoxDecoration(
@@ -127,7 +282,25 @@ class FieldStaffVisitDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(visit.partyName, style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(17))),
+          Row(
+            children: [
+              Expanded(
+                child: Text(visit.customerName, style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(17))),
+              ),
+              if (visit.statusLabel.isNotEmpty)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(9), vertical: Responsive.h(4)),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    visit.statusLabel,
+                    style: TextStyle(color: AppColors.warning, fontSize: Responsive.sp(11), fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
+          ),
           SizedBox(height: Responsive.h(4)),
           Row(
             children: [
@@ -139,19 +312,23 @@ class FieldStaffVisitDetailScreen extends StatelessWidget {
           SizedBox(height: Responsive.h(14)),
           Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.08)),
           SizedBox(height: Responsive.h(14)),
-          _detailRow(icon: Icons.location_on_outlined, label: 'Address', value: visit.address),
+          _detailRow(icon: Icons.location_on_outlined, label: 'Address', value: visit.siteAddress),
           SizedBox(height: Responsive.h(12)),
+          if (visit.customerEmail.isNotEmpty) ...[
+            _detailRow(icon: Icons.email_outlined, label: 'Email', value: visit.customerEmail),
+            SizedBox(height: Responsive.h(12)),
+          ],
           Row(
             children: [
               Expanded(
-                child: _detailRow(icon: Icons.phone_outlined, label: 'Phone', value: visit.phoneNo),
+                child: _detailRow(icon: Icons.phone_outlined, label: 'Phone', value: visit.customerPhone),
               ),
               Material(
                 color: AppColors.info.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => _callNumber(context, visit.phoneNo),
+                  onTap: () => _callNumber(context, visit.customerPhone),
                   child: Padding(
                     padding: const EdgeInsets.all(10),
                     child: Icon(Icons.call_rounded, color: AppColors.info, size: 19),
@@ -172,10 +349,14 @@ class FieldStaffVisitDetailScreen extends StatelessWidget {
               children: [
                 Icon(Icons.workspace_premium_rounded, color: AppColors.primary, size: 20),
                 SizedBox(width: Responsive.w(8)),
-                Text('Incentive Earned', style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w500)),
-                const Spacer(),
+                Expanded(
+                  child: Text(
+                    visit.incentiveStatusLabel.isEmpty ? 'Incentive Earned' : visit.incentiveStatusLabel,
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w500),
+                  ),
+                ),
                 Text(
-                  currency.format(visit.incentiveAmount),
+                  currency.format(incentive),
                   style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(fontSize: Responsive.sp(16)),
                 ),
               ],
@@ -186,7 +367,7 @@ class FieldStaffVisitDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _notesCard() {
+  Widget _notesCard(String notes) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(Responsive.w(16)),
@@ -206,7 +387,7 @@ class FieldStaffVisitDetailScreen extends StatelessWidget {
             ],
           ),
           SizedBox(height: Responsive.h(8)),
-          Text(visit.notes ?? '', style: TextStyle(fontSize: Responsive.sp(12.5), color: AppColors.textPrimary)),
+          Text(notes, style: TextStyle(fontSize: Responsive.sp(12.5), color: AppColors.textPrimary)),
         ],
       ),
     );

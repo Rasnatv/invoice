@@ -1,11 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../ui/owner/data/repository/company_addrepository.dart';
+import '../../Apiprovider/companyprovider.dart';
+import '../../models/owner_models/addcompanymodel.dart';
 import 'company_event.dart';
 import 'company_state.dart';
 
 class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
-  CompanyBloc({required CompanyRepository repository})
-      : _repository = repository,
+  CompanyBloc({required CompanyProvider provider})
+      : _provider = provider,
         super(const CompanyState()) {
     on<LoadCompanies>(_onLoadCompanies);
     on<AddCompanyRequested>(_onAddCompany);
@@ -14,42 +15,46 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
     on<CompanyMessageConsumed>(_onMessageConsumed);
   }
 
-  final CompanyRepository _repository;
+  final CompanyProvider _provider;
 
   Future<void> _onLoadCompanies(
       LoadCompanies event,
       Emitter<CompanyState> emit,
       ) async {
     emit(state.copyWith(status: CompanyStatus.loading, clearError: true));
-    try {
-      final companies = await _repository.fetchCompanies();
-      emit(state.copyWith(status: CompanyStatus.loaded, companies: companies));
-    } catch (e) {
+    final result = await _provider.getCompanies();
+
+    if (result.success) {
+      emit(state.copyWith(status: CompanyStatus.loaded, companies: result.companies));
+    } else if (!result.isUnauthorized) {
       emit(state.copyWith(
         status: CompanyStatus.failure,
-        errorMessage: e.toString(),
+        errorMessage: result.errorMessage ?? 'Failed to load companies.',
       ));
     }
+    // On 401, ApiErrorHandler already navigated to LoginScreen — nothing
+    // further to emit here.
   }
 
+  /// POST /companies/create returns an empty `data: {}`, so there's no id
+  /// or company object to insert into the list locally. On success this
+  /// re-dispatches LoadCompanies to pick up the new row from the server.
   Future<void> _onAddCompany(
       AddCompanyRequested event,
       Emitter<CompanyState> emit,
       ) async {
     emit(state.copyWith(isSubmitting: true, clearError: true, clearSuccess: true));
-    try {
-      final created = await _repository.addCompany(
-        name: event.name,
-        code: event.code,
-        website: event.website,
-      );
-      emit(state.copyWith(
-        isSubmitting: false,
-        companies: [...state.companies, created],
-        successMessage: 'Company added successfully',
-      ));
-    } catch (e) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: e.toString()));
+    final result = await _provider.addCompany(
+      CompanyModel(id: '', name: event.name, code: event.code, website: event.website),
+    );
+
+    if (result.success) {
+      emit(state.copyWith(isSubmitting: false, successMessage: result.message));
+      add(const LoadCompanies());
+    } else if (!result.isUnauthorized) {
+      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
+    } else {
+      emit(state.copyWith(isSubmitting: false));
     }
   }
 
@@ -58,13 +63,11 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
       Emitter<CompanyState> emit,
       ) async {
     emit(state.copyWith(isSubmitting: true, clearError: true, clearSuccess: true));
-    try {
-      await _repository.updateCompany(
-        id: event.id,
-        name: event.name,
-        code: event.code,
-        website: event.website,
-      );
+    final result = await _provider.updateCompany(
+      CompanyModel(id: event.id, name: event.name, code: event.code, website: event.website),
+    );
+
+    if (result.success) {
       final updated = state.companies
           .map((c) => c.id == event.id
           ? c.copyWith(
@@ -78,10 +81,12 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
       emit(state.copyWith(
         isSubmitting: false,
         companies: updated,
-        successMessage: 'Company updated successfully',
+        successMessage: result.message,
       ));
-    } catch (e) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: e.toString()));
+    } else if (!result.isUnauthorized) {
+      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
+    } else {
+      emit(state.copyWith(isSubmitting: false));
     }
   }
 
@@ -90,16 +95,19 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
       Emitter<CompanyState> emit,
       ) async {
     emit(state.copyWith(isSubmitting: true, clearError: true, clearSuccess: true));
-    try {
-      await _repository.deleteCompany(event.id);
+    final result = await _provider.deleteCompany(event.id);
+
+    if (result.success) {
       final updated = state.companies.where((c) => c.id != event.id).toList();
       emit(state.copyWith(
         isSubmitting: false,
         companies: updated,
-        successMessage: 'Company deleted successfully',
+        successMessage: result.message,
       ));
-    } catch (e) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: e.toString()));
+    } else if (!result.isUnauthorized) {
+      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
+    } else {
+      emit(state.copyWith(isSubmitting: false));
     }
   }
 

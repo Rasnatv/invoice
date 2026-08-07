@@ -4,12 +4,13 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/validator/validationfile.dart';
+import '../../Apiprovider/companyprovider.dart';
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/addcompanymodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/company_bloc.dart';
 import '../../bloc/ownerbloc/company_event.dart';
 import '../../bloc/ownerbloc/company_state.dart';
-import 'data/repository/company_addrepository.dart';
 
 /// Lists all companies and lets the owner add / edit / delete them.
 /// Wrapped in its own BlocProvider so it can be pushed from anywhere
@@ -21,7 +22,7 @@ class CompanySetupScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
-      CompanyBloc(repository: CompanyRepository())..add(const LoadCompanies()),
+      CompanyBloc(provider: CompanyProvider())..add(const LoadCompanies()),
       child: const _CompanySetupView(),
     );
   }
@@ -159,30 +160,17 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
     );
   }
 
+
   Future<void> _confirmDelete(BuildContext context, CompanyModel company) async {
     final bloc = context.read<CompanyBloc>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Delete Company?', style: AppTextStyles.bodyBold()),
-        content: Text(
-          'This will remove "${company.name}". This cannot be undone.',
-          style: AppTextStyles.caption(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete Company?',
+      message: 'This will remove "${company.name}". This cannot be undone.',
+      confirmText: 'Delete',
+      confirmColor: AppColors.error,
     );
-    if (confirmed == true) {
+    if (confirmed) {
       bloc.add(DeleteCompanyRequested(company.id));
     }
   }

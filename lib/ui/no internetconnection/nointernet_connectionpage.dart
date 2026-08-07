@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
 
 class NoInternetPage extends StatelessWidget {
   final VoidCallback onRetry;
@@ -45,49 +46,21 @@ class NoInternetPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'No Internet Connection',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A2E),
-                ),
+                style: AppTextStyles.h3(),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Check your Wi-Fi or mobile data\nsettings and try again.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF9CA3AF),
-                  height: 1.6,
-                ),
+                style: AppTextStyles.subtitle().copyWith(height: 1.6),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
 
               // ✅ Retry button — calls back into ConnectivityCubit.checkConnection()
-              ElevatedButton(
-                onPressed: onRetry,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Try Again',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+
             ],
           ),
         ),

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../Apiprovider/designation_provider.dart';
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/designationmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/designationbloc.dart';
@@ -66,13 +67,15 @@ class _DesignationListView extends StatelessWidget {
           if (state is DesignationError) {
             return _ErrorView(
               message: state.message,
-              onRetry: () => context.read<DesignationBloc>().add(FetchDesignations()),
+              onRetry: () =>
+                  context.read<DesignationBloc>().add(FetchDesignations()),
             );
           }
 
           List<DesignationModel> designations = [];
           if (state is DesignationLoaded) designations = state.designations;
-          if (state is DesignationActionSuccess) designations = state.designations;
+          if (state is DesignationActionSuccess)
+            designations = state.designations;
 
 
           return RefreshIndicator(
@@ -90,7 +93,8 @@ class _DesignationListView extends StatelessWidget {
                   designation: designation,
                   primary: _primary,
                   accent: _accent,
-                  onEdit: () => _openAddEditPage(context, designation: designation),
+                  onEdit: () =>
+                      _openAddEditPage(context, designation: designation),
                   onDelete: () => _confirmDelete(context, designation),
                 );
               },
@@ -115,39 +119,26 @@ class _DesignationListView extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: context.read<DesignationBloc>(),
-          child: AddDesignationPage(designation: designation),
-        ),
+        builder: (_) =>
+            BlocProvider.value(
+              value: context.read<DesignationBloc>(),
+              child: AddDesignationPage(designation: designation),
+            ),
       ),
     );
   }
-
-  void _confirmDelete(BuildContext context, DesignationModel designation) {
+  Future<void> _confirmDelete(BuildContext context,
+      DesignationModel designation) async {
     final bloc = context.read<DesignationBloc>();
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete designation?'),
-        content: Text('This will permanently delete "${designation.name}".'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              bloc.add(DeleteDesignation(designation.id));
-            },
-            child: Text(
-              'Delete',
-              style: TextStyle(color: Colors.red.shade600),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete designation?',
+      message: 'This will permanently delete "${designation.name}".',
+      confirmText: 'Delete',
     );
+    if (confirmed) {
+      bloc.add(DeleteDesignation(designation.id));
+    }
   }
 }
 

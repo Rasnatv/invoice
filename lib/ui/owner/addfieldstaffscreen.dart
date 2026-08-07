@@ -6,6 +6,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart'; // exposes Responsive and ResponsiveCenter
 import '../../../core/validator/validationfile.dart';
 import '../../Apiprovider/fieldstaffprovider.dart';
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/fieldstaff_cretaemodel.dart';
 import '../../models/owner_models/fieldstaff_deletemodel.dart';
 import '../../models/owner_models/fieldstaff_getmodel.dart';
@@ -293,45 +294,20 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
     );
   }
 
-  // ---------------- DELETE CONFIRM ----------------
+// ---------------- DELETE CONFIRM ----------------
 
-  void _confirmDeleteStaff(BuildContext context, FieldStaffModel staff) {
+  Future<void> _confirmDeleteStaff(BuildContext context, FieldStaffModel staff) async {
     final bloc = context.read<FieldStaffBloc>();
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Remove Field Staff',
-            style: AppTextStyles.bodyBold(color: AppColors.black)
-                .copyWith(fontSize: Responsive.sp(16)),
-          ),
-          content: Text(
-            'Are you sure you want to remove ${staff.name} from your field staff list?',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                bloc.add(DeleteFieldStaffEvent(
-                  FieldStaffDeleteModel(id: staff.id),
-                ));
-              },
-              child: const Text('Remove',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-            ),
-          ],
-        );
-      },
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Remove Field Staff',
+      message: 'Are you sure you want to remove ${staff.name} from your field staff list?',
+      confirmText: 'Remove',
     );
+    if (confirmed) {
+      bloc.add(DeleteFieldStaffEvent(FieldStaffDeleteModel(id: staff.id)));
+    }
   }
-
   // ---------------- HELPERS ----------------
 
   String _formatDate(DateTime date) {

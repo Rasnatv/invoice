@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import 'connectivity_cubit.dart';
-import 'connectivitystate.dart';
-
-import 'nointernet_connectionpage.dart';
+import '../../bloc/network/network_bloc.dart';
+import 'nointernet_connectionpage.dart'; // adjust to your actual path
 
 class NetworkAwareWrapper extends StatelessWidget {
   final Widget child;
@@ -12,20 +9,14 @@ class NetworkAwareWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ConnectivityCubit, ConnectivityState>(
+    return BlocBuilder<NetworkBloc, NetworkState>(
       builder: (context, state) {
-        // ✅ Show full screen when offline
-        if (state.isOffline) {
+        if (state is NetworkFailure) {
           return NoInternetPage(
-            onRetry: () => context.read<ConnectivityCubit>().checkConnection(),
+            onRetry: () => context.read<NetworkBloc>().add(NetworkObserve()),
           );
         }
-
-        // ✅ Normal app (NO red snackbar / NO banner)
-        return KeyedSubtree(
-          key: ValueKey(state.reconnectCount), // refresh after reconnect
-          child: child,
-        );
+        return child;
       },
     );
   }

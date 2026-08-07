@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../../core/utils/logout.dart';
+import '../../../core/utils/logout_helper.dart';
 import '../salesman/profile/presentation/changepassword.dart';
 import 'editprofile.dart';
 

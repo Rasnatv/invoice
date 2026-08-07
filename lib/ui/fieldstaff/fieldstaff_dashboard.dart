@@ -1,30 +1,41 @@
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:tileshop/ui/fieldstaff/visitdetailscreen.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
-import '../auth/login_screen.dart';
-import 'addfieldstaff.dart';
-import 'fieldstaff repository.dart';
-import 'fieldstaffvisitmodel.dart';
+import '../../bloc/sitevist/sitevisit_bloc.dart';
+import '../../bloc/sitevist/sitevisit_event.dart';
+import '../../bloc/sitevist/sitevisit_state.dart';
+import '../../core/utils/logout_helper.dart';
+import '../../core/validator/validationfile.dart';
+import '../../models/fieldstaffmodels/fieldstaffsitevisitmodel.dart';
+import '../../widgets/appsnackbar.dart';
+import 'addsite.dart';
+import 'visitdetailscreen.dart';
 
 class FieldStaffDashboardScreen extends StatefulWidget {
   const FieldStaffDashboardScreen({
     super.key,
     this.staffName = 'Raju',
-    this.onLogout,
     this.onChangePassword,
   });
 
   final String staffName;
-  final VoidCallback? onLogout;
+
+  /// Logout itself is now handled by the shared `logout()` helper
+  /// (confirm -> clear token -> back to LoginScreen), so there's no
+  /// onLogout override here anymore — just call it directly wherever
+  /// it's needed.
   final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
 
   @override
   State<FieldStaffDashboardScreen> createState() => _FieldStaffDashboardScreenState();
 }
+
 class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
@@ -35,6 +46,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    context.read<SiteVisitBloc>().add(const FetchMySiteVisits());
   }
 
   @override
@@ -44,26 +56,36 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     super.dispose();
   }
 
-  List<FieldStaffVisitModel> _filtered(List<FieldStaffVisitModel> source) {
+  List<SiteVisitListItemModel> _filtered(List<SiteVisitListItemModel> source) {
     if (_query.trim().isEmpty) return source;
     final q = _query.trim().toLowerCase();
     return source
         .where((v) =>
-    v.partyName.toLowerCase().contains(q) ||
-        v.address.toLowerCase().contains(q) ||
-        v.phoneNo.toLowerCase().contains(q))
+    v.customerName.toLowerCase().contains(q) ||
+        v.siteAddress.toLowerCase().contains(q) ||
+        v.customerPhone.toLowerCase().contains(q))
         .toList();
   }
 
-  void _openDetail(FieldStaffVisitModel visit) {
+  void _openDetail(SiteVisitListItemModel visit) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => FieldStaffVisitDetailScreen(visit: visit)),
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<SiteVisitBloc>(),
+          child: FieldStaffVisitDetailScreen(visitId: visit.id),
+        ),
+      ),
     );
   }
 
   void _openAddVisit() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => AddFieldVisitScreen(staffName: widget.staffName)),
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<SiteVisitBloc>(),
+          child: AddFieldVisitScreen(staffName: widget.staffName),
+        ),
+      ),
     );
   }
 
@@ -72,40 +94,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not start a call on this device')),
-      );
-    }
-  }
-
-  Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Logout', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-    if (!mounted) return;
-
-    if (widget.onLogout != null) {
-      widget.onLogout!();
-    } else {
-      // TODO(auth): clear session/token here once real auth exists.
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-      );
+      AppSnackbar.error('Could not start a call on this device');
     }
   }
 
@@ -122,7 +111,9 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         },
         onLogout: () {
           Navigator.of(ctx).pop();
-          _confirmLogout();
+          // Shared helper already confirms, clears the token, and
+          // navigates back to LoginScreen — nothing else needed here.
+          logout(context);
         },
       ),
     );
@@ -136,7 +127,6 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
           if (widget.onChangePassword != null) {
             await widget.onChangePassword!(current, next);
           } else {
-            // TODO(auth): replace with a real API call once auth exists.
             await Future.delayed(const Duration(milliseconds: 600));
           }
         },
@@ -155,7 +145,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openAddVisit,
@@ -163,16 +153,14 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
         label: const Text('Add Visit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
       ),
-      body: AnimatedBuilder(
-        animation: FieldStaffRepository.instance,
-        builder: (context, _) {
-          final myVisits = FieldStaffRepository.instance.visitsFor(widget.staffName);
-          final todayVisits = FieldStaffRepository.instance.todayVisitsFor(widget.staffName);
-          final totalIncentive = FieldStaffRepository.instance.totalIncentiveFor(widget.staffName);
+      body: BlocBuilder<SiteVisitBloc, SiteVisitState>(
+        builder: (context, state) {
+          final todayVisits = state.todayVisits;
+          final allVisits = state.allVisits;
 
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () async => setState(() {}),
+            onRefresh: () async => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -181,9 +169,9 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                     greeting: greeting,
                     name: widget.staffName,
                     dateLabel: today,
-                    total: myVisits.length,
-                    today: todayVisits.length,
-                    incentive: totalIncentive,
+                    total: state.totalVisitsCount,
+                    today: state.todayVisitsCount,
+                    incentive: state.totalIncentive,
                     onAccountTap: _openAccountSheet,
                   ),
                 ),
@@ -199,16 +187,26 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                       SizedBox(height: Responsive.h(16)),
                       _FieldStaffTabBar(
                         controller: _tabController,
-                        todayCount: todayVisits.length,
-                        totalCount: myVisits.length,
+                        todayCount: state.todayVisitsCount,
+                        totalCount: state.totalVisitsCount,
                       ),
                       SizedBox(height: Responsive.h(14)),
+                      if (state.listError != null)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: Responsive.h(10)),
+                          child: _ListErrorBanner(
+                            message: state.listError!,
+                            onRetry: () => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
+                          ),
+                        ),
                     ]),
                   ),
                 ),
                 SliverFillRemaining(
                   hasScrollBody: true,
-                  child: TabBarView(
+                  child: state.isListLoading && state.totalVisitsCount == 0
+                      ? const Center(child: CircularProgressIndicator())
+                      : TabBarView(
                     controller: _tabController,
                     children: [
                       _VisitList(
@@ -220,7 +218,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                         onCallTap: _callNumber,
                       ),
                       _VisitList(
-                        visits: _filtered(myVisits),
+                        visits: _filtered(allVisits),
                         emptyIcon: Icons.map_outlined,
                         emptyLabel: 'No visits logged yet',
                         emptySubLabel: 'Every party you visit will be listed here.',
@@ -235,11 +233,37 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
           );
         },
       ),
+    ));
+  }
+}
+
+class _ListErrorBanner extends StatelessWidget {
+  const _ListErrorBanner({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message, style: TextStyle(color: Colors.red.shade700, fontSize: Responsive.sp(12))),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
     );
   }
 }
 
-// ---------------- HEADER ----------------
 
 class _FieldStaffHeader extends StatelessWidget {
   const _FieldStaffHeader({
@@ -573,50 +597,7 @@ class _AccountSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      _initials,
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)
-                          .copyWith(fontSize: Responsive.sp(15)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          staffName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14.5)),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Field Staff account',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: Responsive.sp(11.5),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+
             const SizedBox(height: 8),
             const Divider(height: 1),
             _AccountTile(
@@ -714,7 +695,6 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _submitting = false;
-  String? _error;
 
   @override
   void dispose() {
@@ -725,7 +705,6 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   }
 
   Future<void> _submit() async {
-    setState(() => _error = null);
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _submitting = true);
@@ -733,24 +712,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       await widget.onSubmit(_currentCtrl.text, _newCtrl.text);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.info,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Expanded(child: Text('Password updated successfully')),
-            ],
-          ),
-        ),
-      );
+      AppSnackbar.success('Password updated successfully');
     } catch (e) {
-      setState(() {
-        _error = 'Could not update password. Please try again.';
-      });
+      AppSnackbar.error('Could not update password. Please try again.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -796,7 +760,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _currentCtrl,
                 obscure: _obscureCurrent,
                 onToggleObscure: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                validator: (v) => (v == null || v.isEmpty) ? 'Enter your current password' : null,
+                validator: (v) => DValidator.validateRequired(v, message: 'Enter your current password'),
               ),
               const SizedBox(height: 12),
               _PasswordField(
@@ -805,8 +769,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 obscure: _obscureNew,
                 onToggleObscure: () => setState(() => _obscureNew = !_obscureNew),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter a new password';
-                  if (v.length < 6) return 'Must be at least 6 characters';
+                  final base = DValidator.validatePassword(v);
+                  if (base != null) return base;
                   if (v == _currentCtrl.text) return 'Must differ from current password';
                   return null;
                 },
@@ -823,13 +787,6 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   return null;
                 },
               ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Colors.red.shade600, fontSize: Responsive.sp(12), fontWeight: FontWeight.w500),
-                ),
-              ],
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -1047,11 +1004,11 @@ class _VisitList extends StatelessWidget {
     required this.onCallTap,
   });
 
-  final List<FieldStaffVisitModel> visits;
+  final List<SiteVisitListItemModel> visits;
   final IconData emptyIcon;
   final String emptyLabel;
   final String emptySubLabel;
-  final ValueChanged<FieldStaffVisitModel> onTapVisit;
+  final ValueChanged<SiteVisitListItemModel> onTapVisit;
   final ValueChanged<String> onCallTap;
 
   @override
@@ -1104,7 +1061,7 @@ class _VisitList extends StatelessWidget {
         return _VisitTile(
           visit: visit,
           onTap: () => onTapVisit(visit),
-          onCallTap: () => onCallTap(visit.phoneNo),
+          onCallTap: () => onCallTap(visit.customerPhone),
         );
       },
     );
@@ -1113,18 +1070,22 @@ class _VisitList extends StatelessWidget {
 
 class _VisitTile extends StatelessWidget {
   const _VisitTile({required this.visit, required this.onTap, required this.onCallTap});
-  final FieldStaffVisitModel visit;
+  final SiteVisitListItemModel visit;
   final VoidCallback onTap;
   final VoidCallback onCallTap;
 
-  String get _initial => visit.partyName.trim().isEmpty
+  String get _initial => visit.customerName.trim().isEmpty
       ? '?'
-      : visit.partyName.trim().substring(0, 1).toUpperCase();
+      : visit.customerName.trim().substring(0, 1).toUpperCase();
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final dateLabel = DateFormat('dd MMM, hh:mm a').format(visit.visitDate);
+    final parsedDate = DateTime.tryParse(visit.visitDate);
+    final dateLabel = parsedDate != null
+        ? DateFormat('dd MMM, hh:mm a').format(parsedDate)
+        : visit.visitDate;
+    final incentive = double.tryParse(visit.incentiveEarned) ?? 0;
 
     return Material(
       color: Colors.white,
@@ -1158,7 +1119,7 @@ class _VisitTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          visit.partyName,
+                          visit.customerName,
                           style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1188,7 +1149,7 @@ class _VisitTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      currency.format(visit.incentiveAmount),
+                      currency.format(incentive),
                       style: TextStyle(color: AppColors.primary, fontSize: Responsive.sp(11.5), fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -1203,7 +1164,7 @@ class _VisitTile extends StatelessWidget {
                   SizedBox(width: Responsive.w(4)),
                   Expanded(
                     child: Text(
-                      visit.address,
+                      visit.siteAddress,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1220,7 +1181,7 @@ class _VisitTile extends StatelessWidget {
                         Icon(Icons.phone_outlined, size: 13, color: AppColors.textSecondary),
                         SizedBox(width: Responsive.w(4)),
                         Text(
-                          visit.phoneNo,
+                          visit.customerPhone,
                           style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12), fontWeight: FontWeight.w500),
                         ),
                       ],
@@ -1255,12 +1216,23 @@ class _VisitTile extends StatelessWidget {
   }
 
   Widget _thumbnail() {
-    if (visit.hasImage) {
+    final thumbUrl = visit.thumbnailUrl;
+    if (thumbUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.file(visit.imageFile!, width: 46, height: 46, fit: BoxFit.cover),
+        child: Image.network(
+          thumbUrl,
+          width: 46,
+          height: 46,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _initialsAvatar(),
+        ),
       );
     }
+    return _initialsAvatar();
+  }
+
+  Widget _initialsAvatar() {
     return Container(
       width: 46,
       height: 46,
