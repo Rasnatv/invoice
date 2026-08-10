@@ -26,10 +26,6 @@ class FieldStaffDashboardScreen extends StatefulWidget {
 
   final String staffName;
 
-  /// Logout itself is now handled by the shared `logout()` helper
-  /// (confirm -> clear token -> back to LoginScreen), so there's no
-  /// onLogout override here anymore — just call it directly wherever
-  /// it's needed.
   final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
 
   @override
@@ -379,28 +375,8 @@ class _FieldStaffHeader extends StatelessWidget {
                                 .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
                           ),
                           SizedBox(height: Responsive.h(4)),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Responsive.w(8),
-                              vertical: Responsive.h(2),
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.16),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'FIELD STAFF',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.92),
-                                fontSize: Responsive.sp(9.5),
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+
+                    ]),),
                     Material(
                       color: Colors.white.withOpacity(0.16),
                       shape: const CircleBorder(),

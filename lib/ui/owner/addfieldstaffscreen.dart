@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart'; // exposes Responsive and ResponsiveCenter
@@ -339,7 +339,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -379,13 +379,10 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
           },
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildBody(BuildContext context, FieldStaffState state) {
-    // hasLoadedOnce means a fetch already completed for this bloc instance
-    // (this screen's lifetime) — a transient submitting/deleting status
-    // shouldn't be treated as "still loading the list" and blank the screen.
     if (!state.hasLoadedOnce &&
         (state.isLoading || state.status == FieldStaffStatus.initial)) {
       return const Center(child: CircularProgressIndicator());

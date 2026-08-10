@@ -72,8 +72,8 @@
 //     return incentivePercent;
 //   }
 // }
-class ProductIncentiveModel {
-  const ProductIncentiveModel({
+class LProductIncentiveModel {
+  const LProductIncentiveModel({
     required this.id,
     required this.name,
     required this.company,
@@ -97,7 +97,7 @@ class ProductIncentiveModel {
   /// e.g. "sq.ft", "box", "piece", "kg", "meter", "liter", "bag"
   final String? unit;
 
-  ProductIncentiveModel copyWith({
+  LProductIncentiveModel copyWith({
     String? id,
     String? name,
     String? company,
@@ -107,7 +107,7 @@ class ProductIncentiveModel {
     String? size,
     String? unit,
   }) {
-    return ProductIncentiveModel(
+    return LProductIncentiveModel(
       id: id ?? this.id,
       name: name ?? this.name,
       company: company ?? this.company,
@@ -132,8 +132,8 @@ class ProductIncentiveModel {
     };
   }
 
-  factory ProductIncentiveModel.fromJson(Map<String, dynamic> json) {
-    return ProductIncentiveModel(
+  factory LProductIncentiveModel.fromJson(Map<String, dynamic> json) {
+    return LProductIncentiveModel(
       id: json['id'] as String,
       name: json['name'] as String,
       company: json['company'] as String,

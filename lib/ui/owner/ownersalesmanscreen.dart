@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -106,7 +107,7 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Salesmen', style: AppTextStyles.h6()),
@@ -208,133 +209,9 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
           ],
         ),
       ),
-    );
+    ));
   }
 }
-
-// class _OwnerSalesmanCard extends StatelessWidget {
-//   const _OwnerSalesmanCard({required this.salesman, required this.onEdit, required this.onDelete});
-//   final HSalesmanModel salesman;
-//   final VoidCallback onEdit;
-//   final VoidCallback onDelete;
-//
-//   Color get _accentColor {
-//     const palette = [
-//       Color(0xFF1565C0),
-//       Color(0xFFAD1457),
-//       Color(0xFF00838F),
-//       Color(0xFF6D4C41),
-//       Color(0xFF558B2F),
-//     ];
-//     final index = salesman.id.hashCode.abs() % palette.length;
-//     return palette[index];
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       padding: EdgeInsets.all(Responsive.w(14)),
-//       decoration: BoxDecoration(
-//         color: AppColors.surface,
-//         borderRadius: BorderRadius.circular(14),
-//         border: Border.all(color: AppColors.border),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//             children: [
-//               Expanded(
-//                 child: Text(salesman.name, style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
-//               ),
-//               SizedBox(width: Responsive.w(4)),
-//               PopupMenuButton<String>(
-//                 padding: EdgeInsets.zero,
-//                 icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
-//                 onSelected: (value) {
-//                   if (value == 'edit') onEdit();
-//                   if (value == 'delete') onDelete();
-//                 },
-//                 itemBuilder: (context) => [
-//                   const PopupMenuItem(
-//                     value: 'edit',
-//                     child: Row(
-//                       children: [
-//                         Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
-//                         SizedBox(width: 8),
-//                         Text('Edit'),
-//                       ],
-//                     ),
-//                   ),
-//                   const PopupMenuItem(
-//                     value: 'delete',
-//                     child: Row(
-//                       children: [
-//                         Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-//                         SizedBox(width: 8),
-//                         Text('Delete', style: TextStyle(color: AppColors.error)),
-//                       ],
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//           SizedBox(height: Responsive.h(6)),
-//           Wrap(
-//             spacing: 6,
-//             runSpacing: 4,
-//             children: [
-//
-//               if (salesman.designationName.isNotEmpty)
-//                 Container(
-//                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-//                   decoration: BoxDecoration(
-//                     color: AppColors.primary.withOpacity(0.1),
-//                     borderRadius: BorderRadius.circular(6),
-//                   ),
-//                   child: Text(
-//                     salesman.designationName,
-//                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
-//                   ),
-//                 ),
-//             ],
-//           ),
-//           SizedBox(height: Responsive.h(4)),
-//           Row(
-//             children: [
-//               const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
-//               SizedBox(width: Responsive.w(4)),
-//               Expanded(
-//                 child: Text(salesman.mobile, style: AppTextStyles.caption(), overflow: TextOverflow.ellipsis),
-//               ),
-//             ],
-//           ),
-//           SizedBox(height: Responsive.h(2)),
-//           Row(
-//             children: [
-//               const Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
-//               SizedBox(width: Responsive.w(4)),
-//               Expanded(
-//                 child: Text(salesman.email, style: AppTextStyles.caption(), overflow: TextOverflow.ellipsis),
-//               ),
-//             ],
-//           ),
-//           SizedBox(height: Responsive.h(8)),
-//           const Divider(height: 1, color: AppColors.border),
-//           SizedBox(height: Responsive.h(8)),
-//           Text(
-//             salesman.joiningDate != null
-//                 ? 'Joined ${DateFormat('dd-MM-yyyy').format(salesman.joiningDate!)}'
-//                 : 'Joining date unavailable',
-//             style: AppTextStyles.caption(),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 class _OwnerSalesmanCard extends StatelessWidget {
   const _OwnerSalesmanCard({required this.salesman, required this.onEdit, required this.onDelete});
   final HSalesmanModel salesman;

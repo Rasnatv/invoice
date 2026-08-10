@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -158,15 +159,15 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                               DValidator.validateRequired(v, message: 'Enter vehicle number'),
                         ),
                         SizedBox(height: Responsive.h(14)),
-                        if (isEdit) ...[
-                          TextFormField(
-                            controller: passwordController,
-                            obscureText: true,
-                            decoration: _inputDecoration(
-                                'New Password (optional)', Icons.lock_outline),
-                          ),
-                          SizedBox(height: Responsive.h(14)),
-                        ],
+                        // if (isEdit) ...[
+                        //   TextFormField(
+                        //     controller: passwordController,
+                        //     obscureText: true,
+                        //     decoration: _inputDecoration(
+                        //         'New Password (optional)', Icons.lock_outline),
+                        //   ),
+                        //   SizedBox(height: Responsive.h(14)),
+                        // ],
                         InkWell(
                           borderRadius: BorderRadius.circular(14),
                           onTap: () async {
@@ -291,7 +292,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -363,7 +364,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
           );
         },
       ),
-    );
+    ));
   }
 }
 

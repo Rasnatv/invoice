@@ -3,8 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 import '../utils/responsive.dart';
 
-/// Centralized text styles built on Google Fonts (Poppins), sized via
-/// [Responsive.sp] so typography scales gracefully across devices.
 class AppTextStyles {
   AppTextStyles._();
 

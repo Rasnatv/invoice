@@ -7,7 +7,7 @@ import '../../../../dummymodels/estimate_model.dart';
 
 class OwnerState {
   final List<EstimateModel> estimates;
-  final List<ProductIncentiveModel> products;
+  final List<LProductIncentiveModel> products;
   final List<SalesmanModel> salesmen;
   final bool loading;
 
@@ -20,7 +20,7 @@ class OwnerState {
 
   OwnerState copyWith({
     List<EstimateModel>? estimates,
-    List<ProductIncentiveModel>? products,
+    List<LProductIncentiveModel>? products,
     List<SalesmanModel>? salesmen,
     bool? loading,
   }) {
@@ -80,11 +80,11 @@ class OwnerCubit extends Cubit<OwnerState> {
     emit(state.copyWith(estimates: updated));
   }
 
-  void addProduct(ProductIncentiveModel product) {
+  void addProduct(LProductIncentiveModel product) {
     emit(state.copyWith(products: [...state.products, product]));
   }
 
-  void updateProduct(ProductIncentiveModel product) {
+  void updateProduct(LProductIncentiveModel product) {
     final updated = state.products.map((p) => p.id == product.id ? product : p).toList();
     emit(state.copyWith(products: updated));
   }
@@ -208,8 +208,8 @@ final List<EstimateModel> _dummyEstimates = [
   ),
 ];
 
-final List<ProductIncentiveModel> _dummyProducts = [
-  const ProductIncentiveModel(
+final List<LProductIncentiveModel> _dummyProducts = [
+  const LProductIncentiveModel(
     id: 'p1',
     name: 'Vitrified Tile 600x600',
     company: 'Kajaria',
@@ -217,7 +217,7 @@ final List<ProductIncentiveModel> _dummyProducts = [
     rate: 55,
     incentivePercent: 5,
   ),
-  const ProductIncentiveModel(
+  const LProductIncentiveModel(
     id: 'p2',
     name: 'Wall Tile 300x450',
     company: 'Somany',
@@ -226,7 +226,7 @@ final List<ProductIncentiveModel> _dummyProducts = [
     incentivePercent: 4,
 
   ),
-  const ProductIncentiveModel(
+  const LProductIncentiveModel(
     id: 'p3',
     name: 'PVC Pipe 4"',
     company: 'Supreme',
