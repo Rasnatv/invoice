@@ -5,7 +5,7 @@ import '../../../../../../core/constants/app_text_styles.dart';
 import '../../../../../../core/utils/responsive.dart';
 import '../../home/widgets/recent_estimate_tile.dart';
 import '../cubit/estimates_cubit.dart';
-import 'create_estimate_screen.dart';
+import '../../create_estimate_screen.dart';
 import 'estimate_details_screen.dart';
 
 class MyEstimatesScreen extends StatelessWidget {

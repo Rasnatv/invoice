@@ -1,21 +1,20 @@
 
 import 'dart:async';
-
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../bloc/salemanbloc/estimate/salesman_estimate_bloc.dart';
-import '../../../../bloc/salemanbloc/estimate/salesmanestimate_event.dart';
-import '../../../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/utils/responsive.dart';
-import '../../../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
-import '../../../../models/salesmanmodels/estimate_activepdctmodel.dart';
-import '../../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
-import '../../../../widgets/custom_text_field.dart';
-import '../../../../widgets/primary_button.dart';
+import '../../bloc/salemanbloc/estimate/salesman_estimate_bloc.dart';
+import '../../bloc/salemanbloc/estimate/salesmanestimate_event.dart';
+import '../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/responsive.dart';
+import '../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
+import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
+import '../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/primary_button.dart';
 
 /// One added item in the estimate. MRP and incentive % are gone as inputs —
 /// /products/active doesn't return pricing, so Rate is a manual entry.
@@ -85,7 +84,7 @@ class _CreateEstimateView extends StatefulWidget {
 class _CreateEstimateViewState extends State<_CreateEstimateView> {
   _Step _step = _Step.details;
 
-  // --- Step 1: Party / Contractor / Salesman ---
+  // --- Step 1: Party / Contractor ---
   final _partyNameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -93,9 +92,6 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   final _contractorNameCtrl = TextEditingController();
   final _contractorPhoneCtrl = TextEditingController();
   final _contractorEmailCtrl = TextEditingController();
-
-  final _salesmanCtrl = TextEditingController(text: 'Rahul Kumar');
-  final _salesmanMobCtrl = TextEditingController();
 
   final _handlingChargeCtrl = TextEditingController(text: '0');
   final _notesCtrl = TextEditingController();
@@ -132,8 +128,6 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _contractorNameCtrl.dispose();
     _contractorPhoneCtrl.dispose();
     _contractorEmailCtrl.dispose();
-    _salesmanCtrl.dispose();
-    _salesmanMobCtrl.dispose();
     _handlingChargeCtrl.dispose();
     _notesCtrl.dispose();
     _termsCtrl.dispose();
@@ -157,6 +151,29 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   /// Sum of every added item's snapshotted incentive — salesman-facing
   /// only, shown separately from the customer's grand total.
   double get _incentiveTotal => _items.fold(0.0, (s, r) => s + r.incentiveAmount);
+
+  /// Sum of (MRP × quantity) across every added item — shown in the
+  /// preview totals box next to the discounted subtotal, so the salesman
+  /// can see the gap between list price and quoted price at a glance.
+  double get _mrpTotal => _items.fold(0.0, (s, r) => s + (r.mrp * r.quantity));
+
+  /// Sum of quantity for items whose unit is some form of "sq.ft" — shown
+  /// as "Total Sq.Ft" in the preview totals box. Unit text is normalized
+  /// (lowercased, spaces/dots stripped) so "Sq.Ft", "sq ft", "SQFT" etc.
+  /// all match.
+  double get _totalSqft => _items.fold(0.0, (s, r) {
+    final u = r.unit.toLowerCase().replaceAll('.', '').replaceAll(' ', '').replaceAll('²', '2');
+    final isSqft = u == 'sqft' ||
+        u == 'sqfeet' ||
+        u == 'squarefeet' ||
+        u == 'squareft' ||
+        u == 'sft' ||
+        u == 'ft2' ||
+        u.contains('sqft') ||
+        u.contains('squareft') ||
+        u.contains('squarefeet');
+    return s + (isSqft ? r.quantity : 0);
+  });
 
   double get _currentItemAmount {
     final qty = double.tryParse(_itemQtyCtrl.text) ?? 0;
@@ -227,10 +244,10 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
         _itemCompanyCtrl.text = product.company;
         _itemSizeCtrl.text = product.size;
         _itemUnitCtrl.text = product.unit;
-        // Auto-fill MRP and Rate straight from the product master. Both
-        // fields stay editable afterwards — this only pre-fills them, it
-        // doesn't lock them, so the salesman can still override the rate
-        // (or MRP) by hand for this particular estimate.
+        // Auto-fill MRP and Rate straight from the product master.
+        // Company / Size / Unit / MRP are display-only from here on (see
+        // the IgnorePointer wrappers in _AddItemsStep) — only Rate stays
+        // editable so the salesman can still quote a different price.
         _itemMrpCtrl.text = _formatPrice(product.mrp);
         _itemRateCtrl.text = _formatPrice(product.rate);
       } else {
@@ -325,9 +342,21 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
 
   void _editItem(int index) {
     final item = _items[index];
+
+    // Look up the matching catalog product by id so the dropdown shows
+    // the selected product's name instead of falling back to the hint.
+    final products = context.read<SalesmanEstimateBloc>().state.products;
+    ActiveProductModel? matchedProduct;
+    for (final p in products) {
+      if (p.id == item.productId) {
+        matchedProduct = p;
+        break;
+      }
+    }
+
     setState(() {
       _editingItemIndex = index;
-      _selectedProduct = null; // matching catalog product not tracked by id here
+      _selectedProduct = matchedProduct;
       _itemCompanyCtrl.text = item.company;
       _itemSizeCtrl.text = item.size;
       _itemUnitCtrl.text = item.unit;
@@ -341,10 +370,16 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
           ? item.rate.toStringAsFixed(0)
           : item.rate.toString();
     });
-    // No product is re-selected on edit (see comment above), so there's
-    // nothing to look an incentive up against until the salesman re-picks
-    // it from the dropdown — make sure any stale preview is cleared.
-    context.read<SalesmanEstimateBloc>().add(const ProductIncentiveCleared());
+
+    if (matchedProduct != null) {
+      // Product resolved — re-run the live incentive lookup now that
+      // qty/rate are populated again.
+      _scheduleIncentiveFetch();
+    } else {
+      // Product no longer in the active list (e.g. deactivated) — nothing
+      // to look an incentive up against, so clear any stale preview.
+      context.read<SalesmanEstimateBloc>().add(const ProductIncentiveCleared());
+    }
   }
 
   void _cancelEditItem() {
@@ -495,8 +530,6 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                       contractorNameCtrl: _contractorNameCtrl,
                       contractorPhoneCtrl: _contractorPhoneCtrl,
                       contractorEmailCtrl: _contractorEmailCtrl,
-                      salesmanCtrl: _salesmanCtrl,
-                      salesmanMobCtrl: _salesmanMobCtrl,
                       onSelectSiteVisit: _selectSiteVisit,
                       onNext: _goToAddItems,
                     ),
@@ -525,18 +558,19 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                       partyName: _partyNameCtrl.text,
                       address: _addressCtrl.text,
                       phone: _phoneCtrl.text,
+                      customerEmail: _customerEmailCtrl.text,
                       contractorName: _contractorNameCtrl.text,
                       contractorPhone: _contractorPhoneCtrl.text,
-                      salesmanName: _salesmanCtrl.text,
-                      salesmanMobile: _salesmanMobCtrl.text,
+                      contractorEmail: _contractorEmailCtrl.text,
                       items: _items,
                       itemsTotal: _itemsTotal,
+                      mrpTotal: _mrpTotal,
                       handlingChargeCtrl: _handlingChargeCtrl,
                       notesCtrl: _notesCtrl,
-                      termsCtrl: _termsCtrl,
                       grandTotal: _grandTotal,
                       totalQty: _totalQty,
                       totalItems: _totalItems,
+                      totalSqft: _totalSqft,
                       incentiveTotal: _incentiveTotal,
                       onHandlingChargeChanged: () => setState(() {}),
                       onSaveDraft: _saveDraft,
@@ -616,8 +650,6 @@ class _DetailsStep extends StatelessWidget {
     required this.contractorNameCtrl,
     required this.contractorPhoneCtrl,
     required this.contractorEmailCtrl,
-    required this.salesmanCtrl,
-    required this.salesmanMobCtrl,
     required this.onSelectSiteVisit,
     required this.onNext,
   });
@@ -631,8 +663,6 @@ class _DetailsStep extends StatelessWidget {
   final TextEditingController contractorNameCtrl;
   final TextEditingController contractorPhoneCtrl;
   final TextEditingController contractorEmailCtrl;
-  final TextEditingController salesmanCtrl;
-  final TextEditingController salesmanMobCtrl;
   final ValueChanged<SiteVisitDropdownItem> onSelectSiteVisit;
   final VoidCallback onNext;
 
@@ -734,7 +764,6 @@ class _DetailsStep extends StatelessWidget {
                 ),
               ),
               SizedBox(height: Responsive.h(16)),
-
             ],
           ),
         ),
@@ -995,6 +1024,12 @@ class _AddItemsStep extends StatelessWidget {
                   ),
 
                   SizedBox(height: Responsive.h(10)),
+
+                  // ---- Auto-filled, read-only product attributes ----
+                  // Company / Size / Unit / MRP all come straight from the
+                  // selected product and are display-only: wrapped in
+                  // IgnorePointer so the salesman can't tap into and edit
+                  // them. Only Rate (below) stays editable.
                   LabeledField(
                     label: 'Company (auto)',
                     field: IgnorePointer(
@@ -1010,10 +1045,12 @@ class _AddItemsStep extends StatelessWidget {
                       Expanded(
                         child: LabeledField(
                           label: 'Size (auto)',
-                          field: CustomTextField(
-                            hint: 'e.g. 600x1200',
-                            icon: Icons.straighten_outlined,
-                            controller: itemSizeCtrl,
+                          field: IgnorePointer(
+                            child: CustomTextField(
+                              hint: 'Select a product first',
+                              icon: Icons.straighten_outlined,
+                              controller: itemSizeCtrl,
+                            ),
                           ),
                         ),
                       ),
@@ -1021,10 +1058,12 @@ class _AddItemsStep extends StatelessWidget {
                       Expanded(
                         child: LabeledField(
                           label: 'Unit (auto)',
-                          field: CustomTextField(
-                            hint: 'e.g. sqft',
-                            icon: Icons.square_foot_outlined,
-                            controller: itemUnitCtrl,
+                          field: IgnorePointer(
+                            child: CustomTextField(
+                              hint: 'Select a product first',
+                              icon: Icons.square_foot_outlined,
+                              controller: itemUnitCtrl,
+                            ),
                           ),
                         ),
                       ),
@@ -1032,15 +1071,13 @@ class _AddItemsStep extends StatelessWidget {
                   ),
                   LabeledField(
                     label: 'MRP (auto)',
-                    field: CustomTextField(
-                      hint: '0',
-                      icon: Icons.currency_rupee,
-                      keyboardType: TextInputType.number,
-                      controller: itemMrpCtrl,
-                      // MRP is pre-filled from the product master when a
-                      // product is selected, but stays editable in case it
-                      // needs a manual override for this estimate.
-                      onChanged: (_) => setLocalState(() {}),
+                    field: IgnorePointer(
+                      child: CustomTextField(
+                        hint: 'Select a product first',
+                        icon: Icons.currency_rupee,
+                        keyboardType: TextInputType.number,
+                        controller: itemMrpCtrl,
+                      ),
                     ),
                   ),
                   LabeledField(
@@ -1064,8 +1101,8 @@ class _AddItemsStep extends StatelessWidget {
                       keyboardType: TextInputType.number,
                       controller: itemRateCtrl,
                       // Auto-filled from the product's default rate on
-                      // selection, but fully editable — the salesman can
-                      // type over it to quote a different rate.
+                      // selection, but this one stays fully editable — the
+                      // salesman can type over it to quote a different rate.
                       onChanged: (_) {
                         setLocalState(() {});
                         onQtyRateChanged();
@@ -1425,18 +1462,19 @@ class _PreviewStep extends StatelessWidget {
     required this.partyName,
     required this.address,
     required this.phone,
+    required this.customerEmail,
     required this.contractorName,
     required this.contractorPhone,
-    required this.salesmanName,
-    required this.salesmanMobile,
+    required this.contractorEmail,
     required this.items,
     required this.itemsTotal,
+    required this.mrpTotal,
     required this.handlingChargeCtrl,
     required this.notesCtrl,
-    required this.termsCtrl,
     required this.grandTotal,
     required this.totalQty,
     required this.totalItems,
+    required this.totalSqft,
     required this.incentiveTotal,
     required this.onHandlingChargeChanged,
     required this.onSaveDraft,
@@ -1447,18 +1485,34 @@ class _PreviewStep extends StatelessWidget {
   final String partyName;
   final String address;
   final String phone;
+
+  /// Customer email — shown as an extra row under Customer Details.
+  final String customerEmail;
+
   final String contractorName;
   final String contractorPhone;
-  final String salesmanName;
-  final String salesmanMobile;
+
+  /// Contractor email — shown as an extra row under Contractor.
+  final String contractorEmail;
+
   final List<_AddedItem> items;
+
+  /// Subtotal — sum of (quantity × rate) across all items, before handling
+  /// charge.
   final double itemsTotal;
+
+  /// Sum of (MRP × quantity) across all items — reference list-price total,
+  /// shown alongside the subtotal so the discount gap is visible.
+  final double mrpTotal;
+
   final TextEditingController handlingChargeCtrl;
   final TextEditingController notesCtrl;
-  final TextEditingController termsCtrl;
   final double grandTotal;
   final double totalQty;
   final int totalItems;
+
+  /// Sum of quantity across items whose unit is a form of "sq.ft".
+  final double totalSqft;
 
   /// Sum of every item's snapshotted incentive — salesman-facing only,
   /// shown separately from the customer's grand total below.
@@ -1506,6 +1560,7 @@ class _PreviewStep extends StatelessWidget {
                   _PreviewRow('Party Name', partyName.isEmpty ? '-' : partyName),
                   _PreviewRow('Address', address.isEmpty ? '-' : address),
                   _PreviewRow('Contact No.', phone.isEmpty ? '-' : phone),
+                  _PreviewRow('Email', customerEmail.isEmpty ? '-' : customerEmail),
                 ],
               ),
               SizedBox(height: Responsive.h(14)),
@@ -1515,15 +1570,7 @@ class _PreviewStep extends StatelessWidget {
                 rows: [
                   _PreviewRow('Name', contractorName.isEmpty ? '-' : contractorName),
                   _PreviewRow('Contact No.', contractorPhone.isEmpty ? '-' : contractorPhone),
-                ],
-              ),
-              SizedBox(height: Responsive.h(14)),
-
-              _PreviewSection(
-                title: 'Salesman',
-                rows: [
-                  _PreviewRow('Name', salesmanName.isEmpty ? '-' : salesmanName),
-                  _PreviewRow('Mob.', salesmanMobile.isEmpty ? '-' : salesmanMobile),
+                  _PreviewRow('Email', contractorEmail.isEmpty ? '-' : contractorEmail),
                 ],
               ),
               SizedBox(height: Responsive.h(20)),
@@ -1565,6 +1612,7 @@ class _PreviewStep extends StatelessWidget {
                       DataColumn(label: Text('Size')),
                       DataColumn(label: Text('Qty'), numeric: true),
                       DataColumn(label: Text('Unit')),
+                      DataColumn(label: Text('MRP'), numeric: true),
                       DataColumn(label: Text('Rate'), numeric: true),
                       DataColumn(label: Text('Amount'), numeric: true),
                       DataColumn(label: Text('Incentive'), numeric: true),
@@ -1579,6 +1627,7 @@ class _PreviewStep extends StatelessWidget {
                         DataCell(Text(item.size.isEmpty ? '-' : item.size)),
                         DataCell(Text(number.format(item.quantity))),
                         DataCell(Text(item.unit)),
+                        DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
                         DataCell(Text(number.format(item.rate))),
                         DataCell(Text(currency.format(item.amount), style: AppTextStyles.bodyBold())),
                         DataCell(Text(
@@ -1612,15 +1661,6 @@ class _PreviewStep extends StatelessWidget {
                 ),
               ),
               SizedBox(height: Responsive.h(10)),
-              LabeledField(
-                label: 'Terms & Conditions (optional)',
-                field: CustomTextField(
-                  hint: 'e.g. Standard terms apply',
-                  icon: Icons.gavel_outlined,
-                  controller: termsCtrl,
-                ),
-              ),
-              SizedBox(height: Responsive.h(10)),
 
               Container(
                 padding: EdgeInsets.all(Responsive.w(14)),
@@ -1634,7 +1674,13 @@ class _PreviewStep extends StatelessWidget {
                     SizedBox(height: Responsive.h(6)),
                     _totalRow('Total Qty', number.format(totalQty)),
                     SizedBox(height: Responsive.h(6)),
-                    _totalRow('Items Total', currency.format(itemsTotal)),
+                    _totalRow('Total Sq.Ft', number.format(totalSqft)),
+                    if (mrpTotal > 0) ...[
+                      SizedBox(height: Responsive.h(6)),
+                      _totalRow('Total MRP', currency.format(mrpTotal)),
+                    ],
+                    SizedBox(height: Responsive.h(6)),
+                    _totalRow('Subtotal', currency.format(itemsTotal)),
                     SizedBox(height: Responsive.h(6)),
                     _totalRow('Handling Charge', currency.format(double.tryParse(handlingChargeCtrl.text) ?? 0)),
                     const Divider(height: 20),

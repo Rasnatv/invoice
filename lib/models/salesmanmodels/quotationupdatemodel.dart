@@ -1,10 +1,4 @@
-/// One line item inside a POST /quotations/update body.
-///
-/// NOTE: product_id is a String here (not int) — confirmed against the
-/// real working payload:
-///   { "product_id": "12", "quantity": 100, "rate": 500 }
-/// This matches how product ids are handled everywhere else on the
-/// quotation detail/list side (ActiveProductModel.id is also a String).
+
 class QuotationUpdateItemRequest {
   final String productId;
   final double quantity;
@@ -16,10 +10,16 @@ class QuotationUpdateItemRequest {
     required this.rate,
   });
 
+  /// Formats a double the same way the rest of the app does when sending
+  /// it to this API — drop the trailing ".0" for whole numbers, otherwise
+  /// keep it as-is.
+  static String _fmt(double value) =>
+      value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
+
   Map<String, dynamic> toJson() => {
     'product_id': productId,
-    'quantity': quantity,
-    'rate': rate,
+    'quantity': _fmt(quantity),
+    'rate': _fmt(rate),
   };
 }
 
@@ -67,7 +67,14 @@ class QuotationUpdateRequest {
     if (contractorPhone != null) map['contractor_phone'] = contractorPhone;
     if (contractorEmail != null) map['contractor_email'] = contractorEmail;
     if (contractorAddress != null) map['contractor_address'] = contractorAddress;
-    if (handlingCharge != null) map['handling_charge'] = handlingCharge;
+    // Sent as a string to match the confirmed-working payload
+    // ("handling_charge": "500") — sending it as a raw JSON number was the
+    // cause of "handling charge added not properly working".
+    if (handlingCharge != null) {
+      map['handling_charge'] = handlingCharge == handlingCharge!.roundToDouble()
+          ? handlingCharge!.toStringAsFixed(0)
+          : handlingCharge.toString();
+    }
     if (notes != null) map['notes'] = notes;
     if (termsConditions != null) map['terms_conditions'] = termsConditions;
     if (items != null) map['items'] = items!.map((e) => e.toJson()).toList();

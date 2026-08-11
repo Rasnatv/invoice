@@ -1,7 +1,9 @@
+
 import '../../../core/dummymodel/product_incentive_model.dart';
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
+import '../../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 
 
 enum LoadStatus { initial, loading, success, failure }
@@ -27,6 +29,13 @@ class SalesmanEstimateState {
   final ProductIncentiveModel? incentive;
   final String? incentiveError;
 
+  /// Full server-calculated estimate preview (POST /quotations/preview)
+  /// shown on the Preview step — items with per-line incentive, subtotal,
+  /// handling charge, discount (if any), grand total, and balance due.
+  final LoadStatus previewStatus;
+  final QuotationPreviewData? previewData;
+  final String? previewError;
+
   final SubmitStatus submitStatus;
   final String? submitMessage;
   final String? submitError;
@@ -46,6 +55,9 @@ class SalesmanEstimateState {
     this.incentiveStatus = LoadStatus.initial,
     this.incentive,
     this.incentiveError,
+    this.previewStatus = LoadStatus.initial,
+    this.previewData,
+    this.previewError,
     this.submitStatus = SubmitStatus.idle,
     this.submitMessage,
     this.submitError,
@@ -68,6 +80,11 @@ class SalesmanEstimateState {
     bool clearIncentive = false,
     String? incentiveError,
     bool clearIncentiveError = false,
+    LoadStatus? previewStatus,
+    QuotationPreviewData? previewData,
+    bool clearPreviewData = false,
+    String? previewError,
+    bool clearPreviewError = false,
     SubmitStatus? submitStatus,
     String? submitMessage,
     bool clearSubmitMessage = false,
@@ -87,6 +104,9 @@ class SalesmanEstimateState {
       incentiveStatus: incentiveStatus ?? this.incentiveStatus,
       incentive: clearIncentive ? null : (incentive ?? this.incentive),
       incentiveError: clearIncentiveError ? null : (incentiveError ?? this.incentiveError),
+      previewStatus: previewStatus ?? this.previewStatus,
+      previewData: clearPreviewData ? null : (previewData ?? this.previewData),
+      previewError: clearPreviewError ? null : (previewError ?? this.previewError),
       submitStatus: submitStatus ?? this.submitStatus,
       submitMessage: clearSubmitMessage ? null : (submitMessage ?? this.submitMessage),
       submitError: clearSubmitError ? null : (submitError ?? this.submitError),

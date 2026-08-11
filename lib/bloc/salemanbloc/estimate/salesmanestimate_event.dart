@@ -1,5 +1,7 @@
+
 import '../../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
 import '../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
+import '../../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 
 abstract class SalesmanEstimateEvent {
   const SalesmanEstimateEvent();
@@ -54,6 +56,21 @@ class ProductIncentiveRequested extends SalesmanEstimateEvent {
 /// deselected, or quantity/rate became invalid (0 or empty).
 class ProductIncentiveCleared extends SalesmanEstimateEvent {
   const ProductIncentiveCleared();
+}
+
+/// Asks for a server-calculated full estimate preview (POST
+/// /quotations/preview) — fired when the salesman reaches the Preview
+/// step, and again (debounced) whenever handling charge or notes change
+/// there.
+class QuotationPreviewRequested extends SalesmanEstimateEvent {
+  final QuotationPreviewRequest request;
+  const QuotationPreviewRequested(this.request);
+}
+
+/// Clears the current full-estimate preview — e.g. the salesman navigated
+/// away from the Preview step back to Add Items.
+class QuotationPreviewCleared extends SalesmanEstimateEvent {
+  const QuotationPreviewCleared();
 }
 
 /// Submits the estimate. request.action must be 'save_quotation' or

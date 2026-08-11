@@ -1,3 +1,4 @@
+
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/bloc/salemanbloc/estimate/salesmanestimate_event.dart';
@@ -27,6 +28,14 @@ class SalesmanEstimateBloc extends Bloc<SalesmanEstimateEvent, SalesmanEstimateS
       transformer: restartable(),
     );
     on<ProductIncentiveCleared>(_onIncentiveCleared);
+    on<QuotationPreviewRequested>(
+      _onPreviewRequested,
+      // Same reasoning as the item-level incentive lookup above — if the
+      // salesman edits handling charge/notes again before the previous
+      // preview call returns, only the latest one should win.
+      transformer: restartable(),
+    );
+    on<QuotationPreviewCleared>(_onPreviewCleared);
     on<QuotationSubmitRequested>(_onSubmitRequested);
     on<QuotationSubmitResultConsumed>(_onSubmitResultConsumed);
   }
@@ -121,6 +130,33 @@ class SalesmanEstimateBloc extends Bloc<SalesmanEstimateEvent, SalesmanEstimateS
       incentiveStatus: LoadStatus.initial,
       clearIncentive: true,
       clearIncentiveError: true,
+    ));
+  }
+
+  Future<void> _onPreviewRequested(
+      QuotationPreviewRequested event,
+      Emitter<SalesmanEstimateState> emit,
+      ) async {
+    emit(state.copyWith(previewStatus: LoadStatus.loading, clearPreviewError: true));
+    final result = await _provider.previewQuotation(event.request);
+    if (result.success) {
+      emit(state.copyWith(previewStatus: LoadStatus.success, previewData: result.preview));
+    } else {
+      emit(state.copyWith(
+        previewStatus: LoadStatus.failure,
+        previewError: result.errorMessage ?? 'Failed to calculate preview.',
+      ));
+    }
+  }
+
+  void _onPreviewCleared(
+      QuotationPreviewCleared event,
+      Emitter<SalesmanEstimateState> emit,
+      ) {
+    emit(state.copyWith(
+      previewStatus: LoadStatus.initial,
+      clearPreviewData: true,
+      clearPreviewError: true,
     ));
   }
 

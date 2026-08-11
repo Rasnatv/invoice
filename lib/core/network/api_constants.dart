@@ -188,4 +188,7 @@ class ApiConstants {
   /// POST { "id": "..." } — sends a saved (draft) quotation/estimate to
   /// the admin/owner for approval.
   static const String quotationsSubmit = '/quotations/submit';
+  // Dashboard
+  static const String dashboard = '/dashboard';
+  static const String qtnpreview = '/quotations/preview';
 }
