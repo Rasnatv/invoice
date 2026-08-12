@@ -1,5 +1,3 @@
-
-
 import '../../Apiprovider/product_enums.dart';
 
 /// Request body for POST /products/create.
@@ -16,6 +14,9 @@ class ProductAddRequestModel {
     this.incentivePercentage,
     required this.bonusType,
     this.minQuantity = 0,
+    this.piecesPerBox,
+    this.packing,
+    this.isBoxUnit = false,
   });
 
   final String name;
@@ -36,6 +37,19 @@ class ProductAddRequestModel {
   /// Only meaningful when [bonusType] is bulk — kept at 0 for single.
   final num minQuantity;
 
+  /// Only sent when the selected unit is a "box"-type unit.
+  /// e.g. "8" (number of pieces packed per box).
+  final String? piecesPerBox;
+
+  /// Only sent when the selected unit is a "box"-type unit.
+  /// e.g. "8pcs/box".
+  final String? packing;
+
+  /// Set this to true when the unit picked in [unitId] is a "Box" unit.
+  /// Controls whether [piecesPerBox] / [packing] are sent to the API at all —
+  /// for non-box units these fields are omitted entirely, not sent empty.
+  final bool isBoxUnit;
+
   Map<String, dynamic> toJson() {
     return {
       'name': name,
@@ -51,6 +65,10 @@ class ProductAddRequestModel {
         'incentive_percentage': incentivePercentage,
       'bonus_type': bonusType.apiValue,
       'min_quantity': minQuantity,
+      if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
+        'pieces_per_box': piecesPerBox,
+      if (isBoxUnit && packing != null && packing!.isNotEmpty)
+        'packing': packing,
     };
   }
 }

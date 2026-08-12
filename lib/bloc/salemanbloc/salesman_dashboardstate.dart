@@ -25,8 +25,8 @@ class DashboardHomeState extends Equatable {
   String get salesmanName => data.user.name;
   int get totalEstimates => data.totals.totalEstimates;
   int get pending => data.totals.pendingApprovals;
-  int get approved => data.totals.activeEstimates - data.totals.pendingApprovals;
-  int get dispatchBills => data.totals.totalSales;
+  int get quotations => data.totals.quotations;
+  int get dispatchBills => data.totals.dispatched;
   List<DashboardHomeMonthlySales> get monthlySales => data.salesOverview.monthlySales;
   List<DashboardHomeRecentEstimate> get recentEstimates => data.recentEstimates;
 

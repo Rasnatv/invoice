@@ -15,24 +15,6 @@ import '../../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../models/salesmanmodels/quotationlistdetailmodel.dart';
 
-/// Shows the full detail of a single quotation/estimate (POST
-/// /quotations/show), with Delete and Submit-for-Approval wired to the
-/// live API through [SalesmanQuotationBloc].
-///
-/// Expects a [SalesmanQuotationBloc] to already be provided above it in
-/// the tree (the list screen pushes this route with `BlocProvider.value`
-/// so both screens share state and a delete/submit here is reflected back
-/// on the list without an extra round trip).
-///
-/// NOTE: /quotations/show does not return `company` or `mrp` per item
-/// (see QuotationDetailItem / the model file) — only product_id, name,
-/// size, unit, quantity, rate, and the incentive-at-time fields. To still
-/// show MRP/company here (handling charge etc. already come straight off
-/// the response), this screen separately loads the active-products
-/// catalog via a private [SalesmanEstimateBloc] and looks each item's
-/// company/mrp up by product_id for display only — nothing here is sent
-/// back to any API. If a product was later deactivated it won't be in
-/// that catalog and its MRP/company will just show '-'.
 class QuotationPreviewScreen extends StatefulWidget {
   const QuotationPreviewScreen({super.key, required this.id});
 

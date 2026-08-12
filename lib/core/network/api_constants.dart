@@ -191,4 +191,8 @@ class ApiConstants {
   // Dashboard
   static const String dashboard = '/dashboard';
   static const String qtnpreview = '/quotations/preview';
+
+  //estimatedetail
+  static const String estimatesShow = '/estimates/show';
+  static const String estimatesMyApproved = '/estimates/myapproved';
 }

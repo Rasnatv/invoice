@@ -379,5 +379,19 @@ class ApiClient {
     data: data,
     options: await _authOptions(),
   );
+  // =================== ESTIMATES ===================
+
+  /// POST /estimates/show — full detail of a single estimate. Body: { "id": "..." }
+  Future<Response> showEstimate(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.estimatesShow,
+    data: data,
+    options: await _authOptions(),
+  );
+  /// GET /estimates/myapproved — the logged-in salesman/owner's approved
+  /// estimates, paginated.
+  Future<Response> myApprovedEstimates({int page = 1, int perPage = 10}) async => dio.get(
+    '${ApiConstants.estimatesMyApproved}?page=$page&per_page=$perPage',
+    options: await _authOptions(),
+  );
 
 }

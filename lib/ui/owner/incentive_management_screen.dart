@@ -371,6 +371,137 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
   }
 }
 
+// class _ProductIncentiveCard extends StatelessWidget {
+//   const _ProductIncentiveCard({
+//     required this.product,
+//     required this.currency,
+//     required this.onEdit,
+//     required this.onDelete,
+//   });
+//
+//   final ProductModel product;
+//   final NumberFormat currency;
+//   final VoidCallback onEdit;
+//   final VoidCallback onDelete;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       padding: EdgeInsets.all(Responsive.w(14)),
+//       decoration: BoxDecoration(
+//         color: AppColors.surface,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: AppColors.border),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             children: [
+//               Expanded(
+//                 child: Text(product.name,
+//                     style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
+//               ),
+//               Container(
+//                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//                 decoration: BoxDecoration(
+//                   color: AppColors.primary.withOpacity(0.12),
+//                   borderRadius: BorderRadius.circular(8),
+//                 ),
+//                 child: Text(
+//                   '${product.incentivePercentage.toStringAsFixed(product.incentivePercentage % 1 == 0 ? 0 : 2)}% incentive',
+//                   style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+//                 ),
+//               ),
+//               if (!product.isActive) ...[
+//                 SizedBox(width: Responsive.w(6)),
+//                 Container(
+//                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//                   decoration: BoxDecoration(
+//                     color: AppColors.error.withOpacity(0.12),
+//                     borderRadius: BorderRadius.circular(8),
+//                   ),
+//                   child: const Text(
+//                     'Inactive',
+//                     style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.w600),
+//                   ),
+//                 ),
+//               ],
+//               SizedBox(width: Responsive.w(4)),
+//               PopupMenuButton<String>(
+//                 padding: EdgeInsets.zero,
+//                 icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+//                 onSelected: (value) {
+//                   if (value == 'edit') onEdit();
+//                   if (value == 'delete') onDelete();
+//                 },
+//                 itemBuilder: (context) => [
+//                   const PopupMenuItem(
+//                     value: 'edit',
+//                     child: Row(
+//                       children: [
+//                         Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
+//                         SizedBox(width: 8),
+//                         Text('Edit'),
+//                       ],
+//                     ),
+//                   ),
+//                   const PopupMenuItem(
+//                     value: 'delete',
+//                     child: Row(
+//                       children: [
+//                         Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+//                         SizedBox(width: 8),
+//                         Text('Delete', style: TextStyle(color: AppColors.error)),
+//                       ],
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ],
+//           ),
+//           SizedBox(height: Responsive.h(3)),
+//           Row(
+//             children: [
+//               Flexible(
+//                 child: Text(
+//                   product.company,
+//                   style: AppTextStyles.caption(),
+//                   maxLines: 1,
+//                   overflow: TextOverflow.ellipsis,
+//                 ),
+//               ),
+//               if (product.size.isNotEmpty) ...[
+//                 Text('  •  ', style: AppTextStyles.caption()),
+//                 Flexible(
+//                   child: Text(
+//                     product.size,
+//                     style: AppTextStyles.caption(),
+//                     maxLines: 1,
+//                     overflow: TextOverflow.ellipsis,
+//                   ),
+//                 ),
+//               ],
+//             ],
+//           ),
+//           SizedBox(height: Responsive.h(6)),
+//           Row(
+//             children: [
+//               Text('MRP ${currency.format(product.mrp)}', style: AppTextStyles.caption()),
+//               SizedBox(width: Responsive.w(10)),
+//               Text('Rate ${currency.format(product.rate)}', style: AppTextStyles.caption()),
+//               SizedBox(width: Responsive.w(10)),
+//               Text('Incentive ${currency.format(product.incentiveAmount)}',
+//                   style: AppTextStyles.caption()),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+//
 class _ProductIncentiveCard extends StatelessWidget {
   const _ProductIncentiveCard({
     required this.product,
@@ -483,6 +614,29 @@ class _ProductIncentiveCard extends StatelessWidget {
                   ),
                 ),
               ],
+              if (product.hasBoxPacking) ...[
+                Text('  •  ', style: AppTextStyles.caption()),
+                Flexible(
+                  child: Text(
+                    product.packing.isNotEmpty
+                        ? product.packing
+                        : '${product.piecesPerBox} pcs/box',
+                    style: AppTextStyles.caption(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ] else if (product.hasMeasurementQty) ...[
+                Text('  •  ', style: AppTextStyles.caption()),
+                Flexible(
+                  child: Text(
+                    product.measurementQty,
+                    style: AppTextStyles.caption(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ],
           ),
           SizedBox(height: Responsive.h(6)),
@@ -496,9 +650,15 @@ class _ProductIncentiveCard extends StatelessWidget {
                   style: AppTextStyles.caption()),
             ],
           ),
+          if (product.minQuantity > 0) ...[
+            SizedBox(height: Responsive.h(4)),
+            Text(
+              'Min. Qty: ${product.minQuantity.toStringAsFixed(product.minQuantity % 1 == 0 ? 0 : 2)}',
+              style: AppTextStyles.caption(),
+            ),
+          ],
         ],
       ),
     );
   }
 }
-

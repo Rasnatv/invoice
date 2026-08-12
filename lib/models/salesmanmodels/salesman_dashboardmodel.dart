@@ -57,9 +57,9 @@ class DashboardHomeData {
     user: const DashboardHomeUser(id: '', name: '', role: '', roleLabel: ''),
     totals: const DashboardHomeTotals(
       totalEstimates: 0,
-      totalSales: 0,
+      dispatched: 0,
+      quotations: 0,
       pendingApprovals: 0,
-      activeEstimates: 0,
     ),
     salesOverview: const DashboardHomeSalesOverview(
       currentMonthTotal: 0,
@@ -95,23 +95,23 @@ class DashboardHomeUser {
 
 class DashboardHomeTotals {
   final int totalEstimates;
-  final int totalSales;
+  final int dispatched;
+  final int quotations;
   final int pendingApprovals;
-  final int activeEstimates;
 
   const DashboardHomeTotals({
     required this.totalEstimates,
-    required this.totalSales,
+    required this.dispatched,
+    required this.quotations,
     required this.pendingApprovals,
-    required this.activeEstimates,
   });
 
   factory DashboardHomeTotals.fromJson(Map<String, dynamic> json) {
     return DashboardHomeTotals(
       totalEstimates: int.tryParse(json['total_estimates']?.toString() ?? '') ?? 0,
-      totalSales: int.tryParse(json['total_sales']?.toString() ?? '') ?? 0,
+      dispatched: int.tryParse(json['dispatched']?.toString() ?? '') ?? 0,
+      quotations: int.tryParse(json['quotations']?.toString() ?? '') ?? 0,
       pendingApprovals: int.tryParse(json['pending_approvals']?.toString() ?? '') ?? 0,
-      activeEstimates: int.tryParse(json['active_estimates']?.toString() ?? '') ?? 0,
     );
   }
 }

@@ -17,6 +17,9 @@ class ProductUpdateRequestModel {
     required this.bonusType,
     required this.minQuantity,
     this.isActive = true,
+    this.piecesPerBox,
+    this.packing,
+    this.isBoxUnit = false,
   });
 
   final String id;
@@ -32,6 +35,19 @@ class ProductUpdateRequestModel {
   final ProductBonusType bonusType;
   final String minQuantity;
   final bool isActive;
+
+  /// Only sent when the selected unit is a "box"-type unit.
+  /// e.g. "8" (number of pieces packed per box).
+  final String? piecesPerBox;
+
+  /// Only sent when the selected unit is a "box"-type unit.
+  /// e.g. "8pcs/box".
+  final String? packing;
+
+  /// Set this to true when the unit picked in [unitId] is a "Box" unit.
+  /// Controls whether [piecesPerBox] / [packing] are sent to the API at all —
+  /// for non-box units these fields are omitted entirely, not sent empty.
+  final bool isBoxUnit;
 
   Map<String, dynamic> toJson() {
     return {
@@ -50,6 +66,10 @@ class ProductUpdateRequestModel {
       'bonus_type': bonusType.apiValue,
       'min_quantity': minQuantity,
       'is_active': isActive ? 1 : 0,
+      if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
+        'pieces_per_box': piecesPerBox,
+      if (isBoxUnit && packing != null && packing!.isNotEmpty)
+        'packing': packing,
     };
   }
 }
