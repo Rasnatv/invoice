@@ -13,7 +13,7 @@ import 'approvedbills.dart';
 import 'create_estimate_screen.dart';
 import 'dashboardhomeestimatetile.dart';
 import 'estimatedetailscreen_forsalesman.dart';
-import 'estimates/presentation/my_estimates_screen.dart';
+import 'my_estimates_screen.dart';
 import 'estimates/widgets/monthlysalechart.dart';
 import 'incentive/salesmanincentivescreen.dart';
 import 'quatation/quatationscreen.dart';

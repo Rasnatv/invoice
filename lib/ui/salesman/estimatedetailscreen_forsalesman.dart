@@ -374,34 +374,10 @@ class _EstimateDetailsView extends StatelessWidget {
                             ],
                           ),
                         )
-                      else
-                        Container(
-                          padding: EdgeInsets.all(Responsive.w(14)),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceAlt,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, size: 16, color: AppColors.textHint),
-                              SizedBox(width: Responsive.w(8)),
-                              Expanded(
-                                child: Text(
-                                  'Discount and payment details will appear here once this estimate is approved.',
-                                  style: AppTextStyles.caption(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      SizedBox(height: Responsive.h(12)),
                     ],
                   ),
                 ),
 
-                // Despatch sheet action — only surfaces once the estimate
-                // is approved, matching the same gating as the discount/
-                // payment section above.
                 if (estimate.isApproved)
                   Container(
                     padding: EdgeInsets.fromLTRB(

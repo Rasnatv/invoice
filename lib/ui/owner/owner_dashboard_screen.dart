@@ -2,10 +2,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../../dummymodels/estimate_model.dart';
+
+import 'package:tileshop/bloc/salemanbloc/salesmandashboard_event.dart';
+import 'package:tileshop/bloc/salemanbloc/salesman_dashboardstate.dart';
+import 'package:tileshop/models/salesmanmodels/salesman_dashboardmodel.dart';
+import 'package:tileshop/bloc/salemanbloc/salesman_dashboardbloc.dart';
+
 import '../salesman/estimates/cubit/estimates_cubit.dart';
 import 'cubit/owner_cubit.dart';
 import '../../widgets/monthlysale.dart';
@@ -21,95 +27,21 @@ import 'ownersalesmanscreen.dart';
 import 'quotations_screen.dart';
 import 'incentive_management_screen.dart';
 
-final List<MonthlySales> dummyMonthlySales = [
-  MonthlySales(monthLabel: 'Feb', amount: 185000),
-  MonthlySales(monthLabel: 'Mar', amount: 220000),
-  MonthlySales(monthLabel: 'Apr', amount: 165000),
-  MonthlySales(monthLabel: 'May', amount: 240000),
-  MonthlySales(monthLabel: 'Jun', amount: 280000),
-  MonthlySales(monthLabel: 'Jul', amount: 310000),
-];
-
-// ---- DUMMY DATA (same content shown on OwnerEstimatesScreen) ----
-final List<EstimateModel> dummyDashboardEstimates = [
-  EstimateModel(
-    id: 'EST-1001',
-    contractorName: 'Nasser Contractors',
-    siteAddress: 'Plot 14, Industrial Area, Kanhangad',
-    phone: '9944556677',
-    salesmanName: 'Ravi Kumar',
-    salesmanMobile: '9876543210',
-    date: DateTime.now().subtract(const Duration(days: 1)),
-    handlingCharge: 500,
-    billType: EstimateBillType.quotation,
-    status: 'Pending',
-    items: [
-      EstimateItem(id: 'I1', name: 'Vitrified Tile 600x600', company: 'Kajaria', size: '600x600', unit: 'box', quantity: 40, mrp: 950, rate: 850),
-      EstimateItem(id: 'I2', name: 'Wall Tile 300x450', company: 'Somany', size: '300x450', unit: 'box', quantity: 20, mrp: 620, rate: 560),
-    ],
-  ),
-  EstimateModel(
-    id: 'EST-1002',
-    contractorName: 'Balaji Builders',
-    siteAddress: 'MG Road, Kasaragod',
-    phone: '9988776655',
-    salesmanName: 'Anitha S',
-    salesmanMobile: '9123456780',
-    date: DateTime.now().subtract(const Duration(days: 3)),
-    handlingCharge: 1200,
-    billType: EstimateBillType.billed,
-    status: 'Approved',
-    items: [
-      EstimateItem(id: 'I3', name: 'Vitrified Tile 800x800', company: 'Nitco', size: '800x800', unit: 'box', quantity: 60, mrp: 1450, rate: 1320),
-      EstimateItem(id: 'I4', name: 'Anti-skid Tile 300x300', company: 'Orientbell', size: '300x300', unit: 'box', quantity: 35, mrp: 480, rate: 430),
-    ],
-    approvedBy: 'Nitheesh',
-    approvedAt: DateTime.now().subtract(const Duration(days: 2)),
-  ),
-  EstimateModel(
-    id: 'EST-1003',
-    contractorName: 'Sri Vinayaga Constructions',
-    siteAddress: 'Bekal Road, Kanhangad',
-    phone: '9090909090',
-    salesmanName: 'Manoj P',
-    salesmanMobile: '9012345678',
-    date: DateTime.now().subtract(const Duration(days: 5)),
-    handlingCharge: 800,
-    billType: EstimateBillType.quotation,
-    status: 'Rejected',
-    items: [
-      EstimateItem(id: 'I5', name: 'Marble Finish Tile 600x1200', company: 'RAK', size: '600x1200', unit: 'box', quantity: 25, mrp: 1800, rate: 1650),
-    ],
-    rejectionReason: 'Rate mismatch with current price list',
-  ),
-  EstimateModel(
-    id: 'EST-1004',
-    contractorName: 'Modern Interiors',
-    siteAddress: 'Hosdurg, Kasaragod',
-    phone: '9876123450',
-    salesmanName: 'Deepa R',
-    salesmanMobile: '9345612780',
-    date: DateTime.now().subtract(const Duration(days: 7)),
-    handlingCharge: 1500,
-    billType: EstimateBillType.billed,
-    status: 'Dispatched',
-    items: [
-      EstimateItem(id: 'I6', name: 'Vitrified Tile 600x600', company: 'Kajaria', size: '600x600', unit: 'box', quantity: 90, mrp: 950, rate: 870),
-      EstimateItem(id: 'I7', name: 'Wall Tile 250x375', company: 'Johnson', size: '250x375', unit: 'box', quantity: 55, mrp: 540, rate: 495),
-      EstimateItem(id: 'I8', name: 'Border Tile', company: 'Somany', size: '100x300', unit: 'piece', quantity: 200, mrp: 45, rate: 38),
-    ],
-    approvedBy: 'Nitheesh',
-    approvedAt: DateTime.now().subtract(const Duration(days: 6)),
-  ),
-];
-
 class OwnerDashboardScreen extends StatelessWidget {
   const OwnerDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => OwnerCubit(),
+    return MultiBlocProvider(
+      providers: [
+        // Drives the header stats / sales overview / recent estimates card.
+        BlocProvider(
+          create: (_) => DashboardHomeBloc()..add(const DashboardHomeRequested()),
+        ),
+        // Kept alive here because OwnerEstimatesScreen / OwnerQuotationsScreen
+        // (pushed from Quick Actions below) still read it via context.read<OwnerCubit>().
+        BlocProvider(create: (_) => OwnerCubit()),
+      ],
       child: const _OwnerDashboardView(),
     );
   }
@@ -125,8 +57,6 @@ class _OwnerDashboardView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final cubit = context.watch<OwnerCubit>();
-    final state = cubit.state;
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final today = DateFormat('dd MMM yyyy, EEEE').format(DateTime.now());
     final hour = DateTime.now().hour;
@@ -138,160 +68,202 @@ class _OwnerDashboardView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: _OwnerHeader(
-              greeting: greeting,
-              dateLabel: today,
-              totalEstimates: state.totalEstimates,
-              dispatched: state.dispatchedCount,
-              quotations: state.quotationCount,
-              pending: state.pendingApprovalCount,
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                SizedBox(height: Responsive.h(70)),
-                const _SectionTitle(title: 'Quick Actions'),
-                SizedBox(height: Responsive.h(14)),
-                SizedBox(
-                  height: Responsive.h(100),
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 9,
-                    separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
-                    itemBuilder: (context, i) {
-                      final actions = <_QuickActionData>[
-                        _QuickActionData(
-                          icon: Icons.note_add_rounded,
-                          label: 'Create\nEstimate',
-                          color: AppColors.primary,
-                          onTap: () => _open(
-                            context,
-                            BlocProvider(create: (_) => EstimatesCubit(), child: const OwnerCreateEstimateScreen()),
-                          ),
-                        ),
-                        _QuickActionData(
-                          icon: Icons.receipt_long_rounded,
-                          label: 'Estimates',
-                          color: const Color(0xFF0EA5E9), // blue
-                          onTap: () => _open(
-                            context,
-                            BlocProvider.value(
-                              value: context.read<OwnerCubit>(),
-                              child: const OwnerEstimatesScreen(),
-                            ),
-                          ),
-                        ),
-                        _QuickActionData(
-                          icon: Icons.request_quote_outlined,
-                          label: 'Quotations',
-                          color: const Color(0xFFF59E0B), // amber
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => BlocProvider.value(
-                                value: context.read<OwnerCubit>(),
-                                child: const OwnerQuotationsScreen(),
-                              ),
-                            ),
-                          ),
-                        ),
-                        _QuickActionData(
-                          icon: Icons.bar_chart_rounded,
-                          label: 'Reports',
-                          color: const Color(0xFF16A34A), // green
-                          onTap: () => _open(context, const ReportsScreen()),
-                        ),
-                        _QuickActionData(
-                          icon: Icons.inventory_2_outlined,
-                          label: 'Product &Incentive\nSetup',
-                          color: const Color(0xFF7C3AED), // violet
-                          onTap: () => _open(context, const IncentiveManagementScreen()),
-                        ),
-                        _QuickActionData(
-                          icon: Icons.badge_outlined,
-                          label: 'Designations',
-                          color: const Color(0xFF0EA5E9), // blue
-                          onTap: () => _open(
-                            context,const DesignationListPage(),
-                            ),
-
-                        ),
-                        _QuickActionData(
-                          icon: Icons.groups_2_outlined,
-                          label: 'Salesmen',
-                          color: const Color(0xFFEC4899), // pink
-                          onTap: () =>
-                              _open(context,
-                              const OwnerSalesmenScreen()),
-                          ),
-
-                        _QuickActionData(
-                          icon: Icons.local_shipping_rounded,
-                          label: 'Driver',
-                          color: const Color(0xFF06B6D4), // cyan
-                          onTap: () => _open(context, const OwnerDriverScreen()),
-                        ),
-                        _QuickActionData(
-                          icon: Icons.assignment_ind_rounded,
-                          label: 'Field Staff',
-                          color: const Color(0xFF0B4718), // pink
-                          onTap: () => _open(context, const OwnerAddFieldStaffScreen (),)
-                        ),
-                      ];
-                      final a = actions[i];
-                      return SizedBox(
-                        width: Responsive.w(84),
-                        child: _QuickActionCard(icon: a.icon, label: a.label, color: a.color, onTap: a.onTap),
-                      );
-                    },
+      body: BlocBuilder<DashboardHomeBloc, DashboardHomeState>(
+        builder: (context, state) {
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
+              // Wait until the bloc leaves the refreshing state so the indicator
+              // doesn't spin forever.
+              await context.read<DashboardHomeBloc>().stream.firstWhere(
+                    (s) => s.status != DashboardHomeStatus.refreshing,
+              );
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _OwnerHeader(
+                    greeting: greeting,
+                    dateLabel: today,
+                    userName: state.data.user.name,
+                    totalEstimates: state.totalEstimates,
+                    dispatched: state.dispatchBills,
+                    quotations: state.quotations,
+                    pending: state.pending,
                   ),
                 ),
-
-                SizedBox(height: Responsive.h(28)),
-                const _SectionTitle(title: 'Sales Overview'),
-                SizedBox(height: Responsive.h(14)),
-                _CardWrapper(
-                  child: MonthlySalesSection(monthlySales: dummyMonthlySales, currency: currency),
-                ),
-                SizedBox(height: Responsive.h(28)),
-                _SectionTitle(
-                  title: 'Recent Estimates',
-                  actionLabel: 'View All',
-                  onAction: () => _open(context, const OwnerEstimatesScreen()),
-                ),
-                SizedBox(height: Responsive.h(14)),
-                if (dummyDashboardEstimates.isEmpty)
-                  const _EmptyState()
-                else
-                  Builder(builder: (context) {
-                    final recent = dummyDashboardEstimates.take(5).toList();
-                    return Column(
-                      children: [
-                        for (int i = 0; i < recent.length; i++) ...[
-                          _RecentEstimateCard(
-                            estimate: recent[i],
-                            currency: currency,
-                            onTap: () => _open(
-                              context,
-                              OwnerEstimateDetailsScreen(initialStatus: recent[i].status),
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      SizedBox(height: Responsive.h(70)),
+                      const _SectionTitle(title: 'Quick Actions'),
+                      SizedBox(height: Responsive.h(14)),
+                      SizedBox(
+                        height: Responsive.h(100),
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: 9,
+                          separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
+                          itemBuilder: (context, i) {
+                            final actions = <_QuickActionData>[
+                              _QuickActionData(
+                                icon: Icons.note_add_rounded,
+                                label: 'Create\nEstimate',
+                                color: AppColors.primary,
+                                onTap: () => _open(
+                                  context,
+                                  BlocProvider(
+                                    create: (_) => EstimatesCubit(),
+                                    child: const OwnerCreateEstimateScreen(),
+                                  ),
+                                ),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.receipt_long_rounded,
+                                label: 'Estimates',
+                                color: const Color(0xFF0EA5E9),
+                                onTap: () => _open(
+                                  context,
+                                  BlocProvider.value(
+                                    value: context.read<OwnerCubit>(),
+                                    child: const OwnerEstimatesScreen(),
+                                  ),
+                                ),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.request_quote_outlined,
+                                label: 'Quotations',
+                                color: const Color(0xFFF59E0B),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BlocProvider.value(
+                                      value: context.read<OwnerCubit>(),
+                                      child: const OwnerQuotationsScreen(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.bar_chart_rounded,
+                                label: 'Reports',
+                                color: const Color(0xFF16A34A),
+                                onTap: () => _open(context, const ReportsScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Product &Incentive\nSetup',
+                                color: const Color(0xFF7C3AED),
+                                onTap: () => _open(context, const IncentiveManagementScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.badge_outlined,
+                                label: 'Designations',
+                                color: const Color(0xFF0EA5E9),
+                                onTap: () => _open(context, const DesignationListPage()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.groups_2_outlined,
+                                label: 'Salesmen',
+                                color: const Color(0xFFEC4899),
+                                onTap: () => _open(context, const OwnerSalesmenScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.local_shipping_rounded,
+                                label: 'Driver',
+                                color: const Color(0xFF06B6D4),
+                                onTap: () => _open(context, const OwnerDriverScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.assignment_ind_rounded,
+                                label: 'Field Staff',
+                                color: const Color(0xFF0B4718),
+                                onTap: () => _open(context, const OwnerAddFieldStaffScreen()),
+                              ),
+                            ];
+                            final a = actions[i];
+                            return SizedBox(
+                              width: Responsive.w(84),
+                              child: _QuickActionCard(
+                                icon: a.icon,
+                                label: a.label,
+                                color: a.color,
+                                onTap: a.onTap,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      SizedBox(height: Responsive.h(28)),
+                      const _SectionTitle(title: 'Sales Overview'),
+                      SizedBox(height: Responsive.h(14)),
+                      _CardWrapper(
+                        child: state.status == DashboardHomeStatus.loading
+                            ? const _InlineLoader()
+                            : MonthlySalesSection(
+                          monthlySales: state.monthlySales
+                              .map(
+                                (m) => MonthlySales(
+                              monthLabel: m.month,
+                              amount: m.total.toDouble(),
                             ),
+                          )
+                              .toList(),
+                          currency: currency,
+                        ),
+                      ),
+                      SizedBox(height: Responsive.h(28)),
+                      _SectionTitle(
+                        title: 'Recent Estimates',
+                        actionLabel: 'View All',
+                        onAction: () => _open(
+                          context,
+                          BlocProvider.value(
+                            value: context.read<OwnerCubit>(),
+                            child: const OwnerEstimatesScreen(),
                           ),
-                          if (i != recent.length - 1) SizedBox(height: Responsive.h(10)),
-                        ],
-                      ],
-                    );
-                  }),
-                SizedBox(height: Responsive.h(30)),
-              ]),
+                        ),
+                      ),
+                      SizedBox(height: Responsive.h(14)),
+                      if (state.status == DashboardHomeStatus.loading)
+                        const _InlineLoader()
+                      else if (state.status == DashboardHomeStatus.failure)
+                        _ErrorState(
+                          message: state.errorMessage ?? 'Failed to load dashboard.',
+                          onRetry: () => context
+                              .read<DashboardHomeBloc>()
+                              .add(const DashboardHomeRequested()),
+                        )
+                      else if (state.recentEstimates.isEmpty)
+                          const _EmptyState()
+                        else
+                          Column(
+                            children: [
+                              for (int i = 0; i < state.recentEstimates.length; i++) ...[
+                                _RecentEstimateCard(
+                                  estimate: state.recentEstimates[i],
+                                  onTap: () => _open(
+                                    context,
+                                    OwnerEstimateDetailsScreen(
+                                      initialStatus: state.recentEstimates[i].statusLabel,
+                                    ),
+                                  ),
+                                ),
+                                if (i != state.recentEstimates.length - 1)
+                                  SizedBox(height: Responsive.h(10)),
+                              ],
+                            ],
+                          ),
+                      SizedBox(height: Responsive.h(30)),
+                    ]),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -303,6 +275,7 @@ class _OwnerHeader extends StatelessWidget {
   const _OwnerHeader({
     required this.greeting,
     required this.dateLabel,
+    required this.userName,
     required this.totalEstimates,
     required this.dispatched,
     required this.quotations,
@@ -311,6 +284,7 @@ class _OwnerHeader extends StatelessWidget {
 
   final String greeting;
   final String dateLabel;
+  final String userName;
   final int totalEstimates;
   final int dispatched;
   final int quotations;
@@ -364,10 +338,11 @@ class _OwnerHeader extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Owner Dashboard',
+                            userName.isNotEmpty ? userName : 'Owner Dashboard',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(17)),
+                            style: AppTextStyles.bodyBold(color: Colors.white)
+                                .copyWith(fontSize: Responsive.sp(17)),
                           ),
                         ],
                       ),
@@ -390,8 +365,6 @@ class _OwnerHeader extends StatelessWidget {
             ),
           ),
         ),
-
-        // Floating stat card strip
         Positioned(
           left: Responsive.w(20),
           right: Responsive.w(20),
@@ -429,7 +402,7 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$dispatched',
                     label: 'Dispatched',
-                    color: const Color(0xFF0EA5E9), // blue
+                    color: const Color(0xFF0EA5E9),
                     icon: Icons.local_shipping_rounded,
                   ),
                 ),
@@ -438,7 +411,7 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$quotations',
                     label: 'Quotations',
-                    color: const Color(0xFFF59E0B), // amber
+                    color: const Color(0xFFF59E0B),
                     icon: Icons.request_quote_rounded,
                   ),
                 ),
@@ -447,7 +420,7 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$pending',
                     label: 'Pending',
-                    color: const Color(0xFFEF4444), // red
+                    color: const Color(0xFFEF4444),
                     icon: Icons.hourglass_bottom_rounded,
                   ),
                 ),
@@ -668,7 +641,25 @@ class _CardWrapper extends StatelessWidget {
   }
 }
 
-// ---------------- EMPTY STATE ----------------
+// ---------------- LOADING / EMPTY / ERROR STATES ----------------
+
+class _InlineLoader extends StatelessWidget {
+  const _InlineLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: Responsive.h(24)),
+      child: const Center(
+        child: SizedBox(
+          height: 28,
+          width: 28,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      ),
+    );
+  }
+}
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -693,23 +684,50 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ---------------- RECENT ESTIMATE CARD (same style as OwnerEstimatesScreen card) ----------------
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardWrapper(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
+        child: Column(
+          children: [
+            Icon(Icons.error_outline_rounded, size: 36, color: AppColors.textSecondary.withOpacity(0.5)),
+            SizedBox(height: Responsive.h(10)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
+            ),
+            SizedBox(height: Responsive.h(12)),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- RECENT ESTIMATE CARD (bound to real API model) ----------------
 
 class _RecentEstimateCard extends StatelessWidget {
   const _RecentEstimateCard({
     required this.estimate,
-    required this.currency,
     required this.onTap,
   });
 
-  final EstimateModel estimate;
-  final NumberFormat currency;
+  final DashboardHomeRecentEstimate estimate;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final bool hasApproval = estimate.approvedBy != null && estimate.approvedBy!.isNotEmpty;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -728,56 +746,28 @@ class _RecentEstimateCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    estimate.contractorName,
+                    estimate.customerName,
                     style: AppTextStyles.bodyBold(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                StatusBadge(status: estimate.status),
+                StatusBadge(status: estimate.statusLabel),
               ],
             ),
             SizedBox(height: Responsive.h(4)),
-            Text('Estimate No: ${estimate.id}', style: AppTextStyles.caption()),
-            SizedBox(height: Responsive.h(4)),
-            Row(
-              children: [
-                const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
-                SizedBox(width: Responsive.w(4)),
-                Expanded(
-                  child: Text(
-                    '${estimate.salesmanName} · ${estimate.salesmanMobile}',
-                    style: AppTextStyles.caption(),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            if (hasApproval) ...[
-              SizedBox(height: Responsive.h(4)),
-              Row(
-                children: [
-                  const Icon(Icons.verified_outlined, size: 14, color: AppColors.primary),
-                  SizedBox(width: Responsive.w(4)),
-                  Expanded(
-                    child: Text(
-                      'Approved by ${estimate.approvedBy}'
-                          '${estimate.approvedAt != null ? ' · ${DateFormat('dd-MM-yyyy').format(estimate.approvedAt!)}' : ''}',
-                      style: AppTextStyles.caption(color: AppColors.primary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            Text('Estimate No: ${estimate.estimateNumber}', style: AppTextStyles.caption()),
             SizedBox(height: Responsive.h(8)),
             const Divider(height: 1, color: AppColors.border),
             SizedBox(height: Responsive.h(8)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(DateFormat('dd-MM-yyyy').format(estimate.date), style: AppTextStyles.caption()),
-                Text('2500', style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                Text(estimate.dateFormatted, style: AppTextStyles.caption()),
+                Text(
+                  estimate.grandTotalFormatted,
+                  style: AppTextStyles.bodyBold(color: AppColors.primary),
+                ),
               ],
             ),
           ],
@@ -786,4 +776,3 @@ class _RecentEstimateCard extends StatelessWidget {
     );
   }
 }
-

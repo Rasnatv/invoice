@@ -1,111 +1,46 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/models/owner_models/owner_viewquotationmodel.dart';
 import 'package:tileshop/ui/owner/quotation_detail_screen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../bloc/ownerbloc/owner_viewquotation_bloic.dart';
+import '../../bloc/ownerbloc/owner_viewquotation_event.dart';
+import '../../bloc/ownerbloc/owner_viewquotations_state.dart';
 
-/// TODO: replace this with the actual logged-in owner's name
-/// (e.g. from your auth/session provider) once available.
-const String kCurrentOwnerName = 'Owner';
-
-enum QuotationFilter { mine, salesman }
-
-class OwnerQuotationsScreen extends StatefulWidget {
+class OwnerQuotationsScreen extends StatelessWidget {
   const OwnerQuotationsScreen({super.key});
 
   @override
-  State<OwnerQuotationsScreen> createState() => _OwnerQuotationsScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => QuotationBloc()..add(const FetchQuotationsEvent()),
+      child: const _OwnerQuotationsView(),
+    );
+  }
 }
 
-class _OwnerQuotationsScreenState extends State<OwnerQuotationsScreen> {
+class _OwnerQuotationsView extends StatefulWidget {
+  const _OwnerQuotationsView();
+
+  @override
+  State<_OwnerQuotationsView> createState() => _OwnerQuotationsViewState();
+}
+
+class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
   final _searchCtrl = TextEditingController();
-  QuotationFilter _filter = QuotationFilter.mine;
 
-  // Dummy quotation data
-  final List<QuotationModel> _quotations = [
-    QuotationModel(
-      id: 'Est.No.015',
-      customerName: 'Rajesh Constructions',
-      customerPhone: '+91 98765 43210',
-      date: DateTime(2026, 7, 5),
-      items: 5,
-      grandTotal: 519500,
-      status: 'Sent',
-      salesmanName: kCurrentOwnerName,
-    ),
-    QuotationModel(
-      id: 'Est.No.015',
-      customerName: 'Sunrise Developers',
-      customerPhone: '+91 76543 21098',
-      date: DateTime(2026, 7, 8),
-      items: 3,
-      grandTotal: 731000,
-      status: 'Accepted',
-      salesmanName: 'Rahul Kumar',
-    ),
-    QuotationModel(
-      id: 'Est.No.016',
-      customerName: 'Metro Infrastructure',
-      customerPhone: '+91 54321 09876',
-      date: DateTime(2026, 7, 10),
-      items: 4,
-      grandTotal: 2138500,
-      status: 'Draft',
-      salesmanName: 'Anil Menon',
-    ),
-    QuotationModel(
-      id: 'Est.No.017',
-      customerName: 'Green Valley Projects',
-      customerPhone: '+91 32109 87654',
-      date: DateTime(2026, 7, 12),
-      items: 6,
-      grandTotal: 1403400,
-      status: 'Viewed',
-      salesmanName: 'Rahul Kumar',
-    ),
-    QuotationModel(
-      id: 'Est.No.018',
-      customerName: 'Urban Spaces Ltd',
-      customerPhone: '+91 10987 65432',
-      date: DateTime(2026, 7, 15),
-      items: 8,
-      grandTotal: 2820000,
-      status: 'Expired',
-      salesmanName: kCurrentOwnerName,
-    ),
-  ];
-
-  List<QuotationModel> _getFilteredQuotations() {
-    final query = _searchCtrl.text.trim().toLowerCase();
-
-    final scoped = _filter == QuotationFilter.mine
-        ? _quotations.where((q) => q.salesmanName == kCurrentOwnerName).toList()
-        : _quotations.where((q) => q.salesmanName != kCurrentOwnerName).toList();
-
-    if (query.isEmpty) return scoped;
-
-    return scoped.where((q) {
-      return q.customerName.toLowerCase().contains(query) ||
-          q.id.toLowerCase().contains(query) ||
-          q.customerPhone.contains(query) ||
-          q.salesmanName.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  // Navigates to the quotation details screen, passing the tapped card's
-  // info through so the header there matches what was tapped. Swap for a
-  // real "fetch quotation by id" call once that API/cubit exists.
-  void _openQuotationDetails(QuotationModel q) {
+  // NOTE: /quotations/show expects the record's "id" (e.g. "23"), not the
+  // human-readable "quotation_number" (e.g. "QOT0015-08-26"). Adjust
+  // `q.id` below if OwnerviewQuotationModel names that field differently.
+  void _openQuotationDetails(OwnerviewQuotationModel q) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OwnerQuotationDetailsScreen(
           quotationId: q.id,
-          customerName: q.customerName,
-          customerPhone: q.customerPhone,
-          date: q.date,
-          grandTotal: q.grandTotal,
         ),
       ),
     );
@@ -121,7 +56,6 @@ class _OwnerQuotationsScreenState extends State<OwnerQuotationsScreen> {
   Widget build(BuildContext context) {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final filteredQuotations = _getFilteredQuotations();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -129,81 +63,147 @@ class _OwnerQuotationsScreenState extends State<OwnerQuotationsScreen> {
         title: Text('Quotations', style: AppTextStyles.h6()),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // My Quotations / Salesman Quotations toggle
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                Responsive.w(16),
-                Responsive.h(14),
-                Responsive.w(16),
-                Responsive.h(10),
-              ),
-              child: _QuotationFilterToggle(
-                value: _filter,
-                onChanged: (value) => setState(() => _filter = value),
-              ),
-            ),
+        child: BlocBuilder<QuotationBloc, QuotationState>(
+          builder: (context, state) {
+            if (state is QuotationLoading || state is QuotationInitial) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-            // Search Bar
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                Responsive.w(16),
-                0,
-                Responsive.w(16),
-                Responsive.h(10),
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Search by customer, ID or salesman',
-                  prefixIcon: Icon(Icons.search_rounded),
+            if (state is QuotationError) {
+              return Center(
+                child: Padding(
+                  padding: EdgeInsets.all(Responsive.w(24)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
+                      SizedBox(height: Responsive.h(12)),
+                      Text(
+                        state.message ?? 'Failed to load quotations.',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.subtitle(),
+                      ),
+                      SizedBox(height: Responsive.h(16)),
+                      ElevatedButton(
+                        onPressed: () => context
+                            .read<QuotationBloc>()
+                            .add(const FetchQuotationsEvent()),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            }
 
-            // Quotation List
-            Expanded(
-              child: filteredQuotations.isEmpty
-                  ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.description_outlined,
-                      size: 64,
-                      color: AppColors.textSecondary.withOpacity(0.5),
-                    ),
-                    SizedBox(height: Responsive.h(16)),
-                    Text(
-                      'No quotations found',
-                      style: AppTextStyles.subtitle(),
-                    ),
-                  ],
+            final loaded = state as QuotationLoaded;
+            final filteredQuotations = loaded.visibleQuotations;
+            // Only auto-load-more when there's no active search filter —
+            // pagination fetches raw pages from the API, which won't line up
+            // with a client-side filtered/searched view.
+            final canLoadMore = loaded.searchQuery.trim().isEmpty;
+
+            return Column(
+              children: [
+                // My Quotations / Salesman Quotations toggle
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    Responsive.w(16),
+                    Responsive.h(14),
+                    Responsive.w(16),
+                    Responsive.h(10),
+                  ),
+                  child: _QuotationFilterToggle(
+                    value: loaded.filter,
+                    onChanged: (value) =>
+                        context.read<QuotationBloc>().add(FilterQuotationsEvent(value)),
+                  ),
                 ),
-              )
-                  : ListView.separated(
-                padding: EdgeInsets.fromLTRB(
-                  Responsive.w(16),
-                  0,
-                  Responsive.w(16),
-                  Responsive.h(20),
+
+                // Search Bar
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    Responsive.w(16),
+                    0,
+                    Responsive.w(16),
+                    Responsive.h(10),
+                  ),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (value) =>
+                        context.read<QuotationBloc>().add(SearchQuotationsEvent(value)),
+                    decoration: const InputDecoration(
+                      hintText: 'Search by customer, ID or salesman',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
                 ),
-                itemCount: filteredQuotations.length,
-                separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
-                itemBuilder: (context, index) {
-                  final q = filteredQuotations[index];
-                  return _QuotationCard(
-                    quotation: q,
-                    currency: currency,
-                    showSalesman: _filter == QuotationFilter.salesman,
-                    onTap: () => _openQuotationDetails(q),
-                  );
-                },
-              ),
-            ),
-          ],
+
+                // Quotation List
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (canLoadMore &&
+                          notification.metrics.pixels >=
+                              notification.metrics.maxScrollExtent - 200) {
+                        context.read<QuotationBloc>().add(const LoadMoreQuotationsEvent());
+                      }
+                      return false;
+                    },
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        context.read<QuotationBloc>().add(const RefreshQuotationsEvent());
+                      },
+                      child: filteredQuotations.isEmpty
+                          ? ListView(
+                        padding: EdgeInsets.only(top: Responsive.h(80)),
+                        children: [
+                          Icon(
+                            Icons.description_outlined,
+                            size: 64,
+                            color: AppColors.textSecondary.withOpacity(0.5),
+                          ),
+                          SizedBox(height: Responsive.h(16)),
+                          Center(
+                            child: Text(
+                              'No quotations found',
+                              style: AppTextStyles.subtitle(),
+                            ),
+                          ),
+                        ],
+                      )
+                          : ListView.separated(
+                        padding: EdgeInsets.fromLTRB(
+                          Responsive.w(16),
+                          0,
+                          Responsive.w(16),
+                          Responsive.h(20),
+                        ),
+                        itemCount: filteredQuotations.length +
+                            (canLoadMore && loaded.isLoadingMore ? 1 : 0),
+                        separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                        itemBuilder: (context, index) {
+                          if (index >= filteredQuotations.length) {
+                            return Padding(
+                              padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                              child: const Center(child: CircularProgressIndicator()),
+                            );
+                          }
+                          final q = filteredQuotations[index];
+                          return _QuotationCard(
+                            quotation: q,
+                            currency: currency,
+                            showSalesman: loaded.filter == QuotationFilterType.salesman,
+                            onTap: () => _openQuotationDetails(q),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -216,8 +216,8 @@ class _QuotationFilterToggle extends StatelessWidget {
     required this.onChanged,
   });
 
-  final QuotationFilter value;
-  final ValueChanged<QuotationFilter> onChanged;
+  final QuotationFilterType value;
+  final ValueChanged<QuotationFilterType> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -232,13 +232,13 @@ class _QuotationFilterToggle extends StatelessWidget {
         children: [
           _ToggleOption(
             label: 'My Quotations',
-            selected: value == QuotationFilter.mine,
-            onTap: () => onChanged(QuotationFilter.mine),
+            selected: value == QuotationFilterType.mine,
+            onTap: () => onChanged(QuotationFilterType.mine),
           ),
           _ToggleOption(
             label: 'Salesman Quotations',
-            selected: value == QuotationFilter.salesman,
-            onTap: () => onChanged(QuotationFilter.salesman),
+            selected: value == QuotationFilterType.salesman,
+            onTap: () => onChanged(QuotationFilterType.salesman),
           ),
         ],
       ),
@@ -293,7 +293,7 @@ class _QuotationCard extends StatelessWidget {
     this.showSalesman = false,
   });
 
-  final QuotationModel quotation;
+  final OwnerviewQuotationModel quotation;
   final NumberFormat currency;
   final VoidCallback onTap;
   final bool showSalesman;
@@ -313,7 +313,6 @@ class _QuotationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Row - Customer Name & Status
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -338,13 +337,12 @@ class _QuotationCard extends StatelessWidget {
 
             SizedBox(height: Responsive.h(4)),
 
-            // Quotation ID & Salesman
             Row(
               children: [
                 const Icon(Icons.assignment_outlined, size: 14, color: AppColors.textSecondary),
                 SizedBox(width: Responsive.w(4)),
                 Text(
-                  quotation.id,
+                  quotation.quotationNumber,
                   style: AppTextStyles.caption(),
                 ),
                 if (showSalesman) ...[
@@ -366,7 +364,6 @@ class _QuotationCard extends StatelessWidget {
 
             SizedBox(height: Responsive.h(4)),
 
-            // Phone
             Row(
               children: [
                 const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
@@ -382,7 +379,6 @@ class _QuotationCard extends StatelessWidget {
             const Divider(height: 1, color: AppColors.border),
             SizedBox(height: Responsive.h(8)),
 
-            // Footer - Date, Items & Amount
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -390,17 +386,17 @@ class _QuotationCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      DateFormat('dd-MM-yyyy').format(quotation.date),
+                      quotation.date,
                       style: AppTextStyles.caption(),
                     ),
                     Text(
-                      '${quotation.items} items',
+                      '${quotation.totalItemsValue} items',
                       style: AppTextStyles.caption(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
                 Text(
-                  currency.format(quotation.grandTotal),
+                  currency.format(quotation.grandTotalValue),
                   style: AppTextStyles.bodyBold(color: AppColors.primary),
                 ),
               ],
@@ -410,26 +406,4 @@ class _QuotationCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class QuotationModel {
-  final String id;
-  final String customerName;
-  final String customerPhone;
-  final DateTime date;
-  final int items;
-  final double grandTotal;
-  final String status;
-  final String salesmanName;
-
-  QuotationModel({
-    required this.id,
-    required this.customerName,
-    required this.customerPhone,
-    required this.date,
-    required this.items,
-    required this.grandTotal,
-    required this.status,
-    required this.salesmanName,
-  });
 }

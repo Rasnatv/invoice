@@ -1,3 +1,4 @@
+
 import '../../Apiprovider/product_enums.dart';
 
 /// Request body for POST /products/create.
@@ -32,9 +33,10 @@ class ProductAddRequestModel {
 
   /// Only sent (and required) when [incentiveType] is percentage.
   final double? incentivePercentage;
+
   final ProductBonusType bonusType;
 
-  /// Only meaningful when [bonusType] is bulk — kept at 0 for single.
+  /// Only meaningful when [bonusType] is bulk. Sent as null otherwise.
   final num minQuantity;
 
   /// Only sent when the selected unit is a "box"-type unit.
@@ -63,8 +65,10 @@ class ProductAddRequestModel {
         'incentive_amount': incentiveAmount.toString(),
       if (incentiveType == ProductIncentiveType.percentage)
         'incentive_percentage': incentivePercentage,
+      // null when bonusType is ProductBonusType.none.
       'bonus_type': bonusType.apiValue,
-      'min_quantity': minQuantity,
+      // null unless bonusType is bulk.
+      'min_quantity': bonusType == ProductBonusType.bulk ? minQuantity : null,
       if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
         'pieces_per_box': piecesPerBox,
       if (isBoxUnit && packing != null && packing!.isNotEmpty)

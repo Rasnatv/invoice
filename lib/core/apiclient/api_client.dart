@@ -69,9 +69,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /drivers/create — unconfirmed against a real response; if your
-  /// backend actually creates drivers at the same URL as the list (like
-  /// units/designations do), point this at ApiConstants.driversget instead.
   Future<Response> addDriver(Map<String, dynamic> data) async => dio.post(
     ApiConstants.driverscreate,
     data: data,
@@ -96,9 +93,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /salesman-designations — kept on the SAME path as the list, not
-  /// ApiConstants.salemancretae ('/salesman-designations/create'), because
-  /// your confirmed real response showed create hitting this exact URL.
   Future<Response> addDesignation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.salemancretaedesignation,
     data: data,
@@ -123,8 +117,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /salesmen/create — unconfirmed against a real response; verify
-  /// this is actually a separate endpoint and not the same URL as `salesmen`.
   Future<Response> addSalesman(Map<String, dynamic> data) async => dio.post(
     ApiConstants.salesmancreate,
     data: data,
@@ -143,9 +135,15 @@ class ApiClient {
     options: await _authOptions(),
   );
 
+  /// GET /salesmen/active — id/name/designation_display list, used to
+  /// populate the "Assign to Salesman" dropdown on the Owner Create
+  /// Estimate screen when approving an estimate.
+  Future<Response> activeSalesmen() async => dio.get(
+    ApiConstants.salesmenActive,
+    options: await _authOptions(),
+  );
+
   // =================== FIELD STAFF ===================
-  /// POST /field-staff/create — unconfirmed against a real response; verify
-  /// this is actually a separate endpoint and not the same URL as `fieldStaff`.
   Future<Response> addFieldStaff(Map<String, dynamic> data) async => dio.post(
     ApiConstants.fieldstaffcreate,
     data: data,
@@ -187,8 +185,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// Fixed back to POST — your confirmed real response showed
-  /// /units/delete working via POST, not DELETE.
   Future<Response> deleteUnit(Map<String, dynamic> data) async => dio.post(
     ApiConstants.deleteUnit,
     data: data,
@@ -201,8 +197,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /companies/create — unconfirmed against a real response; verify
-  /// this is actually a separate endpoint and not the same URL as `companies`.
   Future<Response> addCompany(Map<String, dynamic> data) async => dio.post(
     ApiConstants.companycreate,
     data: data,
@@ -221,48 +215,37 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  //--------------------------------------FieldstaffSection---------------------
-
   // =================== SITE VISITS ===================
-
-  /// POST /site-visits/create
-  Future<Response> createSiteVisit(Map<String, dynamic> data,) async => dio.post(
+  Future<Response> createSiteVisit(Map<String, dynamic> data) async => dio.post(
     ApiConstants.siteVisitCreate,
     data: data,
     options: await _authOptions(),
   );
 
-  /// GET /site-visits/my
   Future<Response> mySiteVisits() async => dio.get(
     ApiConstants.siteVisitsMy,
     options: await _authOptions(),
   );
 
-  /// POST /site-visits/show
-  Future<Response> showSiteVisit(Map<String, dynamic> data,) async => dio.post(
+  Future<Response> showSiteVisit(Map<String, dynamic> data) async => dio.post(
     ApiConstants.siteVisitShow,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /site-visits/update
-  Future<Response> updateSiteVisit(Map<String, dynamic> data,
-      ) async => dio.put(
+  Future<Response> updateSiteVisit(Map<String, dynamic> data) async => dio.put(
     ApiConstants.siteVisitUpdate,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /site-visits/delete
-  Future<Response> deleteSiteVisit(Map<String, dynamic> data,) async => dio.delete(
+  Future<Response> deleteSiteVisit(Map<String, dynamic> data) async => dio.delete(
     ApiConstants.siteVisitDelete,
     data: data,
     options: await _authOptions(),
   );
 
-  /// GET /site-visits/pending-dropdown — pending site visits for the
-  /// phone-number lookup on the Create Estimate screen. Returns the full
-  /// pending list; filtering by phone digits happens client-side.
+  /// GET /site-visits/pending-dropdown
   Future<Response> pendingSiteVisitsDropdown() async => dio.get(
     ApiConstants.siteVisitsPendingDropdown,
     options: await _authOptions(),
@@ -274,29 +257,25 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /products/create
   Future<Response> addProduct(Map<String, dynamic> data) async => dio.post(
     ApiConstants.productsCreate,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /products/update
   Future<Response> updateProduct(Map<String, dynamic> data) async => dio.put(
     ApiConstants.productsUpdate,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /products/delete
   Future<Response> deleteProduct(Map<String, dynamic> data) async => dio.delete(
     ApiConstants.productsDelete,
     data: data,
     options: await _authOptions(),
   );
 
-  /// GET /products/active — active products for the item dropdown on the
-  /// Create Estimate screen (id/name/company/size/unit only, no pricing).
+  /// GET /products/active
   Future<Response> activeProducts() async => dio.get(
     ApiConstants.productsActive,
     options: await _authOptions(),
@@ -320,7 +299,10 @@ class ApiClient {
   /// Estimate screens. `data['action']` drives server-side behavior:
   ///   - 'save_quotation' -> saved as a draft
   ///   - 'submit'          -> submitted for admin/owner approval
-  ///   - 'approve'         -> owner-only, finalizes the estimate
+  ///   - 'approve'         -> owner-only, creates AND finalizes the
+  ///                          estimate in one call. The owner screen sends
+  ///                          `salesman_id` plus optional discount_*/
+  ///                          payment_* fields along with this action.
   Future<Response> createQuotation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.quotationsCreate,
     data: data,
@@ -333,65 +315,80 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// GET /quotations/my — the logged-in salesman/owner's own quotations.
   Future<Response> myQuotations() async => dio.get(
     ApiConstants.quotationsMy,
     options: await _authOptions(),
   );
 
-  /// POST /quotations/show — full detail of a single quotation. Body: { "id": "..." }
   Future<Response> showQuotation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.quotationsShow,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /quotations/update — updates an existing (draft) quotation.
   Future<Response> updateQuotation(Map<String, dynamic> data) async => dio.put(
     ApiConstants.quotationsUpdate,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /quotations/delete — deletes a quotation. Body: { "id": "..." }
   Future<Response> deleteQuotation(Map<String, dynamic> data) async => dio.delete(
     ApiConstants.quotationsDelete,
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /quotations/submit — sends a saved (draft) quotation for
-  /// admin/owner approval. Body: { "id": "..." }
   Future<Response> submitQuotation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.quotationsSubmit,
     data: data,
     options: await _authOptions(),
   );
+
+  /// POST /quotations/approve — owner-only. Approves an already-submitted
+  /// quotation (separate flow from /quotations/create with action=approve).
+  Future<Response> approveQuotation(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.quotationsApprove,
+    data: data,
+    options: await _authOptions(),
+  );
+
   // =================== DASHBOARD ===================
   Future<Response> dashboard() async => dio.get(
     ApiConstants.dashboard,
     options: await _authOptions(),
   );
-  /// POST /quotations/preview
-  ///
+
   Future<Response> previewQuotation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.qtnpreview,
     data: data,
     options: await _authOptions(),
   );
-  // =================== ESTIMATES ===================
 
-  /// POST /estimates/show — full detail of a single estimate. Body: { "id": "..." }
+  // =================== ESTIMATES ===================
   Future<Response> showEstimate(Map<String, dynamic> data) async => dio.post(
     ApiConstants.estimatesShow,
     data: data,
     options: await _authOptions(),
   );
-  /// GET /estimates/myapproved — the logged-in salesman/owner's approved
-  /// estimates, paginated.
+
   Future<Response> myApprovedEstimates({int page = 1, int perPage = 10}) async => dio.get(
     '${ApiConstants.estimatesMyApproved}?page=$page&per_page=$perPage',
     options: await _authOptions(),
   );
 
+  Future<Response> estimates({int page = 1, int perPage = 100}) async => dio.get(
+    '${ApiConstants.estimatesAll}?page=$page&per_page=$perPage',
+    options: await _authOptions(),
+  );
+
+  Future<Response> quotations({int page = 1, int perPage = 10}) async => dio.get(
+    ApiConstants.quotationsAll,
+    queryParameters: {'page': page, 'per_page': perPage},
+    options: await _authOptions(),
+  );
+
+  Future<Response> rejectQuotation() async => dio.get(
+    ApiConstants.reject,
+    options: await _authOptions(),
+  );
 }

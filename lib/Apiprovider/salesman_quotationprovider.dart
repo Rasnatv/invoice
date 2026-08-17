@@ -2,6 +2,8 @@
 import 'package:dio/dio.dart';
 import '../core/apiclient/api_client.dart';
 import '../core/errors/apierrorhandler.dart';
+import '../models/owner_models/get_activedrivermodel.dart';
+import '../models/owner_models/owner_quotationapprovemodel.dart';
 import '../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
 import '../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../models/salesmanmodels/estimatesectionproductincentive.dart';
@@ -128,6 +130,23 @@ class QuotationPreviewResult {
         preview = null;
 }
 
+/// Result wrapper for GET /salesmen/active.
+class SalesmanListResult {
+  final bool success;
+  final List<SalesmanActiveModel> list;
+  final String? errorMessage;
+  final bool isUnauthorized;
+
+  const SalesmanListResult.success(this.list)
+      : success = true,
+        errorMessage = null,
+        isUnauthorized = false;
+
+  const SalesmanListResult.failure(this.errorMessage, {this.isUnauthorized = false})
+      : success = false,
+        list = const [];
+}
+
 /// Provider for the salesman/owner estimate ("quotation") flow. Mirrors
 /// DriverProvider's shape 1:1 (result classes + try/catch) so it drops
 /// straight into the same Bloc/Cubit wiring style already used elsewhere.
@@ -188,6 +207,33 @@ class QuotationProvider {
     }
   }
 
+  /// GET /salesmen/active — used to populate the "Assign to Salesman"
+  /// dropdown on the Owner Create Estimate screen's Preview step.
+  Future<SalesmanListResult> getActiveSalesmen() async {
+    try {
+      final response = await _apiClient.activeSalesmen();
+      final body = response.data;
+
+      if (response.statusCode == 200 && body is Map<String, dynamic>) {
+        final parsed = SalesmanActiveResponseModel.fromJson(body);
+        if (parsed.status == '1') return SalesmanListResult.success(parsed.list);
+        return SalesmanListResult.failure(
+          parsed.message.isNotEmpty ? parsed.message : 'Failed to fetch salesmen.',
+        );
+      }
+      return SalesmanListResult.failure('Unexpected response: ${response.statusCode}');
+    } on DioException catch (e) {
+      final message = await ApiErrorHandler.handleDioError(e);
+      final unauthorized = e.response?.statusCode == 401;
+      return SalesmanListResult.failure(
+        unauthorized ? null : message,
+        isUnauthorized: unauthorized,
+      );
+    } catch (_) {
+      return const SalesmanListResult.failure('Something went wrong. Please try again.');
+    }
+  }
+
   /// POST /quotations/product-incentive — live incentive preview for the
   /// item currently being entered on the Add Items step (not yet added to
   /// the estimate).
@@ -220,9 +266,7 @@ class QuotationProvider {
 
   /// POST /quotations/preview — server-calculated preview (line incentives,
   /// subtotal, handling charge, discount, grand total, balance due) for
-  /// whatever the salesman has entered so far on the estimate. Only fields
-  /// actually captured on screen are sent — no discount/payment, since
-  /// this flow doesn't collect those.
+  /// whatever has been entered so far on the estimate.
   Future<QuotationPreviewResult> previewQuotation(QuotationPreviewRequest request) async {
     try {
       final response = await _apiClient.previewQuotation(request.toJson());
@@ -251,8 +295,9 @@ class QuotationProvider {
   }
 
   /// POST /quotations/create
-  /// `request.action` must be 'save_quotation' or 'submit' when called from
-  /// the salesman screen.
+  /// `request.action` must be 'save_quotation' or 'submit' from the
+  /// salesman screen, or 'approve' from the owner screen (in which case
+  /// `salesmanId` plus any discount_*/payment_* fields are sent along).
   Future<QuotationActionResult> createQuotation(QuotationCreateRequest request) async {
     try {
       final response = await _apiClient.createQuotation(request.toJson());
@@ -416,6 +461,38 @@ class QuotationProvider {
         }
         return QuotationActionResult.failure(
           message.isNotEmpty ? message : 'Failed to submit for approval.',
+        );
+      }
+      return QuotationActionResult.failure('Unexpected response: ${response.statusCode}');
+    } on DioException catch (e) {
+      final message = await ApiErrorHandler.handleDioError(e);
+      final unauthorized = e.response?.statusCode == 401;
+      return QuotationActionResult.failure(
+        unauthorized ? null : message,
+        isUnauthorized: unauthorized,
+      );
+    } catch (_) {
+      return const QuotationActionResult.failure('Something went wrong. Please try again.');
+    }
+  }
+
+  /// POST /quotations/approve — owner-only. Approves an already-submitted
+  /// quotation/estimate (separate flow from creating one directly as
+  /// approved via /quotations/create with action=approve).
+  Future<QuotationActionResult> approveQuotation(QuotationApproveRequest request) async {
+    try {
+      final response = await _apiClient.approveQuotation(request.toJson());
+      final body = response.data;
+
+      if (body is Map<String, dynamic>) {
+        final parsed = QuotationApproveResponseModel.fromJson(body);
+        if (parsed.status == '1') {
+          return QuotationActionResult.success(
+            parsed.message.isNotEmpty ? parsed.message : 'Quotation approved successfully.',
+          );
+        }
+        return QuotationActionResult.failure(
+          parsed.message.isNotEmpty ? parsed.message : 'Failed to approve quotation.',
         );
       }
       return QuotationActionResult.failure('Unexpected response: ${response.statusCode}');

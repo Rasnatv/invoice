@@ -13,6 +13,7 @@ import '../../core/utils/responsive.dart';
 import '../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
 import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
+import '../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 
@@ -21,6 +22,11 @@ import '../../widgets/primary_button.dart';
 /// Incentive is now looked up live from /quotations/product-incentive while
 /// the item is being entered, and whatever the API returned at the moment
 /// "Add Item" is pressed is snapshotted onto the item below.
+///
+/// boxQuantity / pieceQuantity are separate manual entries required by
+/// POST /quotations/create ("box_quantity" / "piece_quantity") — they are
+/// NOT derived from quantity, since the salesman may count stock as a mix
+/// of full boxes and loose pieces that doesn't cleanly divide.
 class _AddedItem {
   final String id;
   final String productId;
@@ -29,6 +35,8 @@ class _AddedItem {
   final String size;
   final String unit;
   final double quantity;
+  final double boxQuantity;
+  final double pieceQuantity;
   final double rate;
 
   /// Product's reference MRP at the time this item was added — display
@@ -50,6 +58,8 @@ class _AddedItem {
     required this.size,
     required this.unit,
     required this.quantity,
+    this.boxQuantity = 0,
+    this.pieceQuantity = 0,
     required this.rate,
     this.mrp = 0,
     this.incentiveAmount = 0,
@@ -92,6 +102,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   final _contractorNameCtrl = TextEditingController();
   final _contractorPhoneCtrl = TextEditingController();
   final _contractorEmailCtrl = TextEditingController();
+  final _contractorAddressCtrl = TextEditingController();
 
   final _handlingChargeCtrl = TextEditingController(text: '0');
   final _notesCtrl = TextEditingController();
@@ -105,6 +116,8 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   final _itemUnitCtrl = TextEditingController();
   final _itemMrpCtrl = TextEditingController();
   final _itemQtyCtrl = TextEditingController();
+  final _itemBoxQtyCtrl = TextEditingController();
+  final _itemPieceQtyCtrl = TextEditingController();
   final _itemRateCtrl = TextEditingController();
 
   ActiveProductModel? _selectedProduct;
@@ -118,9 +131,16 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   Timer? _incentiveDebounce;
   static const _incentiveDebounceDuration = Duration(milliseconds: 450);
 
+  // Debounces the full server-side estimate preview (POST
+  // /quotations/preview) fired when the salesman reaches the Preview
+  // step, and again whenever Handling Charge is edited there.
+  Timer? _previewDebounce;
+  static const _previewDebounceDuration = Duration(milliseconds: 450);
+
   @override
   void dispose() {
     _incentiveDebounce?.cancel();
+    _previewDebounce?.cancel();
     _partyNameCtrl.dispose();
     _addressCtrl.dispose();
     _phoneCtrl.dispose();
@@ -128,6 +148,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _contractorNameCtrl.dispose();
     _contractorPhoneCtrl.dispose();
     _contractorEmailCtrl.dispose();
+    _contractorAddressCtrl.dispose();
     _handlingChargeCtrl.dispose();
     _notesCtrl.dispose();
     _termsCtrl.dispose();
@@ -136,6 +157,8 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _itemUnitCtrl.dispose();
     _itemMrpCtrl.dispose();
     _itemQtyCtrl.dispose();
+    _itemBoxQtyCtrl.dispose();
+    _itemPieceQtyCtrl.dispose();
     _itemRateCtrl.dispose();
     super.dispose();
   }
@@ -175,10 +198,31 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     return s + (isSqft ? r.quantity : 0);
   });
 
+  /// Whether the currently selected product is a "box unit" product
+  /// (is_box_unit == "1" from /products/active). Box-unit products get an
+  /// auto-computed Box Qty / Piece Qty breakdown alongside Quantity (see
+  /// _recomputeBoxQtyIfNeeded); non-box products just use Quantity.
+  bool get _isBoxUnitProduct => _selectedProduct?.isBoxUnit ?? false;
+
+  /// The actual quantity that goes to the API and drives amount/incentive
+  /// calculations. Quantity is now always the single manual entry — for
+  /// both box-unit and normal products — and Box Qty/Piece Qty (when
+  /// shown) are derived FROM this, not the other way around.
+  double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
+
+  /// For box-unit products, mirrors whatever is typed in Quantity
+  /// straight into the read-only Box Qty controller — Box Qty is always
+  /// the same value as Quantity, not divided by pieces-per-box. Piece
+  /// Qty is a separate manual field and is left untouched here. No-op
+  /// for non-box products.
+  void _recomputeBoxQtyIfNeeded() {
+    if (!_isBoxUnitProduct) return;
+    _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
+  }
+
   double get _currentItemAmount {
-    final qty = double.tryParse(_itemQtyCtrl.text) ?? 0;
     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
-    return qty * rate;
+    return _computedQuantity * rate;
   }
 
   // ---------------- Validation ----------------
@@ -205,8 +249,10 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
       _showError('Please select a product');
       return false;
     }
-    if ((double.tryParse(_itemQtyCtrl.text) ?? 0) <= 0) {
-      _showError('Please enter a valid quantity');
+    if (_computedQuantity <= 0) {
+      _showError(_isBoxUnitProduct
+          ? 'Please enter a valid box quantity or piece quantity'
+          : 'Please enter a valid quantity');
       return false;
     }
     if ((double.tryParse(_itemRateCtrl.text) ?? 0) <= 0) {
@@ -250,12 +296,22 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
         // editable so the salesman can still quote a different price.
         _itemMrpCtrl.text = _formatPrice(product.mrp);
         _itemRateCtrl.text = _formatPrice(product.rate);
+        // A newly-selected product may switch between box-unit and
+        // normal, so any previously entered quantity/box/piece values no
+        // longer apply — start those fields fresh.
+        _itemQtyCtrl.clear();
+        _itemBoxQtyCtrl.clear();
+        _itemPieceQtyCtrl.clear();
+        _recomputeBoxQtyIfNeeded();
       } else {
         _itemCompanyCtrl.clear();
         _itemSizeCtrl.clear();
         _itemUnitCtrl.clear();
         _itemMrpCtrl.clear();
         _itemRateCtrl.clear();
+        _itemQtyCtrl.clear();
+        _itemBoxQtyCtrl.clear();
+        _itemPieceQtyCtrl.clear();
       }
     });
     // Rate is now pre-filled as soon as a product is picked, so the
@@ -266,12 +322,13 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
 
   /// Debounces then fires (or clears) the live incentive preview for
   /// whatever product/quantity/rate is currently entered. Called whenever
-  /// the selected product, quantity, or rate changes on the Add Items step.
+  /// the selected product, quantity, box/piece quantity, or rate changes
+  /// on the Add Items step.
   void _scheduleIncentiveFetch() {
     _incentiveDebounce?.cancel();
 
     final product = _selectedProduct;
-    final qty = double.tryParse(_itemQtyCtrl.text) ?? 0;
+    final qty = _computedQuantity;
     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
     final productId = product != null ? int.tryParse(product.id) : null;
 
@@ -290,6 +347,16 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     });
   }
 
+  /// Fired when the Quantity field changes. Quantity is now the single
+  /// source of truth for how much of a product is being quoted, even for
+  /// box-unit products, so every keystroke here also refreshes the
+  /// auto-computed Box Qty / Piece Qty breakdown before (re)scheduling the
+  /// incentive lookup.
+  void _onQuantityChanged() {
+    setState(_recomputeBoxQtyIfNeeded);
+    _scheduleIncentiveFetch();
+  }
+
   void _resetItemFields() {
     _incentiveDebounce?.cancel();
     _selectedProduct = null;
@@ -298,6 +365,8 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _itemUnitCtrl.clear();
     _itemMrpCtrl.clear();
     _itemQtyCtrl.clear();
+    _itemBoxQtyCtrl.clear();
+    _itemPieceQtyCtrl.clear();
     _itemRateCtrl.clear();
     context.read<SalesmanEstimateBloc>().add(const ProductIncentiveCleared());
   }
@@ -323,7 +392,9 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
         company: _itemCompanyCtrl.text.trim(),
         size: _itemSizeCtrl.text.trim(),
         unit: _itemUnitCtrl.text.trim(),
-        quantity: double.tryParse(_itemQtyCtrl.text) ?? 0,
+        quantity: _computedQuantity,
+        boxQuantity: _isBoxUnitProduct ? (double.tryParse(_itemBoxQtyCtrl.text) ?? 0) : 0,
+        pieceQuantity: _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : 0,
         rate: double.tryParse(_itemRateCtrl.text) ?? 0,
         mrp: double.tryParse(_itemMrpCtrl.text) ?? 0,
         incentiveAmount: matchesCurrentProduct ? liveIncentive.totalIncentive : 0,
@@ -366,6 +437,12 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
       _itemQtyCtrl.text = item.quantity == item.quantity.roundToDouble()
           ? item.quantity.toStringAsFixed(0)
           : item.quantity.toString();
+      _itemBoxQtyCtrl.text = item.boxQuantity == item.boxQuantity.roundToDouble()
+          ? item.boxQuantity.toStringAsFixed(0)
+          : item.boxQuantity.toString();
+      _itemPieceQtyCtrl.text = item.pieceQuantity == item.pieceQuantity.roundToDouble()
+          ? item.pieceQuantity.toStringAsFixed(0)
+          : item.pieceQuantity.toString();
       _itemRateCtrl.text = item.rate == item.rate.roundToDouble()
           ? item.rate.toStringAsFixed(0)
           : item.rate.toString();
@@ -425,18 +502,72 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
       _contractorPhoneCtrl.text.trim().isEmpty ? null : _contractorPhoneCtrl.text.trim(),
       contractorEmail:
       _contractorEmailCtrl.text.trim().isEmpty ? null : _contractorEmailCtrl.text.trim(),
+      contractorAddress:
+      _contractorAddressCtrl.text.trim().isEmpty ? null : _contractorAddressCtrl.text.trim(),
       siteVisitId: selectedVisit?.id,
       handlingCharge: _handlingCharge,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       termsConditions: _termsCtrl.text.trim().isEmpty ? null : _termsCtrl.text.trim(),
       items: _items
           .map((r) => QuotationItemRequest(
-        productId: int.tryParse(r.productId) ?? 0,
+        productId: r.productId,
         quantity: r.quantity,
+        boxQuantity: r.boxQuantity,
+        pieceQuantity: r.pieceQuantity,
         rate: r.rate,
       ))
           .toList(),
     );
+  }
+
+  /// Same fields as _buildRequest, minus action/site_visit_id, shaped for
+  /// POST /quotations/preview instead of /quotations/create — this is
+  /// what makes the Preview step show server-calculated incentive,
+  /// subtotal, discount, and balance due instead of the local snapshot
+  /// taken while items were being added.
+  QuotationPreviewRequest _buildPreviewRequest() {
+    return QuotationPreviewRequest(
+      date: DateFormat('yyyy-MM-dd').format(_date),
+      customerName: _partyNameCtrl.text.trim(),
+      customerPhone: _phoneCtrl.text.trim(),
+      customerEmail: _customerEmailCtrl.text.trim().isEmpty ? null : _customerEmailCtrl.text.trim(),
+      customerAddress: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+      contractorName: _contractorNameCtrl.text.trim().isEmpty ? null : _contractorNameCtrl.text.trim(),
+      contractorPhone:
+      _contractorPhoneCtrl.text.trim().isEmpty ? null : _contractorPhoneCtrl.text.trim(),
+      contractorEmail:
+      _contractorEmailCtrl.text.trim().isEmpty ? null : _contractorEmailCtrl.text.trim(),
+      contractorAddress:
+      _contractorAddressCtrl.text.trim().isEmpty ? null : _contractorAddressCtrl.text.trim(),
+      handlingCharge: _handlingCharge,
+      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      termsConditions: _termsCtrl.text.trim().isEmpty ? null : _termsCtrl.text.trim(),
+      items: _items
+          .map((r) => QuotationItemRequest(
+        productId: r.productId,
+        quantity: r.quantity,
+        boxQuantity: r.boxQuantity,
+        pieceQuantity: r.pieceQuantity,
+        rate: r.rate,
+      ))
+          .toList(),
+    );
+  }
+
+  /// Fires (or re-fires) the server-side preview for whatever is
+  /// currently on the form. Called immediately on entering the Preview
+  /// step, and debounced whenever Handling Charge changes there.
+  void _requestPreview() {
+    context.read<SalesmanEstimateBloc>().add(QuotationPreviewRequested(_buildPreviewRequest()));
+  }
+
+  /// Debounces a fresh preview request after Handling Charge is edited on
+  /// the Preview step — mirrors _scheduleIncentiveFetch's debounce
+  /// pattern so a fast typist doesn't fire a request per keystroke.
+  void _onHandlingChargeChanged() {
+    setState(() {});
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(_previewDebounceDuration, _requestPreview);
   }
 
   void _saveDraft() {
@@ -530,6 +661,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                       contractorNameCtrl: _contractorNameCtrl,
                       contractorPhoneCtrl: _contractorPhoneCtrl,
                       contractorEmailCtrl: _contractorEmailCtrl,
+                      contractorAddressCtrl: _contractorAddressCtrl,
                       onSelectSiteVisit: _selectSiteVisit,
                       onNext: _goToAddItems,
                     ),
@@ -541,8 +673,11 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                       itemUnitCtrl: _itemUnitCtrl,
                       itemMrpCtrl: _itemMrpCtrl,
                       itemQtyCtrl: _itemQtyCtrl,
+                      itemBoxQtyCtrl: _itemBoxQtyCtrl,
+                      itemPieceQtyCtrl: _itemPieceQtyCtrl,
                       itemRateCtrl: _itemRateCtrl,
                       currentAmount: _currentItemAmount,
+                      onQuantityChanged: _onQuantityChanged,
                       onQtyRateChanged: _scheduleIncentiveFetch,
                       items: _items,
                       editingIndex: _editingItemIndex,
@@ -650,6 +785,7 @@ class _DetailsStep extends StatelessWidget {
     required this.contractorNameCtrl,
     required this.contractorPhoneCtrl,
     required this.contractorEmailCtrl,
+    required this.contractorAddressCtrl,
     required this.onSelectSiteVisit,
     required this.onNext,
   });
@@ -663,6 +799,7 @@ class _DetailsStep extends StatelessWidget {
   final TextEditingController contractorNameCtrl;
   final TextEditingController contractorPhoneCtrl;
   final TextEditingController contractorEmailCtrl;
+  final TextEditingController contractorAddressCtrl;
   final ValueChanged<SiteVisitDropdownItem> onSelectSiteVisit;
   final VoidCallback onNext;
 
@@ -761,6 +898,14 @@ class _DetailsStep extends StatelessWidget {
                   icon: Icons.alternate_email,
                   keyboardType: TextInputType.emailAddress,
                   controller: contractorEmailCtrl,
+                ),
+              ),
+              LabeledField(
+                label: 'Address (optional)',
+                field: CustomTextField(
+                  hint: 'Enter contractor address',
+                  icon: Icons.location_on_outlined,
+                  controller: contractorAddressCtrl,
                 ),
               ),
               SizedBox(height: Responsive.h(16)),
@@ -902,8 +1047,11 @@ class _AddItemsStep extends StatelessWidget {
     required this.itemUnitCtrl,
     required this.itemMrpCtrl,
     required this.itemQtyCtrl,
+    required this.itemBoxQtyCtrl,
+    required this.itemPieceQtyCtrl,
     required this.itemRateCtrl,
     required this.currentAmount,
+    required this.onQuantityChanged,
     required this.onQtyRateChanged,
     required this.items,
     required this.editingIndex,
@@ -922,11 +1070,29 @@ class _AddItemsStep extends StatelessWidget {
   final TextEditingController itemUnitCtrl;
   final TextEditingController itemMrpCtrl;
   final TextEditingController itemQtyCtrl;
+
+  /// Full box count for the current line item (POST /quotations/create
+  /// field "box_quantity"). Manual entry — kept independent of quantity
+  /// since not every product sells in whole boxes.
+  final TextEditingController itemBoxQtyCtrl;
+
+  /// Loose piece count for the current line item ("piece_quantity").
+  /// Manual entry, same reasoning as itemBoxQtyCtrl.
+  final TextEditingController itemPieceQtyCtrl;
+
   final TextEditingController itemRateCtrl;
   final double currentAmount;
 
-  /// Fired whenever quantity or rate changes, so the parent can debounce a
-  /// fresh live-incentive lookup.
+  /// Fired on every Quantity keystroke. Quantity is the single manual
+  /// entry now (even for box-unit products) — the parent uses this to
+  /// recompute the read-only Box Qty / Piece Qty breakdown and to
+  /// (re)schedule the live incentive lookup.
+  final VoidCallback onQuantityChanged;
+
+  /// Fired when Rate changes, so the parent can (re)schedule a fresh
+  /// live-incentive lookup. (Quantity changes go through
+  /// onQuantityChanged instead, since those also need the box/piece
+  /// recompute.)
   final VoidCallback onQtyRateChanged;
 
   final List<_AddedItem> items;
@@ -937,6 +1103,12 @@ class _AddItemsStep extends StatelessWidget {
   final void Function(int) onRemoveItem;
   final VoidCallback onCancel;
   final VoidCallback onSaveItems;
+
+  /// Whether the selected product is a box-unit product
+  /// (is_box_unit == "1"). Drives which quantity field(s) are shown:
+  ///  - true  -> show Box Qty + Piece Qty, hide Quantity
+  ///  - false / no product selected -> show Quantity only
+  bool get _isBoxUnit => selectedProduct?.isBoxUnit ?? false;
 
   @override
   Widget build(BuildContext context) {
@@ -984,40 +1156,106 @@ class _AddItemsStep extends StatelessWidget {
                           ),
                         );
                       }
+                      // Searchable product picker: typing filters the
+                      // list down to matching names/companies instead of
+                      // making the salesman scroll a long dropdown to
+                      // find one product.
                       return LabeledField(
                         label: 'Select Product',
-                        field: DropdownButtonFormField<ActiveProductModel>(
-                          value: selectedProduct,
-                          isExpanded: true,
-                          icon: const Icon(Icons.arrow_drop_down),
-                          decoration: InputDecoration(
-                            hintText: 'Choose a product',
-                            prefixIcon: const Icon(Icons.inventory_2_outlined),
-                            filled: true,
-                            fillColor: AppColors.surface,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: AppColors.border),
+                        field: KeyedSubtree(
+                          // Re-keying on the selected product forces the
+                          // Autocomplete field to rebuild with a fresh
+                          // initialValue whenever the selection changes
+                          // from elsewhere (e.g. editing an existing
+                          // item, or the fields being reset) — otherwise
+                          // its internal text controller would keep
+                          // showing whatever was last typed.
+                          key: ValueKey(selectedProduct?.id ?? 'none'),
+                          child: Autocomplete<ActiveProductModel>(
+                            displayStringForOption: (p) => '${p.name} — ${p.company}',
+                            initialValue: TextEditingValue(
+                              text: selectedProduct != null
+                                  ? '${selectedProduct!.name} — ${selectedProduct!.company}'
+                                  : '',
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: AppColors.border),
-                            ),
+                            optionsBuilder: (textEditingValue) {
+                              final query = textEditingValue.text.trim().toLowerCase();
+                              if (query.isEmpty) return state.products;
+                              return state.products.where((p) =>
+                              p.name.toLowerCase().contains(query) ||
+                                  p.company.toLowerCase().contains(query));
+                            },
+                            onSelected: (p) {
+                              onProductSelected(p);
+                              setLocalState(() {});
+                            },
+                            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                              return TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                decoration: InputDecoration(
+                                  hintText: 'Search product by name',
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: controller.text.isNotEmpty
+                                      ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 18),
+                                    onPressed: () {
+                                      controller.clear();
+                                      onProductSelected(null);
+                                      setLocalState(() {});
+                                    },
+                                  )
+                                      : null,
+                                  filled: true,
+                                  fillColor: AppColors.surface,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                ),
+                              );
+                            },
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 4,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight: Responsive.h(260),
+                                      //width: MediaQuery.of(context).size.width - Responsive.w(36),
+                                    ),
+                                    child: options.isEmpty
+                                        ? Padding(
+                                      padding: EdgeInsets.all(Responsive.w(14)),
+                                      child: Text('No matching products', style: AppTextStyles.caption()),
+                                    )
+                                        : ListView.separated(
+                                      padding: EdgeInsets.zero,
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      separatorBuilder: (_, __) => const Divider(height: 1),
+                                      itemBuilder: (context, i) {
+                                        final p = options.elementAt(i);
+                                        return ListTile(
+                                          dense: true,
+                                          title: Text(p.name, overflow: TextOverflow.ellipsis),
+                                          subtitle: Text(p.company, overflow: TextOverflow.ellipsis),
+                                          onTap: () => onSelected(p),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          items: state.products
-                              .map((p) => DropdownMenuItem(
-                            value: p,
-                            child: Text(
-                              '${p.name} — ${p.company}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ))
-                              .toList(),
-                          onChanged: (p) {
-                            onProductSelected(p);
-                            setLocalState(() {});
-                          },
                         ),
                       );
                     },
@@ -1029,7 +1267,8 @@ class _AddItemsStep extends StatelessWidget {
                   // Company / Size / Unit / MRP all come straight from the
                   // selected product and are display-only: wrapped in
                   // IgnorePointer so the salesman can't tap into and edit
-                  // them. Only Rate (below) stays editable.
+                  // them. Only Rate / Quantity / Box Qty / Piece Qty stay
+                  // editable.
                   LabeledField(
                     label: 'Company (auto)',
                     field: IgnorePointer(
@@ -1080,6 +1319,9 @@ class _AddItemsStep extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // Quantity is always the manual entry — for every
+                  // product, box-unit or not.
                   LabeledField(
                     label: 'Quantity',
                     field: CustomTextField(
@@ -1089,10 +1331,51 @@ class _AddItemsStep extends StatelessWidget {
                       controller: itemQtyCtrl,
                       onChanged: (_) {
                         setLocalState(() {});
-                        onQtyRateChanged();
+                        onQuantityChanged();
                       },
                     ),
                   ),
+
+                  // Box-unit products additionally show Box Qty / Piece
+                  // Qty. Box Qty is auto-computed from Quantity + the
+                  // product's pieces-per-box (see
+                  // _recomputeBoxQtyIfNeeded in the parent) and stays
+                  // read-only — wrapped in IgnorePointer like the other
+                  // auto-filled fields. Piece Qty stays a manual entry the
+                  // salesman fills in themselves (e.g. loose pieces on
+                  // top of full boxes) and is NOT derived from Quantity.
+                  // Both are hidden entirely for non-box-unit products.
+                  if (_isBoxUnit)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LabeledField(
+                            label: 'Box Qty (auto)',
+                            field: IgnorePointer(
+                              child: CustomTextField(
+                                hint: '0',
+                                icon: Icons.inventory_2_outlined,
+                                keyboardType: TextInputType.number,
+                                controller: itemBoxQtyCtrl,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: Responsive.w(10)),
+                        Expanded(
+                          child: LabeledField(
+                            label: 'Piece Qty',
+                            field: CustomTextField(
+                              hint: '0',
+                              icon: Icons.view_module_outlined,
+                              keyboardType: TextInputType.number,
+                              controller: itemPieceQtyCtrl,
+                              onChanged: (_) => setLocalState(() {}),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   LabeledField(
                     label: 'Rate',
                     field: CustomTextField(
@@ -1411,6 +1694,8 @@ class _AddedItemTile extends StatelessWidget {
                 SizedBox(height: Responsive.h(2)),
                 Text(
                   'Qty: ${item.quantity.toStringAsFixed(0)} ${item.unit}'
+                      '${item.boxQuantity > 0 ? '   Box: ${item.boxQuantity.toStringAsFixed(0)}' : ''}'
+                      '${item.pieceQuantity > 0 ? '   Pcs: ${item.pieceQuantity.toStringAsFixed(0)}' : ''}'
                       '${item.mrp > 0 ? '   MRP: ${item.mrp.toStringAsFixed(0)}' : ''}'
                       '   Rate: ${item.rate.toStringAsFixed(0)}',
                   style: AppTextStyles.caption(),
@@ -1611,6 +1896,8 @@ class _PreviewStep extends StatelessWidget {
                       DataColumn(label: Text('Company')),
                       DataColumn(label: Text('Size')),
                       DataColumn(label: Text('Qty'), numeric: true),
+                      DataColumn(label: Text('Box'), numeric: true),
+                      DataColumn(label: Text('Pcs'), numeric: true),
                       DataColumn(label: Text('Unit')),
                       DataColumn(label: Text('MRP'), numeric: true),
                       DataColumn(label: Text('Rate'), numeric: true),
@@ -1626,6 +1913,8 @@ class _PreviewStep extends StatelessWidget {
                         DataCell(Text(item.company.isEmpty ? '-' : item.company)),
                         DataCell(Text(item.size.isEmpty ? '-' : item.size)),
                         DataCell(Text(number.format(item.quantity))),
+                        DataCell(Text(item.boxQuantity > 0 ? number.format(item.boxQuantity) : '-')),
+                        DataCell(Text(item.pieceQuantity > 0 ? number.format(item.pieceQuantity) : '-')),
                         DataCell(Text(item.unit)),
                         DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
                         DataCell(Text(number.format(item.rate))),
