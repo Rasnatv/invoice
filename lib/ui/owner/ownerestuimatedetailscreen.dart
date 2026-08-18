@@ -306,11 +306,11 @@ class _OwnerEstimateDetailView extends StatelessWidget {
     );
   }
 
+
+
   Widget _buildSummary(BuildContext context, EstimateDetailModel detail, NumberFormat number) {
-    // Discount / payment / balance are only finalized once the estimate
-    // has been approved — matches EstimateDetailModel.isPendingApproval.
-    final canManageDiscount =
-        !detail.isPendingApproval && detail.status.toLowerCase() != 'rejected';
+    final canManageDiscount = detail.isPendingApproval;
+    final canManagePayment = detail.isPendingApproval;
 
     return Container(
       padding: EdgeInsets.all(Responsive.w(14)),
@@ -377,7 +377,30 @@ class _OwnerEstimateDetailView extends StatelessWidget {
             ),
           ],
           SizedBox(height: Responsive.h(10)),
-          _summaryRow('Total Paid', currencyFmt.f(detail.totalPaid), valueColor: AppColors.success),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Total Paid', style: AppTextStyles.body()),
+              Text(currencyFmt.f(detail.totalPaid),
+                  style: AppTextStyles.bodyBold(color: AppColors.success)),
+            ],
+          ),
+          if (canManagePayment && detail.balanceAmount > 0) ...[
+            SizedBox(height: Responsive.h(6)),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _showAddPaymentDialog(context, detail),
+                icon: const Icon(Icons.payments_outlined, size: 16),
+                label: const Text('Add Payment'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+          ],
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -394,7 +417,6 @@ class _OwnerEstimateDetailView extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildPayments(EstimateDetailModel detail) {
     return _DetailSection(
       title: 'Payments',
@@ -1013,4 +1035,147 @@ class _CurrencyFmt {
   const _CurrencyFmt();
   String f(double v) => NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2)
       .format(v);
+}
+/// Records a payment against this bill (pending or approved). Reuses the
+/// same POST /estimates/approve endpoint as discount/approve — only
+/// estimateId + payment fields are set, so every other field (handling
+/// charge, discount, approval notes) is left untouched server-side,
+/// PROVIDED your backend doesn't treat any call to this endpoint as an
+/// implicit approval. Verify that before relying on this for pending bills.
+Future<void> _showAddPaymentDialog(BuildContext context, EstimateDetailModel detail) async {
+  const currencyFmt = _CurrencyFmt(); //
+  final bloc = context.read<OwnerEstimateDetailBloc>();
+  final formKey = GlobalKey<FormState>();
+
+  final amountCtrl = TextEditingController();
+  String paymentMethod = 'cash'; // cash | online | cheque | bank_transfer
+  final refCtrl = TextEditingController();
+  DateTime? paymentDate;
+  final notesCtrl = TextEditingController();
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setLocal) {
+          return AlertDialog(
+            title: const Text('Add Payment'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Balance Due: ${currencyFmt.f(detail.balanceAmount)}',
+                      style: AppTextStyles.bodyBold(color: Colors.red),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: amountCtrl,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'Amount Received',
+                        prefixText: '₹ ',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        final parsed = double.tryParse(v.trim());
+                        if (parsed == null || parsed <= 0) return 'Enter a valid amount';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: paymentMethod,
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Method',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                        DropdownMenuItem(value: 'online', child: Text('Online')),
+                        DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+                        DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                      ],
+                      onChanged: (v) => setLocal(() => paymentMethod = v ?? 'cash'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: refCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Reference (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) setLocal(() => paymentDate = picked);
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Date (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Text(paymentDate == null
+                            ? 'Select date'
+                            : DateFormat('yyyy-MM-dd').format(paymentDate!)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (!formKey.currentState!.validate()) return;
+                  // Only estimateId + payment fields are set — handling
+                  // charge, discount, and approval notes stay untouched.
+                  final request = OwnerApproveEstimateRequest(
+                    estimateId: detail.id,
+                    paymentAmount: double.parse(amountCtrl.text.trim()),
+                    paymentMethod: paymentMethod,
+                    paymentReference: refCtrl.text.trim().isEmpty ? null : refCtrl.text.trim(),
+                    paymentDate: paymentDate == null
+                        ? null
+                        : DateFormat('yyyy-MM-dd').format(paymentDate!),
+                    paymentNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                  );
+                  Navigator.of(dialogContext).pop();
+                  bloc.add(OwnerEstimateApproveRequested(request));
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
