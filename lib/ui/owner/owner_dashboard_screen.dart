@@ -244,10 +244,11 @@ class _OwnerDashboardView extends StatelessWidget {
                               for (int i = 0; i < state.recentEstimates.length; i++) ...[
                                 _RecentEstimateCard(
                                   estimate: state.recentEstimates[i],
-                                  onTap: () => _open(
-                                    context,
-                                    OwnerEstimateDetailsScreen(
-                                      initialStatus: state.recentEstimates[i].statusLabel,
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => OwnerEstimateDetailsScreen(
+                                        estimateId: state.recentEstimates[i].id,
+                                      ),
                                     ),
                                   ),
                                 ),

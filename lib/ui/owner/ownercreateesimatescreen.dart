@@ -499,10 +499,6 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     context.read<OwnerEstimateBloc>().add(OwnerQuotationSubmitRequested(request));
   }
 
-  /// Shows the "Approve Estimate" dialog: the owner must pick which
-  /// salesman this estimate is credited to (pre-filled if one was already
-  /// chosen on the Preview step) before the estimate is created with
-  /// action = 'approve'.
   Future<void> _showApproveDialog() async {
     final bloc = context.read<OwnerEstimateBloc>();
     SalesmanActiveModel? dialogSelection = bloc.state.selectedSalesman;
@@ -521,7 +517,10 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Assign this estimate to a salesman and approve it.'),
+                      const Text(
+                        'You can approve this estimate directly, or optionally '
+                            'assign it to a salesman first.',
+                      ),
                       SizedBox(height: Responsive.h(16)),
                       if (state.salesmenStatus == LoadStatus.loading)
                         const Padding(
@@ -544,20 +543,24 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                           ],
                         )
                       else
-                        DropdownButtonFormField<SalesmanActiveModel>(
+                        DropdownButtonFormField<SalesmanActiveModel?>(
                           value: dialogSelection,
                           isExpanded: true,
                           decoration: const InputDecoration(
-                            labelText: 'Salesman',
+                            labelText: 'Salesman (optional)',
                             prefixIcon: Icon(Icons.person_outline),
                             border: OutlineInputBorder(),
                           ),
-                          items: state.salesmen
-                              .map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(s.displayLabel, overflow: TextOverflow.ellipsis),
-                          ))
-                              .toList(),
+                          items: [
+                            const DropdownMenuItem<SalesmanActiveModel?>(
+                              value: null,
+                              child: Text('No salesman — approve directly'),
+                            ),
+                            ...state.salesmen.map((s) => DropdownMenuItem<SalesmanActiveModel?>(
+                              value: s,
+                              child: Text(s.displayLabel, overflow: TextOverflow.ellipsis),
+                            )),
+                          ],
                           onChanged: (s) => setDialogState(() => dialogSelection = s),
                         ),
                     ],
@@ -568,16 +571,10 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                       child: const Text('Cancel'),
                     ),
                     ElevatedButton(
-                      onPressed: () {
-                        if (dialogSelection == null) {
-                          ScaffoldMessenger.of(dialogContext).showSnackBar(
-                            const SnackBar(content: Text('Please select a salesman')),
-                          );
-                          return;
-                        }
-                        Navigator.of(dialogContext).pop(true);
-                      },
-                      child: const Text('Approve'),
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      child: Text(
+                        dialogSelection != null ? 'Approve & Assign' : 'Approve',
+                      ),
                     ),
                   ],
                 );
@@ -588,16 +585,17 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
       },
     );
 
-    if (confirmed == true && dialogSelection != null) {
-      bloc.add(SalesmanSelected(dialogSelection!));
+    if (confirmed == true) {
+      if (dialogSelection != null) {
+        bloc.add(SalesmanSelected(dialogSelection!));
+      }
       final request = _buildRequest(
         action: 'approve',
-        salesmanId: int.tryParse(dialogSelection!.id),
+        salesmanId: dialogSelection != null ? int.tryParse(dialogSelection!.id) : null,
       );
       bloc.add(OwnerQuotationSubmitRequested(request));
     }
   }
-
   // ---------------- Discount / Payment dialogs (Preview step) ----------------
 
   Future<void> _showAddDiscountDialog() async {

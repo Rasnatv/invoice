@@ -391,4 +391,72 @@ class ApiClient {
     ApiConstants.reject,
     options: await _authOptions(),
   );
+
+  //estimatesection
+  // =================== ESTIMATES (owner actions) ===================
+
+  /// POST /estimates/approve
+  Future<Response> approveEstimate(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.estimatesApprove,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /quotations/reject — body: { id, rejection_notes }
+  /// Replaces the old `rejectQuotation()` which incorrectly used GET.
+  Future<Response> rejectEstimate(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.reject,
+    data: data,
+    options: await _authOptions(),
+  );
+
+
+
+  /// despatch section
+// Add these methods to your existing ApiClient class
+
+// =================== DESPATCHES ===================
+  Future<Response> myDispatches({int page = 1, int perPage = 10}) async => dio.get(
+    '${ApiConstants.despatchesMy}?page=$page&per_page=$perPage',
+    options: await _authOptions(),
+  );
+
+  Future<Response> showDispatch(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.despatchesShow,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  Future<Response> markInTransit(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.despatchesMarkInTransit,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  Future<Response> markDelivered(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.despatchesMarkDelivered,
+    data: data,
+    options: await _authOptions(),
+  );
+  Future<Response> despatchSuggest(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.despatchesSuggest,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// GET /drivers/active — id/name list, used to populate the "Assign
+  /// Driver" dropdown when creating a despatch sheet.
+  Future<Response> activeDrivers() async => dio.get(
+    ApiConstants.driversActive,
+    options: await _authOptions(),
+  );
+
+  /// POST /despatches/create
+  Future<Response> createDespatch(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.despatchesCreate,
+    data: data,
+    options: await _authOptions(),
+  );
+
+
 }
