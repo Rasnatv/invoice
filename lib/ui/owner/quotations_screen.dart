@@ -7,9 +7,9 @@ import 'package:tileshop/ui/owner/quotation_detail_screen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../bloc/ownerbloc/owner_viewquotation_bloic.dart';
-import '../../bloc/ownerbloc/owner_viewquotation_event.dart';
-import '../../bloc/ownerbloc/owner_viewquotations_state.dart';
+import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_bloic.dart';
+import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_event.dart';
+import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotations_state.dart';
 
 class OwnerQuotationsScreen extends StatelessWidget {
   const OwnerQuotationsScreen({super.key});

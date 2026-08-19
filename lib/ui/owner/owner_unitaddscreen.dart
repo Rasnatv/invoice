@@ -9,9 +9,9 @@ import '../../../core/validator/validationfile.dart';
 import '../../Apiprovider/unitprovider.dart';
 import '../../models/owner_models/uintmodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../bloc/ownerbloc/unit_bloc.dart';
-import '../../bloc/ownerbloc/unit_event.dart';
-import '../../bloc/ownerbloc/unit_state.dart';
+import '../../bloc/ownerbloc/unit/unit_bloc.dart';
+import '../../bloc/ownerbloc/unit/unit_event.dart';
+import '../../bloc/ownerbloc/unit/unit_state.dart';
 
 class UnitSetupScreen extends StatelessWidget {
   const UnitSetupScreen({super.key});

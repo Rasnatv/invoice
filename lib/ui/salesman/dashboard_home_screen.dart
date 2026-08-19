@@ -8,17 +8,16 @@ import '../../../core/utils/responsive.dart';
 import '../../bloc/salemanbloc/salesman_dashboardbloc.dart';
 import '../../bloc/salemanbloc/salesman_dashboardstate.dart';
 import '../../bloc/salemanbloc/salesmandashboard_event.dart';
+import '../owner/ownerincentivesummarypage.dart';
 import 'MONTHLYSALE.dart';
 import 'approvedbills.dart';
 import 'create_estimate_screen.dart';
 import 'dashboardhomeestimatetile.dart';
 import 'estimatedetailscreen_forsalesman.dart';
 import 'my_estimates_screen.dart';
-import 'estimates/widgets/monthlysalechart.dart';
-import 'incentive/salesmanincentivescreen.dart';
-import 'quatation/quatationscreen.dart';
-import 'estimates/presentation/estimate_details_screen.dart';
-import 'home/widgets/recent_estimate_tile.dart';
+import 'quatationscreen.dart';
+
+import 'recent_estimate_tile.dart';
 
 class DashboardHomeScreen extends StatelessWidget {
   const DashboardHomeScreen({super.key});
@@ -48,9 +47,12 @@ class _DashboardHomeView extends StatelessWidget {
   }
 
   void _openIncentives(BuildContext context, DashboardHomeState state) {
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SalesmanIncentiveScreen(salesmanName: state.salesmanName),
+        builder: (_) => const OwnerSalesmanIncentiveScreen(
+          isOwner: false,
+        ),
       ),
     );
   }

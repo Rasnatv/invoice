@@ -11,9 +11,9 @@ import '../../Apiprovider/salesmanprovider.dart';
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/salesmanmodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../bloc/ownerbloc/salesman_bloc.dart';
-import '../../bloc/ownerbloc/salesman_event.dart';
-import '../../bloc/ownerbloc/salesman_state.dart';
+import '../../bloc/ownerbloc/ownersalesman/salesman_bloc.dart';
+import '../../bloc/ownerbloc/ownersalesman/salesman_event.dart';
+import '../../bloc/ownerbloc/ownersalesman/salesman_state.dart';
 import 'owneraddsalesmanscreen.dart';
 
 

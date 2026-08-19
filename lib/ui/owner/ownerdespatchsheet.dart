@@ -796,9 +796,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 
-import '../../bloc/ownerbloc/ownerdespatchsheetcreate_bloc.dart';
-import '../../bloc/ownerbloc/ownerdespatchsheetcreate_event.dart';
-import '../../bloc/ownerbloc/ownerdespatchsheetcreate_state.dart';
+import '../../bloc/ownerbloc/ownerdespatchcreate/ownerdespatchsheetcreate_bloc.dart';
+import '../../bloc/ownerbloc/ownerdespatchcreate/ownerdespatchsheetcreate_event.dart';
+import '../../bloc/ownerbloc/ownerdespatchcreate/ownerdespatchsheetcreate_state.dart';
 
 import '../../models/owner_models/ownerdespatchsheetpreparemodel.dart';
 import '../../widgets/primary_button.dart';

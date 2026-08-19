@@ -8,9 +8,9 @@ import '../../Apiprovider/designation_provider.dart';
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/designationmodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../bloc/ownerbloc/designationbloc.dart';
-import '../../bloc/ownerbloc/designationevent.dart';
-import '../../bloc/ownerbloc/designationstate.dart';
+import '../../bloc/ownerbloc/designation/designationbloc.dart';
+import '../../bloc/ownerbloc/designation/designationevent.dart';
+import '../../bloc/ownerbloc/designation/designationstate.dart';
 import 'addDesignationpage.dart';
 
 class DesignationListPage extends StatelessWidget {

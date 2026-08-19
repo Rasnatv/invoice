@@ -12,9 +12,9 @@ import '../../models/owner_models/fieldstaff_deletemodel.dart';
 import '../../models/owner_models/fieldstaff_getmodel.dart';
 import '../../models/owner_models/fieldstaff_updatemodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../bloc/ownerbloc/fieldstaff_bloc.dart';
-import '../../bloc/ownerbloc/fieldstaff_event.dart';
-import '../../bloc/ownerbloc/fieldstaffstate.dart';
+import '../../bloc/ownerbloc/fieldstaff/fieldstaff_bloc.dart';
+import '../../bloc/ownerbloc/fieldstaff/fieldstaff_event.dart';
+import '../../bloc/ownerbloc/fieldstaff/fieldstaffstate.dart';
 
 
 class OwnerAddFieldStaffScreen extends StatelessWidget {

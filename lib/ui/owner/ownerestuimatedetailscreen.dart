@@ -1,5 +1,4 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,9 +6,9 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../bloc/ownerbloc/ownerviewestimatedetail_bloc.dart';
-import '../../bloc/ownerbloc/ownerviewestimatedetail_event.dart';
-import '../../bloc/ownerbloc/ownerviewestimatedetail_state.dart';
+import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_bloc.dart';
+import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
+import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
 import '../../models/owner_models/owner_estimateactionmodel.dart';
 import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
@@ -309,7 +308,6 @@ class _OwnerEstimateDetailView extends StatelessWidget {
 
 
   Widget _buildSummary(BuildContext context, EstimateDetailModel detail, NumberFormat number) {
-    final canManageDiscount = detail.isPendingApproval;
     final canManagePayment = detail.isPendingApproval;
 
     return Container(
@@ -339,20 +337,9 @@ class _OwnerEstimateDetailView extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Discount (${detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel})',
-                      style: AppTextStyles.body(),
-                    ),
-                    if (canManageDiscount) ...[
-                      SizedBox(width: Responsive.w(6)),
-                      InkWell(
-                        onTap: () => _showAdditionalDiscountDialog(context, detail),
-                        child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
-                      ),
-                    ],
-                  ],
+                Text(
+                  'Discount (${detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel})',
+                  style: AppTextStyles.body(),
                 ),
                 Text('- ${currencyFmt.f(detail.discountAmount)}',
                     style: AppTextStyles.bodyBold(color: Colors.red)),
@@ -360,21 +347,6 @@ class _OwnerEstimateDetailView extends StatelessWidget {
             ),
             SizedBox(height: Responsive.h(6)),
             _summaryRow('Amount After Discount', currencyFmt.f(detail.amountAfterDiscount)),
-          ] else if (canManageDiscount) ...[
-            SizedBox(height: Responsive.h(10)),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _showAdditionalDiscountDialog(context, detail),
-                icon: const Icon(Icons.local_offer_outlined, size: 16),
-                label: const Text('Give Additional Discount'),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ),
           ],
           SizedBox(height: Responsive.h(10)),
           Row(
@@ -674,7 +646,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                           items: const [
                             DropdownMenuItem(value: 'none', child: Text('No discount')),
                             DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
-                            DropdownMenuItem(value: 'flat', child: Text('Flat amount')),
+                            DropdownMenuItem(value: 'fixed', child: Text('Fixed')),
                           ],
                           onChanged: (v) => setLocal(() => discountType = v ?? 'none'),
                         ),
@@ -825,121 +797,6 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                     bloc.add(OwnerEstimateApproveRequested(request));
                   },
                   child: const Text('Approve'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  /// Additional discount dialog — used both for adding a first discount to
-  /// an approved estimate and for editing an existing one (pre-fills from
-  /// `detail.discountType` / `discountValue` / `discountNotes` when present).
-  ///
-  /// Reuses the SAME POST /estimates/approve endpoint as the approve flow —
-  /// that API already accepts discount_type/discount_value/discount_notes
-  /// and only requires estimate_id, so no separate discount endpoint is
-  /// needed. Every other field on the request is left null, so calling it
-  /// here only updates the discount, leaving handling charge / payment /
-  /// notes untouched.
-  Future<void> _showAdditionalDiscountDialog(
-      BuildContext context, EstimateDetailModel detail) async {
-    final bloc = context.read<OwnerEstimateDetailBloc>();
-    final formKey = GlobalKey<FormState>();
-    String discountType =
-    (detail.discountType == 'percentage' || detail.discountType == 'flat')
-        ? detail.discountType
-        : 'percentage';
-    final valueCtrl = TextEditingController(
-      text: detail.discountValue > 0 ? detail.discountValue.toStringAsFixed(0) : '',
-    );
-    final notesCtrl = TextEditingController(text: detail.discountNotes);
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setLocal) {
-            return AlertDialog(
-              title: const Text('Additional Discount'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: discountType,
-                      decoration: const InputDecoration(
-                        labelText: 'Discount Type',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
-                        DropdownMenuItem(value: 'flat', child: Text('Flat amount')),
-                      ],
-                      onChanged: (v) => setLocal(() => discountType = v ?? 'percentage'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: valueCtrl,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                      decoration: InputDecoration(
-                        labelText: discountType == 'percentage' ? 'Discount %' : 'Discount Amount',
-                        prefixText: discountType == 'flat' ? '₹ ' : null,
-                        suffixText: discountType == 'percentage' ? '%' : null,
-                        border: const OutlineInputBorder(),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        final parsed = double.tryParse(v.trim());
-                        if (parsed == null || parsed < 0) return 'Enter a valid amount';
-                        if (discountType == 'percentage' && parsed > 100) {
-                          return 'Enter a value between 0 and 100';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: notesCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (!formKey.currentState!.validate()) return;
-                    // Only estimateId + discount fields are set — every
-                    // other field stays null, so /estimates/approve only
-                    // updates the discount and leaves handling charge,
-                    // payment, and approval notes untouched.
-                    final request = OwnerApproveEstimateRequest(
-                      estimateId: detail.id,
-                      discountType: discountType,
-                      discountValue: double.parse(valueCtrl.text.trim()),
-                      discountNotes:
-                      notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                    );
-                    Navigator.of(dialogContext).pop();
-                    bloc.add(OwnerEstimateApproveRequested(request));
-                  },
-                  child: const Text('Save'),
                 ),
               ],
             );

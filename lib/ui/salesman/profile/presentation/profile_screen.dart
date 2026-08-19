@@ -60,11 +60,12 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
               );
             },),
-            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'My Bills', onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const MyBills()),
-              );
-            },),
+            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'My Bills', onTap: () {}
+              // Navigator.of(context).push(
+              //   MaterialPageRoute(builder: (_) => const MyBills()),
+              // );
+            //},
+  ),
             _ProfileTile(
               icon: Icons.logout_rounded,
               label: 'Logout',

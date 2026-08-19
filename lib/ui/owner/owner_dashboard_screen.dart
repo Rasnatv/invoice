@@ -2,18 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-
-import 'package:tileshop/bloc/salemanbloc/salesmandashboard_event.dart';
-import 'package:tileshop/bloc/salemanbloc/salesman_dashboardstate.dart';
-import 'package:tileshop/models/salesmanmodels/salesman_dashboardmodel.dart';
-import 'package:tileshop/bloc/salemanbloc/salesman_dashboardbloc.dart';
-
-import '../salesman/estimates/cubit/estimates_cubit.dart';
-import 'cubit/owner_cubit.dart';
+import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_event.dart';
+import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_state.dart';
+import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_bloc.dart';
+import 'package:tileshop/models/salesmanmodels/salesman_dashboardmodel.dart'; // DashboardHomeRecentEstimate etc.
 import '../../widgets/monthlysale.dart';
 import '../../widgets/owner_widgets.dart'; // StatusBadge
 import 'addfieldstaffscreen.dart';
@@ -22,6 +17,7 @@ import 'owner_driverpage.dart';
 import 'owner_estimates_screen.dart';
 import 'ownercreateesimatescreen.dart';
 import 'ownerestuimatedetailscreen.dart';
+import 'ownerincentivesummarypage.dart';
 import 'ownersalesmanreport.dart';
 import 'ownersalesmanscreen.dart';
 import 'quotations_screen.dart';
@@ -32,16 +28,8 @@ class OwnerDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        // Drives the header stats / sales overview / recent estimates card.
-        BlocProvider(
-          create: (_) => DashboardHomeBloc()..add(const DashboardHomeRequested()),
-        ),
-        // Kept alive here because OwnerEstimatesScreen / OwnerQuotationsScreen
-        // (pushed from Quick Actions below) still read it via context.read<OwnerCubit>().
-        BlocProvider(create: (_) => OwnerCubit()),
-      ],
+    return BlocProvider(
+      create: (_) => OwnerDashboardBloc()..add(const OwnerDashboardRequested()),
       child: const _OwnerDashboardView(),
     );
   }
@@ -68,15 +56,13 @@ class _OwnerDashboardView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: BlocBuilder<DashboardHomeBloc, DashboardHomeState>(
+      body: BlocBuilder<OwnerDashboardBloc, OwnerDashboardState>(
         builder: (context, state) {
           return RefreshIndicator(
             onRefresh: () async {
-              context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
-              // Wait until the bloc leaves the refreshing state so the indicator
-              // doesn't spin forever.
-              await context.read<DashboardHomeBloc>().stream.firstWhere(
-                    (s) => s.status != DashboardHomeStatus.refreshing,
+              context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
+              await context.read<OwnerDashboardBloc>().stream.firstWhere(
+                    (s) => s.status != OwnerDashboardStatus.refreshing,
               );
             },
             child: CustomScrollView(
@@ -86,7 +72,7 @@ class _OwnerDashboardView extends StatelessWidget {
                   child: _OwnerHeader(
                     greeting: greeting,
                     dateLabel: today,
-                    userName: state.data.user.name,
+                    userName: state.userName,
                     totalEstimates: state.totalEstimates,
                     dispatched: state.dispatchBills,
                     quotations: state.quotations,
@@ -112,45 +98,32 @@ class _OwnerDashboardView extends StatelessWidget {
                                 icon: Icons.note_add_rounded,
                                 label: 'Create\nEstimate',
                                 color: AppColors.primary,
-                                onTap: () => _open(
-                                  context,
-                                  BlocProvider(
-                                    create: (_) => EstimatesCubit(),
-                                    child: const OwnerCreateEstimateScreen(),
-                                  ),
-                                ),
+                            onTap: () => _open(context, const OwnerCreateEstimateScreen()),
                               ),
                               _QuickActionData(
                                 icon: Icons.receipt_long_rounded,
                                 label: 'Estimates',
                                 color: const Color(0xFF0EA5E9),
-                                onTap: () => _open(
-                                  context,
-                                  BlocProvider.value(
-                                    value: context.read<OwnerCubit>(),
-                                    child: const OwnerEstimatesScreen(),
-                                  ),
-                                ),
+                                onTap: () => _open(context, const OwnerEstimatesScreen()),
                               ),
                               _QuickActionData(
                                 icon: Icons.request_quote_outlined,
                                 label: 'Quotations',
                                 color: const Color(0xFFF59E0B),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => BlocProvider.value(
-                                      value: context.read<OwnerCubit>(),
-                                      child: const OwnerQuotationsScreen(),
-                                    ),
-                                  ),
-                                ),
+                                onTap: () => _open(context, const OwnerQuotationsScreen()),
                               ),
                               _QuickActionData(
                                 icon: Icons.bar_chart_rounded,
                                 label: 'Reports',
                                 color: const Color(0xFF16A34A),
-                                onTap: () => _open(context, const ReportsScreen()),
+                                onTap: () {}
+                               // => _open(context, const ReportsScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.monetization_on,
+                                label: 'Incentive',
+                                color: const Color(0xFFA02CE1),
+                                onTap: () => _open(context, const OwnerSalesmanIncentiveScreen(isOwner: true)),
                               ),
                               _QuickActionData(
                                 icon: Icons.inventory_2_outlined,
@@ -200,7 +173,7 @@ class _OwnerDashboardView extends StatelessWidget {
                       const _SectionTitle(title: 'Sales Overview'),
                       SizedBox(height: Responsive.h(14)),
                       _CardWrapper(
-                        child: state.status == DashboardHomeStatus.loading
+                        child: state.status == OwnerDashboardStatus.loading
                             ? const _InlineLoader()
                             : MonthlySalesSection(
                           monthlySales: state.monthlySales
@@ -218,23 +191,17 @@ class _OwnerDashboardView extends StatelessWidget {
                       _SectionTitle(
                         title: 'Recent Estimates',
                         actionLabel: 'View All',
-                        onAction: () => _open(
-                          context,
-                          BlocProvider.value(
-                            value: context.read<OwnerCubit>(),
-                            child: const OwnerEstimatesScreen(),
-                          ),
-                        ),
+                        onAction: () => _open(context, const OwnerEstimatesScreen()),
                       ),
                       SizedBox(height: Responsive.h(14)),
-                      if (state.status == DashboardHomeStatus.loading)
+                      if (state.status == OwnerDashboardStatus.loading)
                         const _InlineLoader()
-                      else if (state.status == DashboardHomeStatus.failure)
+                      else if (state.status == OwnerDashboardStatus.failure)
                         _ErrorState(
                           message: state.errorMessage ?? 'Failed to load dashboard.',
                           onRetry: () => context
-                              .read<DashboardHomeBloc>()
-                              .add(const DashboardHomeRequested()),
+                              .read<OwnerDashboardBloc>()
+                              .add(const OwnerDashboardRequested()),
                         )
                       else if (state.recentEstimates.isEmpty)
                           const _EmptyState()
@@ -269,6 +236,7 @@ class _OwnerDashboardView extends StatelessWidget {
     );
   }
 }
+
 
 // ---------------- HEADER ----------------
 
@@ -716,7 +684,6 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-// ---------------- RECENT ESTIMATE CARD (bound to real API model) ----------------
 
 class _RecentEstimateCard extends StatelessWidget {
   const _RecentEstimateCard({

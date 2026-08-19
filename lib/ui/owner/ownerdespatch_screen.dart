@@ -5,9 +5,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/ownerdespatchprovider.dart';
-import '../../bloc/ownerbloc/ownerlist_despatchbloc.dart';
-import '../../bloc/ownerbloc/ownerlist_despatchevent.dart';
-import '../../bloc/ownerbloc/ownerlist_despatchstate.dart';
+import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchbloc.dart';
+import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchevent.dart';
+import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchstate.dart';
 import '../../widgets/despatchcard.dart';
 import 'owner_despatchdetailscreen.dart';
 
@@ -89,9 +89,12 @@ class _OwnerdespatchView extends StatelessWidget {
                       itemBuilder: (context, i) {
                         final dispatch = list[i];
                         return GestureDetector(
-                          onTap: () {
-
-                          },
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => OwnerDispatchDetailScreen(dispatchId: dispatch.id),
+                            ),
+                          ),
                           child: DispatchCard(dispatch: dispatch),
                         );
                       },

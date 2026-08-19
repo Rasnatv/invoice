@@ -37,11 +37,11 @@
 // }
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tileshop/bloc/sitevist/sitevisit_bloc.dart';
 import 'package:tileshop/ui/driver_dashboard/driver_dashboard.dart';
 import 'package:tileshop/ui/fieldstaff/fieldstaff_dashboard.dart';
+import '../bloc/fieldstaffbloc/sitevist/sitevisit_bloc.dart';
 import '../widgets/ownerDashboardshell.dart';
-import '../ui/salesman/presentation/dashboard_shell.dart';
+import '../ui/salesman/dashboard_shell.dart';
 
 enum UserRole { owner, salesman, driver, fieldStaff }
 

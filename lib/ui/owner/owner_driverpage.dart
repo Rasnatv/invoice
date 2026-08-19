@@ -10,9 +10,9 @@ import '../../Apiprovider/driverprovider.dart';
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/get_drivermodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../bloc/ownerbloc/driver_bloc.dart';
-import '../../bloc/ownerbloc/driver_event.dart';
-import '../../bloc/ownerbloc/driver_state.dart';
+import '../../bloc/ownerbloc/driver/driver_bloc.dart';
+import '../../bloc/ownerbloc/driver/driver_event.dart';
+import '../../bloc/ownerbloc/driver/driver_state.dart';
 
 
 /// Public entry point — provides the bloc and loads the drivers list.

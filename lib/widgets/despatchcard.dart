@@ -77,7 +77,7 @@ class DispatchCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('${dispatch.totalItems} item(s)', style: AppTextStyles.caption()),
+              Text('${dispatch.totalItems} items', style: AppTextStyles.caption()),
               Text(currency.format(dispatch.totalAmount), style: AppTextStyles.bodyBold(color: AppColors.primary)),
             ],
           ),

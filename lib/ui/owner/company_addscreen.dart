@@ -9,9 +9,9 @@ import '../../Apiprovider/companyprovider.dart';
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/addcompanymodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../bloc/ownerbloc/company_bloc.dart';
-import '../../bloc/ownerbloc/company_event.dart';
-import '../../bloc/ownerbloc/company_state.dart';
+import '../../bloc/ownerbloc/company/company_bloc.dart';
+import '../../bloc/ownerbloc/company/company_event.dart';
+import '../../bloc/ownerbloc/company/company_state.dart';
 
 /// Lists all companies and lets the owner add / edit / delete them.
 /// Wrapped in its own BlocProvider so it can be pushed from anywhere
