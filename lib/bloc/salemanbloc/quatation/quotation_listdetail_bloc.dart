@@ -1,7 +1,7 @@
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tileshop/bloc/salemanbloc/estimate/qtn_listdetail_event.dart';
-import 'package:tileshop/bloc/salemanbloc/estimate/qtn_listdetail_state.dart';
+import 'package:tileshop/bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
+import 'package:tileshop/bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../../Apiprovider/salesman_quotationprovider.dart';
 
 

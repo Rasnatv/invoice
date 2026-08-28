@@ -1,8 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tileshop/bloc/salemanbloc/salesman_dashboardstate.dart';
-import 'package:tileshop/bloc/salemanbloc/salesmandashboard_event.dart';
+import 'package:tileshop/bloc/salemanbloc/salemandashboard/salesman_dashboardstate.dart';
+import 'package:tileshop/bloc/salemanbloc/salemandashboard/salesmandashboard_event.dart';
 
-import '../../Apiprovider/salesman_dashboardprovider.dart';
+import '../../../Apiprovider/salesman_dashboardprovider.dart';
 
 class DashboardHomeBloc extends Bloc<DashboardHomeEvent, DashboardHomeState> {
   final DashboardHomeApiProvider _provider;

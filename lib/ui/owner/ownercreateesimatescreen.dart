@@ -14,6 +14,7 @@ import '../../models/owner_models/get_activedrivermodel.dart';
 import '../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
 import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
+import '../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 
@@ -112,16 +113,25 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   Timer? _incentiveDebounce;
   static const _incentiveDebounceDuration = Duration(milliseconds: 450);
 
+  /// Debounces re-fetching POST /quotations/preview when the owner edits
+  /// the handling charge on the Preview step, so we don't hit the API on
+  /// every keystroke.
+  Timer? _previewDebounce;
+  static const _previewDebounceDuration = Duration(milliseconds: 500);
+
   // --- Step 3: owner-only — Discount / Payment / Salesman assignment ---
 
   /// Extra discount the owner grants on top of the grand total, entered
   /// through the "Give Additional Discount" dialog. Null until added.
+  /// NOTE: /quotations/preview has no discount fields, so this is applied
+  /// locally on top of the server-calculated grand total, and is only
+  /// ever sent to the backend on submit (action = 'approve').
   String? _discountType; // 'percentage' | 'fixed'
   double? _discountValue;
   String? _discountNotes;
 
   /// Amount already received from the party, entered through the
-  /// "Add Payment" dialog. Null until recorded.
+  /// "Add Payment" dialog. Null until recorded. Same caveat as discount.
   double? _paymentAmount;
   String _paymentMethod = QuotationPaymentMethod.cash;
   String? _paymentReference;
@@ -131,6 +141,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   @override
   void dispose() {
     _incentiveDebounce?.cancel();
+    _previewDebounce?.cancel();
     _partyNameCtrl.dispose();
     _addressCtrl.dispose();
     _phoneCtrl.dispose();
@@ -153,29 +164,11 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     super.dispose();
   }
 
-  // ---------------- Derived totals ----------------
+  // ---------------- Derived (local, pre-submission) values ----------------
+  // Only used on the Add Items step now — the Preview step reads totals
+  // straight from the server (state.preview) instead of computing them.
 
-  double get _itemsTotal => _items.fold(0.0, (s, r) => s + r.amount);
   double get _handlingCharge => double.tryParse(_handlingChargeCtrl.text) ?? 0;
-  double get _grandTotal => _itemsTotal + _handlingCharge;
-  double get _totalQty => _items.fold(0.0, (s, r) => s + r.quantity);
-  int get _totalItems => _items.length;
-  double get _incentiveTotal => _items.fold(0.0, (s, r) => s + r.incentiveAmount);
-  double get _mrpTotal => _items.fold(0.0, (s, r) => s + (r.mrp * r.quantity));
-
-  double get _totalSqft => _items.fold(0.0, (s, r) {
-    final u = r.unit.toLowerCase().replaceAll('.', '').replaceAll(' ', '').replaceAll('²', '2');
-    final isSqft = u == 'sqft' ||
-        u == 'sqfeet' ||
-        u == 'squarefeet' ||
-        u == 'squareft' ||
-        u == 'sft' ||
-        u == 'ft2' ||
-        u.contains('sqft') ||
-        u.contains('squareft') ||
-        u.contains('squarefeet');
-    return s + (isSqft ? r.quantity : 0);
-  });
 
   bool get _isBoxUnitProduct => _selectedProduct?.isBoxUnit ?? false;
   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
@@ -188,24 +181,6 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   double get _currentItemAmount {
     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
     return _computedQuantity * rate;
-  }
-
-  /// Additional discount amount computed from _discountType/_discountValue
-  /// against the grand total — percentage or a flat rupee figure.
-  double get _discountAmount {
-    final value = _discountValue ?? 0;
-    if (value <= 0) return 0;
-    if (_discountType == QuotationDiscountType.percentage) {
-      return _grandTotal * value / 100;
-    }
-    return value;
-  }
-
-  /// What's left to collect after discount and any payment already
-  /// recorded. Clamped at 0.
-  double get _balanceAmount {
-    final remaining = _grandTotal - _discountAmount - (_paymentAmount ?? 0);
-    return remaining < 0 ? 0 : remaining;
   }
 
   // ---------------- Validation ----------------
@@ -440,6 +415,55 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
       return;
     }
     setState(() => _step = _Step.preview);
+    _fetchPreview();
+  }
+
+  // ---------------- Actions: server preview (POST /quotations/preview) ----------------
+
+  QuotationPreviewRequest _buildPreviewRequest() {
+    return QuotationPreviewRequest(
+      date: DateFormat('yyyy-MM-dd').format(_date),
+      customerName: _partyNameCtrl.text.trim(),
+      customerPhone: _phoneCtrl.text.trim(),
+      customerEmail: _customerEmailCtrl.text.trim().isEmpty ? null : _customerEmailCtrl.text.trim(),
+      customerAddress: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+      contractorName:
+      _contractorNameCtrl.text.trim().isEmpty ? null : _contractorNameCtrl.text.trim(),
+      contractorPhone:
+      _contractorPhoneCtrl.text.trim().isEmpty ? null : _contractorPhoneCtrl.text.trim(),
+      contractorEmail:
+      _contractorEmailCtrl.text.trim().isEmpty ? null : _contractorEmailCtrl.text.trim(),
+      contractorAddress:
+      _contractorAddressCtrl.text.trim().isEmpty ? null : _contractorAddressCtrl.text.trim(),
+      handlingCharge: _handlingCharge,
+      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      termsConditions: _termsCtrl.text.trim().isEmpty ? null : _termsCtrl.text.trim(),
+      items: _items
+          .map((r) => QuotationItemRequest(
+        productId: r.productId,
+        quantity: r.quantity,
+        boxQuantity: r.boxQuantity,
+        pieceQuantity: r.pieceQuantity,
+        rate: r.rate,
+      ))
+          .toList(),
+    );
+  }
+
+  /// Calls POST /quotations/preview immediately with the current form
+  /// state. Used when entering the Preview step.
+  void _fetchPreview() {
+    context.read<OwnerEstimateBloc>().add(OwnerQuotationPreviewRequested(_buildPreviewRequest()));
+  }
+
+  /// Debounced re-fetch — used when the owner edits handling charge on
+  /// the Preview step so we don't hit the API on every keystroke.
+  void _schedulePreviewFetch() {
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(_previewDebounceDuration, () {
+      if (!mounted) return;
+      _fetchPreview();
+    });
   }
 
   // ---------------- Actions: build & submit request ----------------
@@ -969,22 +993,15 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                       contractorName: _contractorNameCtrl.text,
                       contractorPhone: _contractorPhoneCtrl.text,
                       contractorEmail: _contractorEmailCtrl.text,
-                      items: _items,
-                      itemsTotal: _itemsTotal,
-                      mrpTotal: _mrpTotal,
                       handlingChargeCtrl: _handlingChargeCtrl,
                       notesCtrl: _notesCtrl,
-                      grandTotal: _grandTotal,
-                      totalQty: _totalQty,
-                      totalItems: _totalItems,
-                      totalSqft: _totalSqft,
-                      incentiveTotal: _incentiveTotal,
                       discountType: _discountType,
                       discountValue: _discountValue,
-                      discountAmount: _discountAmount,
                       paymentAmount: _paymentAmount,
-                      balanceAmount: _balanceAmount,
-                      onHandlingChargeChanged: () => setState(() {}),
+                      onHandlingChargeChanged: () {
+                        setState(() {});
+                        _schedulePreviewFetch();
+                      },
                       onAddDiscount: _showAddDiscountDialog,
                       onEditDiscount: _showAddDiscountDialog,
                       onClearDiscount: _clearDiscount,
@@ -993,6 +1010,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                       onClearPayment: _clearPayment,
                       onSaveDraft: _saveDraft,
                       onApprove: _showApproveDialog,
+                      onRetryPreview: _fetchPreview,
                     ),
                   },
                 ),
@@ -1955,7 +1973,19 @@ class _AddedItemTile extends StatelessWidget {
 }
 
 // =====================================================================
-// STEP 3 — PREVIEW  (owner-only: Assign Salesman / Discount / Payment)
+// STEP 3 — PREVIEW  (server-driven via POST /quotations/preview)
+// =====================================================================
+//
+// All totals/quantities/incentives shown here come straight from
+// state.preview (QuotationPreviewData), fetched by the parent via
+// OwnerQuotationPreviewRequested. Nothing on this step is computed from
+// the locally-added items list anymore, except:
+//   - Additional Discount + Payment Received, because
+//     POST /quotations/preview has no discount/payment fields — the
+//     backend doesn't support previewing those yet. Discount/balance are
+//     therefore a thin client-side formula layered on top of the
+//     server's grand_total, and are only ever sent to the backend on
+//     submit (action = 'approve').
 // =====================================================================
 
 class _PreviewStep extends StatelessWidget {
@@ -1968,21 +1998,11 @@ class _PreviewStep extends StatelessWidget {
     required this.contractorName,
     required this.contractorPhone,
     required this.contractorEmail,
-    required this.items,
-    required this.itemsTotal,
-    required this.mrpTotal,
     required this.handlingChargeCtrl,
     required this.notesCtrl,
-    required this.grandTotal,
-    required this.totalQty,
-    required this.totalItems,
-    required this.totalSqft,
-    required this.incentiveTotal,
     required this.discountType,
     required this.discountValue,
-    required this.discountAmount,
     required this.paymentAmount,
-    required this.balanceAmount,
     required this.onHandlingChargeChanged,
     required this.onAddDiscount,
     required this.onEditDiscount,
@@ -1992,6 +2012,7 @@ class _PreviewStep extends StatelessWidget {
     required this.onClearPayment,
     required this.onSaveDraft,
     required this.onApprove,
+    required this.onRetryPreview,
   });
 
   final DateTime date;
@@ -2002,25 +2023,12 @@ class _PreviewStep extends StatelessWidget {
   final String contractorName;
   final String contractorPhone;
   final String contractorEmail;
-  final List<_AddedItem> items;
-  final double itemsTotal;
-  final double mrpTotal;
   final TextEditingController handlingChargeCtrl;
   final TextEditingController notesCtrl;
-  final double grandTotal;
-  final double totalQty;
-  final int totalItems;
-  final double totalSqft;
-  final double incentiveTotal;
 
-  // Discount (owner only)
   final String? discountType;
   final double? discountValue;
-  final double discountAmount;
-
-  // Payment (owner only)
   final double? paymentAmount;
-  final double balanceAmount;
 
   final VoidCallback onHandlingChargeChanged;
   final VoidCallback onAddDiscount;
@@ -2031,391 +2039,438 @@ class _PreviewStep extends StatelessWidget {
   final VoidCallback onClearPayment;
   final VoidCallback onSaveDraft;
   final VoidCallback onApprove;
+  final VoidCallback onRetryPreview;
+
+  double _discountAmount(double grandTotal) {
+    final value = discountValue ?? 0;
+    if (value <= 0) return 0;
+    if (discountType == QuotationDiscountType.percentage) {
+      return grandTotal * value / 100;
+    }
+    return value;
+  }
+
+  double _balanceAmount(double grandTotal) {
+    final remaining = grandTotal - _discountAmount(grandTotal) - (paymentAmount ?? 0);
+    return remaining < 0 ? 0 : remaining;
+  }
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
 
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.all(Responsive.w(18)),
-            children: [
-              Container(
-                padding: EdgeInsets.all(Responsive.w(14)),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(14),
+    return BlocBuilder<OwnerEstimateBloc, OwnerEstimateState>(
+      buildWhen: (prev, curr) =>
+      prev.previewStatus != curr.previewStatus ||
+          prev.preview != curr.preview ||
+          prev.previewError != curr.previewError ||
+          prev.submitStatus != curr.submitStatus ||
+          prev.submitAction != curr.submitAction ||
+          prev.selectedSalesman != curr.selectedSalesman,
+      builder: (context, state) {
+        final preview = state.preview;
+        final loading = state.previewStatus == LoadStatus.loading && preview == null;
+        final failed = state.previewStatus == LoadStatus.failure && preview == null;
+        final totals = preview?.totals;
+        final grandTotal = totals?.grandTotal ?? 0;
+        final discountAmount = _discountAmount(grandTotal);
+        final balanceAmount = _balanceAmount(grandTotal);
+        final submitting = state.submitStatus == SubmitStatus.submitting;
+        final savingDraft = submitting && state.submitAction == 'save_quotation';
+        final approving = submitting && state.submitAction == 'approve';
+        final canSubmit = preview != null && !submitting;
+
+        return Column(
+          children: [
+            Expanded(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : failed
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(Responsive.w(24)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, size: 36, color: AppColors.error),
+                      SizedBox(height: Responsive.h(10)),
+                      Text(
+                        state.previewError ?? 'Failed to calculate preview.',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.body(color: AppColors.error),
+                      ),
+                      SizedBox(height: Responsive.h(12)),
+                      ElevatedButton(
+                        onPressed: onRetryPreview,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('New Estimate', style: AppTextStyles.h3()),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('Date', style: AppTextStyles.caption()),
-                        Text(DateFormat('dd-MM-yyyy').format(date), style: AppTextStyles.h3()),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: Responsive.h(16)),
-
-              _PreviewSection(
-                title: 'Customer Details',
-                rows: [
-                  _PreviewRow('Party Name', partyName.isEmpty ? '-' : partyName),
-                  _PreviewRow('Address', address.isEmpty ? '-' : address),
-                  _PreviewRow('Contact No.', phone.isEmpty ? '-' : phone),
-                  _PreviewRow('Email', customerEmail.isEmpty ? '-' : customerEmail),
-                ],
-              ),
-              SizedBox(height: Responsive.h(14)),
-
-              _PreviewSection(
-                title: 'Contractor',
-                rows: [
-                  _PreviewRow('Name', contractorName.isEmpty ? '-' : contractorName),
-                  _PreviewRow('Contact No.', contractorPhone.isEmpty ? '-' : contractorPhone),
-                  _PreviewRow('Email', contractorEmail.isEmpty ? '-' : contractorEmail),
-                ],
-              ),
-              SizedBox(height: Responsive.h(20)),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              )
+                  : ListView(
+                padding: EdgeInsets.all(Responsive.w(18)),
                 children: [
-                  Text('Items', style: AppTextStyles.h3()),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                    padding: EdgeInsets.all(Responsive.w(14)),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text('Total Items: $totalItems', style: AppTextStyles.bodyBold(color: AppColors.primary)),
-                  ),
-                ],
-              ),
-              SizedBox(height: Responsive.h(10)),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(AppColors.surfaceAlt),
-                    headingTextStyle: AppTextStyles.bodyBold(),
-                    dataTextStyle: AppTextStyles.body(),
-                    columnSpacing: 18,
-                    columns: const [
-                      DataColumn(label: Text('Sl.No')),
-                      DataColumn(label: Text('Item')),
-                      DataColumn(label: Text('Company')),
-                      DataColumn(label: Text('Size')),
-                      DataColumn(label: Text('Qty'), numeric: true),
-                      DataColumn(label: Text('Box'), numeric: true),
-                      DataColumn(label: Text('Pcs'), numeric: true),
-                      DataColumn(label: Text('Unit')),
-                      DataColumn(label: Text('MRP'), numeric: true),
-                      DataColumn(label: Text('Rate'), numeric: true),
-                      DataColumn(label: Text('Amount'), numeric: true),
-                      DataColumn(label: Text('Incentive'), numeric: true),
-                    ],
-                    rows: items.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final item = entry.value;
-                      return DataRow(cells: [
-                        DataCell(Text('${i + 1}')),
-                        DataCell(Text(item.name)),
-                        DataCell(Text(item.company.isEmpty ? '-' : item.company)),
-                        DataCell(Text(item.size.isEmpty ? '-' : item.size)),
-                        DataCell(Text(number.format(item.quantity))),
-                        DataCell(Text(item.boxQuantity > 0 ? number.format(item.boxQuantity) : '-')),
-                        DataCell(Text(item.pieceQuantity > 0 ? number.format(item.pieceQuantity) : '-')),
-                        DataCell(Text(item.unit)),
-                        DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
-                        DataCell(Text(number.format(item.rate))),
-                        DataCell(Text(currency.format(item.amount), style: AppTextStyles.bodyBold())),
-                        DataCell(Text(
-                          item.incentiveAmount > 0 ? currency.format(item.incentiveAmount) : '-',
-                          style: AppTextStyles.bodyBold(color: AppColors.success),
-                        )),
-                      ]);
-                    }).toList(),
-                  ),
-                ),
-              ),
-              SizedBox(height: Responsive.h(16)),
-
-              LabeledField(
-                label: 'Handling Charge',
-                field: CustomTextField(
-                  hint: 'Enter handling charge',
-                  icon: Icons.currency_rupee,
-                  keyboardType: TextInputType.number,
-                  controller: handlingChargeCtrl,
-                  onChanged: (_) => onHandlingChargeChanged(),
-                ),
-              ),
-              SizedBox(height: Responsive.h(10)),
-              LabeledField(
-                label: 'Notes (optional)',
-                field: CustomTextField(
-                  hint: 'e.g. Customer enquiry for new project',
-                  icon: Icons.notes_outlined,
-                  controller: notesCtrl,
-                ),
-              ),
-              SizedBox(height: Responsive.h(10)),
-
-              Container(
-                padding: EdgeInsets.all(Responsive.w(14)),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  children: [
-                    _totalRow('Total Items', '$totalItems'),
-                    SizedBox(height: Responsive.h(6)),
-                    _totalRow('Total Qty', number.format(totalQty)),
-                    SizedBox(height: Responsive.h(6)),
-                    _totalRow('Total Sq.Ft', number.format(totalSqft)),
-                    if (mrpTotal > 0) ...[
-                      SizedBox(height: Responsive.h(6)),
-                      _totalRow('Total MRP', currency.format(mrpTotal)),
-                    ],
-                    SizedBox(height: Responsive.h(6)),
-                    _totalRow('Subtotal', currency.format(itemsTotal)),
-                    SizedBox(height: Responsive.h(6)),
-                    _totalRow('Handling Charge', currency.format(double.tryParse(handlingChargeCtrl.text) ?? 0)),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Grand Total', style: AppTextStyles.h3()),
-                        Text(currency.format(grandTotal), style: AppTextStyles.h2(color: AppColors.primary)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: Responsive.h(12)),
-
-              // ---- Owner-only: Additional Discount + Payment + Balance ----
-              Container(
-                padding: EdgeInsets.all(Responsive.w(14)),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceAlt,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Text('Additional Discount', style: AppTextStyles.body()),
-                            if (discountValue != null) ...[
-                              SizedBox(width: Responsive.w(6)),
-                              InkWell(
-                                onTap: onEditDiscount,
-                                child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
-                              ),
-                              SizedBox(width: Responsive.w(6)),
-                              InkWell(
-                                onTap: onClearDiscount,
-                                child: Icon(Icons.close, size: 14, color: AppColors.error),
-                              ),
-                            ],
-                          ],
-                        ),
-                        discountValue == null
-                            ? TextButton.icon(
-                          onPressed: onAddDiscount,
-                          icon: const Icon(Icons.local_offer_outlined, size: 16),
-                          label: const Text('Give Additional Discount'),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        )
-                            : Text(
-                          discountType == QuotationDiscountType.percentage
-                              ? '- ${discountValue!.toStringAsFixed(0)}% (${currency.format(discountAmount)})'
-                              : '- ${currency.format(discountAmount)}',
-                          style: AppTextStyles.bodyBold(color: Colors.red),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: Responsive.h(10)),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Text('Payment Received', style: AppTextStyles.body()),
-                            if (paymentAmount != null) ...[
-                              SizedBox(width: Responsive.w(6)),
-                              InkWell(
-                                onTap: onEditPayment,
-                                child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
-                              ),
-                              SizedBox(width: Responsive.w(6)),
-                              InkWell(
-                                onTap: onClearPayment,
-                                child: Icon(Icons.close, size: 14, color: AppColors.error),
-                              ),
-                            ],
-                          ],
-                        ),
-                        paymentAmount == null
-                            ? TextButton.icon(
-                          onPressed: onAddPayment,
-                          icon: const Icon(Icons.payments_outlined, size: 16),
-                          label: const Text('Add Payment'),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        )
-                            : Text(
-                          currency.format(paymentAmount!),
-                          style: AppTextStyles.bodyBold(color: AppColors.success),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Balance Amount', style: AppTextStyles.h3()),
-                        Text(
-                          currency.format(balanceAmount),
-                          style: AppTextStyles.h2(
-                            color: balanceAmount > 0 ? Colors.red : AppColors.success,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: Responsive.h(6)),
-                    Text(
-                      'Discount and payment are only applied when you approve this estimate.',
-                      style: AppTextStyles.caption(),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: Responsive.h(12)),
-
-              if (incentiveTotal > 0)
-                Container(
-                  padding: EdgeInsets.all(Responsive.w(14)),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.success.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.percent, size: 18, color: AppColors.success),
-                          SizedBox(width: Responsive.w(8)),
-                          Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
-                        ],
-                      ),
-                      Text(
-                        currency.format(incentiveTotal),
-                        style: AppTextStyles.h3(color: AppColors.success),
-                      ),
-                    ],
-                  ),
-                ),
-              SizedBox(height: Responsive.h(12)),
-
-              // ---- Owner-only: currently assigned salesman (picked/confirmed
-              // in the Approve dialog) ----
-              BlocBuilder<OwnerEstimateBloc, OwnerEstimateState>(
-                buildWhen: (prev, curr) => prev.selectedSalesman != curr.selectedSalesman,
-                builder: (context, state) {
-                  if (state.selectedSalesman == null) return const SizedBox.shrink();
-                  return Container(
-                    padding: EdgeInsets.all(Responsive.w(12)),
-                    margin: EdgeInsets.only(bottom: Responsive.h(12)),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.person_outline, size: 18, color: AppColors.primary),
-                        SizedBox(width: Responsive.w(8)),
-                        Expanded(
-                          child: Text(
-                            'Will be assigned to ${state.selectedSalesman!.displayLabel}',
-                            style: AppTextStyles.caption(),
-                          ),
+                        Text('New Estimate', style: AppTextStyles.h3()),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Date', style: AppTextStyles.caption()),
+                            Text(DateFormat('dd-MM-yyyy').format(date), style: AppTextStyles.h3()),
+                          ],
                         ),
                       ],
                     ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        BlocBuilder<OwnerEstimateBloc, OwnerEstimateState>(
-          buildWhen: (prev, curr) =>
-          prev.submitStatus != curr.submitStatus || prev.submitAction != curr.submitAction,
-          builder: (context, state) {
-            final submitting = state.submitStatus == SubmitStatus.submitting;
-            final savingDraft = submitting && state.submitAction == 'save_quotation';
-            final approving = submitting && state.submitAction == 'approve';
+                  ),
+                  SizedBox(height: Responsive.h(16)),
 
-            return _BottomActionBar(
-              left: OutlinedButton.icon(
-                onPressed: submitting ? null : onSaveDraft,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: savingDraft
-                    ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Icon(Icons.request_quote_outlined, size: 18),
-                label: Text(savingDraft ? 'Saving…' : 'Save as Quotation'),
+                  _PreviewSection(
+                    title: 'Customer Details',
+                    rows: [
+                      _PreviewRow('Party Name', partyName.isEmpty ? '-' : partyName),
+                      _PreviewRow('Address', address.isEmpty ? '-' : address),
+                      _PreviewRow('Contact No.', phone.isEmpty ? '-' : phone),
+                      _PreviewRow('Email', customerEmail.isEmpty ? '-' : customerEmail),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(14)),
+
+                  _PreviewSection(
+                    title: 'Contractor',
+                    rows: [
+                      _PreviewRow('Name', contractorName.isEmpty ? '-' : contractorName),
+                      _PreviewRow('Contact No.', contractorPhone.isEmpty ? '-' : contractorPhone),
+                      _PreviewRow('Email', contractorEmail.isEmpty ? '-' : contractorEmail),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(20)),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Items', style: AppTextStyles.h3()),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text('Total Items: ${totals?.totalItems ?? 0}',
+                            style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: Responsive.h(10)),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor: MaterialStateProperty.all(AppColors.surfaceAlt),
+                        headingTextStyle: AppTextStyles.bodyBold(),
+                        dataTextStyle: AppTextStyles.body(),
+                        columnSpacing: 18,
+                        columns: const [
+                          DataColumn(label: Text('Sl.No')),
+                          DataColumn(label: Text('Item')),
+                          DataColumn(label: Text('Size')),
+                          DataColumn(label: Text('Qty'), numeric: true),
+                          DataColumn(label: Text('Unit')),
+                          DataColumn(label: Text('MRP'), numeric: true),
+                          DataColumn(label: Text('Rate'), numeric: true),
+                          DataColumn(label: Text('Amount'), numeric: true),
+                          DataColumn(label: Text('Incentive'), numeric: true),
+                        ],
+                        rows: (preview?.items ?? []).asMap().entries.map((entry) {
+                          final i = entry.key;
+                          final item = entry.value;
+                          return DataRow(cells: [
+                            DataCell(Text('${i + 1}')),
+                            DataCell(Text(item.productName)),
+                            DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
+                            DataCell(Text(number.format(item.quantity))),
+                            DataCell(Text(item.productUnit)),
+                            DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
+                            DataCell(Text(number.format(item.rate))),
+                            DataCell(Text(currency.format(item.amount), style: AppTextStyles.bodyBold())),
+                            DataCell(Text(
+                              item.incentiveAmount > 0 ? currency.format(item.incentiveAmount) : '-',
+                              style: AppTextStyles.bodyBold(color: AppColors.success),
+                            )),
+                          ]);
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
+
+                  LabeledField(
+                    label: 'Handling Charge',
+                    field: CustomTextField(
+                      hint: 'Enter handling charge',
+                      icon: Icons.currency_rupee,
+                      keyboardType: TextInputType.number,
+                      controller: handlingChargeCtrl,
+                      onChanged: (_) => onHandlingChargeChanged(),
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(10)),
+                  LabeledField(
+                    label: 'Notes (optional)',
+                    field: CustomTextField(
+                      hint: 'e.g. Customer enquiry for new project',
+                      icon: Icons.notes_outlined,
+                      controller: notesCtrl,
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(10)),
+
+                  Container(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      children: [
+                        _totalRow('Total Items', '${totals?.totalItems ?? 0}'),
+                        SizedBox(height: Responsive.h(6)),
+                        _totalRow('Total Qty', number.format(totals?.totalQuantity ?? 0)),
+                        SizedBox(height: Responsive.h(6)),
+                        _totalRow('Total Sq.Ft', number.format(totals?.totalSquareFeet ?? 0)),
+                        if ((totals?.mrpTotal ?? 0) > 0) ...[
+                          SizedBox(height: Responsive.h(6)),
+                          _totalRow('Total MRP', currency.format(totals!.mrpTotal)),
+                        ],
+                        SizedBox(height: Responsive.h(6)),
+                        _totalRow('Subtotal', currency.format(totals?.subtotal ?? 0)),
+                        SizedBox(height: Responsive.h(6)),
+                        _totalRow('Handling Charge', currency.format(totals?.handlingCharge ?? 0)),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Grand Total', style: AppTextStyles.h3()),
+                            Text(currency.format(grandTotal), style: AppTextStyles.h2(color: AppColors.primary)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(12)),
+
+                  // ---- Owner-only: Additional Discount + Payment + Balance ----
+                  Container(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Additional Discount', style: AppTextStyles.body()),
+                                if (discountValue != null) ...[
+                                  SizedBox(width: Responsive.w(6)),
+                                  InkWell(
+                                    onTap: onEditDiscount,
+                                    child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
+                                  ),
+                                  SizedBox(width: Responsive.w(6)),
+                                  InkWell(
+                                    onTap: onClearDiscount,
+                                    child: Icon(Icons.close, size: 14, color: AppColors.error),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            discountValue == null
+                                ? TextButton.icon(
+                              onPressed: onAddDiscount,
+                              icon: const Icon(Icons.local_offer_outlined, size: 16),
+                              label: const Text('Give Additional Discount'),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            )
+                                : Text(
+                              discountType == QuotationDiscountType.percentage
+                                  ? '- ${discountValue!.toStringAsFixed(0)}% (${currency.format(discountAmount)})'
+                                  : '- ${currency.format(discountAmount)}',
+                              style: AppTextStyles.bodyBold(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: Responsive.h(10)),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Payment Received', style: AppTextStyles.body()),
+                                if (paymentAmount != null) ...[
+                                  SizedBox(width: Responsive.w(6)),
+                                  InkWell(
+                                    onTap: onEditPayment,
+                                    child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textHint),
+                                  ),
+                                  SizedBox(width: Responsive.w(6)),
+                                  InkWell(
+                                    onTap: onClearPayment,
+                                    child: Icon(Icons.close, size: 14, color: AppColors.error),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            paymentAmount == null
+                                ? TextButton.icon(
+                              onPressed: onAddPayment,
+                              icon: const Icon(Icons.payments_outlined, size: 16),
+                              label: const Text('Add Payment'),
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            )
+                                : Text(
+                              currency.format(paymentAmount!),
+                              style: AppTextStyles.bodyBold(color: AppColors.success),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Balance Amount', style: AppTextStyles.h3()),
+                            Text(
+                              currency.format(balanceAmount),
+                              style: AppTextStyles.h2(
+                                color: balanceAmount > 0 ? Colors.red : AppColors.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: Responsive.h(6)),
+                        Text(
+                          'Discount and payment are only applied when you approve this estimate.',
+                          style: AppTextStyles.caption(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(12)),
+
+                  if ((totals?.totalIncentive ?? 0) > 0)
+                    Container(
+                      padding: EdgeInsets.all(Responsive.w(14)),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.percent, size: 18, color: AppColors.success),
+                              SizedBox(width: Responsive.w(8)),
+                              Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                            ],
+                          ),
+                          Text(
+                            currency.format(totals!.totalIncentive),
+                            style: AppTextStyles.h3(color: AppColors.success),
+                          ),
+                        ],
+                      ),
+                    ),
+                  SizedBox(height: Responsive.h(12)),
+
+                  if (state.selectedSalesman != null)
+                    Container(
+                      padding: EdgeInsets.all(Responsive.w(12)),
+                      margin: EdgeInsets.only(bottom: Responsive.h(12)),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person_outline, size: 18, color: AppColors.primary),
+                          SizedBox(width: Responsive.w(8)),
+                          Expanded(
+                            child: Text(
+                              'Will be assigned to ${state.selectedSalesman!.displayLabel}',
+                              style: AppTextStyles.caption(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-              // Opens the Approve dialog (pick/confirm salesman) before
-              // creating the estimate with action = 'approve'.
-              right: PrimaryButton(
-                label: approving ? 'Approving…' : 'Approved',
-                height: 48,
-                onPressed: submitting ? null : onApprove,
-              ),
-            );
-          },
-        ),
-      ],
+            ),
+            BlocBuilder<OwnerEstimateBloc, OwnerEstimateState>(
+              buildWhen: (prev, curr) =>
+              prev.submitStatus != curr.submitStatus || prev.submitAction != curr.submitAction,
+              builder: (context, submitState) {
+                final isSubmitting = submitState.submitStatus == SubmitStatus.submitting;
+                final isSavingDraft = isSubmitting && submitState.submitAction == 'save_quotation';
+                final isApproving = isSubmitting && submitState.submitAction == 'approve';
+                final allowSubmit = preview != null && !isSubmitting;
+
+                return _BottomActionBar(
+                  left: OutlinedButton.icon(
+                    onPressed: allowSubmit ? onSaveDraft : null,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: isSavingDraft
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.request_quote_outlined, size: 18),
+                    label: Text(isSavingDraft ? 'Saving…' : 'Save as Quotation'),
+                  ),
+                  right: PrimaryButton(
+                    label: isApproving ? 'Approving…' : 'Approved',
+                    height: 48,
+                    onPressed: allowSubmit ? onApprove : null,
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 

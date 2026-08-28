@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../models/salesmanmodels/salesman_dashboardmodel.dart';
+import '../../../models/salesmanmodels/salesman_dashboardmodel.dart';
 
 enum DashboardHomeStatus { initial, loading, refreshing, success, failure }
 

@@ -1,3 +1,4 @@
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../../Apiprovider/salesman_quotationprovider.dart';
@@ -7,7 +8,8 @@ import 'ownerestimatecreate_state.dart';
 /// Bloc for the Owner Create Estimate screen. Structurally mirrors
 /// SalesmanEstimateBloc (products / site visits / live incentive /
 /// submit), plus an extra active-salesmen slice used to populate the
-/// "Assign to Salesman" dropdown that only the owner flow needs.
+/// "Assign to Salesman" dropdown, and a server-preview slice that backs
+/// the Preview step's totals/discount/balance.
 class OwnerEstimateBloc extends Bloc<OwnerEstimateEvent, OwnerEstimateState> {
   final QuotationProvider _provider;
 
@@ -24,6 +26,8 @@ class OwnerEstimateBloc extends Bloc<OwnerEstimateEvent, OwnerEstimateState> {
     on<SalesmanSelectionCleared>(_onSalesmanSelectionCleared);
     on<OwnerProductIncentiveRequested>(_onProductIncentiveRequested);
     on<OwnerProductIncentiveCleared>(_onProductIncentiveCleared);
+    on<OwnerQuotationPreviewRequested>(_onQuotationPreviewRequested);
+    on<OwnerQuotationPreviewCleared>(_onQuotationPreviewCleared);
     on<OwnerQuotationSubmitRequested>(_onQuotationSubmitRequested);
     on<OwnerQuotationSubmitResultConsumed>(_onQuotationSubmitResultConsumed);
   }
@@ -116,6 +120,28 @@ class OwnerEstimateBloc extends Bloc<OwnerEstimateEvent, OwnerEstimateState> {
   void _onProductIncentiveCleared(
       OwnerProductIncentiveCleared event, Emitter<OwnerEstimateState> emit) {
     emit(state.copyWith(incentiveStatus: LoadStatus.initial, clearIncentive: true));
+  }
+
+  /// Calls POST /quotations/preview and stores the server-calculated
+  /// totals/discount/balance so the Preview step can render them directly
+  /// instead of re-deriving them on-device.
+  Future<void> _onQuotationPreviewRequested(
+      OwnerQuotationPreviewRequested event, Emitter<OwnerEstimateState> emit) async {
+    emit(state.copyWith(previewStatus: LoadStatus.loading, clearPreviewError: true));
+    final result = await _provider.previewQuotation(event.request);
+    if (result.success) {
+      emit(state.copyWith(previewStatus: LoadStatus.success, preview: result.preview));
+    } else {
+      emit(state.copyWith(
+        previewStatus: LoadStatus.failure,
+        previewError: result.errorMessage ?? 'Failed to calculate preview.',
+      ));
+    }
+  }
+
+  void _onQuotationPreviewCleared(
+      OwnerQuotationPreviewCleared event, Emitter<OwnerEstimateState> emit) {
+    emit(state.copyWith(previewStatus: LoadStatus.initial, clearPreview: true));
   }
 
   Future<void> _onQuotationSubmitRequested(

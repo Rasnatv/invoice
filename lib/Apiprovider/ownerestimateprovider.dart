@@ -1,7 +1,10 @@
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../core/apiclient/api_client.dart';
 import '../core/errors/apierrorhandler.dart';
 import '../models/owner_models/owner_estimateactionmodel.dart';
+import '../models/owner_models/ownerestimate_updatemodel.dart';
 import '../models/salesmanmodels/salesmanownerestimatemodel.dart';
 import '../models/salesmanmodels/salesmanownerresponseestimatemodel.dart';
 import '../models/salesmanmodels/estimatedetail.model.dart';
@@ -41,9 +44,9 @@ class OwnerEstimateDetailResult {
         detail = null;
 }
 
-/// Single provider for the owner's estimate list, detail, approve and
-/// reject calls — mirrors SalesmanOwnerEstimateProvider / EstimateProvider
-/// but adds the two owner-only action endpoints.
+/// Single provider for the owner's estimate list, detail, approve, reject
+/// and update calls — mirrors SalesmanOwnerEstimateProvider / EstimateProvider
+/// but adds the owner-only action endpoints.
 class OwnerEstimateProvider {
   final ApiClient _apiClient;
 
@@ -75,7 +78,11 @@ class OwnerEstimateProvider {
         unauthorized ? null : message,
         isUnauthorized: unauthorized,
       );
-    } catch (_) {
+    } catch (e, st) {
+      // Logged instead of silently swallowed — a parsing/runtime error here
+      // would otherwise surface to the user only as a generic message with
+      // no way to diagnose which field/response shape caused it.
+      debugPrint('OwnerEstimateProvider.getEstimates error: $e\n$st');
       return const OwnerEstimateListResult.failure(
           'Something went wrong. Please try again.');
     }
@@ -105,7 +112,50 @@ class OwnerEstimateProvider {
         unauthorized ? null : message,
         isUnauthorized: unauthorized,
       );
-    } catch (_) {
+    } catch (e, st) {
+      // Logged instead of silently swallowed — this is the exact spot that
+      // was hiding the "Something went wrong" cause for estimate detail.
+      debugPrint('OwnerEstimateProvider.getEstimateDetail error: $e\n$st');
+      return const OwnerEstimateDetailResult.failure(
+          'Something went wrong. Please try again.');
+    }
+  }
+
+  /// POST /estimates/update — partial update; only send fields you want
+  /// changed (see [OwnerUpdateEstimateRequest]).
+  ///
+  /// The response shape is `{ status, status_code, data, message }` — same
+  /// shape as /estimates/show — so it's parsed with the same
+  /// [EstimateDetailResponseModel]. Some backends may return `data: {}`
+  /// on update rather than the full refreshed estimate; callers should
+  /// treat `detail == null` on a successful result as "re-fetch the
+  /// estimate to get the latest state" rather than as a failure.
+  Future<OwnerEstimateDetailResult> updateEstimate(
+      OwnerUpdateEstimateRequest request) async {
+    try {
+      final response = await _apiClient.updateEstimate(request.toJson());
+      final body = response.data;
+
+      if (body is Map<String, dynamic>) {
+        final parsed = EstimateDetailResponseModel.fromJson(body);
+        if (parsed.status == '1') {
+          return OwnerEstimateDetailResult.success(parsed.data);
+        }
+        return OwnerEstimateDetailResult.failure(
+          parsed.message.isNotEmpty ? parsed.message : 'Failed to update estimate.',
+        );
+      }
+      return OwnerEstimateDetailResult.failure(
+          'Unexpected response: ${response.statusCode}');
+    } on DioException catch (e) {
+      final message = await ApiErrorHandler.handleDioError(e);
+      final unauthorized = e.response?.statusCode == 401;
+      return OwnerEstimateDetailResult.failure(
+        unauthorized ? null : message,
+        isUnauthorized: unauthorized,
+      );
+    } catch (e, st) {
+      debugPrint('OwnerEstimateProvider.updateEstimate error: $e\n$st');
       return const OwnerEstimateDetailResult.failure(
           'Something went wrong. Please try again.');
     }
@@ -137,7 +187,8 @@ class OwnerEstimateProvider {
       final message = await ApiErrorHandler.handleDioError(e);
       return OwnerActionResult(
           success: false, message: message ?? 'Failed to approve estimate.');
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('OwnerEstimateProvider.approveEstimate error: $e\n$st');
       return const OwnerActionResult(
           success: false, message: 'Something went wrong. Please try again.');
     }
@@ -169,7 +220,8 @@ class OwnerEstimateProvider {
       final message = await ApiErrorHandler.handleDioError(e);
       return OwnerActionResult(
           success: false, message: message ?? 'Failed to reject estimate.');
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('OwnerEstimateProvider.rejectEstimate error: $e\n$st');
       return const OwnerActionResult(
           success: false, message: 'Something went wrong. Please try again.');
     }

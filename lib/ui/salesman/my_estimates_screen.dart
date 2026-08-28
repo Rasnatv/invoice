@@ -4,9 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
-import '../../bloc/salemanbloc/salesmanowner_estimatelistbloc.dart';
-import '../../bloc/salemanbloc/salesmanowner_estimatelistevent.dart';
-import '../../bloc/salemanbloc/salesmanownerestimatestate.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistbloc.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanownerestimatestate.dart';
 import '../../widgets/estimate_card.dart';
 // TODO: point this at wherever SalesmanEstimateDetailsScreen actually lives
 // in your tree (the file you pasted with `class SalesmanEstimateDetailsScreen

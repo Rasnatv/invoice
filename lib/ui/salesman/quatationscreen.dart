@@ -6,9 +6,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../models/salesmanmodels/quotationlistmodel.dart';
-import '../../bloc/salemanbloc/estimate/qtn_listdetail_event.dart';
-import '../../bloc/salemanbloc/estimate/qtn_listdetail_state.dart';
-import '../../bloc/salemanbloc/estimate/quotation_listdetail_bloc.dart';
+import '../../bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
+import '../../bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
+import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
 import 'quotationpreview.dart';
 
 class QuotationListScreen extends StatelessWidget {

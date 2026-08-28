@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/salesman/salman_despatchlistscreen.dart';
+import '../owner/ownerdespatch_screen.dart';
 import 'cubit/nav_cubit.dart';
 import 'my_estimates_screen.dart';
 import 'dashboard_home_screen.dart';
-import 'profile/presentation/profile_screen.dart';
+import 'profile_screen.dart';
 
 /// Root shell for the Salesman Dashboard — hosts the bottom navigation
 /// bar (Dashboard / Estimates / Dispatch / Contractors / Profile) exactly
@@ -16,7 +17,8 @@ class DashboardShell extends StatelessWidget {
   static const _screens = [
     DashboardHomeScreen(),
     MyEstimatesScreen(),
-    SalesmanDispatchListScreen(),
+    OwnerdespatchScreen(),
+    //SalesmanDispatchListScreen(),
     ProfileScreen(),
   ];
 

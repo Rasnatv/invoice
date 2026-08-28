@@ -1,3 +1,4 @@
+
 double _asDouble(dynamic v) {
   if (v == null) return 0;
   if (v is num) return v.toDouble();
@@ -28,6 +29,8 @@ class QuotationDetailItem {
   final String productName;
   final String productSize;
   final String productUnit;
+  final String companyName;
+  final double mrp;
   final double quantity;
   final double rate;
   final double amount;
@@ -43,6 +46,8 @@ class QuotationDetailItem {
     required this.productName,
     required this.productSize,
     required this.productUnit,
+    required this.companyName,
+    required this.mrp,
     required this.quantity,
     required this.rate,
     required this.amount,
@@ -60,6 +65,8 @@ class QuotationDetailItem {
       productName: _asString(json['product_name']),
       productSize: _asString(json['product_size']),
       productUnit: _asString(json['product_unit']),
+      companyName: _asString(json['company_name']),
+      mrp: _asDouble(json['mrp']),
       quantity: _asDouble(json['quantity']),
       rate: _asDouble(json['rate']),
       amount: _asDouble(json['amount']),
@@ -151,26 +158,33 @@ class QuotationContractor {
   }
 }
 
+/// The `created_by` block from /quotations/show — includes `role_label`
+/// (a human-readable role name like "Salesman") alongside id/email/name/role.
 class QuotationCreatedBy {
   final String id;
   final String name;
   final String email;
   final String role;
+  final String roleLabel;
 
   const QuotationCreatedBy({
     required this.id,
     required this.name,
     required this.email,
     required this.role,
+    required this.roleLabel,
   });
 
   factory QuotationCreatedBy.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const QuotationCreatedBy(id: '', name: '', email: '', role: '');
+    if (json == null) {
+      return const QuotationCreatedBy(id: '', name: '', email: '', role: '', roleLabel: '');
+    }
     return QuotationCreatedBy(
       id: _asString(json['id']),
       name: _asString(json['name']),
       email: _asString(json['email']),
       role: _asString(json['role']),
+      roleLabel: _asString(json['role_label']),
     );
   }
 }

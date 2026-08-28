@@ -4,9 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../bloc/salemanbloc/estimate/salesman_approvedbloc.dart';
-import '../../bloc/salemanbloc/estimate/salesman_approvedevent.dart';
-import '../../bloc/salemanbloc/estimate/salesman_approvedsate.dart';
+import '../../bloc/salemanbloc/approvedbills/salesman_approvedbloc.dart';
+import '../../bloc/salemanbloc/approvedbills/salesman_approvedevent.dart';
+import '../../bloc/salemanbloc/approvedbills/salesman_approvedsate.dart';
 import 'aprrovedestimatetile.dart';
 import 'estimatedetailscreen_forsalesman.dart';
 

@@ -137,7 +137,8 @@
 //
 //   /// GET /salesmen/active — id/name/designation_display list, used to
 //   /// populate the "Assign to Salesman" dropdown on the Owner Create
-//   /// Estimate screen when approving an estimate.
+//   /// Estimate screen when approving an estimate, and the salesman picker
+//   /// on the Owner Salesman Incentives / Reports screens.
 //   Future<Response> activeSalesmen() async => dio.get(
 //     ApiConstants.salesmenActive,
 //     options: await _authOptions(),
@@ -293,6 +294,16 @@
 //     options: await _authOptions(),
 //   );
 //
+//   // =================== CONTRACTORS ===================
+//
+//   /// GET /reports/contractors/active — id/name/mobile list, used to
+//   /// populate the "Select Contractor" dropdown on the Owner Report
+//   /// Filter screen.
+//   Future<Response> activeContractors() async => dio.get(
+//     ApiConstants.contractorsActive,
+//     options: await _authOptions(),
+//   );
+//
 //   // =================== QUOTATIONS / ESTIMATES ===================
 //
 //   /// POST /quotations/create — used by both the salesman and owner Create
@@ -367,6 +378,18 @@
 //   // =================== ESTIMATES ===================
 //   Future<Response> showEstimate(Map<String, dynamic> data) async => dio.post(
 //     ApiConstants.estimatesShow,
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /estimates/update — body: { id, ...only the fields you want to
+//   /// change }. Fields left out of [data] keep their existing server-side
+//   /// values, EXCEPT `items`: if present at all it fully replaces the
+//   /// estimate's item list. Discount/payment fields cannot be changed
+//   /// through this endpoint — use approveEstimate() or the payments
+//   /// endpoints instead.
+//   Future<Response> updateEstimate(Map<String, dynamic> data) async => dio.put(
+//     ApiConstants.estimatesUpdate,
 //     data: data,
 //     options: await _authOptions(),
 //   );
@@ -486,6 +509,96 @@
 //   /// POST /payments/delete — body: { id }
 //   Future<Response> deletePayment(Map<String, dynamic> data) async => dio.post(
 //     ApiConstants.paymentsDelete,
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   // =================== SALESMAN INCENTIVES ===================
+//
+//   /// POST /salesman-incentives/summary
+//   /// Body: { salesman_id (owner only), year, month }
+//   Future<Response> salesmanIncentiveSummary(Map<String, dynamic> data) async => dio.post(
+//     ApiConstants.salesmanIncentiveSummary,
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /salesman-incentives/products?page=&per_page= — full paginated
+//   /// product list for the "View All" screen.
+//   /// Body: { salesman_id (owner only), year, month, page, per_page }
+//   Future<Response> salesmanIncentiveProducts(
+//       Map<String, dynamic> data, {
+//         int page = 1,
+//         int perPage = 10,
+//       }) async => dio.post(
+//     '${ApiConstants.salesmanIncentiveProducts}?page=$page&per_page=$perPage',
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /salesman-incentives/product-bills?page=&per_page= — dispatched
+//   /// bills for a single product, shown on the product detail page.
+//   /// Body: { salesman_id (owner only), product_id, year, month }
+//   Future<Response> salesmanIncentiveProductBills(
+//       Map<String, dynamic> data, {
+//         int page = 1,
+//         int perPage = 10,
+//       }) async => dio.post(
+//     '${ApiConstants.salesmanIncentiveProductBills}?page=$page&per_page=$perPage',
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /salesman-incentives/mark-paid — owner-only. Marks a salesman's
+//   /// incentive for a given month as paid.
+//   /// Body: { salesman_id (owner only), year, month, payment_reference,
+//   ///          payment_date, notes }
+//   Future<Response> markSalesmanIncentivePaid(Map<String, dynamic> data) async => dio.post(
+//     ApiConstants.salesmanIncentiveMarkPaid,
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   // =================== REPORTS ===================
+//
+//   /// POST /reports/salesman-performance
+//   /// Body: { salesman_id, from_date, to_date }
+//   Future<Response> salesmanPerformanceReport(Map<String, dynamic> data) async => dio.post(
+//     ApiConstants.salesmanPerformanceReport,
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /reports/contractor-performance
+//   /// Body: { contractor_id, from_date, to_date }
+//   Future<Response> contractorPerformanceReport(Map<String, dynamic> data) async => dio.post(
+//     ApiConstants.contractorPerformanceReport,
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /reports/quotations?page=&per_page=
+//   /// Body: { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
+//   /// Requires ApiConstants.quotationsReport = 'reports/quotations'.
+//   Future<Response> quotationReport(
+//       Map<String, dynamic> data, {
+//         int page = 1,
+//         int perPage = 10,
+//       }) async => dio.post(
+//     '${ApiConstants.quotationsReport}?page=$page&per_page=$perPage',
+//     data: data,
+//     options: await _authOptions(),
+//   );
+//
+//   /// POST /reports/estimates?page=&per_page=
+//   /// Body: { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
+//   /// Requires ApiConstants.estimatesReport = 'reports/estimates'.
+//   Future<Response> estimateReport(
+//       Map<String, dynamic> data, {
+//         int page = 1,
+//         int perPage = 10,
+//       }) async => dio.post(
+//     '${ApiConstants.estimatesReport}?page=$page&per_page=$perPage',
 //     data: data,
 //     options: await _authOptions(),
 //   );
@@ -629,7 +742,7 @@ class ApiClient {
   /// GET /salesmen/active — id/name/designation_display list, used to
   /// populate the "Assign to Salesman" dropdown on the Owner Create
   /// Estimate screen when approving an estimate, and the salesman picker
-  /// on the Owner Salesman Incentives screen.
+  /// on the Owner Salesman Incentives / Reports screens.
   Future<Response> activeSalesmen() async => dio.get(
     ApiConstants.salesmenActive,
     options: await _authOptions(),
@@ -656,6 +769,13 @@ class ApiClient {
   Future<Response> deleteFieldStaff(Map<String, dynamic> data) async => dio.delete(
     ApiConstants.deleteFieldStaff,
     data: data,
+    options: await _authOptions(),
+  );
+
+  /// GET /field-staff/active — id/name list, used to populate the "Select
+  /// Field Staff" dropdown on the Owner Incentive Report Filter screen.
+  Future<Response> activeFieldStaff() async => dio.get(
+    ApiConstants.fieldStaffActive,
     options: await _authOptions(),
   );
 
@@ -785,6 +905,16 @@ class ApiClient {
     options: await _authOptions(),
   );
 
+  // =================== CONTRACTORS ===================
+
+  /// GET /reports/contractors/active — id/name/mobile list, used to
+  /// populate the "Select Contractor" dropdown on the Owner Report
+  /// Filter screen.
+  Future<Response> activeContractors() async => dio.get(
+    ApiConstants.contractorsActive,
+    options: await _authOptions(),
+  );
+
   // =================== QUOTATIONS / ESTIMATES ===================
 
   /// POST /quotations/create — used by both the salesman and owner Create
@@ -859,6 +989,18 @@ class ApiClient {
   // =================== ESTIMATES ===================
   Future<Response> showEstimate(Map<String, dynamic> data) async => dio.post(
     ApiConstants.estimatesShow,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /estimates/update — body: { id, ...only the fields you want to
+  /// change }. Fields left out of [data] keep their existing server-side
+  /// values, EXCEPT `items`: if present at all it fully replaces the
+  /// estimate's item list. Discount/payment fields cannot be changed
+  /// through this endpoint — use approveEstimate() or the payments
+  /// endpoints instead.
+  Future<Response> updateEstimate(Map<String, dynamic> data) async => dio.put(
+    ApiConstants.estimatesUpdate,
     data: data,
     options: await _authOptions(),
   );
@@ -1024,6 +1166,63 @@ class ApiClient {
   ///          payment_date, notes }
   Future<Response> markSalesmanIncentivePaid(Map<String, dynamic> data) async => dio.post(
     ApiConstants.salesmanIncentiveMarkPaid,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  // =================== REPORTS ===================
+
+  /// POST /reports/salesman-performance
+  /// Body: { salesman_id, from_date, to_date }
+  Future<Response> salesmanPerformanceReport(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.salesmanPerformanceReport,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /reports/contractor-performance
+  /// Body: { contractor_id, from_date, to_date }
+  Future<Response> contractorPerformanceReport(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.contractorPerformanceReport,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /reports/quotations?page=&per_page=
+  /// Body: { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
+  /// Requires ApiConstants.quotationsReport = 'reports/quotations'.
+  Future<Response> quotationReport(
+      Map<String, dynamic> data, {
+        int page = 1,
+        int perPage = 10,
+      }) async => dio.post(
+    '${ApiConstants.quotationsReport}?page=$page&per_page=$perPage',
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /reports/estimates?page=&per_page=
+  /// Body: { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
+  /// Requires ApiConstants.estimatesReport = 'reports/estimates'.
+  Future<Response> estimateReport(
+      Map<String, dynamic> data, {
+        int page = 1,
+        int perPage = 10,
+      }) async => dio.post(
+    '${ApiConstants.estimatesReport}?page=$page&per_page=$perPage',
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /reports/incentives?page=&per_page=
+  /// Body: { type: 'salesman' | 'field_staff', person_id, from_date, to_date, status }
+  /// Requires ApiConstants.incentivesReport = 'reports/incentives'.
+  Future<Response> incentiveReport(
+      Map<String, dynamic> data, {
+        int page = 1,
+        int perPage = 10,
+      }) async => dio.post(
+    '${ApiConstants.incentivesReport}?page=$page&per_page=$perPage',
     data: data,
     options: await _authOptions(),
   );

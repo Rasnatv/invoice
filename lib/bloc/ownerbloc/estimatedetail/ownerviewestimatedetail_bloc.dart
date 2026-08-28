@@ -1,3 +1,4 @@
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../Apiprovider/ownerestimateprovider.dart';
 import 'ownerviewestimatedetail_event.dart';
@@ -13,6 +14,7 @@ class OwnerEstimateDetailBloc
     on<OwnerEstimateDetailLoadRequested>(_onLoadRequested);
     on<OwnerEstimateApproveRequested>(_onApproveRequested);
     on<OwnerEstimateRejectRequested>(_onRejectRequested);
+    on<OwnerEstimateUpdateRequested>(_onUpdateRequested);
   }
 
   Future<void> _onLoadRequested(OwnerEstimateDetailLoadRequested event,
@@ -65,5 +67,31 @@ class OwnerEstimateDetailBloc
       actionMessage: result.message,
     ));
     add(OwnerEstimateDetailLoadRequested(event.request.id));
+  }
+
+  Future<void> _onUpdateRequested(OwnerEstimateUpdateRequested event,
+      Emitter<OwnerEstimateDetailState> emit) async {
+    emit(state.copyWith(
+        actionStatus: OwnerEstimateActionStatus.inProgress, actionMessage: null));
+    final result = await _provider.updateEstimate(event.request);
+    if (!result.success) {
+      emit(state.copyWith(
+        actionStatus: OwnerEstimateActionStatus.failure,
+        actionMessage: result.errorMessage ?? 'Failed to update estimate.',
+      ));
+      return;
+    }
+    emit(state.copyWith(
+      status: OwnerEstimateDetailStatus.success,
+      detail: result.detail ?? state.detail,
+      actionStatus: OwnerEstimateActionStatus.success,
+      actionMessage: 'Estimate updated successfully.',
+    ));
+    // Some backends return an empty `data: {}` on update instead of the
+    // full refreshed estimate — if so, re-fetch to be sure the screen
+    // reflects the latest server state.
+    if (result.detail == null) {
+      add(OwnerEstimateDetailLoadRequested(event.request.id));
+    }
   }
 }

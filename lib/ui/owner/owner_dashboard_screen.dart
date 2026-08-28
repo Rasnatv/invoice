@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/owner/report/ownerreportscreen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -116,8 +117,8 @@ class _OwnerDashboardView extends StatelessWidget {
                                 icon: Icons.bar_chart_rounded,
                                 label: 'Reports',
                                 color: const Color(0xFF16A34A),
-                                onTap: () {}
-                               // => _open(context, const ReportsScreen()),
+                                onTap: ()
+                                => _open(context, const OwnerReportsScreen()),
                               ),
                               _QuickActionData(
                                 icon: Icons.monetization_on,

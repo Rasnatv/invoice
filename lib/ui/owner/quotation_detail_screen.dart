@@ -3,9 +3,9 @@
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
 // import 'package:flutter_bloc/flutter_bloc.dart';
-// import '../../bloc/ownerbloc/ownerviewqtndetail_bloc.dart';
-// import '../../bloc/ownerbloc/ownerviewqtndetail_event.dart';
-// import '../../bloc/ownerbloc/ownerviewqtndetail_state.dart';
+// import '../../bloc/ownerbloc/ownerquattaiondetail/ownerviewqtndetail_bloc.dart';
+// import '../../bloc/ownerbloc/ownerquattaiondetail/ownerviewqtndetail_event.dart';
+// import '../../bloc/ownerbloc/ownerquattaiondetail/ownerviewqtndetail_state.dart';
 // import '../../core/constants/app_colors.dart';
 // import '../../core/constants/app_text_styles.dart';
 // import '../../core/utils/responsive.dart';
@@ -13,18 +13,9 @@
 // import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 // import '../../widgets/primary_button.dart';
 // import 'ownerdespatchsheet.dart';
+// import 'ownerquotationeditscreen.dart';
 //
 //
-//
-// /// Owner's view of a single quotation/estimate.
-// ///
-// /// Loads real data from POST /quotations/show and, when the quotation
-// /// isn't approved yet, lets the owner approve it via POST /quotations/approve
-// /// (optionally overriding the handling charge and capturing a discount /
-// /// initial payment in the same call). Once approved, the bottom action
-// /// switches to "Send to Despatch", which opens the real despatch-sheet
-// /// flow (POST /despatches/suggest -> GET /drivers/active -> POST
-// /// /despatches/create) instead of a dummy salesman-picker dialog.
 // class OwnerQuotationDetailsScreen extends StatelessWidget {
 //   const OwnerQuotationDetailsScreen({super.key, required this.quotationId});
 //
@@ -59,6 +50,18 @@
 //   void dispose() {
 //     context.read<OwnerQuotationDetailBloc>().add(const OwnerQuotationDetailCleared());
 //     super.dispose();
+//   }
+//
+//   /// Whether the quotation's `created_by` is an Owner, derived straight
+//   /// from the response (`created_by.role_label` / `role`) rather than any
+//   /// local session — no separate auth/role source is used. Incentive
+//   /// figures are salesman-facing info, so they're hidden when the creator
+//   /// is the Owner.
+//   bool _isOwner(QuotationDetailModel q) {
+//     final label = q.createdBy.roleLabel.trim().toLowerCase();
+//     if (label.isNotEmpty) return label == 'owner';
+//     // Fallback to the raw role code if role_label wasn't sent.
+//     return q.createdBy.role.trim().toLowerCase() == 'owner';
 //   }
 //
 //   Color _statusColor(String status) {
@@ -107,6 +110,24 @@
 //       buffer.writeln('Despatch: Created');
 //     }
 //     return buffer.toString();
+//   }
+//
+//   /// Opens OwnerQuotationEditScreen prefilled with the currently loaded
+//   /// detail. On a successful save (screen pops with `true`) the detail is
+//   /// re-fetched so this screen reflects the edited customer/contractor/
+//   /// items/totals without a manual pull-to-refresh.
+//   Future<void> _openEditScreen(QuotationDetailModel q) async {
+//     final saved = await Navigator.of(context).push<bool>(
+//       MaterialPageRoute(
+//         builder: (_) => OwnerQuotationEditScreen(estimate: q),
+//       ),
+//     );
+//
+//     if (saved == true && mounted) {
+//       context
+//           .read<OwnerQuotationDetailBloc>()
+//           .add(OwnerQuotationDetailRequested(widget.quotationId));
+//     }
 //   }
 //
 //   Future<void> _showApproveDialog(QuotationDetailModel q) async {
@@ -334,7 +355,26 @@
 //
 //     return Scaffold(
 //       backgroundColor: AppColors.background,
-//       appBar: AppBar(title: Text('Owner Quotation Details', style: AppTextStyles.h6())),
+//       appBar: AppBar(
+//         title: Text('Owner Quotation Details', style: AppTextStyles.h6()),
+//         actions: [
+//           BlocBuilder<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
+//             buildWhen: (prev, curr) => prev.detail != curr.detail,
+//             builder: (context, state) {
+//               final q = state.detail;
+//               if (q == null) return const SizedBox.shrink();
+//               // Editing stays available regardless of status (approved
+//               // quotations can still need a correction) — the update API
+//               // itself doesn't gate on status.
+//               return IconButton(
+//                 icon: const Icon(Icons.edit_outlined),
+//                 tooltip: 'Edit Quotation',
+//                 onPressed: () => _openEditScreen(q),
+//               );
+//             },
+//           ),
+//         ],
+//       ),
 //       body: SafeArea(
 //         child: BlocConsumer<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
 //           listenWhen: (previous, current) =>
@@ -393,6 +433,10 @@
 //
 //             final isApproved = q.status.toLowerCase() == 'approved';
 //             final isApproving = state.approveStatus == OwnerQuotationApproveStatus.inProgress;
+//             // Derived from created_by.role_label / role in the response —
+//             // no separate session/role source. Incentive figures are
+//             // salesman-facing, so hide them when the creator is the Owner.
+//             final isOwner = _isOwner(q);
 //
 //             return Column(
 //               children: [
@@ -532,15 +576,16 @@
 //                             headingTextStyle: AppTextStyles.bodyBold(),
 //                             dataTextStyle: AppTextStyles.body(),
 //                             columnSpacing: 18,
-//                             columns: const [
-//                               DataColumn(label: Text('Sl.No')),
-//                               DataColumn(label: Text('Item')),
-//                               DataColumn(label: Text('Size')),
-//                               DataColumn(label: Text('Qty'), numeric: true),
-//                               DataColumn(label: Text('Unit')),
-//                               DataColumn(label: Text('Rate'), numeric: true),
-//                               DataColumn(label: Text('Amount'), numeric: true),
-//                               DataColumn(label: Text('Incentive'), numeric: true),
+//                             columns: [
+//                               const DataColumn(label: Text('Sl.No')),
+//                               const DataColumn(label: Text('Item')),
+//                               const DataColumn(label: Text('Size')),
+//                               const DataColumn(label: Text('Qty'), numeric: true),
+//                               const DataColumn(label: Text('Unit')),
+//                               const DataColumn(label: Text('Rate'), numeric: true),
+//                               const DataColumn(label: Text('Amount'), numeric: true),
+//                               if (!isOwner)
+//                                 const DataColumn(label: Text('Incentive'), numeric: true),
 //                             ],
 //                             rows: q.items.asMap().entries.map((entry) {
 //                               final i = entry.key;
@@ -556,12 +601,13 @@
 //                                   currency.format(item.amount),
 //                                   style: AppTextStyles.bodyBold(),
 //                                 )),
-//                                 DataCell(Text(
-//                                   item.isIncentiveEligible
-//                                       ? currency.format(item.incentiveAmount)
-//                                       : '-',
-//                                   style: AppTextStyles.body(color: AppColors.success),
-//                                 )),
+//                                 if (!isOwner)
+//                                   DataCell(Text(
+//                                     item.isIncentiveEligible
+//                                         ? currency.format(item.incentiveAmount)
+//                                         : '-',
+//                                     style: AppTextStyles.body(color: AppColors.success),
+//                                   )),
 //                               ]);
 //                             }).toList(),
 //                           ),
@@ -602,33 +648,36 @@
 //
 //                       // Total incentive across items — internal/salesman
 //                       // info, kept visually separate from the customer bill.
-//                       Container(
-//                         padding: EdgeInsets.all(Responsive.w(14)),
-//                         decoration: BoxDecoration(
-//                           color: AppColors.success.withValues(alpha: 0.08),
-//                           borderRadius: BorderRadius.circular(14),
-//                           border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-//                         ),
-//                         child: Row(
-//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                           children: [
-//                             Row(
-//                               children: [
-//                                 Icon(Icons.percent, size: 18, color: AppColors.success),
-//                                 SizedBox(width: Responsive.w(8)),
-//                                 Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
-//                               ],
-//                             ),
-//                             Text(
-//                               currency.format(
-//                                 q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+//                       // Hidden entirely when the quotation's creator is the
+//                       // Owner (derived from created_by.role_label/role).
+//                       if (!isOwner)
+//                         Container(
+//                           padding: EdgeInsets.all(Responsive.w(14)),
+//                           decoration: BoxDecoration(
+//                             color: AppColors.success.withValues(alpha: 0.08),
+//                             borderRadius: BorderRadius.circular(14),
+//                             border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+//                           ),
+//                           child: Row(
+//                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                             children: [
+//                               Row(
+//                                 children: [
+//                                   Icon(Icons.percent, size: 18, color: AppColors.success),
+//                                   SizedBox(width: Responsive.w(8)),
+//                                   Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
+//                                 ],
 //                               ),
-//                               style: AppTextStyles.h3(color: AppColors.success),
-//                             ),
-//                           ],
+//                               Text(
+//                                 currency.format(
+//                                   q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+//                                 ),
+//                                 style: AppTextStyles.h3(color: AppColors.success),
+//                               ),
+//                             ],
+//                           ),
 //                         ),
-//                       ),
-//                       SizedBox(height: Responsive.h(12)),
+//                       if (!isOwner) SizedBox(height: Responsive.h(12)),
 //                     ],
 //                   ),
 //                 ),
@@ -797,21 +846,6 @@ import 'ownerdespatchsheet.dart';
 import 'ownerquotationeditscreen.dart';
 
 
-
-/// Owner's view of a single quotation/estimate.
-///
-/// Loads real data from POST /quotations/show and, when the quotation
-/// isn't approved yet, lets the owner approve it via POST /quotations/approve
-/// (optionally overriding the handling charge and capturing a discount /
-/// initial payment in the same call). Once approved, the bottom action
-/// switches to "Send to Despatch", which opens the real despatch-sheet
-/// flow (POST /despatches/suggest -> GET /drivers/active -> POST
-/// /despatches/create) instead of a dummy salesman-picker dialog.
-///
-/// An Edit action (top-right icon) opens OwnerQuotationEditScreen, prefilled
-/// from this already-loaded detail, and saves via POST /quotations/update.
-/// On a successful edit the detail is re-fetched so the screen reflects the
-/// new customer/contractor/items/totals immediately.
 class OwnerQuotationDetailsScreen extends StatelessWidget {
   const OwnerQuotationDetailsScreen({super.key, required this.quotationId});
 
@@ -846,6 +880,18 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
   void dispose() {
     context.read<OwnerQuotationDetailBloc>().add(const OwnerQuotationDetailCleared());
     super.dispose();
+  }
+
+  /// Whether the quotation's `created_by` is an Owner, derived straight
+  /// from the response (`created_by.role_label` / `role`) rather than any
+  /// local session — no separate auth/role source is used. Incentive
+  /// figures are salesman-facing info, so they're hidden when the creator
+  /// is the Owner.
+  bool _isOwner(QuotationDetailModel q) {
+    final label = q.createdBy.roleLabel.trim().toLowerCase();
+    if (label.isNotEmpty) return label == 'owner';
+    // Fallback to the raw role code if role_label wasn't sent.
+    return q.createdBy.role.trim().toLowerCase() == 'owner';
   }
 
   Color _statusColor(String status) {
@@ -1217,6 +1263,15 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
 
             final isApproved = q.status.toLowerCase() == 'approved';
             final isApproving = state.approveStatus == OwnerQuotationApproveStatus.inProgress;
+            // Derived from created_by.role_label / role in the response —
+            // no separate session/role source. Incentive figures are
+            // salesman-facing, so hide them when the creator is the Owner.
+            final isOwner = _isOwner(q);
+            // Does any item actually carry an MRP from the API? Only show
+            // the column when it's worth showing — this endpoint often
+            // sends "mrp": "0" for every line.
+            final hasAnyMrp = q.items.any((i) => i.mrp > 0);
+            final hasAnyCompany = q.items.any((i) => i.companyName.trim().isNotEmpty);
 
             return Column(
               children: [
@@ -1334,6 +1389,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
+                              // Straight from totals.items_count.
                               'Total Items: ${q.itemsCount}',
                               style: AppTextStyles.bodyBold(color: AppColors.primary),
                             ),
@@ -1356,36 +1412,44 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                             headingTextStyle: AppTextStyles.bodyBold(),
                             dataTextStyle: AppTextStyles.body(),
                             columnSpacing: 18,
-                            columns: const [
-                              DataColumn(label: Text('Sl.No')),
-                              DataColumn(label: Text('Item')),
-                              DataColumn(label: Text('Size')),
-                              DataColumn(label: Text('Qty'), numeric: true),
-                              DataColumn(label: Text('Unit')),
-                              DataColumn(label: Text('Rate'), numeric: true),
-                              DataColumn(label: Text('Amount'), numeric: true),
-                              DataColumn(label: Text('Incentive'), numeric: true),
+                            columns: [
+                              const DataColumn(label: Text('Sl.No')),
+                              const DataColumn(label: Text('Item')),
+                              if (hasAnyCompany) const DataColumn(label: Text('Company')),
+                              const DataColumn(label: Text('Size')),
+                              const DataColumn(label: Text('Qty'), numeric: true),
+                              const DataColumn(label: Text('Unit')),
+                              if (hasAnyMrp) const DataColumn(label: Text('MRP'), numeric: true),
+                              const DataColumn(label: Text('Rate'), numeric: true),
+                              const DataColumn(label: Text('Amount'), numeric: true),
+                              if (!isOwner)
+                                const DataColumn(label: Text('Incentive'), numeric: true),
                             ],
                             rows: q.items.asMap().entries.map((entry) {
                               final i = entry.key;
                               final item = entry.value;
                               return DataRow(cells: [
                                 DataCell(Text('${i + 1}')),
-                                DataCell(Text(item.productName)),
+                                DataCell(Text(item.productName.isEmpty ? '-' : item.productName)),
+                                if (hasAnyCompany)
+                                  DataCell(Text(item.companyName.isEmpty ? '-' : item.companyName)),
                                 DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
                                 DataCell(Text(number.format(item.quantity))),
                                 DataCell(Text(item.productUnit)),
+                                if (hasAnyMrp)
+                                  DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
                                 DataCell(Text(number.format(item.rate))),
                                 DataCell(Text(
                                   currency.format(item.amount),
                                   style: AppTextStyles.bodyBold(),
                                 )),
-                                DataCell(Text(
-                                  item.isIncentiveEligible
-                                      ? currency.format(item.incentiveAmount)
-                                      : '-',
-                                  style: AppTextStyles.body(color: AppColors.success),
-                                )),
+                                if (!isOwner)
+                                  DataCell(Text(
+                                    item.isIncentiveEligible
+                                        ? currency.format(item.incentiveAmount)
+                                        : '-',
+                                    style: AppTextStyles.body(color: AppColors.success),
+                                  )),
                               ]);
                             }).toList(),
                           ),
@@ -1401,6 +1465,9 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                         ),
                         child: Column(
                           children: [
+                            // Everything below is read straight off the API
+                            // response — q.itemsCount / q.totalQuantity come
+                            // from totals{}, the rest are top-level fields.
                             _totalRow('Total Items', '${q.itemsCount}'),
                             SizedBox(height: Responsive.h(6)),
                             _totalRow('Total Qty', number.format(q.totalQuantity)),
@@ -1426,33 +1493,44 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
 
                       // Total incentive across items — internal/salesman
                       // info, kept visually separate from the customer bill.
-                      Container(
-                        padding: EdgeInsets.all(Responsive.w(14)),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.percent, size: 18, color: AppColors.success),
-                                SizedBox(width: Responsive.w(8)),
-                                Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
-                              ],
-                            ),
-                            Text(
-                              currency.format(
-                                q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+                      // Hidden entirely when the quotation's creator is the
+                      // Owner (derived from created_by.role_label/role).
+                      //
+                      // NOTE: /quotations/show has no total_incentive field
+                      // in its `totals` block (only items_count and
+                      // total_quantity), so this is the one figure on this
+                      // screen that's summed client-side from each item's
+                      // own incentive_amount (which the API does provide
+                      // per line). If the backend ever adds a total, this
+                      // should read from it directly instead.
+                      if (!isOwner)
+                        Container(
+                          padding: EdgeInsets.all(Responsive.w(14)),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.percent, size: 18, color: AppColors.success),
+                                  SizedBox(width: Responsive.w(8)),
+                                  Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                                ],
                               ),
-                              style: AppTextStyles.h3(color: AppColors.success),
-                            ),
-                          ],
+                              Text(
+                                currency.format(
+                                  q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+                                ),
+                                style: AppTextStyles.h3(color: AppColors.success),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      SizedBox(height: Responsive.h(12)),
+                      if (!isOwner) SizedBox(height: Responsive.h(12)),
                     ],
                   ),
                 ),

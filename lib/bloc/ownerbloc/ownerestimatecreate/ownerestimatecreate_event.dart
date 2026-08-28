@@ -1,6 +1,8 @@
+
 import '../../../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
 import '../../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
 import '../../../models/owner_models/get_activedrivermodel.dart';
+import '../../../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 
 abstract class OwnerEstimateEvent {
   const OwnerEstimateEvent();
@@ -68,6 +70,22 @@ class OwnerProductIncentiveRequested extends OwnerEstimateEvent {
 /// Clears the current incentive preview.
 class OwnerProductIncentiveCleared extends OwnerEstimateEvent {
   const OwnerProductIncentiveCleared();
+}
+
+/// Asks for a server-calculated full estimate preview
+/// (POST /quotations/preview) — subtotal, handling charge, discount,
+/// grand total, per-item incentive, balance due, etc. Fired when the
+/// user reaches the Preview step, and again whenever handling charge,
+/// discount, or payment change on that step.
+class OwnerQuotationPreviewRequested extends OwnerEstimateEvent {
+  final QuotationPreviewRequest request;
+  const OwnerQuotationPreviewRequested(this.request);
+}
+
+/// Clears the current server preview (e.g. when leaving the Preview step
+/// or when items change and the old preview is stale).
+class OwnerQuotationPreviewCleared extends OwnerEstimateEvent {
+  const OwnerQuotationPreviewCleared();
 }
 
 /// Submits the estimate. request.action must be 'save_quotation' or

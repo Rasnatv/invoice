@@ -127,20 +127,7 @@ class EstimateCard extends StatelessWidget {
                 ],
               ),
             ],
-            // if (estimate.canPayNowBool) ...[
-            //   SizedBox(height: Responsive.h(8)),
-            //   Align(
-            //     alignment: Alignment.centerRight,
-            //     child: Container(
-            //       padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-            //       decoration: BoxDecoration(
-            //         color: AppColors.primary.withOpacity(0.1),
-            //         borderRadius: BorderRadius.circular(8),
-            //       ),
-            //       child: Text('Pay Now Available', style: AppTextStyles.caption(color: AppColors.primary)),
-            //     ),
-          //     ),
-          //   ],
+
            ],
          ),
       ),

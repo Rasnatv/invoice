@@ -1,3 +1,4 @@
+
 double _asDouble(dynamic v) {
   if (v == null) return 0;
   if (v is num) return v.toDouble();
@@ -12,6 +13,16 @@ int _asInt(dynamic v) {
 
 String _asString(dynamic v) => v?.toString() ?? '';
 
+/// Safely reads a nested object field. Unlike `json['x'] as Map<String, dynamic>?`,
+/// this does NOT throw when the API sends an empty string, an empty list, or
+/// any other non-map "no value" placeholder for a relation — it just treats
+/// it as absent. Some backends send `""` instead of `null` for empty
+/// relations (e.g. an estimate with no linked site visit / contractor),
+/// and a hard cast on that throws a TypeError that gets silently swallowed
+/// by callers' generic `catch (_)` blocks, surfacing as a vague
+/// "Something went wrong" with no indication of the real cause.
+Map<String, dynamic>? _asMap(dynamic v) => v is Map<String, dynamic> ? v : null;
+
 bool _asBool(dynamic v) {
   final s = _asString(v);
   return s == '1' || s.toLowerCase() == 'true';
@@ -22,6 +33,9 @@ class EstimateDetailItem {
   final String productId;
   final String productName;
   final String productSize;
+  final String companyName;
+  final String unitName;
+  final double mrp;
   final double quantity;
   final double rate;
   final double amount;
@@ -33,6 +47,9 @@ class EstimateDetailItem {
     required this.productId,
     required this.productName,
     required this.productSize,
+    required this.companyName,
+    required this.unitName,
+    required this.mrp,
     required this.quantity,
     required this.rate,
     required this.amount,
@@ -46,6 +63,9 @@ class EstimateDetailItem {
       productId: _asString(json['product_id']),
       productName: _asString(json['product_name']),
       productSize: _asString(json['product_size']),
+      companyName: _asString(json['company_name']),
+      unitName: _asString(json['unit_name']),
+      mrp: _asDouble(json['mrp']),
       quantity: _asDouble(json['quantity']),
       rate: _asDouble(json['rate']),
       amount: _asDouble(json['amount']),
@@ -55,6 +75,9 @@ class EstimateDetailItem {
   }
 }
 
+/// The customer-facing party on an estimate. The API returns this under
+/// the `contractor` key (not `customer`), and uses `mobile` rather than
+/// `phone` for the contact number.
 class EstimateCustomer {
   final String id;
   final String name;
@@ -77,7 +100,9 @@ class EstimateCustomer {
     return EstimateCustomer(
       id: _asString(json['id']),
       name: _asString(json['name']),
-      phone: _asString(json['phone']),
+      // API field is `mobile`; fall back to `phone` in case an older
+      // payload shape is ever returned.
+      phone: _asString(json['mobile'] ?? json['phone']),
       email: _asString(json['email']),
       address: _asString(json['address']),
     );
@@ -127,6 +152,7 @@ class EstimateSiteVisit {
   final String status;
   final String statusLabel;
   final String fieldStaffName;
+  final String fieldStaffId;
   final EstimateFieldStaff fieldStaff;
 
   const EstimateSiteVisit({
@@ -138,6 +164,7 @@ class EstimateSiteVisit {
     required this.status,
     required this.statusLabel,
     required this.fieldStaffName,
+    required this.fieldStaffId,
     required this.fieldStaff,
   });
 
@@ -152,6 +179,7 @@ class EstimateSiteVisit {
         status: '',
         statusLabel: '',
         fieldStaffName: '',
+        fieldStaffId: '',
         fieldStaff: EstimateFieldStaff.fromJson(null),
       );
     }
@@ -164,7 +192,10 @@ class EstimateSiteVisit {
       status: _asString(json['status']),
       statusLabel: _asString(json['status_label']),
       fieldStaffName: _asString(json['field_staff_name']),
-      fieldStaff: EstimateFieldStaff.fromJson(json['field_staff'] as Map<String, dynamic>?),
+      // Present alongside the nested `field_staff` object in the response;
+      // kept as a flat convenience field in addition to `fieldStaff`.
+      fieldStaffId: _asString(json['field_staff_id']),
+      fieldStaff: EstimateFieldStaff.fromJson(_asMap(json['field_staff'])),
     );
   }
 }
@@ -189,6 +220,26 @@ class EstimateApprovedBy {
       name: _asString(json['name']),
       email: _asString(json['email']),
       role: _asString(json['role']),
+    );
+  }
+
+  /// Server sends id: "0" as a sentinel for "not yet approved".
+  bool get exists => id.isNotEmpty && id != '0';
+}
+
+/// Who created the estimate (e.g. the salesman/field staff role that
+/// submitted it), as returned under `created_by_details`.
+class EstimateCreatedBy {
+  final String role;
+  final String roleLabel;
+
+  const EstimateCreatedBy({required this.role, required this.roleLabel});
+
+  factory EstimateCreatedBy.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const EstimateCreatedBy(role: '', roleLabel: '');
+    return EstimateCreatedBy(
+      role: _asString(json['role']),
+      roleLabel: _asString(json['role_label']),
     );
   }
 }
@@ -250,6 +301,8 @@ class EstimatePayment {
 /// payment/balance figures aren't finalized yet, so the detail screen
 /// hides those sections and the "Create Despatch Sheet" action — both
 /// only become meaningful once an owner/admin has approved the estimate.
+/// Later lifecycle states (e.g. `delivered`) are also treated as
+/// "approved" for these purposes via [isApproved].
 class EstimateDetailModel {
   final String id;
   final String estimateNumber;
@@ -290,6 +343,7 @@ class EstimateDetailModel {
   final double balanceAmount;
   final String balanceStatus;
   final String balanceStatusLabel;
+  final String balanceStatusColor;
   final bool isFullyPaid;
 
   final int itemsCount;
@@ -300,6 +354,7 @@ class EstimateDetailModel {
   final EstimateCustomer customer;
   final EstimateSalesman salesman;
   final EstimateApprovedBy approvedByDetails;
+  final EstimateCreatedBy createdByDetails;
   final List<EstimateDetailItem> items;
   final EstimateQuotationRef quotation;
 
@@ -336,6 +391,7 @@ class EstimateDetailModel {
     required this.balanceAmount,
     required this.balanceStatus,
     required this.balanceStatusLabel,
+    required this.balanceStatusColor,
     required this.isFullyPaid,
     required this.itemsCount,
     required this.totalQuantity,
@@ -344,6 +400,7 @@ class EstimateDetailModel {
     required this.customer,
     required this.salesman,
     required this.approvedByDetails,
+    required this.createdByDetails,
     required this.items,
     required this.quotation,
   });
@@ -388,34 +445,40 @@ class EstimateDetailModel {
       balanceAmount: _asDouble(json['balance_amount']),
       balanceStatus: _asString(json['balance_status']),
       balanceStatusLabel: _asString(json['balance_status_label']),
+      balanceStatusColor: _asString(json['balance_status_color']),
       isFullyPaid: _asBool(json['is_fully_paid']),
       itemsCount: _asInt(totalsMap['items_count']),
       totalQuantity: _asDouble(totalsMap['total_quantity']),
-      siteVisit: EstimateSiteVisit.fromJson(json['site_visit'] as Map<String, dynamic>?),
+      siteVisit: EstimateSiteVisit.fromJson(_asMap(json['site_visit'])),
       payments: rawPayments is List
           ? rawPayments
           .whereType<Map>()
           .map((e) => EstimatePayment.fromJson(e.cast<String, dynamic>()))
           .toList()
           : const [],
-      customer: EstimateCustomer.fromJson(json['customer'] as Map<String, dynamic>?),
-      salesman: EstimateSalesman.fromJson(json['salesman'] as Map<String, dynamic>?),
+      // API returns this party under `contractor`, not `customer`.
+      customer: EstimateCustomer.fromJson(_asMap(json['contractor'])),
+      salesman: EstimateSalesman.fromJson(_asMap(json['salesman'])),
       approvedByDetails:
-      EstimateApprovedBy.fromJson(json['approved_by_details'] as Map<String, dynamic>?),
+      EstimateApprovedBy.fromJson(_asMap(json['approved_by_details'])),
+      createdByDetails:
+      EstimateCreatedBy.fromJson(_asMap(json['created_by_details'])),
       items: rawItems is List
           ? rawItems
           .whereType<Map>()
           .map((e) => EstimateDetailItem.fromJson(e.cast<String, dynamic>()))
           .toList()
           : const [],
-      quotation: EstimateQuotationRef.fromJson(json['quotation'] as Map<String, dynamic>?),
+      quotation: EstimateQuotationRef.fromJson(_asMap(json['quotation'])),
     );
   }
 
-  /// Only an approved estimate has finalized discount/payment figures and
-  /// can move to despatch — everything else (pending_approval, rejected,
-  /// etc.) is treated as "not yet approved" for UI purposes.
-  bool get isApproved => status.toLowerCase() == 'approved';
+  /// Statuses treated as "approved" for UI purposes: once an estimate has
+  /// moved past pending approval — including later lifecycle states like
+  /// `delivered` — discount/payment figures are considered finalized.
+  static const _approvedStatuses = {'approved', 'delivered'};
+
+  bool get isApproved => _approvedStatuses.contains(status.toLowerCase());
 
   bool get isPendingApproval => status.toLowerCase() == 'pending_approval';
 

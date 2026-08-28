@@ -2,10 +2,10 @@
 
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tileshop/bloc/salemanbloc/salesmanowner_estimatelistevent.dart';
-import 'package:tileshop/bloc/salemanbloc/salesmanownerestimatestate.dart';
-import '../../Apiprovider/salesman_ownerestimatelistprovider.dart';
-import '../../models/salesmanmodels/salesmanownerestimatemodel.dart';
+import 'package:tileshop/bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
+import 'package:tileshop/bloc/salemanbloc/estimatelistview/salesmanownerestimatestate.dart';
+import '../../../Apiprovider/salesman_ownerestimatelistprovider.dart';
+import '../../../models/salesmanmodels/salesmanownerestimatemodel.dart';
 
 class EstimatesBloc extends Bloc<SalesmanowrEstimatesEvent , SalesmanownerEstimatesState > {
   final  SalesmanOwnerEstimateProvider _provider;

@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:tileshop/bloc/salemanbloc/estimate/salesman_approvedevent.dart';
-import 'package:tileshop/bloc/salemanbloc/estimate/salesman_approvedsate.dart';
+import 'package:tileshop/bloc/salemanbloc/approvedbills/salesman_approvedevent.dart';
+import 'package:tileshop/bloc/salemanbloc/approvedbills/salesman_approvedsate.dart';
 import '../../../Apiprovider/salesman_approvedestimateprovider.dart';
 
 

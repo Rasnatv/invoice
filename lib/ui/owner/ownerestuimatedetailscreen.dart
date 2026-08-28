@@ -12,6 +12,7 @@ import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
 import '../../models/owner_models/owner_estimateactionmodel.dart';
 import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
+import 'owner_estimateupdation.dart';
 import 'ownerdespatchsheet.dart';
 
 
@@ -28,12 +29,32 @@ class OwnerEstimateDetailsScreen extends StatelessWidget {
     );
   }
 }
+Future<void> _openUpdateScreen(BuildContext context, EstimateDetailModel detail) async {
+  final bloc = context.read<OwnerEstimateDetailBloc>();
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: OwnerEstimateUpdateScreen(detail: detail),
+      ),
+    ),
+  );
+}
 
 class _OwnerEstimateDetailView extends StatelessWidget {
   const _OwnerEstimateDetailView({required this.estimateId});
   final String estimateId;
 
   final currencyFmt = const _CurrencyFmt();
+
+  /// Derived from the API response's `created_by_details.role_label`
+  /// (e.g. "Owner" vs "Salesman") — kept consistent with the salesman-side
+  /// estimate detail screen. When the estimate was created by an Owner,
+  /// the Incentive column is hidden; for a Salesman-created estimate, it
+  /// stays visible.
+  bool _isOwner(EstimateDetailModel detail) {
+    return detail.createdByDetails.roleLabel.trim().toLowerCase() == 'owner';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +103,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
 
             final detail = state.detail!;
             final isBusy = state.actionStatus == OwnerEstimateActionStatus.inProgress;
+            final isOwner = _isOwner(detail);
 
             return Column(
               children: [
@@ -132,7 +154,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                         ]),
                       ],
                       SizedBox(height: Responsive.h(20)),
-                      _buildItemsTable(detail, number),
+                      _buildItemsTable(detail, number, isOwner),
                       SizedBox(height: Responsive.h(16)),
                       _buildSummary(context, detail, number),
                       if (detail.payments.isNotEmpty) ...[
@@ -149,6 +171,16 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                     children: [
                       Row(
                         children: [
+                          // Update icon shown only for pending bills.
+                          if (detail.isPendingApproval)
+                            Padding(
+                              padding: EdgeInsets.only(right: Responsive.w(10)),
+                              child: _RoundIconButton(
+                                icon: Icons.edit_outlined,
+                                tooltip: 'Update',
+                                onPressed: () => _openUpdateScreen(context, detail),
+                              ),
+                            ),
                           _RoundIconButton(
                             icon: Icons.share_outlined,
                             tooltip: 'Share',
@@ -226,7 +258,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildItemsTable(EstimateDetailModel detail, NumberFormat number) {
+  Widget _buildItemsTable(EstimateDetailModel detail, NumberFormat number, bool isOwner) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -272,14 +304,21 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                 headingTextStyle: AppTextStyles.bodyBold(),
                 dataTextStyle: AppTextStyles.body(),
                 columnSpacing: 18,
-                columns: const [
-                  DataColumn(label: Text('Sl.No')),
-                  DataColumn(label: Text('Item')),
-                  DataColumn(label: Text('Size')),
-                  DataColumn(label: Text('Qty'), numeric: true),
-                  DataColumn(label: Text('Rate'), numeric: true),
-                  DataColumn(label: Text('Amount'), numeric: true),
-                  DataColumn(label: Text('Incentive'), numeric: true),
+                // Incentive column is still conditional on isOwner — it
+                // must mirror its `if` on the row-building side below 1:1,
+                // otherwise DataTable throws a cell/column count mismatch.
+                columns: [
+                  const DataColumn(label: Text('Sl.No')),
+                  const DataColumn(label: Text('Item')),
+                  const DataColumn(label: Text('Company')),
+                  const DataColumn(label: Text('Size')),
+                  const DataColumn(label: Text('Unit')),
+                  const DataColumn(label: Text('Qty'), numeric: true),
+                  const DataColumn(label: Text('MRP'), numeric: true),
+                  const DataColumn(label: Text('Rate'), numeric: true),
+                  const DataColumn(label: Text('Amount'), numeric: true),
+                  if (!isOwner)
+                    const DataColumn(label: Text('Incentive'), numeric: true),
                 ],
                 rows: detail.items.asMap().entries.map((entry) {
                   final i = entry.key;
@@ -287,15 +326,19 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                   return DataRow(cells: [
                     DataCell(Text('${i + 1}')),
                     DataCell(Text(item.productName)),
+                    DataCell(Text(item.companyName.isEmpty ? '-' : item.companyName)),
                     DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
+                    DataCell(Text(item.unitName.isEmpty ? '-' : item.unitName)),
                     DataCell(Text(number.format(item.quantity))),
+                    DataCell(Text(item.mrp > 0 ? currencyFmt.f(item.mrp) : '-')),
                     DataCell(Text(number.format(item.rate))),
                     DataCell(Text(currencyFmt.f(item.amount),
                         style: AppTextStyles.bodyBold())),
-                    DataCell(Text(
-                      item.isIncentiveEligible ? currencyFmt.f(item.incentiveAmount) : '-',
-                      style: AppTextStyles.bodyBold(color: AppColors.success),
-                    )),
+                    if (!isOwner)
+                      DataCell(Text(
+                        item.isIncentiveEligible ? currencyFmt.f(item.incentiveAmount) : '-',
+                        style: AppTextStyles.bodyBold(color: AppColors.success),
+                      )),
                   ]);
                 }).toList(),
               ),
@@ -420,8 +463,10 @@ class _OwnerEstimateDetailView extends StatelessWidget {
       ..writeln('Date: ${detail.dateRaw}')
       ..writeln('---');
     for (final item in detail.items) {
+      final companyPart = item.companyName.isNotEmpty ? ' (${item.companyName})' : '';
+      final unitPart = item.unitName.isNotEmpty ? ' ${item.unitName}' : '';
       buffer.writeln(
-          '${item.productName} x ${item.quantity.toStringAsFixed(0)} = ${currencyFmt.f(item.amount)}');
+          '${item.productName}$companyPart x ${item.quantity.toStringAsFixed(0)}$unitPart = ${currencyFmt.f(item.amount)}');
     }
     buffer
       ..writeln('---')

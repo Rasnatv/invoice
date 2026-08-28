@@ -1,9 +1,10 @@
+
 import '../../../../core/dummymodel/product_incentive_model.dart';
 import '../../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
 import '../../../models/owner_models/get_activedrivermodel.dart';
-import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
-
+import '../../../../models/salesmanmodels/estimatesectionproductincentive.dart';
+import '../../../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 
 enum LoadStatus { initial, loading, success, failure }
 
@@ -33,6 +34,13 @@ class OwnerEstimateState {
   final String? salesmenError;
   final SalesmanActiveModel? selectedSalesman;
 
+  /// Server-calculated full estimate preview (POST /quotations/preview) —
+  /// the source of truth for totals/discount/balance shown on the
+  /// Preview step.
+  final LoadStatus previewStatus;
+  final QuotationPreviewData? preview;
+  final String? previewError;
+
   final SubmitStatus submitStatus;
   final String? submitMessage;
   final String? submitError;
@@ -56,6 +64,9 @@ class OwnerEstimateState {
     this.salesmen = const [],
     this.salesmenError,
     this.selectedSalesman,
+    this.previewStatus = LoadStatus.initial,
+    this.preview,
+    this.previewError,
     this.submitStatus = SubmitStatus.idle,
     this.submitMessage,
     this.submitError,
@@ -84,6 +95,11 @@ class OwnerEstimateState {
     bool clearSalesmenError = false,
     SalesmanActiveModel? selectedSalesman,
     bool clearSelectedSalesman = false,
+    LoadStatus? previewStatus,
+    QuotationPreviewData? preview,
+    bool clearPreview = false,
+    String? previewError,
+    bool clearPreviewError = false,
     SubmitStatus? submitStatus,
     String? submitMessage,
     bool clearSubmitMessage = false,
@@ -108,6 +124,9 @@ class OwnerEstimateState {
       salesmenError: clearSalesmenError ? null : (salesmenError ?? this.salesmenError),
       selectedSalesman:
       clearSelectedSalesman ? null : (selectedSalesman ?? this.selectedSalesman),
+      previewStatus: previewStatus ?? this.previewStatus,
+      preview: clearPreview ? null : (preview ?? this.preview),
+      previewError: clearPreviewError ? null : (previewError ?? this.previewError),
       submitStatus: submitStatus ?? this.submitStatus,
       submitMessage: clearSubmitMessage ? null : (submitMessage ?? this.submitMessage),
       submitError: clearSubmitError ? null : (submitError ?? this.submitError),

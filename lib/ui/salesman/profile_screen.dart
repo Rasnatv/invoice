@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:tileshop/ui/salesman/profile/presentation/viewprofile.dart';
-import '../../../../../core/constants/app_colors.dart';
-import '../../../../../core/constants/app_text_styles.dart';
-import '../../../../../core/utils/responsive.dart';
-import '../../../auth/login_screen.dart';
+import 'package:tileshop/ui/salesman/viewprofile.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/responsive.dart';
+import '../auth/login_screen.dart';
 import 'changepassword.dart';
 import 'mybills.dart';
 
