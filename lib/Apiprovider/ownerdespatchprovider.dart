@@ -1,3 +1,4 @@
+
 import 'package:dio/dio.dart';
 import '../../../core/apiclient/api_client.dart';
 import '../../../core/errors/apierrorhandler.dart';
@@ -82,18 +83,20 @@ class DispatchProvider {
   );
 
   /// POST /despatches/mark-delivered — second step, only valid once the
-  /// dispatch is `in_transit`. Signatures are base64 PNG data URIs
-  /// (e.g. `data:image/png;base64,...`).
+  /// dispatch is `in_transit`. Signatures are optional: either, both, or
+  /// neither may be supplied. When provided they're base64 PNG data URIs
+  /// (e.g. `data:image/png;base64,...`); the server responds with hosted
+  /// image URLs for whichever ones were uploaded.
   Future<DispatchDetailResult> markDelivered({
     required String id,
-    required String customerSignatureBase64,
-    required String driverSignatureBase64,
+    String? customerSignatureBase64,
+    String? driverSignatureBase64,
   }) =>
       _detailCall(
             () => _apiClient.markDelivered({
           'id': int.tryParse(id) ?? id,
-          'customer_signature': customerSignatureBase64,
-          'driver_signature': driverSignatureBase64,
+          if (customerSignatureBase64 != null) 'customer_signature': customerSignatureBase64,
+          if (driverSignatureBase64 != null) 'driver_signature': driverSignatureBase64,
         }),
         fallbackError: 'Failed to mark as delivered.',
       );

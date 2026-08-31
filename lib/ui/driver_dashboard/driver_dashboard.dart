@@ -1,18 +1,22 @@
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
+
+import '../../Apiprovider/driverdespatchprovider.dart';
+import '../../bloc/driverbloc/driverdashboard/driverdashboard_bloc.dart';
+import '../../bloc/driverbloc/driverdashboard/driverdashboard_event.dart';
+import '../../bloc/driverbloc/driverdashboard/driverdashboard_state.dart';
+import '../../models/drivermodels/driverdashboardmodel.dart';
 import '../auth/login_screen.dart';
-import 'despatchrepository.dart';
-import 'driverdespatchbillmodel.dart';
 import 'driverdetailscreen.dart';
 
-class DriverDashboardScreen extends StatefulWidget {
+class DriverDashboardScreen extends StatelessWidget {
   const DriverDashboardScreen({
     super.key,
-    this.driverName = 'Rajesh',
+    this.driverName = 'Driver',
     this.onLogout,
     this.onChangePassword,
   });
@@ -22,71 +26,68 @@ class DriverDashboardScreen extends StatefulWidget {
   final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
 
   @override
-  State<DriverDashboardScreen> createState() => _DriverDashboardScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => DriverDashboardBloc(DriverDespatchProvider())..add(const FetchDriverDashboard()),
+      child: _DriverDashboardView(
+        driverName: driverName,
+        onLogout: onLogout,
+        onChangePassword: onChangePassword,
+      ),
+    );
+  }
 }
-class _DriverDashboardScreenState extends State<DriverDashboardScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+
+class _DriverDashboardView extends StatefulWidget {
+  const _DriverDashboardView({
+    required this.driverName,
+    this.onLogout,
+    this.onChangePassword,
+  });
+
+  final String driverName;
+  final VoidCallback? onLogout;
+  final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
+
+  @override
+  State<_DriverDashboardView> createState() => _DriverDashboardViewState();
+}
+
+class _DriverDashboardViewState extends State<_DriverDashboardView> {
   final _searchCtrl = TextEditingController();
   String _query = '';
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
   void dispose() {
-    _tabController.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  /// Bills despatched to this driver_features specifically.
-  /// TODO(backend): filter server-side once despatch sheets carry a real
-  /// driver_features ID instead of a plain name match.
-  List<DriverDespatchedBillModel> _myBills(List<DriverDespatchedBillModel> all) =>
-      all.where((b) => b.driverName == widget.driverName).toList();
-
-  List<DriverDespatchedBillModel> _filtered(List<DriverDespatchedBillModel> source) {
+  List<DriverDespatchListItem> _filtered(List<DriverDespatchListItem> source) {
     if (_query.trim().isEmpty) return source;
     final q = _query.trim().toLowerCase();
     return source
         .where((b) =>
-    b.contractorName.toLowerCase().contains(q) ||
+    b.partyName.toLowerCase().contains(q) ||
         b.dsNumber.toLowerCase().contains(q) ||
         b.id.toLowerCase().contains(q))
         .toList();
   }
 
-  void _markDelivered(DriverDespatchedBillModel bill) {
-    DespatchRepository.instance.markDelivered(bill.id);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.info,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text('${bill.contractorName} marked as delivered')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openDetail(DriverDespatchedBillModel bill) {
-    Navigator.of(context).push(
+  void _openDetail(DriverDespatchListItem bill) {
+    Navigator.of(context)
+        .push(
       MaterialPageRoute(
-        builder: (_) => DriverBillDetailScreen(
-          billId: bill.id,
-          onDelivered: () => _markDelivered(bill),
-        ),
+        builder: (_) => DriverBillDetailScreen(billId: bill.id),
       ),
-    );
+    )
+        .then((_) {
+      // Refresh counts/status once the user returns from the detail
+      // screen, in case they marked it in-transit or delivered there.
+      if (mounted) {
+        context.read<DriverDashboardBloc>().add(const RefreshDriverDashboard());
+      }
+    });
   }
 
   Future<void> _confirmLogout() async {
@@ -115,7 +116,6 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     if (widget.onLogout != null) {
       widget.onLogout!();
     } else {
-      // TODO(auth): clear session/token here once real auth exists.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
             (route) => false,
@@ -123,8 +123,6 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     }
   }
 
-  /// Opens the account sheet (tap on avatar / overflow icon) with
-  /// "Change Password" and "Logout" actions.
   void _openAccountSheet() {
     showModalBottomSheet(
       context: context,
@@ -152,7 +150,6 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
           if (widget.onChangePassword != null) {
             await widget.onChangePassword!(current, next);
           } else {
-            // TODO(auth): replace with a real API call once auth exists.
             await Future.delayed(const Duration(milliseconds: 600));
           }
         },
@@ -173,16 +170,34 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: AnimatedBuilder(
-        animation: DespatchRepository.instance,
-        builder: (context, _) {
-          final myBills = _myBills(DespatchRepository.instance.bills);
-          final pending = myBills.where((b) => !b.isDelivered).toList();
-          final delivered = myBills.where((b) => b.isDelivered).toList();
+      body: BlocBuilder<DriverDashboardBloc, DriverDashboardState>(
+        builder: (context, state) {
+          if (state.status == DriverDashboardStatus.initial ||
+              (state.status == DriverDashboardStatus.loading && state.dashboard == null)) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state.status == DriverDashboardStatus.failure && state.dashboard == null) {
+            return _ErrorView(
+              message: state.errorMessage ?? 'Failed to load dashboard',
+              onRetry: () => context.read<DriverDashboardBloc>().add(const FetchDriverDashboard()),
+            );
+          }
+
+          final dashboard = state.dashboard!;
+          final all = _filtered(dashboard.list);
 
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () async => setState(() {}),
+            onRefresh: () async {
+              context.read<DriverDashboardBloc>().add(const RefreshDriverDashboard());
+              await context
+                  .read<DriverDashboardBloc>()
+                  .stream
+                  .firstWhere((s) =>
+              s.status == DriverDashboardStatus.success ||
+                  s.status == DriverDashboardStatus.failure);
+            },
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -191,9 +206,9 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
                     greeting: greeting,
                     name: widget.driverName,
                     dateLabel: today,
-                    total: myBills.length,
-                    pending: pending.length,
-                    delivered: delivered.length,
+                    total: dashboard.total,
+                    pending: dashboard.pending + dashboard.inTransit,
+                    delivered: dashboard.delivered,
                     onAccountTap: _openAccountSheet,
                   ),
                 ),
@@ -206,47 +221,18 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
                         controller: _searchCtrl,
                         onChanged: (v) => setState(() => _query = v),
                       ),
-                      SizedBox(height: Responsive.h(16)),
-                      _DriverTabBar(
-                        controller: _tabController,
-                        pendingCount: pending.length,
-                        deliveredCount: delivered.length,
-                        totalCount: myBills.length,
-                      ),
                       SizedBox(height: Responsive.h(14)),
                     ]),
                   ),
                 ),
                 SliverFillRemaining(
                   hasScrollBody: true,
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _BillList(
-                        bills: _filtered(pending),
-                        emptyIcon: Icons.inventory_2_outlined,
-                        emptyLabel: 'No pending deliveries',
-                        emptySubLabel: 'All caught up! New despatches will appear here.',
-                        onTapBill: _openDetail,
-                        onDeliverTap: _markDelivered,
-                      ),
-                      _BillList(
-                        bills: _filtered(delivered),
-                        emptyIcon: Icons.local_shipping_outlined,
-                        emptyLabel: 'No delivered bills yet',
-                        emptySubLabel: 'Completed deliveries will show up here.',
-                        onTapBill: _openDetail,
-                        onDeliverTap: null,
-                      ),
-                      _BillList(
-                        bills: _filtered(myBills),
-                        emptyIcon: Icons.receipt_long_outlined,
-                        emptyLabel: 'No despatch sheets yet',
-                        emptySubLabel: 'Bills assigned to you will be listed here.',
-                        onTapBill: _openDetail,
-                        onDeliverTap: _markDelivered,
-                      ),
-                    ],
+                  child: _BillList(
+                    bills: all,
+                    emptyIcon: Icons.receipt_long_outlined,
+                    emptyLabel: 'No despatch sheets yet',
+                    emptySubLabel: 'Bills assigned to you will be listed here.',
+                    onTapBill: _openDetail,
                   ),
                 ),
               ],
@@ -302,7 +288,7 @@ class _DriverHeader extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.primary.withOpacity(0.86)],
+              colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.86)],
             ),
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(28),
@@ -310,7 +296,7 @@ class _DriverHeader extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withOpacity(0.22),
+                color: AppColors.primary.withValues(alpha: 0.22),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -333,9 +319,9 @@ class _DriverHeader extends StatelessWidget {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
+                            color: Colors.white.withValues(alpha: 0.18),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.4),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.4),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -358,7 +344,7 @@ class _DriverHeader extends StatelessWidget {
                           Text(
                             greeting,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.78),
+                              color: Colors.white.withValues(alpha: 0.78),
                               fontSize: Responsive.sp(11.5),
                               fontWeight: FontWeight.w500,
                               letterSpacing: 0.2,
@@ -379,13 +365,13 @@ class _DriverHeader extends StatelessWidget {
                               vertical: Responsive.h(2),
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.16),
+                              color: Colors.white.withValues(alpha: 0.16),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               'DRIVER',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.92),
+                                color: Colors.white.withValues(alpha: 0.92),
                                 fontSize: Responsive.sp(9.5),
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.8,
@@ -396,7 +382,7 @@ class _DriverHeader extends StatelessWidget {
                       ),
                     ),
                     Material(
-                      color: Colors.white.withOpacity(0.16),
+                      color: Colors.white.withValues(alpha: 0.16),
                       shape: const CircleBorder(),
                       child: InkWell(
                         customBorder: const CircleBorder(),
@@ -413,18 +399,18 @@ class _DriverHeader extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(6)),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 12.5, color: Colors.white.withOpacity(0.9)),
+                      Icon(Icons.calendar_today_rounded, size: 12.5, color: Colors.white.withValues(alpha: 0.9)),
                       SizedBox(width: Responsive.w(6)),
                       Text(
                         dateLabel,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: Responsive.sp(11.5),
                           fontWeight: FontWeight.w500,
                         ),
@@ -445,10 +431,10 @@ class _DriverHeader extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.textSecondary.withOpacity(0.06)),
+              border: Border.all(color: AppColors.textSecondary.withValues(alpha: 0.06)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -493,7 +479,7 @@ class _DriverHeader extends StatelessWidget {
   Widget _statDivider() => Container(
     width: 1,
     height: 37,
-    color: AppColors.textSecondary.withOpacity(0.12),
+    color: AppColors.textSecondary.withValues(alpha: 0.12),
   );
 }
 
@@ -517,7 +503,7 @@ class _MiniStat extends StatelessWidget {
         Container(
           width: 30,
           height: 30,
-          decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Icon(icon, size: 15, color: color),
         ),
@@ -539,8 +525,6 @@ class _MiniStat extends StatelessWidget {
 
 // ---------------- ACCOUNT SHEET ----------------
 
-/// Bottom sheet shown when the avatar / overflow icon in the header is
-/// tapped. Houses account-level actions: change password and logout.
 class _AccountSheet extends StatelessWidget {
   const _AccountSheet({
     required this.driverName,
@@ -570,7 +554,7 @@ class _AccountSheet extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 30,
               offset: const Offset(0, -6),
             ),
@@ -584,7 +568,7 @@ class _AccountSheet extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
-                color: AppColors.textSecondary.withOpacity(0.2),
+                color: AppColors.textSecondary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -596,7 +580,7 @@ class _AccountSheet extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -683,7 +667,7 @@ class _AccountTile extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -699,7 +683,7 @@ class _AccountTile extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary.withOpacity(0.5)),
+              Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary.withValues(alpha: 0.5)),
             ],
           ),
         ),
@@ -713,7 +697,6 @@ class _AccountTile extends StatelessWidget {
 class _ChangePasswordDialog extends StatefulWidget {
   const _ChangePasswordDialog({required this.onSubmit});
 
-  /// Called with (currentPassword, newPassword) once the form validates.
   final Future<void> Function(String current, String next) onSubmit;
 
   @override
@@ -791,7 +774,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -959,7 +942,7 @@ class _SearchField extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -995,65 +978,6 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-// ---------------- TAB BAR ----------------
-
-class _DriverTabBar extends StatelessWidget {
-  const _DriverTabBar({
-    required this.controller,
-    required this.pendingCount,
-    required this.deliveredCount,
-    required this.totalCount,
-  });
-
-  final TabController controller;
-  final int pendingCount;
-  final int deliveredCount;
-  final int totalCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: TabBar(
-        controller: controller,
-        indicator: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: Colors.white,
-        unselectedLabelColor: AppColors.textSecondary,
-        labelStyle: TextStyle(fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w700),
-        unselectedLabelStyle: TextStyle(fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w600),
-        dividerColor: Colors.transparent,
-        tabs: [
-          Tab(text: 'Pending ($pendingCount)'),
-          Tab(text: 'Delivered ($deliveredCount)'),
-          Tab(text: 'All ($totalCount)'),
-        ],
-      ),
-    );
-  }
-}
-
 // ---------------- BILL LIST ----------------
 
 class _BillList extends StatelessWidget {
@@ -1063,15 +987,13 @@ class _BillList extends StatelessWidget {
     required this.emptyLabel,
     required this.emptySubLabel,
     required this.onTapBill,
-    required this.onDeliverTap,
   });
 
-  final List<DriverDespatchedBillModel> bills;
+  final List<DriverDespatchListItem> bills;
   final IconData emptyIcon;
   final String emptyLabel;
   final String emptySubLabel;
-  final ValueChanged<DriverDespatchedBillModel> onTapBill;
-  final ValueChanged<DriverDespatchedBillModel>? onDeliverTap;
+  final ValueChanged<DriverDespatchListItem> onTapBill;
 
   @override
   Widget build(BuildContext context) {
@@ -1086,11 +1008,11 @@ class _BillList extends StatelessWidget {
                 width: 74,
                 height: 74,
                 decoration: BoxDecoration(
-                  color: AppColors.textSecondary.withOpacity(0.08),
+                  color: AppColors.textSecondary.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(emptyIcon, size: 32, color: AppColors.textSecondary.withOpacity(0.5)),
+                child: Icon(emptyIcon, size: 32, color: AppColors.textSecondary.withValues(alpha: 0.5)),
               ),
               SizedBox(height: Responsive.h(14)),
               Text(
@@ -1123,7 +1045,6 @@ class _BillList extends StatelessWidget {
         return _BillTile(
           bill: bill,
           onTap: () => onTapBill(bill),
-          onDeliverTap: onDeliverTap == null ? null : () => onDeliverTap!(bill),
         );
       },
     );
@@ -1131,20 +1052,22 @@ class _BillList extends StatelessWidget {
 }
 
 class _BillTile extends StatelessWidget {
-  const _BillTile({required this.bill, required this.onTap, required this.onDeliverTap});
-  final DriverDespatchedBillModel bill;
+  const _BillTile({required this.bill, required this.onTap});
+  final DriverDespatchListItem bill;
   final VoidCallback onTap;
-  final VoidCallback? onDeliverTap;
 
-  String get _initial => bill.contractorName.trim().isEmpty
+  String get _initial => bill.partyName.trim().isEmpty
       ? '?'
-      : bill.contractorName.trim().substring(0, 1).toUpperCase();
+      : bill.partyName.trim().substring(0, 1).toUpperCase();
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final delivered = bill.isDelivered;
-    final statusColor = delivered ? AppColors.info : AppColors.warning;
+    final statusColor = bill.isDelivered
+        ? AppColors.info
+        : bill.isInTransit
+        ? AppColors.primary
+        : AppColors.warning;
 
     return Material(
       color: Colors.white,
@@ -1155,10 +1078,10 @@ class _BillTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.textSecondary.withOpacity(0.08)),
+            border: Border.all(color: AppColors.textSecondary.withValues(alpha: 0.08)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -1168,7 +1091,6 @@ class _BillTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // status accent bar
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
@@ -1192,7 +1114,7 @@ class _BillTile extends StatelessWidget {
                               width: 34,
                               height: 34,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
@@ -1208,7 +1130,7 @@ class _BillTile extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    bill.contractorName,
+                                    bill.partyName,
                                     style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -1225,11 +1147,11 @@ class _BillTile extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            _StatusChip(delivered: delivered),
+                            _StatusChip(statusLabel: bill.statusLabel),
                           ],
                         ),
                         SizedBox(height: Responsive.h(10)),
-                        Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.08)),
+                        Divider(height: 1, color: AppColors.textSecondary.withValues(alpha: 0.08)),
                         SizedBox(height: Responsive.h(10)),
                         Row(
                           children: [
@@ -1248,7 +1170,7 @@ class _BillTile extends StatelessWidget {
                         SizedBox(height: Responsive.h(6)),
                         Row(
                           children: [
-                            _MetaChip(icon: Icons.inventory_2_outlined, label: '${bill.itemCount} items'),
+                            _MetaChip(icon: Icons.inventory_2_outlined, label: '${bill.itemsCount} items'),
                             SizedBox(width: Responsive.w(6)),
                             Expanded(
                               child: _MetaChip(icon: Icons.person_outline, label: bill.salesmanName),
@@ -1266,7 +1188,7 @@ class _BillTile extends StatelessWidget {
                                     .copyWith(fontSize: Responsive.sp(16)),
                               ),
                             ),
-                            _DeliverButton(delivered: delivered, onTap: onDeliverTap),
+                            Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary.withValues(alpha: 0.5)),
                           ],
                         ),
                       ],
@@ -1319,29 +1241,36 @@ class _MetaChip extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.delivered});
-  final bool delivered;
+  const _StatusChip({required this.statusLabel});
+  final String statusLabel;
 
   @override
   Widget build(BuildContext context) {
-    final color = delivered ? AppColors.info : AppColors.warning;
+    final lower = statusLabel.toLowerCase();
+    final Color color = lower == 'delivered'
+        ? AppColors.info
+        : lower == 'in transit'
+        ? AppColors.primary
+        : AppColors.warning;
+    final IconData icon = lower == 'delivered'
+        ? Icons.check_circle_rounded
+        : lower == 'in transit'
+        ? Icons.local_shipping_rounded
+        : Icons.access_time_filled_rounded;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: Responsive.w(9), vertical: Responsive.h(4)),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            delivered ? Icons.check_circle_rounded : Icons.access_time_filled_rounded,
-            size: 11,
-            color: color,
-          ),
+          Icon(icon, size: 11, color: color),
           SizedBox(width: Responsive.w(4)),
           Text(
-            delivered ? 'Delivered' : 'Pending',
+            statusLabel,
             style: TextStyle(color: color, fontSize: Responsive.sp(10.5), fontWeight: FontWeight.w700),
           ),
         ],
@@ -1350,54 +1279,27 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// Full-width "Mark Delivered" pill for pending bills. Renders as a static,
-/// muted "Delivered" pill once the bill is complete.
-class _DeliverButton extends StatelessWidget {
-  const _DeliverButton({required this.delivered, required this.onTap});
-  final bool delivered;
-  final VoidCallback? onTap;
+// ---------------- ERROR VIEW ----------------
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    if (delivered) {
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
-        decoration: BoxDecoration(
-          color: AppColors.info.withOpacity(0.10),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded, color: AppColors.info, size: 15),
-            SizedBox(width: Responsive.w(5)),
-            Text(
-              'Done',
-              style: TextStyle(color: AppColors.info, fontSize: Responsive.sp(11.5), fontWeight: FontWeight.w700),
-            ),
+            const Icon(Icons.error_outline_rounded, size: 40, color: Colors.redAccent),
+            SizedBox(height: Responsive.h(10)),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
+            SizedBox(height: Responsive.h(14)),
+            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
-        ),
-      );
-    }
-    return Material(
-      color: AppColors.primary,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 15),
-              SizedBox(width: Responsive.w(5)),
-              Text(
-                'Deliver',
-                style: TextStyle(color: Colors.white, fontSize: Responsive.sp(11.5), fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -178,4 +178,16 @@ class ApiConstants {
   static const String estimatesReport='/reports/estimates';
   static const String fieldStaffActive = '/field-staff/active';
   static const String incentivesReport = '/reports/incentives';
+
+
+  //incentive setup
+  static const String salesmanIncentiveSetupList = '/salesman-incentive-setup';
+  static const String salesmanIncentiveSetupGet = '/salesman-incentive-setup/get';
+  static const String salesmanIncentiveSetupSave = '/salesman-incentive-setup/save';
+  static const String salesmanIncentiveSetupDelete = '/salesman-incentive-setup/delete';
+
+
+  //DRIVER
+  static const driversDashboard = '/drivers/dashboard';
+  static const driversShow = '/drivers/show';
 }

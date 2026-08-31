@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
-import '../../../core/dummymodel/product_incentive_model.dart';
 import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 
 enum OwnerEditLoadStatus { initial, loading, success, failure }

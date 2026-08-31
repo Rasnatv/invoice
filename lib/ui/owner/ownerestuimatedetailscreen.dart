@@ -330,7 +330,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                     DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
                     DataCell(Text(item.unitName.isEmpty ? '-' : item.unitName)),
                     DataCell(Text(number.format(item.quantity))),
-                    DataCell(Text(item.mrp > 0 ? currencyFmt.f(item.mrp) : '-')),
+                    DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
                     DataCell(Text(number.format(item.rate))),
                     DataCell(Text(currencyFmt.f(item.amount),
                         style: AppTextStyles.bodyBold())),

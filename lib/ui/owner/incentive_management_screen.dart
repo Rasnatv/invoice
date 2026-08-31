@@ -1,8 +1,8 @@
 
+// }
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:tileshop/ui/owner/salesmanincentivesetup.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -14,58 +14,6 @@ import 'add_incentiveproduct.dart';
 import 'company_addscreen.dart';
 import 'owner_unitaddscreen.dart';
 
-/// How the monthly bonus is paid out once a salesman crosses their target.
-enum BonusType { fixed, percent }
-
-/// Simple dummy salesman record. Swap this out for your real dummymodel/API
-/// once you wire this screen up to actual salesman data.
-class SalesmanModel {
-  const SalesmanModel({required this.id, required this.name});
-  final String id;
-  final String name;
-}
-
-class SalesmanMonthlyBonus {
-  const SalesmanMonthlyBonus({
-    this.enabled = false,
-    required this.month,
-    required this.year,
-    this.target,
-    this.bonusType = BonusType.percent,
-    this.bonusValue = 0,
-  });
-
-  final bool enabled;
-  final int month;
-  final int year;
-  final double? target;
-  final BonusType bonusType;
-
-  /// Meaning depends on [bonusType]: a ₹ amount when fixed, a % when percent.
-  final double bonusValue;
-
-  bool get hasTarget => target != null && target! > 0;
-
-  SalesmanMonthlyBonus copyWith({
-    bool? enabled,
-    int? month,
-    int? year,
-    double? target,
-    bool clearTarget = false,
-    BonusType? bonusType,
-    double? bonusValue,
-  }) {
-    return SalesmanMonthlyBonus(
-      enabled: enabled ?? this.enabled,
-      month: month ?? this.month,
-      year: year ?? this.year,
-      target: clearTarget ? null : (target ?? this.target),
-      bonusType: bonusType ?? this.bonusType,
-      bonusValue: bonusValue ?? this.bonusValue,
-    );
-  }
-}
-
 class IncentiveManagementScreen extends StatefulWidget {
   const IncentiveManagementScreen({super.key});
 
@@ -75,59 +23,42 @@ class IncentiveManagementScreen extends StatefulWidget {
 
 class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
   final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
 
   // Owns the bloc for this screen so the list survives navigating to
   // company/unit setup and back, and so we can trigger a refresh after
   // returning from add/edit without re-parsing a popped result.
   late final ProductBloc _productBloc;
 
-  // ---- Salesman dummy data (unrelated to the product API; left as-is) ----
-  final List<SalesmanModel> _salesmen = const [
-    SalesmanModel(id: 's1', name: 'Ramesh Kumar'),
-    SalesmanModel(id: 's2', name: 'Suresh Patel'),
-    SalesmanModel(id: 's3', name: 'Anita Sharma'),
-  ];
-
-  late final Map<String, SalesmanMonthlyBonus> _monthlyBonusBySalesman = {
-    's1': SalesmanMonthlyBonus(
-      enabled: true,
-      month: DateTime.now().month,
-      year: DateTime.now().year,
-      target: 300000,
-      bonusType: BonusType.percent,
-      bonusValue: 2,
-    ),
-    's2': SalesmanMonthlyBonus(
-      enabled: true,
-      month: DateTime.now().month,
-      year: DateTime.now().year,
-      target: 200000,
-      bonusType: BonusType.fixed,
-      bonusValue: 5000,
-    ),
-    's3': SalesmanMonthlyBonus(
-      enabled: false,
-      month: DateTime.now().month,
-      year: DateTime.now().year,
-    ),
-  };
-
+  // Still used to format MRP/Rate/Incentive in the product cards below.
   final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-
-  String _periodLabelFor(SalesmanMonthlyBonus b) =>
-      DateFormat('MMMM yyyy').format(DateTime(b.year, b.month));
 
   @override
   void initState() {
     super.initState();
     _productBloc = ProductBloc()..add(const LoadProducts());
+    _scrollCtrl.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
     _searchCtrl.dispose();
     _productBloc.close();
     super.dispose();
+  }
+
+  /// Requests the next page once the user is within ~200px of the bottom.
+  /// The bloc itself guards against duplicate/overlapping requests and
+  /// against calling past the last page, so it's safe to call this on
+  /// every scroll tick.
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final threshold = _scrollCtrl.position.maxScrollExtent - 200;
+    if (_scrollCtrl.position.pixels >= threshold) {
+      _productBloc.add(const LoadMoreProducts());
+    }
   }
 
   List<ProductModel> _filtered(List<ProductModel> products) {
@@ -180,22 +111,6 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
     }
   }
 
-  /// "Add Incentive" -> opens the salesman-selection screen. Setting the
-  /// actual target/incentive happens on a separate page after that.
-  Future<void> _openIncentiveSetupList() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AddIncentiveScreen(
-          salesmen: _salesmen,
-          bonusBySalesman: _monthlyBonusBySalesman,
-          currency: _currency,
-          periodLabelFor: _periodLabelFor,
-        ),
-      ),
-    );
-    if (mounted) setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -223,32 +138,20 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
             builder: (context, state) {
               final loading = state.status == ProductStatus.loading;
               final items = _filtered(state.products);
+              // Infinite scroll only makes sense over the full server-side
+              // list — while a search filter is active, keep the bottom
+              // spinner hidden even if more pages are still loading.
+              final searching = _searchCtrl.text.trim().isNotEmpty;
 
               return RefreshIndicator(
                 onRefresh: () async => _productBloc.add(const LoadProducts()),
                 child: ListView(
+                  controller: _scrollCtrl,
                   padding: EdgeInsets.fromLTRB(
                       Responsive.w(16), Responsive.h(14), Responsive.w(16), Responsive.h(20)),
                   children: [
                     SizedBox(height: Responsive.h(14)),
 
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _openIncentiveSetupList,
-                        icon: const Icon(Icons.add_chart_outlined, color: AppColors.primary),
-                        label: Text(
-                          'Add Monthly Target',
-                          style: AppTextStyles.bodyBold().copyWith(color: AppColors.primary),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primary),
-                          padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: Responsive.h(12)),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -360,6 +263,19 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
                             ],
                           ],
                         ),
+
+                    // Bottom-of-list spinner while the next page loads.
+                    if (!searching && state.isLoadingMore)
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               );

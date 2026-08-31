@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/owner/report/ownerreportscreen.dart';
+import 'package:tileshop/ui/owner/salesmanincentivesetup.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -128,9 +129,15 @@ class _OwnerDashboardView extends StatelessWidget {
                               ),
                               _QuickActionData(
                                 icon: Icons.inventory_2_outlined,
-                                label: 'Product &Incentive\nSetup',
-                                color: const Color(0xFF7C3AED),
+                                label: 'Product Setup',
+                                color: const Color(0xFF9F1A49),
                                 onTap: () => _open(context, const IncentiveManagementScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.calendar_month,
+                                label: ' Monthely Target',
+                                color: const Color(0xFF1EBA95),
+                                onTap: () => _open(context, const AddIncentiveScreen()),
                               ),
                               _QuickActionData(
                                 icon: Icons.badge_outlined,

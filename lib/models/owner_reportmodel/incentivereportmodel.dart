@@ -1,32 +1,3 @@
-/// Models for GET /reports/incentives (POST body, actually — matches the
-/// same shape as QuotationReportResponseModel / EstimateReportResponseModel).
-///
-/// Example payload:
-/// {
-///   "status": "1",
-///   "status_code": "200",
-///   "data": {
-///     "summary": {
-///       "total_incentive": "2525.00",
-///       "paid_count": "0",
-///       "pending_count": "0"
-///     },
-///     "list": [
-///       {
-///         "id": "1",
-///         "person_name": "Field Staff",
-///         "incentive_amount": "2525.00",
-///         "status": "pending",
-///         "status_label": "Pending",
-///         "created_at": "2026-08-19 14:10:51",
-///         "paid_at": "",
-///         "payment_reference": "",
-///         "notes": "Auto-calculated from completed estimate ..."
-///       }
-///     ]
-///   },
-///   "message": "Incentive report generated"
-/// }
 
 class IncentiveReportResponseModel {
   final String status;

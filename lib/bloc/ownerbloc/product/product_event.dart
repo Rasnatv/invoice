@@ -1,3 +1,4 @@
+
 import 'package:equatable/equatable.dart';
 
 import '../../../models/owner_models/addproductmodel.dart';
@@ -17,6 +18,9 @@ class LoadProductDropdowns extends ProductEvent {
   const LoadProductDropdowns();
 }
 
+/// Resets and (re)loads from page 1 — used for the initial load and for
+/// pull-to-refresh. For subsequent pages, use [LoadMoreProducts] instead;
+/// this event always replaces the list rather than appending to it.
 class LoadProducts extends ProductEvent {
   const LoadProducts({this.page = 1, this.perPage = 10});
 
@@ -25,6 +29,18 @@ class LoadProducts extends ProductEvent {
 
   @override
   List<Object?> get props => [page, perPage];
+}
+
+/// Fetches the next page after the currently loaded one and appends it to
+/// the existing product list. The bloc ignores this if a load is already
+/// in progress or a previous page came back short (i.e. no more pages).
+class LoadMoreProducts extends ProductEvent {
+  const LoadMoreProducts({this.perPage = 10});
+
+  final int perPage;
+
+  @override
+  List<Object?> get props => [perPage];
 }
 
 class CreateProduct extends ProductEvent {

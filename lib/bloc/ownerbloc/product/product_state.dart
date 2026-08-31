@@ -1,3 +1,4 @@
+
 import 'package:equatable/equatable.dart';
 import '../../../models/owner_models/activecompanymodel.dart';
 import '../../../models/owner_models/activeuintmodel.dart';
@@ -23,6 +24,9 @@ class ProductState extends Equatable {
     this.errorMessage,
     this.actionMessage,
     this.isUnauthorized = false,
+    this.currentPage = 1,
+    this.hasMore = true,
+    this.isLoadingMore = false,
   });
 
   final ProductStatus status;
@@ -36,6 +40,16 @@ class ProductState extends Equatable {
   final String? actionMessage;
   final bool isUnauthorized;
 
+  /// Pagination bookkeeping. `currentPage` is the last page successfully
+  /// loaded into `products`. `hasMore` is inferred client-side: a page that
+  /// comes back with fewer than `perPage` items is treated as the last
+  /// page, since the API response carries no total/last_page metadata.
+  /// `isLoadingMore` drives a small bottom-of-list spinner, kept separate
+  /// from `status` so loading page 2 doesn't blank the already-loaded list.
+  final int currentPage;
+  final bool hasMore;
+  final bool isLoadingMore;
+
   ProductState copyWith({
     ProductStatus? status,
     List<ProductModel>? products,
@@ -46,6 +60,9 @@ class ProductState extends Equatable {
     String? actionMessage,
     bool? isUnauthorized,
     bool clearMessages = false,
+    int? currentPage,
+    bool? hasMore,
+    bool? isLoadingMore,
   }) {
     return ProductState(
       status: status ?? this.status,
@@ -56,6 +73,9 @@ class ProductState extends Equatable {
       errorMessage: clearMessages ? null : (errorMessage ?? this.errorMessage),
       actionMessage: clearMessages ? null : (actionMessage ?? this.actionMessage),
       isUnauthorized: isUnauthorized ?? this.isUnauthorized,
+      currentPage: currentPage ?? this.currentPage,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
@@ -69,5 +89,8 @@ class ProductState extends Equatable {
     errorMessage,
     actionMessage,
     isUnauthorized,
+    currentPage,
+    hasMore,
+    isLoadingMore,
   ];
 }
