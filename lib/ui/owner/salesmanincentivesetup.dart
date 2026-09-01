@@ -343,6 +343,13 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
     _bonusCtrl.text = detail.bonusValue == 0 ? '' : _trimZeros(detail.bonusValue);
   }
 
+  // NEW: called the instant the user switches month/year, BEFORE the
+  // new /get response arrives, so stale values from the previous
+  // period never stay visible on screen while the new period loads.
+  void _resetFormForNewPeriod() {
+    setState(() => _applyDetail(null));
+  }
+
   String _trimZeros(double v) {
     final s = v.toStringAsFixed(2);
     return s.endsWith('.00') ? s.substring(0, s.length - 3) : s;
@@ -498,7 +505,9 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                               ? null
                               : (v) {
                             if (v != null && v != _month) {
-                              setState(() => _month = v);
+                              // Clear stale fields immediately, THEN refetch.
+                              _month = v;
+                              _resetFormForNewPeriod();
                               _fetchForPeriod();
                             }
                           },
@@ -516,7 +525,9 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                               ? null
                               : (v) {
                             if (v != null && v != _year) {
-                              setState(() => _year = v);
+                              // Clear stale fields immediately, THEN refetch.
+                              _year = v;
+                              _resetFormForNewPeriod();
                               _fetchForPeriod();
                             }
                           },
