@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/owner/report/ownerreportscreen.dart';
 import 'package:tileshop/ui/owner/salesmanincentivesetup.dart';
 import '../../../core/constants/app_colors.dart';
@@ -20,7 +21,6 @@ import 'owner_estimates_screen.dart';
 import 'ownercreateesimatescreen.dart';
 import 'ownerestuimatedetailscreen.dart';
 import 'ownerincentivesummarypage.dart';
-import 'ownersalesmanreport.dart';
 import 'ownersalesmanscreen.dart';
 import 'quotations_screen.dart';
 import 'incentive_management_screen.dart';
@@ -56,7 +56,7 @@ class _OwnerDashboardView extends StatelessWidget {
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       body: BlocBuilder<OwnerDashboardBloc, OwnerDashboardState>(
         builder: (context, state) {
@@ -241,7 +241,7 @@ class _OwnerDashboardView extends StatelessWidget {
           );
         },
       ),
-    );
+    ));
   }
 }
 

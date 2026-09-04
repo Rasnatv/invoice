@@ -2,12 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/paymentprovider.dart';
 import '../../core/utils/currency_utils.dart';
 import '../../models/owner_models/paymentmodel.dart';
+import '../../widgets/appsnackbar.dart';
 
 /// "Record Payment" screen.
 ///
@@ -57,9 +59,7 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedMethod == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a payment method')),
-      );
+      AppSnackbar.error('Please select a payment method');
       return;
     }
 
@@ -84,14 +84,10 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
     setState(() => _saving = false);
 
     if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message ?? 'Payment saved')),
-      );
+      AppSnackbar.success(result.message ?? 'Payment saved');
       Navigator.of(context).pop(true);
     } else if (result.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.errorMessage!)),
-      );
+      AppSnackbar.error(result.errorMessage!);
     }
   }
 
@@ -99,7 +95,7 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Record Payment', style: AppTextStyles.h6()),
@@ -228,7 +224,7 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _summaryRow(

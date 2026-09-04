@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
@@ -32,7 +33,7 @@ class _MyEstimatesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('My Estimates', style: AppTextStyles.h6()),
@@ -159,6 +160,6 @@ class _MyEstimatesView extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

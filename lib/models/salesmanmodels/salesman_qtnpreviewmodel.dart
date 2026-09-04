@@ -101,6 +101,54 @@ class QuotationPreviewParty {
   }
 }
 
+// class QuotationPreviewItem {
+//   final String productId;
+//   final String productName;
+//   final String productSize;
+//   final String productUnit;
+//   final double mrp;
+//   final double rate;
+//   final double quantity;
+//   final double amount;
+//   final double mrpTotal;
+//   final double incentiveAmount;
+//   final bool isIncentiveEligible;
+//   final double perUnitIncentive;
+//   final String product_company;
+//
+//   const QuotationPreviewItem({
+//     required this.productId,
+//     required this.productName,
+//     required this.productSize,
+//     required this.productUnit,
+//     required this.mrp,
+//     required this.rate,
+//     required this.quantity,
+//     required this.amount,
+//     required this.mrpTotal,
+//     required this.incentiveAmount,
+//     required this.isIncentiveEligible,
+//     required this.perUnitIncentive, required this.product_company,
+//   });
+//
+//   factory QuotationPreviewItem.fromJson(Map<String, dynamic> json) {
+//     return QuotationPreviewItem(
+//       productId: _asString(json['product_id']),
+//       productName: _asString(json['product_name']),
+//       productSize: _asString(json['product_size']),
+//       productCompany: _asString(json['product_company']),
+//       productUnit: _asString(json['product_unit']),
+//       mrp: _asDouble(json['mrp']),
+//       rate: _asDouble(json['rate']),
+//       quantity: _asDouble(json['quantity']),
+//       amount: _asDouble(json['amount']),
+//       mrpTotal: _asDouble(json['mrp_total']),
+//       incentiveAmount: _asDouble(json['incentive_amount']),
+//       isIncentiveEligible: _asString(json['is_incentive_eligible']) == '1',
+//       perUnitIncentive: _asDouble(json['per_unit_incentive']),
+//     );
+//   }
+// }
 class QuotationPreviewItem {
   final String productId;
   final String productName;
@@ -114,6 +162,7 @@ class QuotationPreviewItem {
   final double incentiveAmount;
   final bool isIncentiveEligible;
   final double perUnitIncentive;
+  final String productCompany;
 
   const QuotationPreviewItem({
     required this.productId,
@@ -128,6 +177,7 @@ class QuotationPreviewItem {
     required this.incentiveAmount,
     required this.isIncentiveEligible,
     required this.perUnitIncentive,
+    required this.productCompany,
   });
 
   factory QuotationPreviewItem.fromJson(Map<String, dynamic> json) {
@@ -135,6 +185,7 @@ class QuotationPreviewItem {
       productId: _asString(json['product_id']),
       productName: _asString(json['product_name']),
       productSize: _asString(json['product_size']),
+      productCompany: _asString(json['product_company']),
       productUnit: _asString(json['product_unit']),
       mrp: _asDouble(json['mrp']),
       rate: _asDouble(json['rate']),
@@ -142,7 +193,8 @@ class QuotationPreviewItem {
       amount: _asDouble(json['amount']),
       mrpTotal: _asDouble(json['mrp_total']),
       incentiveAmount: _asDouble(json['incentive_amount']),
-      isIncentiveEligible: _asString(json['is_incentive_eligible']) == '1',
+      isIncentiveEligible:
+      _asString(json['is_incentive_eligible']) == '1',
       perUnitIncentive: _asDouble(json['per_unit_incentive']),
     );
   }

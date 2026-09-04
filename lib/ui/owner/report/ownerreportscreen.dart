@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -16,7 +17,7 @@ class OwnerReportsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar:  AppBar(
           title: Text(' Reports', style: AppTextStyles.h6())),
@@ -109,7 +110,7 @@ class OwnerReportsScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

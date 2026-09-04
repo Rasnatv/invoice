@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
@@ -12,14 +12,8 @@ import '../../bloc/driverbloc/driverdespatchdetail/driverdespatchdetail_bloc.dar
 import '../../bloc/driverbloc/driverdespatchdetail/driverdespatchdetail_event.dart';
 import '../../bloc/driverbloc/driverdespatchdetail/driverdespatchdetail_state.dart';
 import '../../models/drivermodels/driverdashboarddespatchdetailscreenmodel.dart';
+import '../../widgets/appsnackbar.dart';
 
-/// Full-detail view of a single despatch bill assigned to the driver.
-/// Loaded live from POST /drivers/show. Exposes the driver's two-step
-/// delivery flow:
-///   pending    -> "Mark as In Transit" (POST /despatches/mark-in-transit)
-///   in transit -> optionally upload either/both signatures -> "Mark as
-///                 Delivered" (POST /despatches/mark-delivered)
-///   delivered  -> read-only signatures, no actions
 class DriverBillDetailScreen extends StatelessWidget {
   const DriverBillDetailScreen({super.key, required this.billId});
 
@@ -55,7 +49,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Despatch Details', style: AppTextStyles.h6()),
@@ -64,32 +58,14 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
         listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
         listener: (context, state) {
           if (state.actionStatus == DriverDespatchActionStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: AppColors.info,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(state.actionMessage ?? 'Updated successfully')),
-                  ],
-                ),
-              ),
-            );
+            AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
             setState(() {
               _customerSigFile = null;
               _driverSigFile = null;
             });
             context.read<DriverDespatchDetailBloc>().add(const ClearDriverDespatchActionStatus());
           } else if (state.actionStatus == DriverDespatchActionStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.actionMessage ?? 'Something went wrong'),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
+            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
             context.read<DriverDespatchDetailBloc>().add(const ClearDriverDespatchActionStatus());
           }
         },
@@ -234,7 +210,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
           );
         },
       ),
-    );
+    ));
   }
 
   Widget _infoRow(String label, String value) {

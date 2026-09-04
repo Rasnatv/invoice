@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 
 import '../../../core/apiclient/api_client.dart';
 import '../../../core/constants/app_colors.dart';
@@ -12,6 +13,7 @@ import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
 
 import '../../models/owner_models/ownerestimate_updatemodel.dart';
+import '../../widgets/appsnackbar.dart';
 import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
 
@@ -217,26 +219,20 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one item.')),
-      );
+      AppSnackbar.error('Add at least one item.');
       return;
     }
 
     final updateItems = <EstimateUpdateItem>[];
     for (final row in _items) {
       if (row.productId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Select a product for every item row.')),
-        );
+        AppSnackbar.error('Select a product for every item row.');
         return;
       }
       final qty = double.tryParse(row.quantityCtrl.text.trim());
       final rate = double.tryParse(row.rateCtrl.text.trim());
       if (qty == null || qty <= 0 || rate == null || rate < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid quantity and rate for every item.')),
-        );
+        AppSnackbar.error('Enter a valid quantity and rate for every item.');
         return;
       }
       updateItems.add(EstimateUpdateItem(
@@ -247,7 +243,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
         rate: rate,
       ));
     }
-
     final request = OwnerUpdateEstimateRequest(
       id: widget.detail.id,
       customerName: _nameCtrl.text.trim(),
@@ -267,7 +262,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Update Estimate', style: AppTextStyles.h6())),
       body: SafeArea(
@@ -276,14 +271,10 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
           previous.actionStatus != current.actionStatus,
           listener: (context, state) {
             if (state.actionStatus == OwnerEstimateActionStatus.success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Estimate updated.')),
-              );
+              AppSnackbar.success(state.actionMessage ?? 'Estimate updated.');
               Navigator.of(context).pop(true);
             } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Failed to update estimate.')),
-              );
+              AppSnackbar.error(state.actionMessage ?? 'Failed to update estimate.');
             }
           },
           builder: (context, state) {
@@ -432,7 +423,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
           },
         ),
       ),
-    );
+    ));
   }
 }
 

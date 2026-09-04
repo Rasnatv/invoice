@@ -1,3 +1,4 @@
+
 import 'package:flutter/services.dart';
 
 class DValidator {
@@ -146,5 +147,30 @@ class DValidator {
   static List<TextInputFormatter> get postalCode => [
     FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s-]')),
     LengthLimitingTextInputFormatter(10),
+  ];
+
+  // ── Optional decimal number (e.g. area sqft, budget) ──────
+  /// For optional numeric fields. Empty is allowed (returns null).
+  /// If something is typed, it must be a valid non-negative number.
+  static String? validateOptionalNumber(String fieldName, String? value, {double? max}) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return null; // optional field, nothing typed is fine
+    final n = double.tryParse(v);
+    if (n == null) {
+      return 'Enter a valid $fieldName';
+    }
+    if (n < 0) {
+      return '$fieldName cannot be negative';
+    }
+    if (max != null && n > max) {
+      return '$fieldName must be at most $max';
+    }
+    return null;
+  }
+
+  /// Digits + a single decimal point — use on sqft/budget fields.
+  static List<TextInputFormatter> get decimalNumber => [
+    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+    LengthLimitingTextInputFormatter(12),
   ];
 }

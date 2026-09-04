@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -9,6 +10,7 @@ import '../../../models/salesmanmodels/quotationlistmodel.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
+import '../../widgets/appsnackbar.dart';
 import 'quotationpreview.dart';
 
 class QuotationListScreen extends StatelessWidget {
@@ -31,7 +33,7 @@ class _QuotationListView extends StatelessWidget {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Quotations', style: AppTextStyles.h6()),
@@ -42,25 +44,16 @@ class _QuotationListView extends StatelessWidget {
           prev.deleteStatus != curr.deleteStatus || prev.submitStatus != curr.submitStatus,
           listener: (context, state) {
             if (state.deleteStatus == QuotationActionStatus.success) {
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('Quotation deleted.')));
+              AppSnackbar.success('Quotation deleted.');
               context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
             } else if (state.deleteStatus == QuotationActionStatus.failure) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(state.deleteError ?? 'Failed to delete quotation.'),
-                backgroundColor: AppColors.error,
-              ));
+              AppSnackbar.error(state.deleteError ?? 'Failed to delete quotation.');
               context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
             } else if (state.submitStatus == QuotationActionStatus.success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.submitMessage ?? 'Submitted for approval.')),
-              );
+              AppSnackbar.success(state.submitMessage ?? 'Submitted for approval.');
               context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
             } else if (state.submitStatus == QuotationActionStatus.failure) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(state.submitError ?? 'Failed to submit for approval.'),
-                backgroundColor: AppColors.error,
-              ));
+              AppSnackbar.error(state.submitError ?? 'Failed to submit for approval.');
               context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
             }
           },
@@ -154,7 +147,7 @@ class _QuotationListView extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Future<void> _confirmDelete(BuildContext context, QuotationListItem quotation) async {

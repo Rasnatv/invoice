@@ -248,9 +248,9 @@ class _AddFieldVisitScreenState extends State<AddFieldVisitScreen> {
           elevation: 0,
           title: Text(
             _isEditing ? 'Edit Visit' : 'Add Visit',
-            style: TextStyle(fontSize: Responsive.sp(17)),
+              style: AppTextStyles.h6()),
           ),
-        ),
+
         body: BlocListener<SiteVisitBloc, SiteVisitState>(
           listenWhen: (prev, curr) =>
           curr.actionStatus != prev.actionStatus &&
@@ -328,6 +328,9 @@ class _AddFieldVisitScreenState extends State<AddFieldVisitScreen> {
                           controller: _areaCtrl,
                           icon: Icons.square_foot_rounded,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: DValidator.decimalNumber,
+                          // Optional field: empty is fine, but if typed it must be a valid number.
+                          validator: (v) => DValidator.validateOptionalNumber('Area', v),
                         ),
                         SizedBox(height: Responsive.h(14)),
                         _field(
@@ -335,6 +338,9 @@ class _AddFieldVisitScreenState extends State<AddFieldVisitScreen> {
                           controller: _budgetCtrl,
                           icon: Icons.currency_rupee_rounded,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: DValidator.decimalNumber,
+                          validator: (v) =>
+                              DValidator.validateOptionalNumber('Estimated budget', v),
                         ),
                       ],
                     )
@@ -346,6 +352,8 @@ class _AddFieldVisitScreenState extends State<AddFieldVisitScreen> {
                             controller: _areaCtrl,
                             icon: Icons.square_foot_rounded,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: DValidator.decimalNumber,
+                            validator: (v) => DValidator.validateOptionalNumber('Area', v),
                           ),
                         ),
                         SizedBox(width: Responsive.w(12)),
@@ -355,6 +363,9 @@ class _AddFieldVisitScreenState extends State<AddFieldVisitScreen> {
                             controller: _budgetCtrl,
                             icon: Icons.currency_rupee_rounded,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: DValidator.decimalNumber,
+                            validator: (v) =>
+                                DValidator.validateOptionalNumber('Estimated budget', v),
                           ),
                         ),
                       ],

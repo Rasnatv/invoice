@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../bloc/profile/profile_bloc.dart';
+import '../../bloc/profile/profile_event.dart';
+import '../../bloc/profile/profile_state.dart';
+import '../../core/validator/validationfile.dart';
+import '../../widgets/appsnackbar.dart';
 
 class OwnerChangePasswordScreen extends StatefulWidget {
   const OwnerChangePasswordScreen({super.key});
@@ -20,7 +26,6 @@ class _ChangePasswordScreenState extends State<OwnerChangePasswordScreen> {
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
-  bool _isLoading = false;
 
   // Password rule states
   bool _hasMinLength = false;
@@ -103,170 +108,167 @@ class _ChangePasswordScreenState extends State<OwnerChangePasswordScreen> {
   bool get _allRulesPassed =>
       _hasMinLength && _hasUppercase && _hasLowercase && _hasNumber && _hasSpecialChar;
 
-  Future<void> _handleChangePassword() async {
+  void _handleChangePassword() {
     if (!_formKey.currentState!.validate()) return;
 
     if (!_allRulesPassed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password does not meet all requirements'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackbar.error('Password does not meet all requirements');
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      // TODO: Call your change password API here
-      // Example:
-      // await AuthRepository().changePassword(
-      //   currentPassword: _currentPasswordController.text,
-      //   newPassword: _newPasswordController.text,
-      // );
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password changed successfully'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
-      Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to change password: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    context.read<ProfileBloc>().add(
+      ChangePasswordRequested(
+        currentPassword: _currentPasswordController.text,
+        newPassword: _newPasswordController.text,
+        newPasswordConfirmation: _confirmPasswordController.text,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Change Password', style: AppTextStyles.h6())),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(Responsive.w(20)),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Update your password', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(4)),
-                Text(
-                  'Please enter your current password and choose a new one.',
-                  style: AppTextStyles.caption(),
-                ),
-                SizedBox(height: Responsive.h(28)),
+    return BlocListener<ProfileBloc, ProfileState>(
+      listenWhen: (prev, curr) => prev.passwordStatus != curr.passwordStatus,
+      listener: (context, state) {
+        if (state.passwordStatus == ProfileActionStatus.success) {
+          AppSnackbar.success(state.passwordMessage ?? 'Password changed successfully');
+          context.read<ProfileBloc>().add(const ResetProfileActionStatus());
+          Navigator.of(context).pop();
+        } else if (state.passwordStatus == ProfileActionStatus.failure) {
+          AppSnackbar.error('Failed to change password: ${state.passwordMessage}');
+          context.read<ProfileBloc>().add(const ResetProfileActionStatus());
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: Text('Change Password', style: AppTextStyles.h6())),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(Responsive.w(20)),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Update your password', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(4)),
+                  Text(
+                    'Please enter your current password and choose a new one.',
+                    style: AppTextStyles.caption(),
+                  ),
+                  SizedBox(height: Responsive.h(28)),
 
-                _PasswordField(
-                  label: 'Current Password',
-                  controller: _currentPasswordController,
-                  obscureText: _obscureCurrent,
-                  onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your current password';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: Responsive.h(16)),
-
-                _PasswordField(
-                  label: 'New Password',
-                  controller: _newPasswordController,
-                  obscureText: _obscureNew,
-                  onToggle: () => setState(() => _obscureNew = !_obscureNew),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a new password';
-                    }
-                    if (value == _currentPasswordController.text) {
-                      return 'New password must be different from current password';
-                    }
-                    if (!_allRulesPassed) {
-                      return 'Password does not meet all requirements';
-                    }
-                    return null;
-                  },
-                ),
-
-                // Strength meter
-                if (_newPasswordController.text.isNotEmpty) ...[
-                  SizedBox(height: Responsive.h(10)),
-                  _StrengthMeter(score: _strengthScore, color: _strengthColor, label: _strengthLabel),
-                ],
-
-                SizedBox(height: Responsive.h(12)),
-
-                // Requirements checklist
-                _RequirementsChecklist(
-                  hasMinLength: _hasMinLength,
-                  hasUppercase: _hasUppercase,
-                  hasLowercase: _hasLowercase,
-                  hasNumber: _hasNumber,
-                  hasSpecialChar: _hasSpecialChar,
-                ),
-
-                SizedBox(height: Responsive.h(16)),
-
-                _PasswordField(
-                  label: 'Confirm New Password',
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirm,
-                  onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please confirm your new password';
-                    }
-                    if (value != _newPasswordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: Responsive.h(32)),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: Responsive.h(50),
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleChangePassword,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                      height: Responsive.w(20),
-                      width: Responsive.w(20),
-                      child: const CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                        : Text(
-                      'Update Password',
-                      style: AppTextStyles.bodyBold(color: Colors.white),
+                  _PasswordField(
+                    label: 'Current Password',
+                    controller: _currentPasswordController,
+                    obscureText: _obscureCurrent,
+                    onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                    validator: (value) => DValidator.validateRequired(
+                      value,
+                      message: 'Please enter your current password',
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(height: Responsive.h(16)),
+
+                  _PasswordField(
+                    label: 'New Password',
+                    controller: _newPasswordController,
+                    obscureText: _obscureNew,
+                    onToggle: () => setState(() => _obscureNew = !_obscureNew),
+                    validator: (value) {
+                      // Empty check via DValidator; the strength rules below
+                      // (upper/lower/number/special/length) are screen-specific
+                      // and drive the live checklist UI, so they stay custom
+                      // rather than DValidator.validatePassword.
+                      final required = DValidator.validateRequired(
+                        value,
+                        message: 'Please enter a new password',
+                      );
+                      if (required != null) return required;
+                      if (value == _currentPasswordController.text) {
+                        return 'New password must be different from current password';
+                      }
+                      if (!_allRulesPassed) {
+                        return 'Password does not meet all requirements';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  // Strength meter
+                  if (_newPasswordController.text.isNotEmpty) ...[
+                    SizedBox(height: Responsive.h(10)),
+                    _StrengthMeter(score: _strengthScore, color: _strengthColor, label: _strengthLabel),
+                  ],
+
+                  SizedBox(height: Responsive.h(12)),
+
+                  // Requirements checklist
+                  _RequirementsChecklist(
+                    hasMinLength: _hasMinLength,
+                    hasUppercase: _hasUppercase,
+                    hasLowercase: _hasLowercase,
+                    hasNumber: _hasNumber,
+                    hasSpecialChar: _hasSpecialChar,
+                  ),
+
+                  SizedBox(height: Responsive.h(16)),
+
+                  _PasswordField(
+                    label: 'Confirm New Password',
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirm,
+                    onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    validator: (value) {
+                      final required = DValidator.validateRequired(
+                        value,
+                        message: 'Please confirm your new password',
+                      );
+                      if (required != null) return required;
+                      if (value != _newPasswordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: Responsive.h(32)),
+
+                  BlocBuilder<ProfileBloc, ProfileState>(
+                    buildWhen: (prev, curr) => prev.passwordStatus != curr.passwordStatus,
+                    builder: (context, state) {
+                      final isLoading = state.passwordStatus == ProfileActionStatus.loading;
+                      return SizedBox(
+                        width: double.infinity,
+                        height: Responsive.h(50),
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : _handleChangePassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: isLoading
+                              ? SizedBox(
+                            height: Responsive.w(20),
+                            width: Responsive.w(20),
+                            child: const CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                              : Text(
+                            'Update Password',
+                            style: AppTextStyles.bodyBold(color: Colors.white),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),

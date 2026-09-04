@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -14,7 +15,9 @@ import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_bloc.dart';
 import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_event.dart';
 import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_state.dart';
 
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/owner_despatchdetailmodel.dart';
+import '../../widgets/appsnackbar.dart';
 
 class OwnerDispatchDetailScreen extends StatelessWidget {
   const OwnerDispatchDetailScreen({super.key, required this.dispatchId});
@@ -50,32 +53,21 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Dispatch Details', style: AppTextStyles.h6())),
       body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
         listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
         listener: (context, state) {
           if (state.actionStatus == DispatchActionStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.actionMessage ?? 'Updated successfully')),
-            );
+            AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
             setState(() {
               _customerSigFile = null;
               _driverSigFile = null;
             });
-
-            // The bloc now re-fetches the full dispatch record internally
-            // right after a successful mark-in-transit/delivered action, so
-            // we just clear the one-shot action status here.
             context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
           } else if (state.actionStatus == DispatchActionStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.actionMessage ?? 'Something went wrong'),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
+            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
             context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
           }
         },
@@ -134,7 +126,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
           );
         },
       ),
-    );
+    ));
   }
 
   // ---------- sections ----------
@@ -472,24 +464,35 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     return 'data:image/png;base64,$base64Str';
   }
 
-  void _confirmMarkInTransit(BuildContext context, String id) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Mark as In Transit?'),
-        content: const Text('This confirms the dispatch has left for delivery.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogCtx);
-              context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+  // void _confirmMarkInTransit(BuildContext context, String id) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (dialogCtx) => AlertDialog(
+  //       title: const Text('Mark as In Transit?'),
+  //       content: const Text('This confirms the dispatch has left for delivery.'),
+  //       actions: [
+  //         TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             Navigator.pop(dialogCtx);
+  //             context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
+  //           },
+  //           child: const Text('Confirm'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+  void _confirmMarkInTransit(BuildContext context, String id) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Mark as In Transit?',
+      message: 'This confirms the dispatch has left for delivery.',
+      confirmText: 'Confirm',
     );
+    if (confirmed) {
+      context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
+    }
   }
 
   /// Signatures are optional — whatever was (or wasn't) uploaded just gets

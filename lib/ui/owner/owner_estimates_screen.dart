@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/owner/paymenthistory.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -107,7 +108,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Estimates', style: AppTextStyles.h6()),
@@ -171,7 +172,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
           },
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildBody(BuildContext context, OwnerEstimatesState state) {
@@ -227,6 +228,184 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   }
 }
 
+// class _OwnerEstimateCard extends StatelessWidget {
+//   const _OwnerEstimateCard({
+//     super.key,
+//     required this.estimate,
+//     required this.onTap,
+//     required this.onPayNow,
+//     required this.onHistoryTap,
+//   });
+//
+//   final SalesmanowrEstimateModel estimate;
+//   final VoidCallback onTap;
+//   final VoidCallback onPayNow;
+//   final VoidCallback onHistoryTap;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final bool showBalance = estimate.hasBalance;
+//
+//     return InkWell(
+//       onTap: onTap,
+//       borderRadius: BorderRadius.circular(14),
+//       child: Container(
+//         padding: EdgeInsets.all(Responsive.w(14)),
+//         decoration: BoxDecoration(
+//           color: AppColors.surface,
+//           borderRadius: BorderRadius.circular(14),
+//           border: Border.all(color: AppColors.border),
+//         ),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Expanded(
+//                   child: Text(
+//                     estimate.contractorName.isNotEmpty
+//                         ? estimate.contractorName
+//                         : estimate.customerName,
+//                     style: AppTextStyles.bodyBold(),
+//                     maxLines: 1,
+//                     overflow: TextOverflow.ellipsis,
+//                   ),
+//                 ),
+//                 IconButton(
+//                   onPressed: onHistoryTap,
+//                   icon: const Icon(Icons.history, size: 20),
+//                   color: AppColors.textSecondary,
+//                   visualDensity: VisualDensity.compact,
+//                   padding: EdgeInsets.zero,
+//                   constraints: const BoxConstraints(),
+//                   tooltip: 'Payment History',
+//                 ),
+//                 SizedBox(width: Responsive.w(6)),
+//                 _StatusChip(label: estimate.statusLabel, statusKey: estimate.statusKey),
+//               ],
+//             ),
+//             SizedBox(height: Responsive.h(4)),
+//             Text('Estimate No: ${estimate.estimateNumber}', style: AppTextStyles.caption()),
+//             SizedBox(height: Responsive.h(4)),
+//             Row(
+//               children: [
+//                 const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
+//                 SizedBox(width: Responsive.w(4)),
+//                 Expanded(
+//                   child: Text(
+//                     estimate.salesmanName.isEmpty
+//                         ? estimate.customerName
+//                         : '${estimate.salesmanName} · ${estimate.customerName}',
+//                     style: AppTextStyles.caption(),
+//                     overflow: TextOverflow.ellipsis,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             if (estimate.isApproved) ...[
+//               SizedBox(height: Responsive.h(4)),
+//               Row(
+//                 children: [
+//                   const Icon(Icons.verified_outlined, size: 14, color: AppColors.primary),
+//                   SizedBox(width: Responsive.w(4)),
+//                   Expanded(
+//                     child: Text(
+//                       'Approved by ${estimate.approvedBy}'
+//                           '${estimate.approvedAt.isNotEmpty ? ' · ${estimate.approvedAt}' : ''}',
+//                       style: AppTextStyles.caption(color: AppColors.primary),
+//                       overflow: TextOverflow.ellipsis,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ],
+//             SizedBox(height: Responsive.h(8)),
+//             const Divider(height: 1, color: AppColors.border),
+//             SizedBox(height: Responsive.h(8)),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//               children: [
+//                 Text(estimate.date, style: AppTextStyles.caption()),
+//                 Text(estimate.grandTotalFormatted,
+//                     style: AppTextStyles.bodyBold(color: AppColors.primary)),
+//               ],
+//             ),
+//             if (showBalance) ...[
+//               SizedBox(height: Responsive.h(6)),
+//               Row(
+//                 children: [
+//                   const Icon(Icons.error_outline, size: 14, color: Colors.red),
+//                   SizedBox(width: Responsive.w(4)),
+//                   Expanded(
+//                     child: Text(
+//                       'Balance: ${estimate.balanceAmountFormatted}',
+//                       style: AppTextStyles.bodyBold(color: Colors.red),
+//                       overflow: TextOverflow.ellipsis,
+//                     ),
+//                   ),
+//                   SizedBox(width: Responsive.w(8)),
+//                   SizedBox(
+//                     height: 32,
+//                     child: ElevatedButton(
+//                       onPressed: onPayNow,
+//                       style: ElevatedButton.styleFrom(
+//                         backgroundColor: AppColors.primary,
+//                         foregroundColor: Colors.white,
+//                         padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
+//                         shape: RoundedRectangleBorder(
+//                           borderRadius: BorderRadius.circular(8),
+//                         ),
+//                         minimumSize: Size.zero,
+//                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+//                       ),
+//                       child: Text(
+//                         'Pay Now',
+//                         style: AppTextStyles.caption(color: Colors.white),
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ],
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// class _StatusChip extends StatelessWidget {
+//   const _StatusChip({required this.label, required this.statusKey});
+//   final String label;
+//   final String statusKey;
+//
+//   Color get _color {
+//     switch (statusKey) {
+//       case 'approved':
+//         return AppColors.success;
+//       case 'rejected':
+//         return Colors.red;
+//       case 'despatched':
+//         return AppColors.primary;
+//       case 'pending_approval':
+//       default:
+//         return Colors.orange;
+//     }
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//       decoration: BoxDecoration(
+//         color: _color.withOpacity(0.12),
+//         borderRadius: BorderRadius.circular(20),
+//       ),
+//       child: Text(label, style: AppTextStyles.caption(color: _color)),
+//     );
+//   }
+// }
 class _OwnerEstimateCard extends StatelessWidget {
   const _OwnerEstimateCard({
     super.key,
@@ -263,9 +442,7 @@ class _OwnerEstimateCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    estimate.contractorName.isNotEmpty
-                        ? estimate.contractorName
-                        : estimate.customerName,
+                    'Estimate No: ${estimate.estimateNumber}',
                     style: AppTextStyles.bodyBold(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -285,23 +462,39 @@ class _OwnerEstimateCard extends StatelessWidget {
               ],
             ),
             SizedBox(height: Responsive.h(4)),
-            Text('Estimate No: ${estimate.estimateNumber}', style: AppTextStyles.caption()),
-            SizedBox(height: Responsive.h(4)),
+            // Party / Customer name
             Row(
               children: [
-                const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
                 SizedBox(width: Responsive.w(4)),
                 Expanded(
                   child: Text(
-                    estimate.salesmanName.isEmpty
-                        ? estimate.customerName
-                        : '${estimate.salesmanName} · ${estimate.customerName}',
-                    style: AppTextStyles.caption(),
+                    estimate.customerName,
+                    style: AppTextStyles.bodyBold(),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
+            // Contractor name (only if present)
+            if (estimate.contractorName.isNotEmpty) ...[
+              SizedBox(height: Responsive.h(4)),
+              Row(
+                children: [
+                  const Icon(Icons.engineering_outlined, size: 14, color: AppColors.textSecondary),
+                  SizedBox(width: Responsive.w(4)),
+                  Expanded(
+                    child: Text(
+                      estimate.contractorName,
+                      style: AppTextStyles.caption(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
             if (estimate.isApproved) ...[
               SizedBox(height: Responsive.h(4)),
               Row(
@@ -373,7 +566,6 @@ class _OwnerEstimateCard extends StatelessWidget {
     );
   }
 }
-
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.label, required this.statusKey});
   final String label;

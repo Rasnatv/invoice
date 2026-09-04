@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -9,6 +10,7 @@ import '../../bloc/ownerbloc/addincentive/addincentive_bloc.dart';
 import '../../bloc/ownerbloc/addincentive/addincentive_event.dart';
 import '../../bloc/ownerbloc/addincentive/addincentive_state.dart';
 import '../../models/owner_models/owner_incentivesetupmodel.dart';
+import '../../widgets/appsnackbar.dart';
 
 /// SCREEN 1 — "Add Incentive"
 ///
@@ -109,7 +111,7 @@ class _AddIncentiveViewState extends State<_AddIncentiveView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Add Incentive', style: AppTextStyles.h6())),
       body: SafeArea(
@@ -119,14 +121,10 @@ class _AddIncentiveViewState extends State<_AddIncentiveView> {
               current.actionStatus != SalesmanIncentiveActionStatus.submitting,
           listener: (context, state) {
             if (state.actionStatus == SalesmanIncentiveActionStatus.success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Done')),
-              );
+              AppSnackbar.success(state.actionMessage ?? 'Done');
               context.read<SalesmanIncentiveBloc>().add(const LoadSalesmanIncentiveList());
             } else if (state.actionStatus == SalesmanIncentiveActionStatus.failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionError ?? 'Something went wrong. Please try again.')),
-              );
+              AppSnackbar.error(state.actionError ?? 'Something went wrong. Please try again.');
             }
           },
           builder: (context, state) {
@@ -268,7 +266,7 @@ class _AddIncentiveViewState extends State<_AddIncentiveView> {
           },
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -432,14 +430,10 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
               setState(() => _applyDetail(state.detail));
             }
             if (state.actionStatus == SalesmanIncentiveActionStatus.success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Done')),
-              );
+              AppSnackbar.success(state.actionMessage ?? 'Done');
               Navigator.of(context).pop(true);
             } else if (state.actionStatus == SalesmanIncentiveActionStatus.failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionError ?? 'Something went wrong. Please try again.')),
-              );
+              AppSnackbar.error(state.actionError ?? 'Something went wrong. Please try again.');
             }
           },
           builder: (context, state) {

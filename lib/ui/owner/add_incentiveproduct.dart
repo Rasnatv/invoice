@@ -5,6 +5,7 @@ import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/validator/validationfile.dart';
 import '../../Apiprovider/product_enums.dart';
 import '../../bloc/ownerbloc/product/product_bloc.dart';
 import '../../bloc/ownerbloc/product/product_event.dart';
@@ -12,16 +13,12 @@ import '../../bloc/ownerbloc/product/product_state.dart';
 import '../../models/owner_models/addproductmodel.dart';
 import '../../models/owner_models/getproductmodel.dart';
 import '../../models/owner_models/updateproductmodel.dart';
+import '../../widgets/appsnackbar.dart';
 
-/// Public entry point — wraps the form in its own BlocProvider so callers
-/// don't need to know ProductBloc exists.
+
 class AddIncentiveProductScreen extends StatelessWidget {
   const AddIncentiveProductScreen({super.key, this.product});
 
-  /// If null -> "Add" mode. If provided -> "Edit" mode, prefilled.
-  /// NOTE: the list API doesn't return incentive_type / bonus_type /
-  /// min_quantity, so those three fields fall back to their defaults in
-  /// edit mode. company_id and unit_id ARE returned and are prefilled.
   final ProductModel? product;
 
   @override
@@ -107,11 +104,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     super.dispose();
   }
 
-  /// Returns true when the selected unit's API record has
-  /// show_pieces_per_box = "1". Driven entirely by the units/active
-  /// response now — no more matching on unit name/abbreviation, so this
-  /// keeps working automatically if more "box-type" units get added on
-  /// the backend later.
   bool _computeIsBoxUnit(ProductState state) {
     if (_selectedUnitId == null) return false;
     final matches = state.units.where((u) => u.id == _selectedUnitId);
@@ -130,12 +122,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     });
   }
 
-  /// Once companies/units have actually loaded, make sure the ids we
-  /// prefilled from widget.product really exist in those lists. If a
-  /// product references a company/unit that's since been deactivated (so
-  /// it's missing from the "active" dropdown list), fall back to null
-  /// instead of leaving DropdownButtonFormField pointed at a value with no
-  /// matching item (which Flutter renders as blank with no error).
   void _syncDropdownSelectionsIfNeeded(ProductState state) {
     if (_dropdownSelectionSynced) return;
     if (state.dropdownStatus != DropdownStatus.loaded) return;
@@ -152,23 +138,18 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     });
   }
 
-  String? _requiredValidator(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Required';
-    return null;
-  }
-
-  String? _numberValidator(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Required';
-    if (double.tryParse(v.trim()) == null) return 'Enter a valid number';
+  String? _requiredNumberValidator(String? v) {
+    final requiredError = DValidator.validateRequired(v, message: 'Required');
+    if (requiredError != null) return requiredError;
+    if (double.tryParse(v!.trim()) == null) return 'Enter a valid number';
     return null;
   }
 
   void _save(BuildContext context) {
     if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
     if (_selectedCompanyId == null || _selectedUnitId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company and a unit.')),
-      );
+      AppSnackbar.error('Please select a company and a unit.');
       return;
     }
 
@@ -241,18 +222,12 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
               previous.dropdownStatus != current.dropdownStatus,
           listener: (context, state) {
             if (state.status == ProductStatus.actionSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Saved successfully.')),
-              );
+              AppSnackbar.success(state.actionMessage ?? 'Saved successfully.');
               Navigator.of(context).pop(true);
             } else if (state.status == ProductStatus.error && state.errorMessage != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.errorMessage!)),
-              );
+              AppSnackbar.error(state.errorMessage!);
             }
 
-            // Re-check the prefilled company/unit ids as soon as the
-            // dropdown lists finish loading.
             if (state.dropdownStatus == DropdownStatus.loaded) {
               _syncDropdownSelectionsIfNeeded(state);
             }
@@ -284,8 +259,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                   _FieldLabel('Product Name'),
                   TextFormField(
                     controller: _nameCtrl,
+                    inputFormatters: DValidator.textWithLimit,
                     decoration: const InputDecoration(hintText: 'e.g. Marvel Statuario'),
-                    validator: _requiredValidator,
+                    validator: (v) =>
+                        DValidator.validateRequired(v, message: 'Product name is required'),
                   ),
                   SizedBox(height: Responsive.h(14)),
 
@@ -312,7 +289,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       onChanged: dropdownsLoading
                           ? null
                           : (v) => setState(() => _selectedCompanyId = v),
-                      validator: (v) => v == null ? 'Required' : null,
+                      validator: (v) => DValidator.validateDropdown('company', v),
                     ),
                   SizedBox(height: Responsive.h(14)),
 
@@ -327,8 +304,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             _FieldLabel('Size'),
                             TextFormField(
                               controller: _sizeCtrl,
+                              inputFormatters: DValidator.textWithLimit,
                               decoration: const InputDecoration(hintText: 'e.g. 600x1200'),
-                              validator: _requiredValidator,
+                              validator: (v) =>
+                                  DValidator.validateRequired(v, message: 'Size is required'),
                             ),
                           ],
                         ),
@@ -358,7 +337,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                                 onChanged: dropdownsLoading
                                     ? null
                                     : (v) => _onUnitChanged(v, state),
-                                validator: (v) => v == null ? 'Required' : null,
+                                validator: (v) => DValidator.validateDropdown('unit', v),
                               ),
                           ],
                         ),
@@ -380,6 +359,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                               _FieldLabel('Packing'),
                               TextFormField(
                                 controller: _packingCtrl,
+                                inputFormatters: DValidator.textWithLimit,
                                 decoration: const InputDecoration(hintText: 'e.g. 8pcs/box'),
                               ),
                             ],
@@ -394,6 +374,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                               TextFormField(
                                 controller: _piecesPerBoxCtrl,
                                 keyboardType: TextInputType.number,
+                                inputFormatters: DValidator.digitsOnly,
                                 decoration: const InputDecoration(hintText: 'e.g. 8'),
                               ),
                             ],
@@ -415,8 +396,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             TextFormField(
                               controller: _mrpCtrl,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: DValidator.decimalNumber,
                               decoration: const InputDecoration(hintText: 'e.g. 650'),
-                              validator: _numberValidator,
+                              validator: _requiredNumberValidator,
                             ),
                           ],
                         ),
@@ -430,8 +412,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             TextFormField(
                               controller: _rateCtrl,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: DValidator.decimalNumber,
                               decoration: const InputDecoration(hintText: 'e.g. 50'),
-                              validator: _numberValidator,
+                              validator: _requiredNumberValidator,
                             ),
                           ],
                         ),
@@ -457,21 +440,30 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                     },
                   ),
                   SizedBox(height: Responsive.h(12)),
+
+                  // FIX: this used to be `if (percentage) ... else ...`,
+                  // which meant `none` fell into the `else` branch and the
+                  // Incentive Amount field showed up even when the user
+                  // picked "None". Now `none` matches neither branch, so no
+                  // incentive field is built (and therefore none is
+                  // validated) when Incentive Type is "None".
                   if (_incentiveType == ProductIncentiveType.percentage) ...[
                     _FieldLabel('Incentive (%)'),
                     TextFormField(
                       controller: _incentivePercentCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: DValidator.decimalNumber,
                       decoration: const InputDecoration(hintText: 'e.g. 5'),
-                      validator: _numberValidator,
+                      validator: _requiredNumberValidator,
                     ),
-                  ] else ...[
+                  ] else if (_incentiveType == ProductIncentiveType.fixed) ...[
                     _FieldLabel('Incentive Amount (₹)'),
                     TextFormField(
                       controller: _incentiveFixedCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: DValidator.decimalNumber,
                       decoration: const InputDecoration(hintText: 'e.g. 20'),
-                      validator: _numberValidator,
+                      validator: _requiredNumberValidator,
                     ),
                   ],
                   SizedBox(height: Responsive.h(20)),
@@ -498,8 +490,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                     TextFormField(
                       controller: _minQuantityCtrl,
                       keyboardType: TextInputType.number,
+                      inputFormatters: DValidator.digitsOnly,
                       decoration: const InputDecoration(hintText: 'e.g. 5'),
-                      validator: _numberValidator,
+                      validator: _requiredNumberValidator,
                     ),
                   ],
                   SizedBox(height: Responsive.h(28)),

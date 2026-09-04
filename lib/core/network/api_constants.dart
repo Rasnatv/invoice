@@ -190,4 +190,9 @@ class ApiConstants {
   //DRIVER
   static const driversDashboard = '/drivers/dashboard';
   static const driversShow = '/drivers/show';
+
+  //profile
+  static const String profile = '/profile';
+  static const String profileUpdate = '/profile';
+  static const String changePassword = '/change-password';
 }

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_bloc.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_event.dart' hide LoadActiveSalesmen;
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_state.dart';
@@ -144,7 +145,7 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
     Responsive.init(context);
     final dateFmt = DateFormat('dd MMM yyyy');
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text('Reports', style: AppTextStyles.h6())),
@@ -267,7 +268,7 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

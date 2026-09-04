@@ -1,4 +1,101 @@
-
+//
+// import '../../Apiprovider/product_enums.dart';
+//
+// /// Request body for POST /products/create.
+// class ProductAddRequestModel {
+//   const ProductAddRequestModel({
+//     required this.name,
+//     required this.companyId,
+//     required this.size,
+//     required this.unitId,
+//     required this.mrp,
+//     required this.rate,
+//     required this.incentiveType,
+//     this.incentiveAmount,
+//     this.incentivePercentage,
+//     required this.bonusType,
+//     this.minQuantity = 0,
+//     this.piecesPerBox,
+//     this.packing,
+//     this.isBoxUnit = false,
+//   });
+//
+//   final String name;
+//   final String companyId;
+//   final String size;
+//   final String unitId;
+//   final double mrp;
+//   final double rate;
+//   final ProductIncentiveType incentiveType;
+//
+//   /// Only sent (and required) when [incentiveType] is fixed.
+//   final double? incentiveAmount;
+//
+//   /// Only sent (and required) when [incentiveType] is percentage.
+//   final double? incentivePercentage;
+//
+//   final ProductBonusType bonusType;
+//
+//   /// Only meaningful when [bonusType] is bulk. Sent as null otherwise.
+//   final num minQuantity;
+//
+//   /// Only sent when the selected unit is a "box"-type unit.
+//   /// e.g. "8" (number of pieces packed per box).
+//   final String? piecesPerBox;
+//
+//   /// Only sent when the selected unit is a "box"-type unit.
+//   /// e.g. "8pcs/box".
+//   final String? packing;
+//
+//   /// Set this to true when the unit picked in [unitId] is a "Box" unit.
+//   /// Controls whether [piecesPerBox] / [packing] are sent to the API at all —
+//   /// for non-box units these fields are omitted entirely, not sent empty.
+//   final bool isBoxUnit;
+//
+//   Map<String, dynamic> toJson() {
+//     return {
+//       'name': name,
+//       'company_id': companyId,
+//       'size': size,
+//       'unit_id': unitId,
+//       'mrp': mrp.toString(),
+//       'rate': rate.toString(),
+//       'incentive_type': incentiveType.apiValue,
+//       if (incentiveType == ProductIncentiveType.fixed)
+//         'incentive_amount': incentiveAmount.toString(),
+//       if (incentiveType == ProductIncentiveType.percentage)
+//         'incentive_percentage': incentivePercentage,
+//       // null when bonusType is ProductBonusType.none.
+//       'bonus_type': bonusType.apiValue,
+//       // null unless bonusType is bulk.
+//       'min_quantity': bonusType == ProductBonusType.bulk ? minQuantity : null,
+//       if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
+//         'pieces_per_box': piecesPerBox,
+//       if (isBoxUnit && packing != null && packing!.isNotEmpty)
+//         'packing': packing,
+//     };
+//   }
+// }
+//
+// class ProductAddResponseModel {
+//   const ProductAddResponseModel({
+//     required this.status,
+//     required this.statusCode,
+//     required this.message,
+//   });
+//
+//   final String status;
+//   final String statusCode;
+//   final String message;
+//
+//   factory ProductAddResponseModel.fromJson(Map<String, dynamic> json) {
+//     return ProductAddResponseModel(
+//       status: json['status']?.toString() ?? '0',
+//       statusCode: json['status_code']?.toString() ?? '',
+//       message: json['message']?.toString() ?? '',
+//     );
+//   }
+// }
 import '../../Apiprovider/product_enums.dart';
 
 /// Request body for POST /products/create.
@@ -10,7 +107,7 @@ class ProductAddRequestModel {
     required this.unitId,
     required this.mrp,
     required this.rate,
-    required this.incentiveType,
+    this.incentiveType = ProductIncentiveType.none,
     this.incentiveAmount,
     this.incentivePercentage,
     required this.bonusType,
@@ -26,6 +123,10 @@ class ProductAddRequestModel {
   final String unitId;
   final double mrp;
   final double rate;
+
+  /// Defaults to [ProductIncentiveType.none] — when none, incentive_type,
+  /// incentive_amount, and incentive_percentage are all omitted from the
+  /// request entirely.
   final ProductIncentiveType incentiveType;
 
   /// Only sent (and required) when [incentiveType] is fixed.
@@ -36,7 +137,7 @@ class ProductAddRequestModel {
 
   final ProductBonusType bonusType;
 
-  /// Only meaningful when [bonusType] is bulk. Sent as null otherwise.
+  /// Only meaningful when [bonusType] is bulk. Omitted otherwise.
   final num minQuantity;
 
   /// Only sent when the selected unit is a "box"-type unit.
@@ -60,15 +161,19 @@ class ProductAddRequestModel {
       'unit_id': unitId,
       'mrp': mrp.toString(),
       'rate': rate.toString(),
-      'incentive_type': incentiveType.apiValue,
-      if (incentiveType == ProductIncentiveType.fixed)
-        'incentive_amount': incentiveAmount.toString(),
-      if (incentiveType == ProductIncentiveType.percentage)
+      // Omitted entirely (not sent as null) when incentiveType is none.
+      if (incentiveType != ProductIncentiveType.none)
+        'incentive_type': incentiveType.apiValue,
+      if (incentiveType == ProductIncentiveType.fixed && incentiveAmount != null)
+        'incentive_amount': incentiveAmount!.toString(),
+      if (incentiveType == ProductIncentiveType.percentage && incentivePercentage != null)
         'incentive_percentage': incentivePercentage,
-      // null when bonusType is ProductBonusType.none.
-      'bonus_type': bonusType.apiValue,
-      // null unless bonusType is bulk.
-      'min_quantity': bonusType == ProductBonusType.bulk ? minQuantity : null,
+      // Omitted entirely (not sent as null) when bonusType is none.
+      if (bonusType != ProductBonusType.none)
+        'bonus_type': bonusType.apiValue,
+      // Only sent when bonusType is bulk.
+      if (bonusType == ProductBonusType.bulk)
+        'min_quantity': minQuantity,
       if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
         'pieces_per_box': piecesPerBox,
       if (isBoxUnit && packing != null && packing!.isNotEmpty)

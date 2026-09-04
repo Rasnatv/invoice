@@ -1,22 +1,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../Apiprovider/ownerincentiveprovider.dart';
 import '../../models/salesmanmodels/salesmanowner_incentivemodel.dart';
 
-/// Date-wise bill details of a single product for one salesman, for the
-/// selected month — opened by tapping a product row on the Salesman
-/// Incentive screen.
-///
-/// Hits POST /salesman-incentives/product-bills. `salesmanId` is only sent
-/// when the owner is viewing a salesman's incentives (matches the same
-/// owner/salesman toggle used by [OwnerIncentiveBloc] for the summary
-/// call) — when a salesman views their own incentives, pass `null` and it
-/// is simply omitted from the request body.
+
 class OwnerProductBillsPage extends StatefulWidget {
   const OwnerProductBillsPage({
     super.key,
@@ -103,7 +95,7 @@ class _OwnerProductBillsPageState extends State<OwnerProductBillsPage> {
     final monthFmt = DateFormat('MMMM yyyy');
     final product = widget.product;
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text(product.productName, style: AppTextStyles.h6())),
       body: SafeArea(
@@ -112,7 +104,7 @@ class _OwnerProductBillsPageState extends State<OwnerProductBillsPage> {
           child: _buildBody(context, currency, dateFmt, monthFmt),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildBody(

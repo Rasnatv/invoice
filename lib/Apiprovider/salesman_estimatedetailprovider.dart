@@ -1,3 +1,4 @@
+
 import 'package:dio/dio.dart';
 import '../core/apiclient/api_client.dart';
 import '../core/errors/apierrorhandler.dart';
@@ -8,14 +9,12 @@ class EstimateDetailResult {
   final bool success;
   final EstimateDetailModel? detail;
   final String? errorMessage;
-  final bool isUnauthorized;
 
   const EstimateDetailResult.success(this.detail)
       : success = true,
-        errorMessage = null,
-        isUnauthorized = false;
+        errorMessage = null;
 
-  const EstimateDetailResult.failure(this.errorMessage, {this.isUnauthorized = false})
+  const EstimateDetailResult.failure(this.errorMessage)
       : success = false,
         detail = null;
 }
@@ -29,27 +28,18 @@ class EstimateProvider {
   Future<EstimateDetailResult> getEstimateDetail(String id) async {
     try {
       final response = await _apiClient.showEstimate({'id': id});
-      final body = response.data;
 
-      if (body is Map<String, dynamic>) {
-        final parsed = EstimateDetailResponseModel.fromJson(body);
-        if (parsed.status == '1' && parsed.data != null) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final parsed = EstimateDetailResponseModel.fromJson(response.data);
+        if (parsed.data != null) {
           return EstimateDetailResult.success(parsed.data);
         }
-        return EstimateDetailResult.failure(
-          parsed.message.isNotEmpty ? parsed.message : 'Failed to fetch estimate.',
-        );
+        return EstimateDetailResult.failure(parsed.message);
       }
-      return EstimateDetailResult.failure('Unexpected response: ${response.statusCode}');
+      return EstimateDetailResult.failure(response.statusCode.toString());
     } on DioException catch (e) {
       final message = await ApiErrorHandler.handleDioError(e);
-      final unauthorized = e.response?.statusCode == 401;
-      return EstimateDetailResult.failure(
-        unauthorized ? null : message,
-        isUnauthorized: unauthorized,
-      );
-    } catch (_) {
-      return const EstimateDetailResult.failure('Something went wrong. Please try again.');
+      return EstimateDetailResult.failure(message);
     }
   }
 }

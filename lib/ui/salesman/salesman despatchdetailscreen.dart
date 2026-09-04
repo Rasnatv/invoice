@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -14,13 +14,10 @@ import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_event.dart'
 import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_state.dart';
 
 import '../../models/owner_models/owner_despatchdetailmodel.dart';
+import '../../widgets/appsnackbar.dart';
 import '../../widgets/signaturecontroller.dart';
 
-/// Salesman version of the dispatch bill detail screen.
-///
-/// Deliberately reuses [DispatchDetailBloc] / [DispatchProvider] / events /
-/// states from the owner flow — same auth token, same API, same shape of
-/// data, same mark-in-transit / mark-delivered actions.
+
 class SalesmanDispatchDetailScreen extends StatelessWidget {
   const SalesmanDispatchDetailScreen({super.key, required this.dispatchId});
 
@@ -56,16 +53,14 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Dispatch Details', style: AppTextStyles.h6())),
       body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
         listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
         listener: (context, state) {
           if (state.actionStatus == DispatchActionStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.actionMessage ?? 'Updated successfully')),
-            );
+            AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
             _customerSigCtrl.clear();
             _driverSigCtrl.clear();
             setState(() {
@@ -74,12 +69,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
             });
             context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
           } else if (state.actionStatus == DispatchActionStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.actionMessage ?? 'Something went wrong'),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
+            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
             context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
           }
         },
@@ -138,7 +128,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
           );
         },
       ),
-    );
+    ));
   }
 
   // ---------- sections ----------
@@ -487,9 +477,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
 
     if (customerSig == null || driverSig == null) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please capture or upload both signatures before proceeding.')),
-      );
+      AppSnackbar.error('Please capture or upload both signatures before proceeding.');
       return;
     }
 

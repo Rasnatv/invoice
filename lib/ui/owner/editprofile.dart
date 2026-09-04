@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../bloc/profile/profile_bloc.dart';
+import '../../bloc/profile/profile_event.dart';
+import '../../bloc/profile/profile_state.dart';
+import '../../core/validator/validationfile.dart';
+import '../../models/profilemodel.dart';
+import '../../widgets/appsnackbar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final String initialName;
@@ -10,9 +17,9 @@ class EditProfileScreen extends StatefulWidget {
 
   const EditProfileScreen({
     super.key,
-    this.initialName = 'Rahul Kumar',
-    this.initialPhone = '+91 98765 43210',
-    this.initialEmail = 'rahul.sales@dreams.com',
+    this.initialName = '',
+    this.initialPhone = '',
+    this.initialEmail = '',
   });
 
   @override
@@ -28,8 +35,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final FocusNode _phoneFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  bool _isSaving = false;
 
   @override
   void initState() {
@@ -50,127 +55,134 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _onSave() async {
+  void _onSave() {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
 
-    setState(() => _isSaving = true);
-
-    // TODO: replace with actual "update profile" API / bloc call.
-    await Future.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted) return;
-    setState(() => _isSaving = false);
-
-    Navigator.of(context).pop({
-      'name': _nameController.text.trim(),
-      'phone': _phoneController.text.trim(),
-      'email': _emailController.text.trim(),
-    });
+    context.read<ProfileBloc>().add(
+      UpdateProfileRequested(
+        ProfileModel(
+          name: _nameController.text.trim(),
+          mobile: _phoneController.text.trim(),
+          email: _emailController.text.trim(),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Edit Profile', style: AppTextStyles.h6()),
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: EdgeInsets.all(Responsive.w(20)),
-            children: [
-              Center(
-                child: Stack(
+    return BlocListener<ProfileBloc, ProfileState>(
+      listenWhen: (prev, curr) => prev.updateStatus != curr.updateStatus,
+      listener: (context, state) {
+        if (state.updateStatus == ProfileActionStatus.success) {
+          AppSnackbar.success(state.updateMessage ?? 'Profile updated successfully');
+          context.read<ProfileBloc>().add(const ResetProfileActionStatus());
+          Navigator.of(context).pop();
+        } else if (state.updateStatus == ProfileActionStatus.failure) {
+          AppSnackbar.error(state.updateMessage ?? 'Failed to update profile');
+          context.read<ProfileBloc>().add(const ResetProfileActionStatus());
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('Edit Profile', style: AppTextStyles.h6()),
+        ),
+        body: SafeArea(
+          child: Form(
+            key: _formKey,
+            child: BlocBuilder<ProfileBloc, ProfileState>(
+              buildWhen: (prev, curr) => prev.updateStatus != curr.updateStatus,
+              builder: (context, state) {
+                final isSaving = state.updateStatus == ProfileActionStatus.loading;
+
+                return ListView(
+                  padding: EdgeInsets.all(Responsive.w(20)),
                   children: [
-                    CircleAvatar(
-                      radius: Responsive.w(46),
-                      backgroundColor: AppColors.primarySoft,
-                      child: Icon(Icons.person,
-                          size: Responsive.w(46), color: AppColors.primary),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt_outlined,
-                            color: Colors.white, size: 14),
+                    Center(
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: Responsive.w(46),
+                            backgroundColor: AppColors.primarySoft,
+                            child: Icon(Icons.person,
+                                size: Responsive.w(46), color: AppColors.primary),
+                          ),
+                        ],
                       ),
                     ),
+                    SizedBox(height: Responsive.h(28)),
+
+                    const _FieldLabel('FULL NAME'),
+                    SizedBox(height: Responsive.h(8)),
+                    _BrandField(
+                      controller: _nameController,
+                      focusNode: _nameFocus,
+                      hint: 'Your full name',
+                      icon: Icons.person_outline_rounded,
+                      keyboardType: TextInputType.name,
+                      validator: (v) => DValidator.validateName('Name', v),
+                    ),
+                    SizedBox(height: Responsive.h(20)),
+
+                    const _FieldLabel('PHONE NUMBER'),
+                    SizedBox(height: Responsive.h(8)),
+                    _BrandField(
+                      controller: _phoneController,
+                      focusNode: _phoneFocus,
+                      hint: '+91 98765 43210',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                      validator: (v) {
+                        final value = v?.trim() ?? '';
+                        // Some roles (e.g. owners in this API) legitimately
+                        // have no phone on file — only validate format if
+                        // something was actually entered. DValidator's
+                        // phone validator expects an exact-length local
+                        // number, so we keep this screen's own looser
+                        // regex to allow the "+91 ..." format shown above.
+                        if (value.isEmpty) return null;
+                        final phoneRegex = RegExp(r'^\+?[0-9\s]{7,15}$');
+                        if (!phoneRegex.hasMatch(value)) {
+                          return 'Invalid phone number';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: Responsive.h(20)),
+
+                    const _FieldLabel('EMAIL ADDRESS'),
+                    SizedBox(height: Responsive.h(8)),
+                    _BrandField(
+                      controller: _emailController,
+                      focusNode: _emailFocus,
+                      hint: 'you@company.com',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) {
+                        final value = v?.trim() ?? '';
+                        // Some roles (e.g. drivers in this API) legitimately
+                        // have no email on file, so DValidator.validateEmail
+                        // (which requires a value) doesn't fit here directly.
+                        if (value.isEmpty) return null;
+                        return DValidator.validateEmail(value);
+                      },
+                    ),
+                    SizedBox(height: Responsive.h(32)),
+
+                    _BrandButton(
+                      label: isSaving ? 'Saving…' : 'Save Changes',
+                      isLoading: isSaving,
+                      onPressed: _onSave,
+                    ),
+                    SizedBox(height: Responsive.h(20)),
                   ],
-                ),
-              ),
-              SizedBox(height: Responsive.h(28)),
-
-              const _FieldLabel('FULL NAME'),
-              SizedBox(height: Responsive.h(8)),
-              _BrandField(
-                controller: _nameController,
-                focusNode: _nameFocus,
-                hint: 'Your full name',
-                icon: Icons.person_outline_rounded,
-                keyboardType: TextInputType.name,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Name is required';
-                  return null;
-                },
-              ),
-              SizedBox(height: Responsive.h(20)),
-
-              const _FieldLabel('PHONE NUMBER'),
-              SizedBox(height: Responsive.h(8)),
-              _BrandField(
-                controller: _phoneController,
-                focusNode: _phoneFocus,
-                hint: '+91 98765 43210',
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                validator: (v) {
-                  final value = v?.trim() ?? '';
-                  final phoneRegex = RegExp(r'^\+?[0-9\s]{7,15}$');
-                  if (value.isEmpty || !phoneRegex.hasMatch(value)) {
-                    return 'Invalid phone number';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: Responsive.h(20)),
-
-              const _FieldLabel('EMAIL ADDRESS'),
-              SizedBox(height: Responsive.h(8)),
-              _BrandField(
-                controller: _emailController,
-                focusNode: _emailFocus,
-                hint: 'you@company.com',
-                icon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) {
-                  final value = v?.trim() ?? '';
-                  final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  if (value.isEmpty || !emailRegex.hasMatch(value)) {
-                    return 'Invalid email';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: Responsive.h(32)),
-
-              _BrandButton(
-                label: _isSaving ? 'Saving…' : 'Save Changes',
-                isLoading: _isSaving,
-                onPressed: _onSave,
-              ),
-              SizedBox(height: Responsive.h(20)),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),

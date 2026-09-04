@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -65,6 +64,7 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                 TextFormField(
                   controller: nameCtrl,
                   decoration: const InputDecoration(labelText: 'Unit Name'),
+                  inputFormatters: DValidator.textWithLimit,
                   validator: (v) =>
                       DValidator.validateRequired(v, message: 'Unit name is required'),
                 ),
@@ -72,6 +72,7 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                 TextFormField(
                   controller: abbrCtrl,
                   decoration: const InputDecoration(labelText: 'Abbreviation'),
+                  inputFormatters: DValidator.textWithLimit,
                   validator: (v) =>
                       DValidator.validateRequired(v, message: 'Abbreviation is required'),
                 ),
@@ -163,87 +164,87 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
     Responsive.init(context);
 
     return BlocListener<UnitBloc, UnitState>(
-      listenWhen: (previous, current) =>
-      previous.errorMessage != current.errorMessage ||
-          previous.successMessage != current.successMessage,
-      listener: (context, state) {
-        if (state.errorMessage != null) {
-          AppSnackbar.error(state.errorMessage!);
-          context.read<UnitBloc>().add(const UnitMessageConsumed());
-        } else if (state.successMessage != null) {
-          AppSnackbar.success(state.successMessage!);
-          context.read<UnitBloc>().add(const UnitMessageConsumed());
-        }
-      },
-      child: NetworkAwareWrapper(child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text('Unit Setup', style: AppTextStyles.h6())),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _openUnitForm(context),
-          backgroundColor: AppColors.primary,
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: Text('Add Unit', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
-        ),
-        body: SafeArea(
-          child: BlocBuilder<UnitBloc, UnitState>(
-            builder: (context, state) {
-              if (state.status == UnitStatus.loading && state.units.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
+        listenWhen: (previous, current) =>
+        previous.errorMessage != current.errorMessage ||
+            previous.successMessage != current.successMessage,
+        listener: (context, state) {
+          if (state.errorMessage != null) {
+            AppSnackbar.error(state.errorMessage!);
+            context.read<UnitBloc>().add(const UnitMessageConsumed());
+          } else if (state.successMessage != null) {
+            AppSnackbar.success(state.successMessage!);
+            context.read<UnitBloc>().add(const UnitMessageConsumed());
+          }
+        },
+        child: NetworkAwareWrapper(child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: Text('Unit Setup', style: AppTextStyles.h6())),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _openUnitForm(context),
+            backgroundColor: AppColors.primary,
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: Text('Add Unit', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
+          ),
+          body: SafeArea(
+            child: BlocBuilder<UnitBloc, UnitState>(
+              builder: (context, state) {
+                if (state.status == UnitStatus.loading && state.units.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (state.status == UnitStatus.failure && state.units.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(Responsive.w(20)),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          state.errorMessage ?? 'Something went wrong',
-                          style: AppTextStyles.subtitle(),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: Responsive.h(12)),
-                        OutlinedButton(
-                          onPressed: () => context.read<UnitBloc>().add(const LoadUnits()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
+                if (state.status == UnitStatus.failure && state.units.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(Responsive.w(20)),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            state.errorMessage ?? 'Something went wrong',
+                            style: AppTextStyles.subtitle(),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: Responsive.h(12)),
+                          OutlinedButton(
+                            onPressed: () => context.read<UnitBloc>().add(const LoadUnits()),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
                     ),
+                  );
+                }
+
+                if (state.units.isEmpty) {
+                  return Center(child: Text('No units added yet', style: AppTextStyles.subtitle()));
+                }
+
+                return RefreshIndicator(
+                  onRefresh: () async => context.read<UnitBloc>().add(const LoadUnits()),
+                  child: ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      Responsive.w(16),
+                      Responsive.h(14),
+                      Responsive.w(16),
+                      Responsive.h(90),
+                    ),
+                    itemCount: state.units.length,
+                    separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                    itemBuilder: (context, index) {
+                      final unit = state.units[index];
+                      return _UnitCard(
+                        unit: unit,
+                        onEdit: () => _openUnitForm(context, unit: unit),
+                        onDelete: () => _confirmDelete(context, unit),
+                      );
+                    },
                   ),
                 );
-              }
-
-              if (state.units.isEmpty) {
-                return Center(child: Text('No units added yet', style: AppTextStyles.subtitle()));
-              }
-
-              return RefreshIndicator(
-                onRefresh: () async => context.read<UnitBloc>().add(const LoadUnits()),
-                child: ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
-                    Responsive.w(16),
-                    Responsive.h(14),
-                    Responsive.w(16),
-                    Responsive.h(90),
-                  ),
-                  itemCount: state.units.length,
-                  separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
-                  itemBuilder: (context, index) {
-                    final unit = state.units[index];
-                    return _UnitCard(
-                      unit: unit,
-                      onEdit: () => _openUnitForm(context, unit: unit),
-                      onDelete: () => _confirmDelete(context, unit),
-                    );
-                  },
-                ),
-              );
-            },
+              },
+            ),
           ),
         ),
-      ),
-    ));
+        ));
   }
 }
 

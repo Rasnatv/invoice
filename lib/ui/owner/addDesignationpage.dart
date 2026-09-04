@@ -1,8 +1,8 @@
 
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -73,10 +73,10 @@ class _AddDesignationPageState extends State<AddDesignationPage> {
       body: BlocListener<DesignationBloc, DesignationState>(
         listener: (context, state) {
           if (state is DesignationActionSuccess) {
-            AppSnackbar.success(state.message);
+            if (state.message != null) AppSnackbar.success(state.message!);
             Navigator.pop(context);
           } else if (state is DesignationActionFailure) {
-            AppSnackbar.error(state.message);
+            if (state.message != null) AppSnackbar.error(state.message!);
           }
         },
         child: BlocBuilder<DesignationBloc, DesignationState>(

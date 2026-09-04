@@ -73,6 +73,7 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                 TextFormField(
                   controller: nameCtrl,
                   textCapitalization: TextCapitalization.words,
+                  inputFormatters: DValidator.textWithLimit,
                   decoration: const InputDecoration(labelText: 'Company Name'),
                   validator: (v) =>
                       DValidator.validateRequired(v, message: 'Company name is required'),
@@ -81,6 +82,7 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                 TextFormField(
                   controller: codeCtrl,
                   textCapitalization: TextCapitalization.characters,
+                  inputFormatters: DValidator.textWithLimit,
                   decoration: const InputDecoration(labelText: 'Company Code'),
                   validator: (v) =>
                       DValidator.validateRequired(v, message: 'Company code is required'),
@@ -89,6 +91,7 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                 TextFormField(
                   controller: websiteCtrl,
                   keyboardType: TextInputType.url,
+                  inputFormatters: DValidator.textWithLimit,
                   decoration: const InputDecoration(
                     labelText: 'Website (optional)',
                     hintText: 'https://example.com',
@@ -181,89 +184,89 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
     Responsive.init(context);
 
     return BlocListener<CompanyBloc, CompanyState>(
-      listenWhen: (previous, current) =>
-      previous.errorMessage != current.errorMessage ||
-          previous.successMessage != current.successMessage,
-      listener: (context, state) {
-        if (state.errorMessage != null) {
-          AppSnackbar.error(state.errorMessage!);
-          context.read<CompanyBloc>().add(const CompanyMessageConsumed());
-        } else if (state.successMessage != null) {
-          AppSnackbar.success(state.successMessage!);
-          context.read<CompanyBloc>().add(const CompanyMessageConsumed());
-        }
-      },
-      child: NetworkAwareWrapper(child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text('Company Setup', style: AppTextStyles.h6())),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _openCompanyForm(context),
-          backgroundColor: AppColors.primary,
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: Text('Add Company', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
-        ),
-        body: SafeArea(
-          child: BlocBuilder<CompanyBloc, CompanyState>(
-            builder: (context, state) {
-              if (state.status == CompanyStatus.loading && state.companies.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
+        listenWhen: (previous, current) =>
+        previous.errorMessage != current.errorMessage ||
+            previous.successMessage != current.successMessage,
+        listener: (context, state) {
+          if (state.errorMessage != null) {
+            AppSnackbar.error(state.errorMessage!);
+            context.read<CompanyBloc>().add(const CompanyMessageConsumed());
+          } else if (state.successMessage != null) {
+            AppSnackbar.success(state.successMessage!);
+            context.read<CompanyBloc>().add(const CompanyMessageConsumed());
+          }
+        },
+        child: NetworkAwareWrapper(child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: Text('Company Setup', style: AppTextStyles.h6())),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _openCompanyForm(context),
+            backgroundColor: AppColors.primary,
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: Text('Add Company', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
+          ),
+          body: SafeArea(
+            child: BlocBuilder<CompanyBloc, CompanyState>(
+              builder: (context, state) {
+                if (state.status == CompanyStatus.loading && state.companies.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (state.status == CompanyStatus.failure && state.companies.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(Responsive.w(20)),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          state.errorMessage ?? 'Something went wrong',
-                          style: AppTextStyles.subtitle(),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: Responsive.h(12)),
-                        OutlinedButton(
-                          onPressed: () => context.read<CompanyBloc>().add(const LoadCompanies()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
+                if (state.status == CompanyStatus.failure && state.companies.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(Responsive.w(20)),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            state.errorMessage ?? 'Something went wrong',
+                            style: AppTextStyles.subtitle(),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: Responsive.h(12)),
+                          OutlinedButton(
+                            onPressed: () => context.read<CompanyBloc>().add(const LoadCompanies()),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
                     ),
+                  );
+                }
+
+                if (state.companies.isEmpty) {
+                  return Center(
+                    child: Text('No companies added yet', style: AppTextStyles.subtitle()),
+                  );
+                }
+
+                return RefreshIndicator(
+                  onRefresh: () async => context.read<CompanyBloc>().add(const LoadCompanies()),
+                  child: ListView.separated(
+                    padding: EdgeInsets.fromLTRB(
+                      Responsive.w(16),
+                      Responsive.h(14),
+                      Responsive.w(16),
+                      Responsive.h(90),
+                    ),
+                    itemCount: state.companies.length,
+                    separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                    itemBuilder: (context, index) {
+                      final company = state.companies[index];
+                      return _CompanyCard(
+                        company: company,
+                        onEdit: () => _openCompanyForm(context, company: company),
+                        onDelete: () => _confirmDelete(context, company),
+                      );
+                    },
                   ),
                 );
-              }
-
-              if (state.companies.isEmpty) {
-                return Center(
-                  child: Text('No companies added yet', style: AppTextStyles.subtitle()),
-                );
-              }
-
-              return RefreshIndicator(
-                onRefresh: () async => context.read<CompanyBloc>().add(const LoadCompanies()),
-                child: ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
-                    Responsive.w(16),
-                    Responsive.h(14),
-                    Responsive.w(16),
-                    Responsive.h(90),
-                  ),
-                  itemCount: state.companies.length,
-                  separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
-                  itemBuilder: (context, index) {
-                    final company = state.companies[index];
-                    return _CompanyCard(
-                      company: company,
-                      onEdit: () => _openCompanyForm(context, company: company),
-                      onDelete: () => _confirmDelete(context, company),
-                    );
-                  },
-                ),
-              );
-            },
+              },
+            ),
           ),
         ),
-      ),
-    ));
+        ));
   }
 }
 

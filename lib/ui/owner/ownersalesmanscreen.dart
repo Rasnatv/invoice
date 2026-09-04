@@ -1,4 +1,5 @@
 
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -139,15 +140,12 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
             Expanded(
               child: BlocConsumer<SalesmanBloc, SalesmanState>(
                 listener: (context, state) {
-                  // AppSnackbar uses a global ScaffoldMessengerKey, so this
-                  // fires correctly even while an Add/Edit screen is pushed
-                  // on top of this one.
                   if (state is SalesmanActionSuccess) {
-                    AppSnackbar.success(state.message);
+                    AppSnackbar.success(state.message ?? '');
                   } else if (state is SalesmanActionFailure) {
-                    AppSnackbar.error(state.message);
+                    AppSnackbar.error(state.message ?? '');
                   } else if (state is SalesmanError) {
-                    AppSnackbar.error(state.message);
+                    AppSnackbar.error(state.message ?? '');
                   }
                 },
                 builder: (context, state) {
@@ -164,7 +162,7 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
                           children: [
                             Icon(Icons.error_outline, size: 48, color: AppColors.error),
                             const SizedBox(height: 12),
-                            Text(state.message, textAlign: TextAlign.center, style: AppTextStyles.caption()),
+                            Text(state.message ?? '', textAlign: TextAlign.center, style: AppTextStyles.caption()),
                             const SizedBox(height: 16),
                             ElevatedButton(
                               onPressed: () => context.read<SalesmanBloc>().add(FetchSalesmen()),
@@ -332,37 +330,37 @@ class _OwnerSalesmanCard extends StatelessWidget {
               // In the _OwnerSalesmanCard build method, update the status badge
 
 // Replace the status badge section with this:
-    Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-    color: salesman.isActive
-    ? Colors.green.withOpacity(0.1)
-        : Colors.red.withOpacity(0.1),
-    borderRadius: BorderRadius.circular(6),
-    ),
-    child: Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-    Container(
-    width: 6,
-    height: 6,
-    decoration: BoxDecoration(
-    shape: BoxShape.circle,
-    color: salesman.isActive ? Colors.green : Colors.red,
-    ),
-    ),
-    const SizedBox(width: 4),
-    Text(
-    salesman.isActive ? 'Active' : 'Inactive',
-    style: TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    color: salesman.isActive ? Colors.green : Colors.red,
-    ),
-    ),
-    ],
-    ),
-    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: salesman.isActive
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: salesman.isActive ? Colors.green : Colors.red,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      salesman.isActive ? 'Active' : 'Inactive',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: salesman.isActive ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             ],
           ),

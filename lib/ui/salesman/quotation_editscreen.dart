@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -15,10 +16,10 @@ import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
 import '../../bloc/salemanbloc/estimate/salesman_estimate_bloc.dart';
 import '../../bloc/salemanbloc/estimate/salesmanestimate_event.dart';
 import '../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
-
 import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../models/salesmanmodels/quotationupdatemodel.dart';
+import '../../widgets/appsnackbar.dart';
 
 /// CreateEstimateScreen uses.
 class QuotationEditScreen extends StatelessWidget {
@@ -41,18 +42,7 @@ class QuotationEditScreen extends StatelessWidget {
   }
 }
 
-/// One editable line item — covers both items that already existed on the
-/// quotation and brand-new ones added here. Only product_id / quantity /
-/// rate are ever sent back to /quotations/update; company/size/MRP/
-/// incentive are display-only, same as CreateEstimateScreen.
-///
-/// NOTE: /quotations/show does NOT return company or mrp per item (only
-/// product_id/name/size/unit/quantity/rate + incentive fields), so for
-/// pre-existing items these start empty/zero and get backfilled from the
-/// active-products catalog once it loads (see
-/// _QuotationEditViewState._backfillCompanyAndMrp). If a product was later
-/// deactivated it won't be in that catalog and company/mrp will stay
-/// blank — that's a data-availability gap, not a bug in this screen.
+
 class _EditItem {
   const _EditItem({
     required this.id,
@@ -255,8 +245,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+    AppSnackbar.error(msg);
   }
 
   /// Finds the active-products entry matching [productId], or null if the
@@ -535,24 +524,17 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Edit Quotation', style: AppTextStyles.h6())),
       body: SafeArea(
         child: MultiBlocListener(
           listeners: [
-            // NOTE: submitStatus is shared with "submit for approval" on the
-            // preview screen underneath us (same bloc instance, same field).
-            // The preview screen's own BlocListener is still mounted while
-            // this screen is pushed on top, so it will also react to this
-            // same success/failure. Harmless, just a minor UX duplicate.
             BlocListener<SalesmanQuotationBloc, SalesmanQuotationState>(
               listenWhen: (prev, curr) => prev.submitStatus != curr.submitStatus,
               listener: (context, state) {
                 if (state.submitStatus == QuotationActionStatus.success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(state.submitMessage ?? 'Quotation updated.')),
-                  );
+                  AppSnackbar.success(state.submitMessage ?? 'Quotation updated.');
                   context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
                   Navigator.of(context).pop();
                 } else if (state.submitStatus == QuotationActionStatus.failure) {
@@ -580,15 +562,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                   children: [
                     Text('Customer Details', style: AppTextStyles.h3()),
                     SizedBox(height: Responsive.h(12)),
-                    // Party/customer details are locked on the edit screen —
-                    // editing the customer on an existing quotation isn't
-                    // supported by this form, so these are wrapped in
-                    // IgnorePointer (same pattern used for the auto-filled
-                    // product fields further down) to display the existing
-                    // values without letting them be tapped into or changed.
-                    // The values still get sent back on save exactly as
-                    // loaded, since the controllers themselves aren't
-                    // touched — only pointer/tap input is blocked.
                     LabeledField(
                       label: 'Party Name',
                       field: IgnorePointer(
@@ -958,7 +931,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildProductDropdown() {

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -6,6 +7,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/designation_provider.dart';
 import '../../core/utils/confirmation_dialogue.dart';
+import '../../core/utils/delete_helper.dart';
 import '../../models/owner_models/designationmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/designation/designationbloc.dart';
@@ -53,11 +55,11 @@ class _DesignationListView extends StatelessWidget {
           child: BlocConsumer<DesignationBloc, DesignationState>(
             listener: (context, state) {
               if (state is DesignationActionSuccess) {
-                AppSnackbar.success(state.message);
+                if (state.message != null) AppSnackbar.success(state.message!);
               } else if (state is DesignationActionFailure) {
-                AppSnackbar.error(state.message);
+                if (state.message != null) AppSnackbar.error(state.message!);
               } else if (state is DesignationError) {
-                AppSnackbar.error(state.message);
+                if (state.message != null) AppSnackbar.error(state.message!);
               }
             },
             builder: (context, state) {
@@ -96,7 +98,8 @@ class _DesignationListView extends StatelessWidget {
                     Responsive.h(96),
                   ),
                   itemCount: designations.length,
-                  separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                  separatorBuilder: (_, __) =>
+                      SizedBox(height: Responsive.h(10)),
                   itemBuilder: (context, index) {
                     final designation = designations[index];
                     return _DesignationCard(
@@ -134,29 +137,25 @@ class _DesignationListView extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: context.read<DesignationBloc>(),
-          child: AddDesignationPage(designation: designation),
-        ),
+        builder: (_) =>
+            BlocProvider.value(
+              value: context.read<DesignationBloc>(),
+              child: AddDesignationPage(designation: designation),
+            ),
       ),
     );
   }
 
-  Future<void> _confirmDelete(
-      BuildContext context, DesignationModel designation) async {
+  Future<void> _confirmDelete(BuildContext context,
+      DesignationModel designation) async {
     final bloc = context.read<DesignationBloc>();
-    final confirmed = await showConfirmDialog(
+    await deleteItem(
       context,
-      title: 'Delete designation?',
-      message: 'This will permanently delete "${designation.name}".',
-      confirmText: 'Delete',
+      itemName: designation.name,
+      onConfirmed: () async => bloc.add(DeleteDesignation(designation.id)),
     );
-    if (confirmed) {
-      bloc.add(DeleteDesignation(designation.id));
-    }
   }
 }
-
 class _DesignationCard extends StatelessWidget {
   final DesignationModel designation;
   final Color primary;
@@ -240,7 +239,7 @@ class _DesignationCard extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  final String message;
+  final String? message;
   final VoidCallback onRetry;
   const _ErrorView({required this.message, required this.onRetry});
 
@@ -258,14 +257,15 @@ class _ErrorView extends StatelessWidget {
               color: Colors.red.shade300,
             ),
             SizedBox(height: Responsive.h(12)),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.black54,
-                fontSize: Responsive.sp(14),
+            if (message != null)
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: Responsive.sp(14),
+                ),
               ),
-            ),
             SizedBox(height: Responsive.h(16)),
             ElevatedButton(
               onPressed: onRetry,

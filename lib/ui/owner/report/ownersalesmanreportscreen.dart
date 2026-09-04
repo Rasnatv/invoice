@@ -1,174 +1,8 @@
-// import 'package:flutter/material.dart';
-// import 'package:intl/intl.dart';
-// import '../../../core/constants/app_colors.dart';
-// import '../../../core/constants/app_text_styles.dart';
-// import '../../../core/utils/responsive.dart';
-// import 'ownerreportfilterscreen.dart';
-// import 'ownerreportwidget.dart';
-//
-// class _ReportRow {
-//   const _ReportRow({
-//     required this.code,
-//     required this.status,
-//     required this.subtitle,
-//     required this.amount,
-//     required this.date,
-//   });
-//
-//   final String code;
-//   final String status;
-//   final String subtitle;
-//   final double amount;
-//   final DateTime date;
-// }
-//
-// /// Full performance summary for a single salesman.
-// /// Matches mockup frame 3.
-// class OwnerSalesmanReportScreen extends StatefulWidget {
-//   const OwnerSalesmanReportScreen({
-//     super.key,
-//     required this.salesmanName,
-//     required this.startDate,
-//     required this.endDate,
-//   });
-//
-//   final String salesmanName;
-//   final DateTime startDate;
-//   final DateTime endDate;
-//
-//   @override
-//   State<OwnerSalesmanReportScreen> createState() => _OwnerSalesmanReportScreenState();
-// }
-//
-// class _OwnerSalesmanReportScreenState extends State<OwnerSalesmanReportScreen> {
-//   bool _showQuotations = true;
-//
-//   // TODO: replace all of the below with real data from your
-//   // OwnerReportsBloc / repository, filtered by salesman + date range.
-//   final _quotations = [
-//     _ReportRow(
-//       code: 'QUO-202608-118',
-//       status: 'Delivered',
-//       subtitle: 'Sunrise Interiors · Kozhikode',
-//       amount: 64200,
-//       date: DateTime(2026, 8, 8),
-//     ),
-//     _ReportRow(
-//       code: 'QUO-202608-117',
-//       status: 'Pending',
-//       subtitle: 'Green Valley Builders · Wayanad',
-//       amount: 128000,
-//       date: DateTime(2026, 8, 7),
-//     ),
-//   ];
-//
-//   final _estimates = [
-//     _ReportRow(
-//       code: 'EST-202608-054',
-//       status: 'Approved',
-//       subtitle: 'Sunrise Interiors · Kozhikode',
-//       amount: 58600,
-//       date: DateTime(2026, 8, 5),
-//     ),
-//   ];
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     Responsive.init(context);
-//     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-//     final rangeLabel =
-//         '${DateFormat('dd').format(widget.startDate)}\u2013${DateFormat('dd MMM yyyy').format(widget.endDate)}';
-//
-//     final rows = _showQuotations ? _quotations : _estimates;
-//
-//     return Scaffold(
-//       backgroundColor: AppColors.background,
-//       body: Column(
-//         children: [
-//           ReportHeaderBar(
-//             title: 'Salesman Report',
-//             subtitle: rangeLabel,
-//             showBack: true,
-//             trailing: EditFilterButton(
-//               onTap: () => Navigator.of(context).pushReplacement(
-//                 MaterialPageRoute(
-//                   builder: (_) => OwnerReportFilterScreen(
-//                     type: ReportPersonType.salesman,
-//                     initialPerson: widget.salesmanName,
-//                     initialStart: widget.startDate,
-//                     initialEnd: widget.endDate,
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ),
-//           Expanded(
-//             child: ListView(
-//               padding: EdgeInsets.all(Responsive.w(20)),
-//               children: [
-//                 ReportPersonHeaderCard(
-//                   name: widget.salesmanName,
-//                   subtitle: 'Sales Executive · Kozhikode',
-//                   avatarColor: AppColors.primary,
-//                 ),
-//                 SizedBox(height: Responsive.h(14)),
-//                 ReportStatGrid(
-//                   tiles: [
-//                     const ReportStatTile(value: '42', label: 'Quotations Made'),
-//                     const ReportStatTile(value: '18', label: 'Estimates Made'),
-//                     ReportStatTile(value: currency.format(802000), label: 'Total Sales'),
-//                     const ReportStatTile(value: '43%', label: 'Conversion Rate', valueColor: Color(0xFFF59E0B)),
-//                     ReportStatTile(
-//                       value: currency.format(41775),
-//                       label: 'Incentive Earned',
-//                       valueColor: const Color(0xFF16A34A),
-//                     ),
-//                     const ReportStatTile(value: '80%', label: 'Target Achieved', valueColor: Color(0xFF16A34A)),
-//                   ],
-//                 ),
-//                 SizedBox(height: Responsive.h(18)),
-//                 ReportTabSwitcher(
-//                   leftLabel: 'Quotations',
-//                   rightLabel: 'Estimates',
-//                   isLeftSelected: _showQuotations,
-//                   onChanged: (isLeft) => setState(() => _showQuotations = isLeft),
-//                 ),
-//                 SizedBox(height: Responsive.h(14)),
-//                 for (int i = 0; i < rows.length; i++) ...[
-//                   ReportListItemCard(
-//                     code: rows[i].code,
-//                     status: rows[i].status,
-//                     subtitle: rows[i].subtitle,
-//                     amountFormatted: currency.format(rows[i].amount),
-//                     dateFormatted: DateFormat('dd MMM yyyy').format(rows[i].date),
-//                     onTap: () {
-//                       // TODO: navigate to the quotation/estimate detail screen.
-//                     },
-//                   ),
-//                   if (i != rows.length - 1) SizedBox(height: Responsive.h(10)),
-//                 ],
-//                 if (rows.isEmpty)
-//                   Padding(
-//                     padding: EdgeInsets.symmetric(vertical: Responsive.h(30)),
-//                     child: Center(
-//                       child: Text(
-//                         _showQuotations ? 'No quotations in this period' : 'No estimates in this period',
-//                         style: AppTextStyles.caption(),
-//                       ),
-//                     ),
-//                   ),
-//                 SizedBox(height: Responsive.h(20)),
-//               ],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_bloc.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_event.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_state.dart';
@@ -176,7 +10,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../models/owner_reportmodel/reportentrymodel.dart';
-import 'ownerreportfilterscreen.dart';
 import 'ownerreportwidget.dart';
 
 /// Full performance summary for a single salesman.
@@ -245,7 +78,7 @@ class _OwnerSalesmanReportViewState extends State<_OwnerSalesmanReportView> {
     final rangeLabel =
         '${DateFormat('dd').format(widget.startDate)}\u2013${DateFormat('dd MMM yyyy').format(widget.endDate)}';
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar:  AppBar(
         title: Text('Salesman Report', style: AppTextStyles.h6())),
@@ -337,7 +170,7 @@ class _OwnerSalesmanReportViewState extends State<_OwnerSalesmanReportView> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildRow(ReportEntryModel row, NumberFormat currency) {

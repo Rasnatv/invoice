@@ -2,12 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../bloc/ownerbloc/ownerquatationedit/owner_qtneditbloc.dart';
 import '../../bloc/ownerbloc/ownerquatationedit/owner_qtneditestate.dart';
 import '../../bloc/ownerbloc/ownerquatationedit/owner_qtneditevent.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
+import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 
@@ -224,8 +226,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+    AppSnackbar.error(msg);
   }
 
   ActiveProductModel? _findCatalogMatch(List<ActiveProductModel> products, String productId) {
@@ -474,7 +475,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Edit Quotation', style: AppTextStyles.h6())),
       body: SafeArea(
@@ -484,18 +485,12 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
               listenWhen: (prev, curr) => prev.updateStatus != curr.updateStatus,
               listener: (context, state) {
                 if (state.updateStatus == OwnerQuotationUpdateStatus.success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(state.updateMessage ?? 'Quotation updated.')),
-                  );
-                  context
-                      .read<OwnerQuotationEditBloc>()
-                      .add(const OwnerQuotationUpdateResultConsumed());
+                  AppSnackbar.success(state.updateMessage ?? 'Quotation updated.');
+                  context.read<OwnerQuotationEditBloc>().add(const OwnerQuotationUpdateResultConsumed());
                   Navigator.of(context).pop(true);
                 } else if (state.updateStatus == OwnerQuotationUpdateStatus.failure) {
                   _showError(state.updateError ?? 'Failed to update quotation.');
-                  context
-                      .read<OwnerQuotationEditBloc>()
-                      .add(const OwnerQuotationUpdateResultConsumed());
+                  context.read<OwnerQuotationEditBloc>().add(const OwnerQuotationUpdateResultConsumed());
                 }
               },
             ),
@@ -876,7 +871,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildProductDropdown() {

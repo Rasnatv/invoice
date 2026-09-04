@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -10,6 +11,7 @@ import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_bloc.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
 import '../../models/owner_models/owner_estimateactionmodel.dart';
+import '../../widgets/appsnackbar.dart';
 import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
 import 'owner_estimateupdation.dart';
@@ -61,20 +63,16 @@ class _OwnerEstimateDetailView extends StatelessWidget {
     Responsive.init(context);
     final number = NumberFormat.decimalPattern('en_IN');
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:  Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Owner Estimate Details', style: AppTextStyles.h6())),
       body: SafeArea(
         child: BlocConsumer<OwnerEstimateDetailBloc, OwnerEstimateDetailState>(
           listener: (context, state) {
             if (state.actionStatus == OwnerEstimateActionStatus.success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Done')),
-              );
+              AppSnackbar.success(state.actionMessage ?? 'Done');
             } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.actionMessage ?? 'Action failed')),
-              );
+              AppSnackbar.error(state.actionMessage ?? 'Action failed');
             }
           },
           builder: (context, state) {
@@ -113,20 +111,40 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                     children: [
                       _buildHeader(detail),
                       SizedBox(height: Responsive.h(16)),
+                      if (detail.notes.isNotEmpty) ...[
+                        _DetailSection(title: 'Notes', rows: [
+                          _Row('Notes', detail.notes, icon: Icons.sticky_note_2_outlined),
+                        ]),
+                        SizedBox(height: Responsive.h(14)),
+                      ],
                       _DetailSection(title: 'Customer Details', rows: [
                         _Row('Name', detail.customerName, icon: Icons.groups_2_outlined),
                         _Row('Phone', detail.customerPhone, icon: Icons.phone_outlined),
+                        if (detail.customerEmail.isNotEmpty)
+                          _Row('Email', detail.customerEmail,
+                              icon: Icons.email_outlined),
                         if (detail.customerAddress.isNotEmpty)
                           _Row('Address', detail.customerAddress,
                               icon: Icons.location_on_outlined),
                       ]),
+                      if (detail.customer.name.isNotEmpty) ...[
+                        SizedBox(height: Responsive.h(14)),
+                        _DetailSection(title: 'Contractor Details', rows: [
+                          _Row('Name', detail.customer.name, icon: Icons.person_outline),
+                          _Row('Phone', detail.customer.phone,
+                              icon: Icons.phone_outlined),
+                          if (detail.customer.email.isNotEmpty)
+                            _Row('Email', detail.customer.email,
+                                icon: Icons.email_outlined),
+                          if (detail.customer.address.isNotEmpty)
+                            _Row('Address', detail.customer.address,
+                                icon: Icons.location_on_outlined),
+                        ]),
+                      ],
                       if (detail.salesman.name.isNotEmpty) ...[
                         SizedBox(height: Responsive.h(14)),
                         _DetailSection(title: 'Salesman', rows: [
                           _Row('Name', detail.salesman.name, icon: Icons.badge_outlined),
-                          if (detail.salesman.employeeCode.isNotEmpty)
-                            _Row('Employee Code', detail.salesman.employeeCode,
-                                icon: Icons.numbers),
                         ]),
                       ],
                       if (detail.isApproved) ...[
@@ -188,10 +206,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
                               await Clipboard.setData(
                                   ClipboardData(text: _buildShareText(detail)));
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('Estimate summary copied to clipboard')),
-                                );
+                                AppSnackbar.success('Estimate summary copied to clipboard');
                               }
                             },
                           ),
@@ -207,7 +222,7 @@ class _OwnerEstimateDetailView extends StatelessWidget {
           },
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildHeader(EstimateDetailModel detail) {

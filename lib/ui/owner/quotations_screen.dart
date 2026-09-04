@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/models/owner_models/owner_viewquotationmodel.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/owner/quotation_detail_screen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -57,7 +58,7 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Quotations', style: AppTextStyles.h6()),
@@ -206,7 +207,7 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
           },
         ),
       ),
-    );
+    ));
   }
 }
 

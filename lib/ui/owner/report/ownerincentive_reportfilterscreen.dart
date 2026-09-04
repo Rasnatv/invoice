@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../bloc/ownerbloc/fieldstaffactive/owner_fieldstaffactive_bloc.dart';
 import '../../../bloc/ownerbloc/fieldstaffactive/owner_fieldstaffactive_event.dart';
 import '../../../bloc/ownerbloc/fieldstaffactive/owner_fieldstaffactive_state.dart';
@@ -8,6 +8,7 @@ import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_bloc.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_event.dart';
 import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_state.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import 'owner_incentivereportscreen.dart';
 import 'ownerreportwidget.dart';
@@ -135,7 +136,7 @@ class _OwnerIncentiveReportFilterScreenState
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
@@ -213,7 +214,7 @@ class _OwnerIncentiveReportFilterScreenState
           ),
         ],
       ),
-    );
+    ));
   }
 
   /// Salesman pulls live data from [_ownerReportsBloc] via GET
@@ -237,11 +238,21 @@ class _OwnerIncentiveReportFilterScreenState
           }
 
           if (state.activeSalesmenStatus == LoadStatus.failure) {
-            return ReportDropdownField(
-              options: const [],
-              value: null,
-              hint: state.activeSalesmenError ?? 'Failed to load salesmen',
-              onChanged: (_) {},
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ReportDropdownField(
+                  options: const [],
+                  value: null,
+                  hint: 'Choose salesman',
+                  onChanged: (_) {},
+                ),
+                SizedBox(height: Responsive.h(6)),
+                Text(
+                  state.activeSalesmenError ?? 'Failed to load salesmen.',
+                  style: AppTextStyles.caption(color: AppColors.error),
+                ),
+              ],
             );
           }
 
@@ -280,11 +291,21 @@ class _OwnerIncentiveReportFilterScreenState
         }
 
         if (state is FieldStaffActiveError) {
-          return ReportDropdownField(
-            options: const [],
-            value: null,
-            hint: state.message,
-            onChanged: (_) {},
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ReportDropdownField(
+                options: const [],
+                value: null,
+                hint: 'Choose field staff',
+                onChanged: (_) {},
+              ),
+              SizedBox(height: Responsive.h(6)),
+              Text(
+                state.message ?? 'Failed to load field staff.',
+                style: AppTextStyles.caption(color: AppColors.error),
+              ),
+            ],
           );
         }
 

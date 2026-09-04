@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../Apiprovider/ownerreportprovider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -177,7 +178,7 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Quotation Report', style: AppTextStyles.h6())),
       body: SingleChildScrollView(
@@ -251,6 +252,6 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
           ],
         ),
       ),
-    );
+    ));
   }
 }

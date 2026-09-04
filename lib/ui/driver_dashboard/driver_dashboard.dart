@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
-
 import '../../Apiprovider/driverdespatchprovider.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_bloc.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_event.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_state.dart';
+import '../../core/utils/logout_helper.dart';
 import '../../models/drivermodels/driverdashboardmodel.dart';
+import '../../widgets/appsnackbar.dart';
 import '../auth/login_screen.dart';
 import 'driverdetailscreen.dart';
 
@@ -90,38 +92,7 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
     });
   }
 
-  Future<void> _confirmLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Logout', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
 
-    if (confirmed != true) return;
-    if (!mounted) return;
-
-    if (widget.onLogout != null) {
-      widget.onLogout!();
-    } else {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-      );
-    }
-  }
 
   void _openAccountSheet() {
     showModalBottomSheet(
@@ -134,9 +105,14 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
           Navigator.of(ctx).pop();
           _openChangePasswordDialog();
         },
+
         onLogout: () {
           Navigator.of(ctx).pop();
-          _confirmLogout();
+          if (widget.onLogout != null) {
+            widget.onLogout!();
+          } else {
+            logout(context);
+          }
         },
       ),
     );
@@ -168,7 +144,7 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       body: BlocBuilder<DriverDashboardBloc, DriverDashboardState>(
         builder: (context, state) {
@@ -240,7 +216,7 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
           );
         },
       ),
-    );
+    ));
   }
 }
 
@@ -732,20 +708,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       await widget.onSubmit(_currentCtrl.text, _newCtrl.text);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.info,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Expanded(child: Text('Password updated successfully')),
-            ],
-          ),
-        ),
-      );
+      AppSnackbar.success('Password updated successfully');
     } catch (e) {
       setState(() {
         _error = 'Could not update password. Please try again.';
@@ -754,7 +717,6 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       if (mounted) setState(() => _submitting = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(

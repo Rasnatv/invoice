@@ -6,17 +6,6 @@ import '../../../../../core/utils/responsive.dart';
 
 import '../../models/salesmanmodels/salesman_dashboardmodel.dart';
 
-// ---------------- MONTHLY SALES CHART ----------------
-//
-// Usage inside dashboard_home_screen.dart (already wired in the file I sent):
-//
-//   _CardWrapper(
-//     child: DashboardMonthlySalesChart(data: state.monthlySales),
-//   ),
-//
-// `state.monthlySales` is `List<DashboardHomeMonthlySales>` coming straight off
-// `sales_overview.monthly_sales` in the API response — oldest to newest.
-
 class DashboardMonthlySalesChart extends StatelessWidget {
   const DashboardMonthlySalesChart({super.key, required this.data});
 

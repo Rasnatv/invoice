@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -104,7 +103,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
         });
       } else {
         setState(() {
-          _designationError = result.errorMessage ?? 'Failed to load designations';
+          _designationError = result.errorMessage;
           _loadingDesignations = false;
         });
       }
@@ -141,6 +140,11 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
 
   String? _validatePasswordOptional(String? value) {
     if (value == null || value.isEmpty) {
+      // Password is optional on edit (leave blank to keep current password).
+      // On add, treat a blank password as invalid since an account needs one.
+      if (!widget.isEdit) {
+        return 'Password is required';
+      }
       return null;
     }
     return DValidator.validatePassword(value);
@@ -219,7 +223,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
             }
           } else if (state is SalesmanActionFailure) {
             setState(() => _isSubmitting = false);
-            AppSnackbar.error(state.message);
+            AppSnackbar.error(state.message ?? '');
           }
         },
         child: SafeArea(
@@ -275,7 +279,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
                 TextFormField(
                   controller: _salaryCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: DValidator.digitsOnly,
+                  inputFormatters: DValidator.decimalNumber,
                   validator: _validateSalary,
                   decoration: const InputDecoration(hintText: 'Monthly salary'),
                 ),
@@ -308,9 +312,32 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
                 ),
                 SizedBox(height: Responsive.h(16)),
 
-                // Password field (optional - only for new salesmen)
-
-                  SizedBox(height: Responsive.h(16)),
+                // Password Field (required on add, optional on edit —
+                // leave blank on edit to keep the existing password)
+                Text('Password', style: AppTextStyles.bodyBold()),
+                SizedBox(height: Responsive.h(6)),
+                TextFormField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscurePassword,
+                  inputFormatters: DValidator.textWithLimit,
+                  validator: _validatePasswordOptional,
+                  decoration: InputDecoration(
+                    hintText: widget.isEdit
+                        ? 'Leave blank to keep current password'
+                        : 'Enter password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                ),
+                SizedBox(height: Responsive.h(16)),
 
                 // Active toggle (only for edit mode)
                 if (widget.isEdit) ...[

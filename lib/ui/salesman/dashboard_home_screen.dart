@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -17,7 +18,6 @@ import 'estimatedetailscreen_forsalesman.dart';
 import 'my_estimates_screen.dart';
 import 'quatationscreen.dart';
 
-import 'recent_estimate_tile.dart';
 
 class DashboardHomeScreen extends StatelessWidget {
   const DashboardHomeScreen({super.key});
@@ -92,7 +92,7 @@ class _DashboardHomeView extends StatelessWidget {
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       body: BlocBuilder<DashboardHomeBloc, DashboardHomeState>(
         builder: (context, state) {
@@ -209,7 +209,7 @@ class _DashboardHomeView extends StatelessWidget {
           );
         },
       ),
-    );
+    ));
   }
 }
 

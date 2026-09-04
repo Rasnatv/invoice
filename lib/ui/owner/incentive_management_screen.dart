@@ -1,15 +1,17 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../bloc/ownerbloc/product/product_bloc.dart';
 import '../../bloc/ownerbloc/product/product_event.dart';
 import '../../bloc/ownerbloc/product/product_state.dart';
+import '../../core/utils/delete_helper.dart';
 import '../../models/owner_models/getproductmodel.dart';
+import '../../widgets/appsnackbar.dart';
 import 'add_incentiveproduct.dart';
 import 'company_addscreen.dart';
 import 'owner_unitaddscreen.dart';
@@ -85,30 +87,13 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
   }
 
   Future<void> _confirmDeleteProduct(ProductModel product) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Delete Product?', style: AppTextStyles.bodyBold()),
-        content: Text(
-          'This will remove "${product.name}" and its incentive setup. This cannot be undone.',
-          style: AppTextStyles.caption(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    await deleteItem(
+      context,
+      itemName: product.name,
+      onConfirmed: () async {
+        _productBloc.add(DeleteProduct(product.id));
+      },
     );
-    if (confirmed == true) {
-      _productBloc.add(DeleteProduct(product.id));
-    }
   }
 
   @override
@@ -117,7 +102,7 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
 
     return BlocProvider.value(
       value: _productBloc,
-      child: Scaffold(
+      child: NetworkAwareWrapper(child:Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(title: Text('Incentive Setup', style: AppTextStyles.h6())),
         body: SafeArea(
@@ -126,13 +111,9 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
             previous.status != current.status || previous.errorMessage != current.errorMessage,
             listener: (context, state) {
               if (state.status == ProductStatus.actionSuccess && state.actionMessage != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.actionMessage!)),
-                );
+                AppSnackbar.success(state.actionMessage!);
               } else if (state.status == ProductStatus.error && state.errorMessage != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.errorMessage!)),
-                );
+                AppSnackbar.error(state.errorMessage!);
               }
             },
             builder: (context, state) {
@@ -283,7 +264,7 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 

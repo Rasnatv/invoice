@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/salesman/salesman%20despatchdetailscreen.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -11,12 +12,6 @@ import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchevent.dart';
 import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchstate.dart';
 import '../../models/owner_models/owner_despatchmodellist.dart';
 
-
-/// Salesman version of the dispatch bills listing screen.
-///
-/// Deliberately reuses [DispatchListBloc] / [DispatchProvider] / events /
-/// states from the owner flow — same auth token, same API, same shape of
-/// data. Only the screen (and navigation target) differs.
 class SalesmanDispatchListScreen extends StatelessWidget {
   const SalesmanDispatchListScreen({super.key});
 
@@ -63,7 +58,7 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Dispatch Bills', style: AppTextStyles.h6()),
@@ -96,7 +91,7 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
           },
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildBody(BuildContext context, DispatchListState state) {

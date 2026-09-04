@@ -63,6 +63,31 @@ class ApiClient {
   Future<Response> userLogin(LoginRequest request) =>
       dio.post(ApiConstants.login, data: request.toJson());
 
+  // =================== PROFILE ===================
+  // Shared by owner, salesman, and driver — same shape, different fields
+  // populated depending on role (see ProfileModel).
+
+  /// GET /profile
+  Future<Response> getProfile() async => dio.get(
+    ApiConstants.profile,
+    options: await _authOptions(),
+  );
+
+  /// PUT /profile
+  Future<Response> updateProfile(Map<String, dynamic> data) async => dio.put(
+    ApiConstants.profileUpdate,
+    data: data,
+    options: await _authOptions(),
+  );
+
+  /// POST /change-password
+  /// Body: { current_password, new_password, new_password_confirmation }
+  Future<Response> changePassword(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.changePassword,
+    data: data,
+    options: await _authOptions(),
+  );
+
   // =================== DRIVER ===================
   Future<Response> drivers() async => dio.get(
     ApiConstants.driversget,
@@ -182,18 +207,18 @@ class ApiClient {
   );
 
   Future<Response> addUnit(Map<String, dynamic> data) async => dio.post(
-    ApiConstants.units,
+    ApiConstants.unitscreate,
     data: data,
     options: await _authOptions(),
   );
 
-  Future<Response> updateUnit(Map<String, dynamic> data) async => dio.post(
+  Future<Response> updateUnit(Map<String, dynamic> data) async => dio.put(
     ApiConstants.updateUnit,
     data: data,
     options: await _authOptions(),
   );
 
-  Future<Response> deleteUnit(Map<String, dynamic> data) async => dio.post(
+  Future<Response> deleteUnit(Map<String, dynamic> data) async => dio.delete(
     ApiConstants.deleteUnit,
     data: data,
     options: await _authOptions(),

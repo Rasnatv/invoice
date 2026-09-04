@@ -1,3 +1,4 @@
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../Apiprovider/companyprovider.dart';
 import '../../../models/owner_models/addcompanymodel.dart';
@@ -26,14 +27,12 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
 
     if (result.success) {
       emit(state.copyWith(status: CompanyStatus.loaded, companies: result.companies));
-    } else if (!result.isUnauthorized) {
+    } else {
       emit(state.copyWith(
         status: CompanyStatus.failure,
-        errorMessage: result.errorMessage ?? 'Failed to load companies.',
+        errorMessage: result.errorMessage,
       ));
     }
-    // On 401, ApiErrorHandler already navigated to LoginScreen — nothing
-    // further to emit here.
   }
 
   /// POST /companies/create returns an empty `data: {}`, so there's no id
@@ -51,10 +50,8 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
     if (result.success) {
       emit(state.copyWith(isSubmitting: false, successMessage: result.message));
       add(const LoadCompanies());
-    } else if (!result.isUnauthorized) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
     } else {
-      emit(state.copyWith(isSubmitting: false));
+      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
     }
   }
 
@@ -83,10 +80,8 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
         companies: updated,
         successMessage: result.message,
       ));
-    } else if (!result.isUnauthorized) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
     } else {
-      emit(state.copyWith(isSubmitting: false));
+      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
     }
   }
 
@@ -104,10 +99,8 @@ class CompanyBloc extends Bloc<CompanyEvent, CompanyState> {
         companies: updated,
         successMessage: result.message,
       ));
-    } else if (!result.isUnauthorized) {
-      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
     } else {
-      emit(state.copyWith(isSubmitting: false));
+      emit(state.copyWith(isSubmitting: false, errorMessage: result.errorMessage));
     }
   }
 

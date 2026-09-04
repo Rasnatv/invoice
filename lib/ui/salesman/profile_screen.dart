@@ -1,12 +1,14 @@
+
 import 'package:flutter/material.dart';
-import 'package:tileshop/ui/salesman/viewprofile.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../bloc/profile/profile_bloc.dart';
+import '../../../bloc/profile/profile_state.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../auth/login_screen.dart';
 import 'changepassword.dart';
-import 'mybills.dart';
-
+import 'viewprofile.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -16,68 +18,76 @@ class ProfileScreen extends StatelessWidget {
     Responsive.init(context);
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title:  Text('Profile',style: AppTextStyles.h6(),)),
+      appBar: AppBar(title: Text('Profile', style: AppTextStyles.h6())),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.all(Responsive.w(20)),
-          children: [
-            Center(
-              child: Column(
-                children: [
-                  Stack(
+        child: BlocBuilder<ProfileBloc, ProfileState>(
+          builder: (context, state) {
+            if (state.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (state.errorMessage != null && state.profile == null) {
+              return Center(child: Text(state.errorMessage!));
+            }
+
+            final profile = state.profile;
+
+            return ListView(
+              padding: EdgeInsets.all(Responsive.w(20)),
+              children: [
+                Center(
+                  child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: Responsive.w(46),
-                        backgroundColor: AppColors.primarySoft,
-                        child: Icon(Icons.person, size: Responsive.w(46), color: AppColors.primary),
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: Responsive.w(46),
+                            backgroundColor: AppColors.primarySoft,
+                            child: Icon(Icons.person, size: Responsive.w(46), color: AppColors.primary),
+                          ),
+
+
+                        ],
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 14),
-                        ),
-                      ),
+                      SizedBox(height: Responsive.h(14)),
+                      Text(profile?.name ?? '-', style: AppTextStyles.h2()),
+                      Text(profile?.mobile ?? '-', style: AppTextStyles.body()),
+                      Text(profile?.email ?? '-', style: AppTextStyles.caption()),
                     ],
                   ),
-                  SizedBox(height: Responsive.h(14)),
-                  Text('Rahul Kumar', style: AppTextStyles.h2()),
-                  Text('+91 98765 43210', style: AppTextStyles.body()),
-                  Text('rahul.sales@dreams.com', style: AppTextStyles.caption()),
-                ],
-              ),
-            ),
-            SizedBox(height: Responsive.h(28)),
-            _ProfileTile(icon: Icons.person_outline_rounded, label: 'My Profile', onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ViewProfileScreen()),
-              );
-            },),
-            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'Change Password', onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-              );
-            },),
-            _ProfileTile(icon: Icons.lock_outline_rounded, label: 'My Bills', onTap: () {}
-              // Navigator.of(context).push(
-              //   MaterialPageRoute(builder: (_) => const MyBills()),
-              // );
-            //},
-  ),
-            _ProfileTile(
-              icon: Icons.logout_rounded,
-              label: 'Logout',
-              color: AppColors.error,
-              onTap: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
-              },
-            ),
-          ],
+                ),
+                SizedBox(height: Responsive.h(28)),
+                _ProfileTile(
+                  icon: Icons.person_outline_rounded,
+                  label: 'My Profile',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ViewProfileScreen()),
+                    );
+                  },
+                ),
+                _ProfileTile(
+                  icon: Icons.lock_outline_rounded,
+                  label: 'Change Password',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+                    );
+                  },
+                ),
+                _ProfileTile(
+                  icon: Icons.logout_rounded,
+                  label: 'Logout',
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          (route) => false,
+                    );
+                  },
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

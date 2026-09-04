@@ -1,3 +1,42 @@
+//
+// import '../../../models/owner_models/designationmodel.dart';
+//
+//
+// abstract class DesignationState {}
+//
+// class DesignationInitial extends DesignationState {}
+//
+// class DesignationLoading extends DesignationState {}
+//
+// class DesignationLoaded extends DesignationState {
+//   final List<DesignationModel> designations;
+//
+//   DesignationLoaded(this.designations);
+// }
+//
+// class DesignationError extends DesignationState {
+//   final String message;
+//
+//   DesignationError(this.message);
+// }
+//
+// class DesignationActionLoading extends DesignationState {}
+//
+// class DesignationActionSuccess extends DesignationState {
+//   final String message;
+//   final List<DesignationModel> designations;
+//
+//   DesignationActionSuccess({
+//     required this.message,
+//     required this.designations,
+//   });
+// }
+//
+// class DesignationActionFailure extends DesignationState {
+//   final String message;
+//
+//   DesignationActionFailure(this.message);
+// }
 
 import '../../../models/owner_models/designationmodel.dart';
 
@@ -15,7 +54,7 @@ class DesignationLoaded extends DesignationState {
 }
 
 class DesignationError extends DesignationState {
-  final String message;
+  final String? message;
 
   DesignationError(this.message);
 }
@@ -23,7 +62,7 @@ class DesignationError extends DesignationState {
 class DesignationActionLoading extends DesignationState {}
 
 class DesignationActionSuccess extends DesignationState {
-  final String message;
+  final String? message;
   final List<DesignationModel> designations;
 
   DesignationActionSuccess({
@@ -33,7 +72,7 @@ class DesignationActionSuccess extends DesignationState {
 }
 
 class DesignationActionFailure extends DesignationState {
-  final String message;
+  final String? message;
 
   DesignationActionFailure(this.message);
 }

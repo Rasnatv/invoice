@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
@@ -74,7 +74,7 @@ class _OwnerProductBillsViewState extends State<_OwnerProductBillsView> {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final product = widget.product;
 
-    return Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         controller: _scrollController,
@@ -166,7 +166,7 @@ class _OwnerProductBillsViewState extends State<_OwnerProductBillsView> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

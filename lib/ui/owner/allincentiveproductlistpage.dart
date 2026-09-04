@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
@@ -78,7 +78,7 @@ class _AllProductsViewState extends State<_AllProductsView> {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final monthFmt = DateFormat('MMMM yyyy');
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('All Products', style: AppTextStyles.h6())),
       body: SafeArea(
@@ -167,7 +167,7 @@ class _AllProductsViewState extends State<_AllProductsView> {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 

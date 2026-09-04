@@ -1,12 +1,14 @@
 // lib/presentation/owner/payments/payment_history_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/paymentprovider.dart';
 import '../../core/utils/currency_utils.dart';
 import '../../models/owner_models/paymentmodel.dart';
+import '../../widgets/appsnackbar.dart';
 import 'ownerrescorpayment.dart';
 
 
@@ -86,7 +88,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     Responsive.init(context);
     final data = _data;
 
-    return Scaffold(
+    return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -125,9 +127,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             backgroundColor: AppColors.surface,
             foregroundColor: AppColors.textPrimary,
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sharing coming soon')),
-              );
+              AppSnackbar.warning('Sharing coming soon');
             },
             child: const Icon(Icons.share_outlined),
           ),
@@ -143,7 +143,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildBody(PaymentDetailsData? data) {
