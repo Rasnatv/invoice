@@ -1,4 +1,5 @@
 //
+//
 // import 'package:dio/dio.dart';
 //
 // import '../core/apiclient/api_client.dart';
@@ -19,19 +20,16 @@
 //   final List<OwnerviewQuotationModel> salesmanQuotations;
 //
 //   final String? errorMessage;
-//   final bool isUnauthorized;
 //
 //   const OwnerviewQuotationListResult.success(
 //       this.myQuotations,
 //       this.salesmanQuotations,
 //       )   : success = true,
-//         errorMessage = null,
-//         isUnauthorized = false;
+//         errorMessage = null;
 //
 //   const OwnerviewQuotationListResult.failure(
-//       this.errorMessage, {
-//         this.isUnauthorized = false,
-//       })  : success = false,
+//       this.errorMessage,
+//       )   : success = false,
 //         myQuotations = const [],
 //         salesmanQuotations = const [];
 // }
@@ -45,13 +43,11 @@
 //   final bool success;
 //   final String? message;
 //   final String? errorMessage;
-//   final bool isUnauthorized;
 //
 //   const QuotationUpdateResult({
 //     required this.success,
 //     this.message,
 //     this.errorMessage,
-//     this.isUnauthorized = false,
 //   });
 // }
 //
@@ -83,43 +79,21 @@
 //         perPage: perPage,
 //       );
 //
-//       final body = response.data;
+//       if (response.statusCode == 200 || response.statusCode == 201) {
+//         final parsed = QuotationListResponseModel.fromJson(response.data);
 //
-//       if (response.statusCode == 200 &&
-//           body is Map<String, dynamic>) {
-//         final parsed = QuotationListResponseModel.fromJson(body);
-//
-//         if (parsed.status == '1') {
-//           return OwnerviewQuotationListResult.success(
-//             parsed.data.myQuotations,
-//             parsed.data.salesmanQuotations,
-//           );
-//         }
-//
-//         return OwnerviewQuotationListResult.failure(
-//           parsed.message.isNotEmpty
-//               ? parsed.message
-//               : 'Failed to fetch quotations.',
+//         return OwnerviewQuotationListResult.success(
+//           parsed.data.myQuotations,
+//           parsed.data.salesmanQuotations,
 //         );
 //       }
 //
 //       return OwnerviewQuotationListResult.failure(
-//         'Unexpected response: ${response.statusCode}',
+//         response.statusCode.toString(),
 //       );
 //     } on DioException catch (e) {
 //       final message = await ApiErrorHandler.handleDioError(e);
-//
-//       final unauthorized =
-//           e.response?.statusCode == 401;
-//
-//       return OwnerviewQuotationListResult.failure(
-//         unauthorized ? null : message,
-//         isUnauthorized: unauthorized,
-//       );
-//     } catch (_) {
-//       return const OwnerviewQuotationListResult.failure(
-//         'Something went wrong. Please try again.',
-//       );
+//       return OwnerviewQuotationListResult.failure(message);
 //     }
 //   }
 //
@@ -137,70 +111,29 @@
 //         request.toJson(),
 //       );
 //
-//       final body = response.data;
-//
-//       if (body is Map<String, dynamic>) {
-//         final status =
-//             body['status']?.toString() ?? '0';
-//
-//         final message =
-//             body['message']?.toString() ?? '';
-//
-//         // -------------------------------------------------------------
-//         // SUCCESS
-//         // -------------------------------------------------------------
-//
-//         if (status == '1') {
-//           return QuotationUpdateResult(
-//             success: true,
-//             message: message.isNotEmpty
-//                 ? message
-//                 : 'Quotation updated successfully.',
-//           );
-//         }
-//
-//         // -------------------------------------------------------------
-//         // API FAILURE
-//         // -------------------------------------------------------------
+//       if (response.statusCode == 200 || response.statusCode == 201) {
+//         final message = response.data['message']?.toString();
 //
 //         return QuotationUpdateResult(
-//           success: false,
-//           errorMessage: message.isNotEmpty
-//               ? message
-//               : 'Failed to update quotation.',
+//           success: true,
+//           message: message,
 //         );
 //       }
 //
-//       // ---------------------------------------------------------------
-//       // INVALID RESPONSE
-//       // ---------------------------------------------------------------
-//
-//       return const QuotationUpdateResult(
+//       return QuotationUpdateResult(
 //         success: false,
-//         errorMessage: 'Unexpected response from server.',
+//         errorMessage: response.statusCode.toString(),
 //       );
 //     } on DioException catch (e) {
-//       final message =
-//       await ApiErrorHandler.handleDioError(e);
-//
-//       final unauthorized =
-//           e.response?.statusCode == 401;
+//       final message = await ApiErrorHandler.handleDioError(e);
 //
 //       return QuotationUpdateResult(
 //         success: false,
-//         errorMessage: unauthorized ? null : message,
-//         isUnauthorized: unauthorized,
-//       );
-//     } catch (_) {
-//       return const QuotationUpdateResult(
-//         success: false,
-//         errorMessage:
-//         'Something went wrong. Please try again.',
+//         errorMessage: message,
 //       );
 //     }
 //   }
 // }
-
 import 'package:dio/dio.dart';
 
 import '../core/apiclient/api_client.dart';
@@ -208,7 +141,6 @@ import '../core/errors/apierrorhandler.dart';
 
 import '../models/owner_models/owner_viewquotationmodel.dart';
 import '../models/salesmanmodels/quotationupdatemodel.dart';
-
 
 // =====================================================================
 // OWNER QUOTATION LIST RESULT
@@ -235,7 +167,6 @@ class OwnerviewQuotationListResult {
         salesmanQuotations = const [];
 }
 
-
 // =====================================================================
 // QUOTATION UPDATE RESULT
 // =====================================================================
@@ -252,6 +183,21 @@ class QuotationUpdateResult {
   });
 }
 
+// =====================================================================
+// QUOTATION CANCEL RESULT
+// =====================================================================
+
+class QuotationCancelResult {
+  final bool success;
+  final String? message;
+  final String? errorMessage;
+
+  const QuotationCancelResult({
+    required this.success,
+    this.message,
+    this.errorMessage,
+  });
+}
 
 // =====================================================================
 // QUOTATION PROVIDER
@@ -263,7 +209,6 @@ class OwnerviewQuotationProvider {
   OwnerviewQuotationProvider({
     ApiClient? apiClient,
   }) : _apiClient = apiClient ?? ApiClient();
-
 
   // ===================================================================
   // GET ALL QUOTATIONS
@@ -298,7 +243,6 @@ class OwnerviewQuotationProvider {
     }
   }
 
-
   // ===================================================================
   // UPDATE QUOTATION
   // POST /quotations/update
@@ -329,6 +273,44 @@ class OwnerviewQuotationProvider {
       final message = await ApiErrorHandler.handleDioError(e);
 
       return QuotationUpdateResult(
+        success: false,
+        errorMessage: message,
+      );
+    }
+  }
+
+  // ===================================================================
+  // CANCEL QUOTATION
+  // POST /quotations/cancel — body: { id }
+  //
+  // Same success/failure shape as updateQuotation() above: checks the
+  // HTTP status, pulls `message` straight off the raw response body on
+  // success, and routes DioExceptions through ApiErrorHandler on failure.
+  // `data` in the response is an empty object, so there's nothing else
+  // to parse out of it.
+  // ===================================================================
+
+  Future<QuotationCancelResult> cancelQuotation(String id) async {
+    try {
+      final response = await _apiClient.cancelQuotation({'id': id});
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final message = response.data['message']?.toString();
+
+        return QuotationCancelResult(
+          success: true,
+          message: message,
+        );
+      }
+
+      return QuotationCancelResult(
+        success: false,
+        errorMessage: response.statusCode.toString(),
+      );
+    } on DioException catch (e) {
+      final message = await ApiErrorHandler.handleDioError(e);
+
+      return QuotationCancelResult(
         success: false,
         errorMessage: message,
       );

@@ -159,15 +159,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                               DValidator.validateRequired(v, message: 'Enter vehicle number'),
                         ),
                         SizedBox(height: Responsive.h(14)),
-                        // if (isEdit) ...[
-                        //   TextFormField(
-                        //     controller: passwordController,
-                        //     obscureText: true,
-                        //     decoration: _inputDecoration(
-                        //         'New Password (optional)', Icons.lock_outline),
-                        //   ),
-                        //   SizedBox(height: Responsive.h(14)),
-                        // ],
+
                         InkWell(
                           borderRadius: BorderRadius.circular(14),
                           onTap: () async {
@@ -182,9 +174,28 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                             }
                           },
                           child: InputDecorator(
-                            decoration:
-                            _inputDecoration('Joining Date', Icons.event_outlined),
-                            child: Text(_formatDate(joiningDate)),
+                            decoration: InputDecoration(
+                              labelText: 'Joining Date',
+                              floatingLabelBehavior: FloatingLabelBehavior.always, // forces label to top
+                              prefixIcon: Icon(Icons.event_outlined, color: AppColors.textSecondary, size: 20),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: Responsive.w(14),
+                                vertical: Responsive.h(14),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            child: Text(
+                              _formatDate(joiningDate),
+                              style: TextStyle(
+                                fontSize: Responsive.sp(14),
+                                color: AppColors.black,
+                              ),
+                            ),
                           ),
                         ),
                         SizedBox(height: Responsive.h(10)),

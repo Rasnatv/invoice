@@ -1,25 +1,20 @@
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-
 import '../../bloc/ownerbloc/ownerdespatchcreate/ownerdespatchsheetcreate_bloc.dart';
 import '../../bloc/ownerbloc/ownerdespatchcreate/ownerdespatchsheetcreate_event.dart';
 import '../../bloc/ownerbloc/ownerdespatchcreate/ownerdespatchsheetcreate_state.dart';
 
+import '../../core/validator/validationfile.dart';
 import '../../models/owner_models/ownerdespatchsheetpreparemodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/primary_button.dart';
 
-/// Owner's despatch-sheet creation screen for an APPROVED estimate.
-/// Loads quantity suggestions (POST /despatches/suggest) + active drivers
-/// (GET /drivers/active), lets the owner adjust boxes/pieces/quantity per
-/// item, assign a driver + vehicle, and submits via POST /despatches/create.
 class OwnerDespatchSheetScreen extends StatelessWidget {
   const OwnerDespatchSheetScreen({super.key, required this.estimateId});
   final String estimateId;
@@ -172,7 +167,7 @@ class _DespatchFormState extends State<_DespatchForm> {
   void initState() {
     super.initState();
     final s = widget.suggestion;
-    _refNoCtrl = TextEditingController(text: s.previewDsNumber);
+    _refNoCtrl = TextEditingController(text: s.estimateNumber);
     _partyNameCtrl = TextEditingController(text: s.partyName);
     _contactCtrl = TextEditingController(text: s.contactNumber);
     _addressCtrl = TextEditingController(text: s.deliveryAddress);
@@ -253,29 +248,35 @@ class _DespatchFormState extends State<_DespatchForm> {
                 SizedBox(height: Responsive.h(10)),
                 TextFormField(
                   controller: _refNoCtrl,
+                  inputFormatters: DValidator.textWithLimit,
                   decoration: _decor('Reference No.', icon: Icons.confirmation_number_outlined),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  validator: (v) =>
+                      DValidator.validateRequired(v, message: 'Reference No. is required'),
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: _partyNameCtrl,
+                  inputFormatters: DValidator.lettersOnly,
                   decoration: _decor('Party Name', icon: Icons.groups_2_outlined),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  validator: (v) => DValidator.validateName('Party Name', v),
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: _contactCtrl,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: DValidator.phoneNumber,
                   decoration: _decor('Contact Number', icon: Icons.call_outlined),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  validator: (v) => DValidator.validatePhoneNumber(v),
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: _addressCtrl,
                   minLines: 2,
                   maxLines: 4,
+                  inputFormatters: DValidator.textWithLimit,
                   decoration: _decor('Delivery Address', icon: Icons.location_on_outlined),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  validator: (v) =>
+                      DValidator.validateRequired(v, message: 'Delivery Address is required'),
                 ),
                 SizedBox(height: Responsive.h(20)),
 
@@ -322,18 +323,19 @@ class _DespatchFormState extends State<_DespatchForm> {
                         _selectedDriverName = driver.name;
                       });
                     },
-                    validator: (v) => v == null ? 'Select a driver' : null,
+                    validator: (v) => DValidator.validateDropdown<String>('driver', v),
                   ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: _vehicleCtrl,
                   textCapitalization: TextCapitalization.characters,
+                  inputFormatters: DValidator.postalCode,
                   decoration: _decor(
-                    'Vehicle Number',
+                    'Vehicle Number (optional)',
                     icon: Icons.local_shipping_outlined,
                     hint: 'KA01AB1234',
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  // Optional field — no validator, so it's fine left blank.
                 ),
                 SizedBox(height: Responsive.h(12)),
                 InkWell(
@@ -360,6 +362,7 @@ class _DespatchFormState extends State<_DespatchForm> {
                   controller: _notesCtrl,
                   minLines: 1,
                   maxLines: 3,
+                  inputFormatters: DValidator.textWithLimit,
                   decoration: _decor('Delivery Notes (optional)', icon: Icons.notes_outlined),
                 ),
                 SizedBox(height: Responsive.h(20)),
@@ -444,11 +447,15 @@ class _DespatchFormState extends State<_DespatchForm> {
   }
 }
 
-/// Table-style item list (header row + one row per item, each with inline
-/// editable Boxes / Pieces / Quantity cells) — matches the compact sheet
-/// layout from the old draft, but driven by the real suggestion data and
-/// wired to the same controllers used for submit.
-class _DespatchItemsTable extends StatelessWidget {
+/// FIX: this was a StatelessWidget with a Scrollbar(thumbVisibility: true)
+/// and no ScrollController — that combination throws
+/// "A ScrollController is required when Scrollbar.thumbVisibility is true"
+/// during layout, which was breaking rendering of this whole section
+/// (including the driver dropdown above it, since it's part of the same
+/// ListView). Converted to StatefulWidget so it can own a single
+/// ScrollController shared by both the Scrollbar and the
+/// SingleChildScrollView.
+class _DespatchItemsTable extends StatefulWidget {
   const _DespatchItemsTable({
     required this.items,
     required this.boxesCtrls,
@@ -459,10 +466,27 @@ class _DespatchItemsTable extends StatelessWidget {
   final List<DespatchSuggestionItem> items;
   final Map<String, TextEditingController> boxesCtrls;
   final Map<String, TextEditingController> piecesCtrls;
-  final Map<String, TextEditingController> qtyCtrls;
+  final Map<String, TextEditingController> qtyCtrls; // kept for submit only
+
+  @override
+  State<_DespatchItemsTable> createState() => _DespatchItemsTableState();
+}
+
+class _DespatchItemsTableState extends State<_DespatchItemsTable> {
+  final _horizontalController = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = widget.items;
+    final boxesCtrls = widget.boxesCtrls;
+    final piecesCtrls = widget.piecesCtrls;
+
     if (items.isEmpty) {
       return Container(
         padding: EdgeInsets.all(Responsive.w(14)),
@@ -482,115 +506,105 @@ class _DespatchItemsTable extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // Header row
-          Container(
-            color: AppColors.surfaceAlt,
-            padding:
-            EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(10)),
-            child: Row(
-              children: [
-                SizedBox(width: 24, child: Text('#', style: AppTextStyles.caption())),
-                Expanded(flex: 3, child: Text('Item', style: AppTextStyles.caption())),
-                SizedBox(width: 70, child: Text('Boxes', style: AppTextStyles.caption())),
-                SizedBox(width: 70, child: Text('Pieces', style: AppTextStyles.caption())),
-                SizedBox(width: 78, child: Text('Qty', style: AppTextStyles.caption())),
-              ],
-            ),
+      child: Scrollbar(
+        controller: _horizontalController,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _horizontalController,
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(AppColors.surfaceAlt),
+            headingTextStyle: AppTextStyles.captionnew(),
+            dataTextStyle: AppTextStyles.body(),
+            columnSpacing: 20,
+            horizontalMargin: 12,
+            dividerThickness: 0.6,
+            columns: const [
+              DataColumn(label: Text('#')),
+              DataColumn(label: Text('Item')),
+              DataColumn(label: Text('Company')),
+              DataColumn(label: Text('Size')),
+              DataColumn(label: Text('Box')),
+              DataColumn(label: Text('Pcs')),
+            ],
+            rows: [
+              for (var i = 0; i < items.length; i++)
+                DataRow(
+                  cells: [
+                    DataCell(Text('${i + 1}')),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 140),
+                        child: Text(
+                          items[i].productName,
+                          style: AppTextStyles.bodyBold(),
+                          softWrap: true,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 120),
+                        child: Text(
+                          items[i].companyName.isEmpty ? '-' : items[i].companyName,
+                          softWrap: true,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 100),
+                        child: Text(
+                          items[i].productSize.isEmpty ? '-' : items[i].productSize,
+                          softWrap: true,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: 60,
+                        child: TextFormField(
+                          controller: boxesCtrls[items[i].estimateItemId],
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          inputFormatters: DValidator.digitsOnly,
+                          style: AppTextStyles.body(),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding:
+                            EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) =>
+                              DValidator.validateOptionalNumber('Boxes', v),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: 60,
+                        child: TextFormField(
+                          controller: piecesCtrls[items[i].estimateItemId],
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          inputFormatters: DValidator.digitsOnly,
+                          style: AppTextStyles.body(),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding:
+                            EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) =>
+                              DValidator.validateOptionalNumber('Pieces', v),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
-          // Item rows
-          for (var i = 0; i < items.length; i++)
-            Container(
-              padding:
-              EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(10)),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 24,
-                    child: Padding(
-                      padding: EdgeInsets.only(top: Responsive.h(14)),
-                      child: Text('${i + 1}', style: AppTextStyles.body()),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Padding(
-                      padding: EdgeInsets.only(top: Responsive.h(14), right: Responsive.w(8)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            items[i].productName,
-                            style: AppTextStyles.bodyBold(),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          SizedBox(height: Responsive.h(2)),
-                          Text(
-                            'Unit: ${items[i].unit} · Remaining: ${items[i].remainingQuantity.toStringAsFixed(0)}',
-                            style: AppTextStyles.caption(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 70,
-                    child: TextFormField(
-                      controller: boxesCtrls[items[i].estimateItemId],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: AppTextStyles.body(),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: Responsive.w(6)),
-                  SizedBox(
-                    width: 70,
-                    child: TextFormField(
-                      controller: piecesCtrls[items[i].estimateItemId],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: AppTextStyles.body(),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: Responsive.w(6)),
-                  SizedBox(
-                    width: 78,
-                    child: TextFormField(
-                      controller: qtyCtrls[items[i].estimateItemId],
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      textAlign: TextAlign.center,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                      style: AppTextStyles.body(),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }

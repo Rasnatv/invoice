@@ -314,29 +314,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
 
                 // Password Field (required on add, optional on edit —
                 // leave blank on edit to keep the existing password)
-                Text('Password', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                TextFormField(
-                  controller: _passwordCtrl,
-                  obscureText: _obscurePassword,
-                  inputFormatters: DValidator.textWithLimit,
-                  validator: _validatePasswordOptional,
-                  decoration: InputDecoration(
-                    hintText: widget.isEdit
-                        ? 'Leave blank to keep current password'
-                        : 'Enter password',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: AppColors.textSecondary,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                ),
+
                 SizedBox(height: Responsive.h(16)),
 
                 // Active toggle (only for edit mode)

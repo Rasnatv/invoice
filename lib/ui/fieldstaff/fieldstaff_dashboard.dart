@@ -10,23 +10,19 @@ import '../../../../core/utils/responsive.dart';
 import '../../bloc/fieldstaffbloc/sitevist/sitevisit_bloc.dart';
 import '../../bloc/fieldstaffbloc/sitevist/sitevisit_event.dart';
 import '../../bloc/fieldstaffbloc/sitevist/sitevisit_state.dart';
+import '../../bloc/profile/profile_bloc.dart';
+import '../../bloc/profile/profile_event.dart';
+import '../../bloc/profile/profile_state.dart';
 import '../../core/utils/logout_helper.dart';
-import '../../core/validator/validationfile.dart';
 import '../../models/fieldstaffmodels/fieldstaffsitevisitmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import 'addsite.dart';
+import 'fieldstaff_incentivelistscreen.dart';
+import 'fieldstaffchangepasswordscreen.dart';
 import 'visitdetailscreen.dart';
 
 class FieldStaffDashboardScreen extends StatefulWidget {
-  const FieldStaffDashboardScreen({
-    super.key,
-    this.staffName = 'Raju',
-    this.onChangePassword,
-  });
-
-  final String staffName;
-
-  final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
+  const FieldStaffDashboardScreen({super.key});
 
   @override
   State<FieldStaffDashboardScreen> createState() => _FieldStaffDashboardScreenState();
@@ -43,6 +39,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     context.read<SiteVisitBloc>().add(const FetchMySiteVisits());
+    context.read<ProfileBloc>().add(const LoadProfile());
   }
 
   @override
@@ -75,11 +72,12 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   }
 
   void _openAddVisit() {
+    final staffName = context.read<ProfileBloc>().state.profile?.name ?? 'Field Staff';
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
           value: context.read<SiteVisitBloc>(),
-          child: AddFieldVisitScreen(staffName: widget.staffName),
+          child: AddFieldVisitScreen(staffName: staffName),
         ),
       ),
     );
@@ -95,15 +93,16 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   }
 
   void _openAccountSheet() {
+    final staffName = context.read<ProfileBloc>().state.profile?.name ?? 'Field Staff';
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => _AccountSheet(
-        staffName: widget.staffName,
+        staffName: staffName,
         onChangePassword: () {
           Navigator.of(ctx).pop();
-          _openChangePasswordDialog();
+          _openChangePassword();
         },
         onLogout: () {
           Navigator.of(ctx).pop();
@@ -115,17 +114,22 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     );
   }
 
-  Future<void> _openChangePasswordDialog() async {
-    await showDialog(
-      context: context,
-      builder: (_) => _ChangePasswordDialog(
-        onSubmit: (current, next) async {
-          if (widget.onChangePassword != null) {
-            await widget.onChangePassword!(current, next);
-          } else {
-            await Future.delayed(const Duration(milliseconds: 600));
-          }
-        },
+  void _openIncentiveList() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const IncentiveListScreen(),
+      ),
+    );
+  }
+
+  void _openChangePassword() {
+    final profileBloc = context.read<ProfileBloc>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: profileBloc,
+          child: const FieldStaffChangePasswordScreen(),
+        ),
       ),
     );
   }
@@ -161,14 +165,22 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
-                  child: _FieldStaffHeader(
-                    greeting: greeting,
-                    name: widget.staffName,
-                    dateLabel: today,
-                    total: state.totalVisitsCount,
-                    today: state.todayVisitsCount,
-                    incentive: state.totalIncentive,
-                    onAccountTap: _openAccountSheet,
+                  child: BlocBuilder<ProfileBloc, ProfileState>(
+                    builder: (context, profileState) {
+                      final name = profileState.profile?.name;
+                      return _FieldStaffHeader(
+                        greeting: greeting,
+                        name: profileState.isLoading
+                            ? 'Loading...'
+                            : (name == null || name.isEmpty ? 'Field Staff' : name),
+                        dateLabel: today,
+                        total: state.totalVisitsCount,
+                        today: state.todayVisitsCount,
+                        incentive: state.totalIncentive,
+                        onAccountTap: _openAccountSheet,
+                        onIncentiveTap: _openIncentiveList,
+                      );
+                    },
                   ),
                 ),
                 SliverPadding(
@@ -270,6 +282,7 @@ class _FieldStaffHeader extends StatelessWidget {
     required this.today,
     required this.incentive,
     required this.onAccountTap,
+    required this.onIncentiveTap,
   });
 
   final String greeting;
@@ -279,6 +292,7 @@ class _FieldStaffHeader extends StatelessWidget {
   final int today;
   final double incentive;
   final VoidCallback onAccountTap;
+  final VoidCallback onIncentiveTap;
 
   String get _initials {
     final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
@@ -355,28 +369,28 @@ class _FieldStaffHeader extends StatelessWidget {
                     SizedBox(width: Responsive.w(12)),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            greeting,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.78),
-                              fontSize: Responsive.sp(11.5),
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.2,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              greeting,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.78),
+                                fontSize: Responsive.sp(11.5),
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.2,
+                              ),
                             ),
-                          ),
-                          SizedBox(height: Responsive.h(2)),
-                          Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold(color: Colors.white)
-                                .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
-                          ),
-                          SizedBox(height: Responsive.h(4)),
+                            SizedBox(height: Responsive.h(2)),
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.bodyBold(color: Colors.white)
+                                  .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
+                            ),
+                            SizedBox(height: Responsive.h(4)),
 
-                    ]),),
+                          ]),),
                     Material(
                       color: Colors.white.withOpacity(0.16),
                       shape: const CircleBorder(),
@@ -457,11 +471,9 @@ class _FieldStaffHeader extends StatelessWidget {
                 ),
                 _statDivider(),
                 Expanded(
-                  child: _MiniStat(
-                    icon: Icons.workspace_premium_rounded,
+                  child: _IncentiveStat(
                     value: currency.format(incentive),
-                    label: 'Incentive',
-                    color: AppColors.info,
+                    onTap: onIncentiveTap,
                   ),
                 ),
               ],
@@ -520,6 +532,79 @@ class _MiniStat extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------- INCENTIVE STAT (highlighted gold/orange chip) ----------------
+
+class _IncentiveStat extends StatelessWidget {
+  const _IncentiveStat({required this.value, required this.onTap});
+  final String value;
+  final VoidCallback onTap;
+
+  static const _incentiveColor = Color(0xFFFF8A00);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: Responsive.h(2)),
+          child: Column(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFFFB020), Color(0xFFFF8A00)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _incentiveColor.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.currency_rupee_rounded, size: 16, color: Colors.white),
+              ),
+              SizedBox(height: Responsive.h(6)),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodyBold(color: _incentiveColor).copyWith(fontSize: Responsive.sp(15)),
+              ),
+              SizedBox(height: Responsive.h(1)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Incentive',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.sp(10.5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(width: Responsive.w(2)),
+                  Icon(Icons.chevron_right_rounded, size: 12, color: AppColors.textSecondary.withOpacity(0.6)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -645,218 +730,6 @@ class _AccountTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ---------------- CHANGE PASSWORD DIALOG ----------------
-
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog({required this.onSubmit});
-
-  final Future<void> Function(String current, String next) onSubmit;
-
-  @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _currentCtrl = TextEditingController();
-  final _newCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-
-  bool _obscureCurrent = true;
-  bool _obscureNew = true;
-  bool _obscureConfirm = true;
-  bool _submitting = false;
-
-  @override
-  void dispose() {
-    _currentCtrl.dispose();
-    _newCtrl.dispose();
-    _confirmCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _submitting = true);
-    try {
-      await widget.onSubmit(_currentCtrl.text, _newCtrl.text);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      AppSnackbar.success('Password updated successfully');
-    } catch (e) {
-      AppSnackbar.error('Could not update password. Please try again.');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.lock_outline_rounded, size: 19, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Change Password',
-                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(16)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _PasswordField(
-                label: 'Current Password',
-                controller: _currentCtrl,
-                obscure: _obscureCurrent,
-                onToggleObscure: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                validator: (v) => DValidator.validateRequired(v, message: 'Enter your current password'),
-              ),
-              const SizedBox(height: 12),
-              _PasswordField(
-                label: 'New Password',
-                controller: _newCtrl,
-                obscure: _obscureNew,
-                onToggleObscure: () => setState(() => _obscureNew = !_obscureNew),
-                validator: (v) {
-                  final base = DValidator.validatePassword(v);
-                  if (base != null) return base;
-                  if (v == _currentCtrl.text) return 'Must differ from current password';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _PasswordField(
-                label: 'Confirm New Password',
-                controller: _confirmCtrl,
-                obscure: _obscureConfirm,
-                onToggleObscure: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Confirm your new password';
-                  if (v != _newCtrl.text) return 'Passwords do not match';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Material(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _submitting ? null : _submit,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          child: Center(
-                            child: _submitting
-                                ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation(Colors.white),
-                              ),
-                            )
-                                : Text(
-                              'Update Password',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: Responsive.sp(13),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PasswordField extends StatelessWidget {
-  const _PasswordField({
-    required this.label,
-    required this.controller,
-    required this.obscure,
-    required this.onToggleObscure,
-    required this.validator,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final bool obscure;
-  final VoidCallback onToggleObscure;
-  final String? Function(String?) validator;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscure,
-      validator: validator,
-      style: TextStyle(fontSize: Responsive.sp(13.5)),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: Responsive.sp(12.5), color: AppColors.textSecondary),
-        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 19),
-        suffixIcon: IconButton(
-          icon: Icon(obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 19),
-          onPressed: onToggleObscure,
-        ),
-        filled: true,
-        fillColor: AppColors.surfaceAlt,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        errorStyle: TextStyle(fontSize: Responsive.sp(11)),
       ),
     );
   }

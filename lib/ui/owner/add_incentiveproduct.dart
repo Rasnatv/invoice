@@ -1,4 +1,5 @@
 
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -81,13 +82,35 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         TextEditingController(text: p != null ? p.incentivePercentage.toString() : '');
     _incentiveFixedCtrl =
         TextEditingController(text: p != null ? p.incentiveAmount.toString() : '');
-    _minQuantityCtrl = TextEditingController(text: '0');
+    _minQuantityCtrl =
+        TextEditingController(text: p != null ? p.minQuantity.toString() : '0');
+
     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
     _packingCtrl = TextEditingController(text: p?.packing ?? '');
 
     // Prefill dropdown selections from the product being edited.
     _selectedCompanyId = p?.companyId;
     _selectedUnitId = p?.unitId;
+
+    // ProductModel.incentiveType is parsed straight from the API's
+    // incentive_type field ('fixed' / 'percentage' / '' -> none). No
+    // guessing from which of incentivePercentage/incentiveAmount happens
+    // to be non-zero.
+    _incentiveType =
+    p == null ? ProductIncentiveType.percentage : p.incentiveType;
+
+    // ProductModel.bonusType is parsed straight from the API's bonus_type
+    // field ('bulk' / 'single' / '' -> none). Legacy records with an empty
+    // bonus_type ("") correctly resolve to ProductBonusType.none here.
+    _bonusType = p?.bonusType ?? ProductBonusType.single;
+
+    // FIX: is_box_unit alone isn't fully reliable — some legacy records
+    // report is_box_unit: "0" from the API while still having
+    // pieces_per_box/packing populated (e.g. a product with
+    // is_box_unit: "0" but packing: "6pcs/Box" and pieces_per_box: "6").
+    // Trust isBoxUnit when it's true, but fall back to hasBoxPacking so we
+    // never hide fields that actually contain real data.
+    _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
   }
 
   @override
@@ -134,7 +157,17 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
       if (!companyExists) _selectedCompanyId = null;
       if (!unitExists) _selectedUnitId = null;
       _dropdownSelectionSynced = true;
-      _isBoxUnit = _computeIsBoxUnit(state);
+
+      // Once the unit list is loaded and the selected unit is confirmed to
+      // exist in it, the dropdown-driven flag becomes authoritative for
+      // FUTURE unit changes. But don't let a false negative from this
+      // recompute clobber a true _isBoxUnit we already derived from the
+      // product's own data (isBoxUnit / hasBoxPacking) in initState — only
+      // upgrade to true, never silently downgrade to false here.
+      if (unitExists) {
+        final dropdownSaysBox = _computeIsBoxUnit(state);
+        _isBoxUnit = _isBoxUnit || dropdownSaysBox;
+      }
     });
   }
 
@@ -146,7 +179,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
   }
 
   void _save(BuildContext context) {
-    if (!_formKey.currentState!.validate()) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCompanyId == null || _selectedUnitId == null) {
       AppSnackbar.error('Please select a company and a unit.');
@@ -441,12 +473,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                   ),
                   SizedBox(height: Responsive.h(12)),
 
-                  // FIX: this used to be `if (percentage) ... else ...`,
-                  // which meant `none` fell into the `else` branch and the
-                  // Incentive Amount field showed up even when the user
-                  // picked "None". Now `none` matches neither branch, so no
-                  // incentive field is built (and therefore none is
-                  // validated) when Incentive Type is "None".
+                  // `none` matches neither branch below, so no incentive
+                  // field is built (and therefore none is validated) when
+                  // Incentive Type is "None".
                   if (_incentiveType == ProductIncentiveType.percentage) ...[
                     _FieldLabel('Incentive (%)'),
                     TextFormField(

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -11,30 +12,25 @@ import '../../bloc/driverbloc/driverdashboard/driverdashboard_event.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_state.dart';
 import '../../core/utils/logout_helper.dart';
 import '../../models/drivermodels/driverdashboardmodel.dart';
-import '../../widgets/appsnackbar.dart';
-import '../auth/login_screen.dart';
+
+import 'driverchangepswdscreen.dart';
 import 'driverdetailscreen.dart';
+
 
 class DriverDashboardScreen extends StatelessWidget {
   const DriverDashboardScreen({
     super.key,
-    this.driverName = 'Driver',
     this.onLogout,
-    this.onChangePassword,
   });
 
-  final String driverName;
   final VoidCallback? onLogout;
-  final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => DriverDashboardBloc(DriverDespatchProvider())..add(const FetchDriverDashboard()),
       child: _DriverDashboardView(
-        driverName: driverName,
         onLogout: onLogout,
-        onChangePassword: onChangePassword,
       ),
     );
   }
@@ -42,14 +38,10 @@ class DriverDashboardScreen extends StatelessWidget {
 
 class _DriverDashboardView extends StatefulWidget {
   const _DriverDashboardView({
-    required this.driverName,
     this.onLogout,
-    this.onChangePassword,
   });
 
-  final String driverName;
   final VoidCallback? onLogout;
-  final Future<void> Function(String currentPassword, String newPassword)? onChangePassword;
 
   @override
   State<_DriverDashboardView> createState() => _DriverDashboardViewState();
@@ -92,20 +84,16 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
     });
   }
 
-
-
   void _openAccountSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => _AccountSheet(
-        driverName: widget.driverName,
         onChangePassword: () {
           Navigator.of(ctx).pop();
-          _openChangePasswordDialog();
+          _openChangePasswordScreen();
         },
-
         onLogout: () {
           Navigator.of(ctx).pop();
           if (widget.onLogout != null) {
@@ -118,18 +106,12 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
     );
   }
 
-  Future<void> _openChangePasswordDialog() async {
-    await showDialog(
-      context: context,
-      builder: (_) => _ChangePasswordDialog(
-        onSubmit: (current, next) async {
-          if (widget.onChangePassword != null) {
-            await widget.onChangePassword!(current, next);
-          } else {
-            await Future.delayed(const Duration(milliseconds: 600));
-          }
-        },
-      ),
+  // Was a showDialog(_ChangePasswordDialog) before — now a full screen
+  // that talks to ProfileBloc directly (same bloc/event/state used by the
+  // Owner change-password flow), so there's no callback to wire up here.
+  void _openChangePasswordScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DriverChangePasswordScreen()),
     );
   }
 
@@ -180,7 +162,6 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
                 SliverToBoxAdapter(
                   child: _DriverHeader(
                     greeting: greeting,
-                    name: widget.driverName,
                     dateLabel: today,
                     total: dashboard.total,
                     pending: dashboard.pending + dashboard.inTransit,
@@ -225,7 +206,6 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
 class _DriverHeader extends StatelessWidget {
   const _DriverHeader({
     required this.greeting,
-    required this.name,
     required this.dateLabel,
     required this.total,
     required this.pending,
@@ -234,19 +214,11 @@ class _DriverHeader extends StatelessWidget {
   });
 
   final String greeting;
-  final String name;
   final String dateLabel;
   final int total;
   final int pending;
   final int delivered;
   final VoidCallback onAccountTap;
-
-  String get _initials {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -300,19 +272,15 @@ class _DriverHeader extends StatelessWidget {
                             border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.4),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            _initials,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: Responsive.sp(16),
-                              letterSpacing: 0.4,
-                            ),
+                          child: Icon(
+                            Icons.local_shipping_rounded,
+                            color: Colors.white,
+                            size: Responsive.w(22),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(width: Responsive.w(12)),
+                    SizedBox(width: Responsive.w(10)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,37 +294,8 @@ class _DriverHeader extends StatelessWidget {
                               letterSpacing: 0.2,
                             ),
                           ),
-                          SizedBox(height: Responsive.h(2)),
-                          Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold(color: Colors.white)
-                                .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
-                          ),
-                          SizedBox(height: Responsive.h(4)),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Responsive.w(8),
-                              vertical: Responsive.h(2),
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'DRIVER',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.92),
-                                fontSize: Responsive.sp(9.5),
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                          SizedBox(height: Responsive.h(6)),
+    ]),),
                     Material(
                       color: Colors.white.withValues(alpha: 0.16),
                       shape: const CircleBorder(),
@@ -371,7 +310,7 @@ class _DriverHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: Responsive.h(16)),
+                SizedBox(height: Responsive.h(10)),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(6)),
                   decoration: BoxDecoration(
@@ -503,21 +442,12 @@ class _MiniStat extends StatelessWidget {
 
 class _AccountSheet extends StatelessWidget {
   const _AccountSheet({
-    required this.driverName,
     required this.onChangePassword,
     required this.onLogout,
   });
 
-  final String driverName;
   final VoidCallback onChangePassword;
   final VoidCallback onLogout;
-
-  String get _initials {
-    final parts = driverName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -560,33 +490,13 @@ class _AccountSheet extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      _initials,
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)
-                          .copyWith(fontSize: Responsive.sp(15)),
-                    ),
+                    child: Icon(Icons.local_shipping_rounded, color: AppColors.primary, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          driverName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14.5)),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Driver account',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: Responsive.sp(11.5),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      'Driver account',
+                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14.5)),
                     ),
                   ),
                 ],
@@ -663,228 +573,6 @@ class _AccountTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ---------------- CHANGE PASSWORD DIALOG ----------------
-
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog({required this.onSubmit});
-
-  final Future<void> Function(String current, String next) onSubmit;
-
-  @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _currentCtrl = TextEditingController();
-  final _newCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-
-  bool _obscureCurrent = true;
-  bool _obscureNew = true;
-  bool _obscureConfirm = true;
-  bool _submitting = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _currentCtrl.dispose();
-    _newCtrl.dispose();
-    _confirmCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    setState(() => _error = null);
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _submitting = true);
-    try {
-      await widget.onSubmit(_currentCtrl.text, _newCtrl.text);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      AppSnackbar.success('Password updated successfully');
-    } catch (e) {
-      setState(() {
-        _error = 'Could not update password. Please try again.';
-      });
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.lock_outline_rounded, size: 19, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Change Password',
-                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(16)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _PasswordField(
-                label: 'Current Password',
-                controller: _currentCtrl,
-                obscure: _obscureCurrent,
-                onToggleObscure: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                validator: (v) => (v == null || v.isEmpty) ? 'Enter your current password' : null,
-              ),
-              const SizedBox(height: 12),
-              _PasswordField(
-                label: 'New Password',
-                controller: _newCtrl,
-                obscure: _obscureNew,
-                onToggleObscure: () => setState(() => _obscureNew = !_obscureNew),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter a new password';
-                  if (v.length < 6) return 'Must be at least 6 characters';
-                  if (v == _currentCtrl.text) return 'Must differ from current password';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _PasswordField(
-                label: 'Confirm New Password',
-                controller: _confirmCtrl,
-                obscure: _obscureConfirm,
-                onToggleObscure: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Confirm your new password';
-                  if (v != _newCtrl.text) return 'Passwords do not match';
-                  return null;
-                },
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _error!,
-                  style: TextStyle(color: Colors.red.shade600, fontSize: Responsive.sp(12), fontWeight: FontWeight.w500),
-                ),
-              ],
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Material(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _submitting ? null : _submit,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          child: Center(
-                            child: _submitting
-                                ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation(Colors.white),
-                              ),
-                            )
-                                : Text(
-                              'Update Password',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: Responsive.sp(13),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PasswordField extends StatelessWidget {
-  const _PasswordField({
-    required this.label,
-    required this.controller,
-    required this.obscure,
-    required this.onToggleObscure,
-    required this.validator,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final bool obscure;
-  final VoidCallback onToggleObscure;
-  final String? Function(String?) validator;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscure,
-      validator: validator,
-      style: TextStyle(fontSize: Responsive.sp(13.5)),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(fontSize: Responsive.sp(12.5), color: AppColors.textSecondary),
-        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 19),
-        suffixIcon: IconButton(
-          icon: Icon(obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 19),
-          onPressed: onToggleObscure,
-        ),
-        filled: true,
-        fillColor: AppColors.surfaceAlt,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        errorStyle: TextStyle(fontSize: Responsive.sp(11)),
       ),
     );
   }

@@ -1,4 +1,6 @@
 
+import '../../Apiprovider/product_enums.dart';
+
 class ProductModel {
   const ProductModel({
     required this.id,
@@ -7,14 +9,17 @@ class ProductModel {
     required this.company,
     required this.size,
     required this.unitId,
+    required this.isBoxUnit,
     required this.piecesPerBox,
     required this.packing,
     required this.minQuantity,
     required this.measurementQty,
     required this.mrp,
     required this.rate,
+    required this.incentiveType,
     required this.incentivePercentage,
     required this.incentiveAmount,
+    required this.bonusType,
     required this.isActive,
   });
 
@@ -24,6 +29,13 @@ class ProductModel {
   final String company;
   final String size;
   final String unitId;
+
+  /// From API's "is_box_unit": "0"/"1". Source of truth for whether
+  /// packing/pieces-per-box apply to this product. Note: some legacy
+  /// records report "0" here while still having pieces_per_box/packing
+  /// populated (e.g. id 33 — is_box_unit "0" but packing "6pcs/Box"). Use
+  /// [hasBoxPacking] as a fallback in the UI when this alone isn't enough.
+  final bool isBoxUnit;
 
   /// Empty string when the product's unit isn't a "box"-type unit.
   final String piecesPerBox;
@@ -40,12 +52,26 @@ class ProductModel {
 
   final double mrp;
   final double rate;
+
+  /// Parsed incentive type ('percentage' / 'fixed' / absent -> none).
+  /// This is the SOURCE OF TRUTH for which incentive field applies — don't
+  /// infer it from incentivePercentage/incentiveAmount being non-zero,
+  /// since both can be populated simultaneously by the API.
+  final ProductIncentiveType incentiveType;
+
   final double incentivePercentage;
   final double incentiveAmount;
+
+  /// Parsed bonus type ('bulk' / 'single' / absent-or-empty -> none).
+  /// Many legacy records return "" for bonus_type, which correctly resolves
+  /// to ProductBonusType.none (shown as "None" in the edit screen).
+  final ProductBonusType bonusType;
+
   final bool isActive;
 
-  /// True when this product carries box-packing info, useful for
-  /// conditionally showing the packing/pieces-per-box fields in the UI.
+  /// True when this product carries box-packing info. Kept as a display/
+  /// fallback helper; prefer [isBoxUnit] first, falling back to this when
+  /// isBoxUnit is false but packing data is actually present.
   bool get hasBoxPacking => piecesPerBox.isNotEmpty || packing.isNotEmpty;
 
   /// True when this product is measured (e.g. "As per Measurement") rather
@@ -60,16 +86,19 @@ class ProductModel {
       company: json['company']?.toString() ?? '',
       size: json['size']?.toString() ?? '',
       unitId: json['unit_id']?.toString() ?? '',
+      isBoxUnit: json['is_box_unit']?.toString() == '1',
       piecesPerBox: json['pieces_per_box']?.toString() ?? '',
       packing: json['packing']?.toString() ?? '',
       minQuantity: double.tryParse(json['min_quantity']?.toString() ?? '') ?? 0,
       measurementQty: json['measurement_qty']?.toString() ?? '',
       mrp: double.tryParse(json['mrp']?.toString() ?? '') ?? 0,
       rate: double.tryParse(json['rate']?.toString() ?? '') ?? 0,
+      incentiveType: _incentiveTypeFromApi(json['incentive_type']?.toString()),
       incentivePercentage:
       double.tryParse(json['incentive_percentage']?.toString() ?? '') ?? 0,
       incentiveAmount:
       double.tryParse(json['incentive_amount']?.toString() ?? '') ?? 0,
+      bonusType: _bonusTypeFromApi(json['bonus_type']?.toString()),
       isActive: json['is_active']?.toString() == '1',
     );
   }
@@ -82,14 +111,18 @@ class ProductModel {
       'company': company,
       'size': size,
       'unit_id': unitId,
+      'is_box_unit': isBoxUnit ? '1' : '0',
       'pieces_per_box': piecesPerBox,
       'packing': packing,
       'min_quantity': minQuantity,
       'measurement_qty': measurementQty,
       'mrp': mrp,
       'rate': rate,
+      if (incentiveType.apiValue != null)
+        'incentive_type': incentiveType.apiValue,
       'incentive_percentage': incentivePercentage,
       'incentive_amount': incentiveAmount,
+      if (bonusType.apiValue != null) 'bonus_type': bonusType.apiValue,
       'is_active': isActive ? '1' : '0',
     };
   }
@@ -101,14 +134,17 @@ class ProductModel {
     String? company,
     String? size,
     String? unitId,
+    bool? isBoxUnit,
     String? piecesPerBox,
     String? packing,
     double? minQuantity,
     String? measurementQty,
     double? mrp,
     double? rate,
+    ProductIncentiveType? incentiveType,
     double? incentivePercentage,
     double? incentiveAmount,
+    ProductBonusType? bonusType,
     bool? isActive,
   }) {
     return ProductModel(
@@ -118,16 +154,46 @@ class ProductModel {
       company: company ?? this.company,
       size: size ?? this.size,
       unitId: unitId ?? this.unitId,
+      isBoxUnit: isBoxUnit ?? this.isBoxUnit,
       piecesPerBox: piecesPerBox ?? this.piecesPerBox,
       packing: packing ?? this.packing,
       minQuantity: minQuantity ?? this.minQuantity,
       measurementQty: measurementQty ?? this.measurementQty,
       mrp: mrp ?? this.mrp,
       rate: rate ?? this.rate,
+      incentiveType: incentiveType ?? this.incentiveType,
       incentivePercentage: incentivePercentage ?? this.incentivePercentage,
       incentiveAmount: incentiveAmount ?? this.incentiveAmount,
+      bonusType: bonusType ?? this.bonusType,
       isActive: isActive ?? this.isActive,
     );
+  }
+}
+
+/// Parses the raw API string ('fixed' / 'percentage' / anything else,
+/// incl. null/empty) into [ProductIncentiveType]. Defaults to `none`.
+/// Private to this file since product_enums.dart doesn't expose a parser.
+ProductIncentiveType _incentiveTypeFromApi(String? value) {
+  switch (value) {
+    case 'fixed':
+      return ProductIncentiveType.fixed;
+    case 'percentage':
+      return ProductIncentiveType.percentage;
+    default:
+      return ProductIncentiveType.none;
+  }
+}
+
+/// Parses the raw API string ('bulk' / 'single' / anything else, incl.
+/// null/empty) into [ProductBonusType]. Defaults to `none`.
+ProductBonusType _bonusTypeFromApi(String? value) {
+  switch (value) {
+    case 'bulk':
+      return ProductBonusType.bulk;
+    case 'single':
+      return ProductBonusType.single;
+    default:
+      return ProductBonusType.none;
   }
 }
 

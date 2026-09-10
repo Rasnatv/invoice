@@ -160,15 +160,26 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                 if (picked != null) joiningDate.value = picked;
                               },
                               child: InputDecorator(
-                                decoration: _inputDecoration(
-                                    'Joining Date', Icons.calendar_today_outlined),
+                                decoration: InputDecoration(
+                                  labelText: 'Joining Date',
+                                  prefixIcon: Icon(Icons.calendar_today_outlined,
+                                      color: AppColors.textSecondary, size: 20),
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: Responsive.w(14),
+                                    vertical: Responsive.h(14),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
                                 child: Text(
                                   date != null ? _formatDate(date) : 'Select date',
                                   style: TextStyle(
                                     fontSize: Responsive.sp(14),
-                                    color: date != null
-                                        ? AppColors.black
-                                        : AppColors.textSecondary,
+                                    color: date != null ? AppColors.black : AppColors.textSecondary,
                                   ),
                                 ),
                               ),

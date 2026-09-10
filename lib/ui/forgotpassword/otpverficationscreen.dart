@@ -1,9 +1,14 @@
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../bloc/forgotpswd/forgotpassword_bloc.dart';
+import '../../bloc/forgotpswd/forgotpassword_event.dart';
+import '../../bloc/forgotpswd/forgotpassword_state.dart';
 import 'newpasswordsetscreen.dart';
 
 
@@ -32,8 +37,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
 
   Timer? _resendTimer;
   int _secondsRemaining = _kResendSeconds;
-  bool _isVerifying = false;
-  String? _errorText;
+  String? _localErrorText;
 
   @override
   void initState() {
@@ -79,7 +83,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
   String get _code => _controllers.map((c) => c.text).join();
 
   void _onDigitChanged(int index, String value) {
-    if (_errorText != null) setState(() => _errorText = null);
+    if (_localErrorText != null) setState(() => _localErrorText = null);
 
     if (value.isNotEmpty && index < _kOtpLength - 1) {
       _focusNodes[index + 1].requestFocus();
@@ -93,50 +97,39 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     setState(() {});
   }
 
-  Future<void> _onVerify() async {
+  void _onVerify() {
     if (_code.length != _kOtpLength) {
-      setState(() => _errorText = 'Enter the complete 6-digit code');
+      setState(() => _localErrorText = 'Enter the complete 6-digit code');
       return;
     }
 
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isVerifying = true;
-      _errorText = null;
-    });
-
-    // TODO: replace with actual "verify OTP" API / bloc call.
-    await Future.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted) return;
-    setState(() => _isVerifying = false);
-
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 350),
-        pageBuilder: (_, anim, __) => const ResetSuccessScreen(),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
+    setState(() => _localErrorText = null);
+    context.read<ForgotPasswordBloc>().add(VerifyForgotPasswordOtp(_code));
   }
 
   void _onResend() {
     if (_secondsRemaining != 0) return;
-    // TODO: replace with actual "resend OTP" API / bloc call.
+
     for (final c in _controllers) {
       c.clear();
     }
-    setState(() => _errorText = null);
+    setState(() => _localErrorText = null);
     _focusNodes.first.requestFocus();
     _startResendTimer();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('A new code has been sent'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.all(Responsive.w(16)),
+    context.read<ForgotPasswordBloc>().add(const ResendForgotPasswordOtp());
+  }
+
+  void _goToNewPasswordScreen() {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 350),
+        pageBuilder: (_, anim, __) => BlocProvider.value(
+          value: context.read<ForgotPasswordBloc>(),
+          child: const SetNewPasswordScreen(),
+        ),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
       ),
     );
   }
@@ -153,66 +146,112 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: ClipPath(
-              clipper: _HeaderClipper(),
-              child: Container(
-                height: Responsive.h(220),
-                decoration: const BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: _HeaderContent(
-                      icon: Icons.mark_email_read_outlined,
-                      title: 'Verify Code',
-                      subtitle: 'Code sent to $_maskedEmail',
-                      onBack: () => Navigator.of(context).maybePop(),
-                    ),
-                  ),
-                ),
-              ),
+    return BlocListener<ForgotPasswordBloc, ForgotPasswordState>(
+      listener: (context, state) {
+        if (state.verifyOtpStatus == RequestStatus.success) {
+          _goToNewPasswordScreen();
+        }
+        if (state.resendOtpStatus == RequestStatus.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('A new code has been sent'),
+              backgroundColor: AppColors.primary,
+              behavior: SnackBarBehavior.floating,
+              shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: EdgeInsets.all(Responsive.w(16)),
             ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(22)),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(height: Responsive.h(28)),
-                  FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slide,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 440),
-                        child: _FormCard(
-                          controllers: _controllers,
-                          focusNodes: _focusNodes,
-                          errorText: _errorText,
-                          isVerifying: _isVerifying,
-                          secondsRemaining: _secondsRemaining,
-                          onDigitChanged: _onDigitChanged,
-                          onVerify: _onVerify,
-                          onResend: _onResend,
-                        ),
+          );
+        }
+        if (state.resendOtpStatus == RequestStatus.failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+              Text(state.resendOtpError ?? 'Could not resend the code'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+              shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: EdgeInsets.all(Responsive.w(16)),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        backgroundColor: AppColors.background,
+        body: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: ClipPath(
+                clipper: _HeaderClipper(),
+                child: Container(
+                  height: Responsive.h(220),
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: _HeaderContent(
+                        icon: Icons.mark_email_read_outlined,
+                        title: 'Verify Code',
+                        subtitle: 'Code sent to $_maskedEmail',
+                        onBack: () => Navigator.of(context).maybePop(),
                       ),
                     ),
                   ),
-                  SizedBox(height: Responsive.h(24)),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: Responsive.w(22)),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(height: Responsive.h(28)),
+                    FadeTransition(
+                      opacity: _fade,
+                      child: SlideTransition(
+                        position: _slide,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          child: BlocBuilder<ForgotPasswordBloc,
+                              ForgotPasswordState>(
+                            buildWhen: (previous, current) =>
+                            previous.verifyOtpStatus !=
+                                current.verifyOtpStatus,
+                            builder: (context, state) {
+                              final isVerifying = state.verifyOtpStatus ==
+                                  RequestStatus.loading;
+                              final serverError =
+                              state.verifyOtpStatus == RequestStatus.failure
+                                  ? state.verifyOtpError
+                                  : null;
+                              return _FormCard(
+                                controllers: _controllers,
+                                focusNodes: _focusNodes,
+                                errorText: _localErrorText ?? serverError,
+                                isVerifying: isVerifying,
+                                secondsRemaining: _secondsRemaining,
+                                onDigitChanged: _onDigitChanged,
+                                onVerify: _onVerify,
+                                onResend: _onResend,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: Responsive.h(24)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -15,6 +15,7 @@ import 'package:tileshop/models/salesmanmodels/salesman_dashboardmodel.dart'; //
 import '../../widgets/monthlysale.dart';
 import '../../widgets/owner_widgets.dart'; // StatusBadge
 import 'addfieldstaffscreen.dart';
+import 'fieldstaffincentivelistscreen.dart';
 import 'owner_designationlist.dart';
 import 'owner_driverpage.dart';
 import 'owner_estimates_screen.dart';
@@ -92,7 +93,7 @@ class _OwnerDashboardView extends StatelessWidget {
                         height: Responsive.h(100),
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          itemCount: 9,
+                          itemCount: 12,
                           separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
                           itemBuilder: (context, i) {
                             final actions = <_QuickActionData>[
@@ -162,6 +163,13 @@ class _OwnerDashboardView extends StatelessWidget {
                                 label: 'Field Staff',
                                 color: const Color(0xFF0B4718),
                                 onTap: () => _open(context, const OwnerAddFieldStaffScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.bar_chart_rounded,
+                                label: 'Fieldstaff incentive',
+                                color: const Color(0xFF16A34A),
+                                onTap: ()
+                                => _open(context, const FieldStaffIncentiveScreen()),
                               ),
                             ];
                             final a = actions[i];

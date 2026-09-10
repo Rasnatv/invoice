@@ -1,11 +1,13 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import 'newpasswordsetscreen.dart';
+import '../../bloc/forgotpswd/forgotpassword_bloc.dart';
+import '../../bloc/forgotpswd/forgotpassword_event.dart';
+import '../../bloc/forgotpswd/forgotpassword_state.dart';
 import 'otpverficationscreen.dart';
-
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -24,11 +26,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
 
-  bool _isSubmitting = false;
+  late final ForgotPasswordBloc _bloc;
 
   @override
   void initState() {
     super.initState();
+    _bloc = ForgotPasswordBloc();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -46,26 +49,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     _emailController.dispose();
     _emailFocus.dispose();
     _controller.dispose();
+    _bloc.close();
     super.dispose();
   }
 
-  Future<void> _onSendCode() async {
+  void _onSendCode() {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
+    _bloc.add(SendForgotPasswordOtp(_emailController.text.trim()));
+  }
 
-    setState(() => _isSubmitting = true);
-
-    // TODO: replace with actual "send OTP" API / bloc call.
-    await Future.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-
+  void _goToOtpScreen() {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 350),
-        pageBuilder: (_, anim, __) =>
-            OtpVerificationScreen(email: _emailController.text.trim()),
+        pageBuilder: (_, anim, __) => BlocProvider.value(
+          value: _bloc,
+          child: OtpVerificationScreen(email: _emailController.text.trim()),
+        ),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
       ),
@@ -76,63 +77,97 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: ClipPath(
-              clipper: _HeaderClipper(),
-              child: Container(
-                height: Responsive.h(220),
-                decoration: const BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: _HeaderContent(
-                      icon: Icons.lock_reset_rounded,
-                      title: 'Forgot Password',
-                      subtitle: "We'll help you get back in",
-                      onBack: () => Navigator.of(context).maybePop(),
-                    ),
-                  ),
-                ),
+    return BlocProvider.value(
+      value: _bloc,
+      child: BlocListener<ForgotPasswordBloc, ForgotPasswordState>(
+        listenWhen: (previous, current) =>
+        previous.sendOtpStatus != current.sendOtpStatus,
+        listener: (context, state) {
+          if (state.sendOtpStatus == RequestStatus.success) {
+            _goToOtpScreen();
+          } else if (state.sendOtpStatus == RequestStatus.failure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.sendOtpError ?? 'Something went wrong'),
+                backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                margin: EdgeInsets.all(Responsive.w(16)),
               ),
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(22)),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(height: Responsive.h(28)),
-                  FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slide,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 440),
-                        child: _FormCard(
-                          formKey: _formKey,
-                          emailController: _emailController,
-                          emailFocus: _emailFocus,
-                          isSubmitting: _isSubmitting,
-                          onSendCode: _onSendCode,
+            );
+          }
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: AppColors.background,
+          body: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: ClipPath(
+                  clipper: _HeaderClipper(),
+                  child: Container(
+                    height: Responsive.h(220),
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: _HeaderContent(
+                          icon: Icons.lock_reset_rounded,
+                          title: 'Forgot Password',
+                          subtitle: "We'll help you get back in",
+                          onBack: () => Navigator.of(context).maybePop(),
                         ),
                       ),
                     ),
                   ),
-                  SizedBox(height: Responsive.h(24)),
-                ],
+                ),
               ),
-            ),
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(22)),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(height: Responsive.h(28)),
+                      FadeTransition(
+                        opacity: _fade,
+                        child: SlideTransition(
+                          position: _slide,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 440),
+                            child: BlocBuilder<ForgotPasswordBloc,
+                                ForgotPasswordState>(
+                              buildWhen: (previous, current) =>
+                              previous.sendOtpStatus !=
+                                  current.sendOtpStatus,
+                              builder: (context, state) {
+                                final isSubmitting =
+                                    state.sendOtpStatus ==
+                                        RequestStatus.loading;
+                                return _FormCard(
+                                  formKey: _formKey,
+                                  emailController: _emailController,
+                                  emailFocus: _emailFocus,
+                                  isSubmitting: isSubmitting,
+                                  onSendCode: _onSendCode,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: Responsive.h(24)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

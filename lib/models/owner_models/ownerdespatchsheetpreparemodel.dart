@@ -1,3 +1,4 @@
+
 double _asDouble(dynamic v) {
   if (v == null) return 0;
   if (v is num) return v.toDouble();
@@ -19,6 +20,8 @@ String _asString(dynamic v) => v?.toString() ?? '';
 class DespatchSuggestionItem {
   final String estimateItemId;
   final String productName;
+  final String companyName;
+  final String productSize; // Added
   final String unit;
   final double remainingQuantity;
   final int suggestedBoxes;
@@ -28,6 +31,8 @@ class DespatchSuggestionItem {
   const DespatchSuggestionItem({
     required this.estimateItemId,
     required this.productName,
+    required this.companyName,
+    required this.productSize, // Added
     required this.unit,
     required this.remainingQuantity,
     required this.suggestedBoxes,
@@ -39,6 +44,8 @@ class DespatchSuggestionItem {
     return DespatchSuggestionItem(
       estimateItemId: _asString(json['estimate_item_id']),
       productName: _asString(json['product_name']),
+      companyName: _asString(json['company_name']),
+      productSize: _asString(json['product_size']), // Added
       unit: _asString(json['unit']),
       remainingQuantity: _asDouble(json['remaining_quantity']),
       suggestedBoxes: _asInt(json['suggested_boxes']),

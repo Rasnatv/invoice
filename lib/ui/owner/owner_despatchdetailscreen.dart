@@ -6,7 +6,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -168,7 +167,6 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       ),
     );
   }
-
   Widget _itemsTable(DispatchDetail d) {
     return Container(
       decoration: BoxDecoration(
@@ -186,9 +184,11 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
               children: [
                 SizedBox(width: 24, child: Text('#', style: AppTextStyles.captionnew())),
                 Expanded(flex: 3, child: Text('Item', style: AppTextStyles.captionnew())),
+                Expanded(flex: 2, child: Text('Company', style: AppTextStyles.captionnew())),
                 Expanded(flex: 2, child: Text('Size', style: AppTextStyles.captionnew())),
-                SizedBox(width: 44, child: Text('Box', style: AppTextStyles.captionnew())),
-                SizedBox(width: 44, child: Text('Pcs', style: AppTextStyles.captionnew())),
+                SizedBox(width: 40, child: Text('Box', style: AppTextStyles.captionnew())),
+                SizedBox(width: 40, child: Text('Pcs', style: AppTextStyles.captionnew())),
+                SizedBox(width: 48, child: Text('Qty', style: AppTextStyles.captionnew())),
               ],
             ),
           ),
@@ -206,11 +206,20 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
                   ),
                   Expanded(
                     flex: 2,
+                    child: Text(
+                      d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
+                      style: AppTextStyles.body(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
                     child: Text(d.items[i].productSize,
                         style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
                   ),
-                  SizedBox(width: 44, child: Text(d.items[i].boxes.toStringAsFixed(0), style: AppTextStyles.body())),
-                  SizedBox(width: 44, child: Text(d.items[i].pieces.toStringAsFixed(0), style: AppTextStyles.body())),
+                  SizedBox(width: 40, child: Text(d.items[i].boxes.toStringAsFixed(0), style: AppTextStyles.body())),
+                  SizedBox(width: 40, child: Text(d.items[i].pieces.toStringAsFixed(0), style: AppTextStyles.body())),
+                  SizedBox(width: 48, child: Text(d.items[i].quantity.toStringAsFixed(0), style: AppTextStyles.body())),
                 ],
               ),
             ),
@@ -464,25 +473,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     return 'data:image/png;base64,$base64Str';
   }
 
-  // void _confirmMarkInTransit(BuildContext context, String id) {
-  //   showDialog(
-  //     context: context,
-  //     builder: (dialogCtx) => AlertDialog(
-  //       title: const Text('Mark as In Transit?'),
-  //       content: const Text('This confirms the dispatch has left for delivery.'),
-  //       actions: [
-  //         TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
-  //         ElevatedButton(
-  //           onPressed: () {
-  //             Navigator.pop(dialogCtx);
-  //             context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
-  //           },
-  //           child: const Text('Confirm'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+
   void _confirmMarkInTransit(BuildContext context, String id) async {
     final confirmed = await showConfirmDialog(
       context,

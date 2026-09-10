@@ -606,13 +606,14 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                         border: OutlineInputBorder(),
                       ),
                       items: const [
+                        DropdownMenuItem(value: null, child: Text('None')),
                         DropdownMenuItem(
                           value: QuotationDiscountType.percentage,
-                          child: Text('Percentage (%)'),
+                          child: Text('Percentage'),
                         ),
                         DropdownMenuItem(
                           value: QuotationDiscountType.fixed,
-                          child: Text('Fixed Amount (₹)'),
+                          child: Text('Fixed '),
                         ),
                       ],
                       onChanged: (v) => setDialogState(() => type = v ?? type),
@@ -644,14 +645,6 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // TextFormField(
-                    //   controller: notesCtrl,
-                    //   decoration: const InputDecoration(
-                    //     labelText: 'Notes (optional)',
-                    //     hintText: 'e.g. Bulk discount',
-                    //     border: OutlineInputBorder(),
-                    //   ),
-                   // ),
                   ],
                 ),
               ),

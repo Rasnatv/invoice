@@ -195,4 +195,23 @@ class ApiConstants {
   static const String profile = '/profile';
   static const String profileUpdate = '/profile';
   static const String changePassword = '/change-password';
+
+
+  ///FIELD STAFF INCENTIVE SECTION
+
+  // =================== FIELD STAFF INCENTIVES ===================
+  static const String fieldStaffIncentivesSummary = '/field-staff-incentives/summary';
+
+  static const String fieldStaffIncentivesList = '/field-staff-incentives';
+
+  static const String fieldStaffIncentivesShow = '/field-staff-incentives/show';
+  static const String fieldStaffIncentivesMarkPaid = '/field-staff-incentives/mark-paid';
+  static const String activeFieldStaff = '/field-staff/active';
+  //forgot password
+  static const String forgotPassword = '/forgot-password';
+  static const String verifyOtp = '/verify-otp';
+  static const String resetPassword = '/reset-password';
+
+  //cancel quottation
+static const String quotationsCancel='/quotations/cancel';
 }

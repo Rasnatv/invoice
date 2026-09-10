@@ -1,9 +1,9 @@
-/// Line item as returned inside the `items` array of
-/// POST /despatches/show, /mark-in-transit and /mark-delivered.
+
 class DispatchItemDetail {
   final String id;
   final String estimateItemId;
   final String productName;
+  final String companyName;
   final String productSize;
   final String packing;
   final double boxes;
@@ -14,6 +14,7 @@ class DispatchItemDetail {
     required this.id,
     required this.estimateItemId,
     required this.productName,
+    required this.companyName,
     required this.productSize,
     required this.packing,
     required this.boxes,
@@ -26,6 +27,7 @@ class DispatchItemDetail {
       id: json['id']?.toString() ?? '',
       estimateItemId: json['estimate_item_id']?.toString() ?? '',
       productName: json['product_name']?.toString() ?? '',
+      companyName: json['company_name']?.toString() ?? '',
       productSize: json['product_size']?.toString() ?? '',
       packing: json['packing']?.toString() ?? '',
       boxes: double.tryParse(json['boxes']?.toString() ?? '') ?? 0,
@@ -34,8 +36,6 @@ class DispatchItemDetail {
     );
   }
 }
-
-/// Nested `estimate` summary object.
 class DispatchEstimateSummary {
   final String id;
   final String estimateNumber;

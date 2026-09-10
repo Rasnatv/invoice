@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -123,6 +124,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
   // ---- Add / edit item form ----
   ActiveProductModel? _selectedProduct;
+  final _productSearchCtrl = TextEditingController();
+  final _productSearchFocus = FocusNode();
+  bool _showProductSuggestions = false;
   final _itemCompanyCtrl = TextEditingController();
   final _itemSizeCtrl = TextEditingController();
   final _itemUnitCtrl = TextEditingController();
@@ -184,6 +188,8 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     _handlingCharge.dispose();
     _notes.dispose();
     _termsConditions.dispose();
+    _productSearchCtrl.dispose();
+    _productSearchFocus.dispose();
     _itemCompanyCtrl.dispose();
     _itemSizeCtrl.dispose();
     _itemUnitCtrl.dispose();
@@ -260,10 +266,13 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   }
 
   // ---- Add-item form wiring ----
+  static String _productDisplayString(ActiveProductModel p) => '${p.name} — ${p.company}';
+
   void _onProductSelected(ActiveProductModel? product) {
     setState(() {
       _selectedProduct = product;
       if (product != null) {
+        _productSearchCtrl.text = _productDisplayString(product);
         _itemCompanyCtrl.text = product.company;
         _itemSizeCtrl.text = product.size;
         _itemUnitCtrl.text = product.unit;
@@ -278,6 +287,16 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
       }
     });
     _scheduleIncentiveFetch();
+  }
+
+  /// Clears the product search box itself — used by the field's clear
+  /// button and whenever the whole item form resets. Plain deselection
+  /// (user edits the typed text without picking a fresh option) goes
+  /// through `_onProductSelected(null)` instead and leaves the typed
+  /// text alone so they can keep searching.
+  void _clearProductSelection() {
+    _productSearchCtrl.clear();
+    _onProductSelected(null);
   }
 
   void _scheduleIncentiveFetch() {
@@ -312,6 +331,8 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     setState(() {
       _selectedProduct = null;
       _editingItemIndex = null;
+      _showProductSuggestions = false;
+      _productSearchCtrl.clear();
       _itemCompanyCtrl.clear();
       _itemSizeCtrl.clear();
       _itemUnitCtrl.clear();
@@ -390,6 +411,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     setState(() {
       _editingItemIndex = index;
       _selectedProduct = match;
+      _showProductSuggestions = false;
+      _productSearchCtrl.text =
+      match != null ? _productDisplayString(match) : item.name;
       _itemCompanyCtrl.text = match?.company ?? item.company;
       _itemSizeCtrl.text = item.size;
       _itemUnitCtrl.text = item.unit;
@@ -912,39 +936,95 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         }
 
         final products = state.products;
-        final selected =
-        _selectedProduct != null && products.any((p) => p.id == _selectedProduct!.id)
-            ? _selectedProduct
-            : null;
+        final query = _productSearchCtrl.text.trim().toLowerCase();
+        final filtered = query.isEmpty
+            ? products
+            : products.where((p) {
+          return p.name.toLowerCase().contains(query) ||
+              p.company.toLowerCase().contains(query) ||
+              p.size.toLowerCase().contains(query);
+        }).toList();
 
         return LabeledField(
           label: 'Select Product',
-          field: DropdownButtonFormField<ActiveProductModel>(
-            value: selected,
-            isExpanded: true,
-            icon: const Icon(Icons.arrow_drop_down),
-            decoration: InputDecoration(
-              hintText: 'Choose a product',
-              prefixIcon: const Icon(Icons.inventory_2_outlined),
-              filled: true,
-              fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+          field: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _productSearchCtrl,
+                focusNode: _productSearchFocus,
+                decoration: InputDecoration(
+                  hintText: 'Type a product name…',
+                  prefixIcon: const Icon(Icons.inventory_2_outlined),
+                  suffixIcon: _productSearchCtrl.text.isEmpty
+                      ? null
+                      : IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: 'Clear',
+                    onPressed: _clearProductSelection,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                ),
+                onChanged: (text) {
+                  if (_selectedProduct != null &&
+                      text != _productDisplayString(_selectedProduct!)) {
+                    _onProductSelected(null);
+                  }
+                  setState(() {
+                    _showProductSuggestions = text.trim().isNotEmpty;
+                  });
+                },
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-            ),
-            items: products
-                .map((p) => DropdownMenuItem(
-              value: p,
-              child: Text('${p.name} — ${p.company}', overflow: TextOverflow.ellipsis),
-            ))
-                .toList(),
-            onChanged: _onProductSelected,
+              if (_showProductSuggestions) ...[
+                SizedBox(height: Responsive.h(6)),
+                Container(
+                  constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: filtered.isEmpty
+                      ? Padding(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    child: Text('No matching products', style: AppTextStyles.caption()),
+                  )
+                      : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final p = filtered[index];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.inventory_2_outlined, size: 18),
+                        title: Text(p.name, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(
+                          '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () {
+                          _onProductSelected(p);
+                          setState(() => _showProductSuggestions = false);
+                          _productSearchFocus.unfocus();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
           ),
         );
       },

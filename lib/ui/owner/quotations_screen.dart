@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -8,9 +7,30 @@ import 'package:tileshop/ui/owner/quotation_detail_screen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_bloic.dart';
+import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_bloc.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_event.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotations_state.dart';
+
+// Shared status -> color mapping so every quotation status badge (across
+// the list and detail screens) reads the same way. Falls back to
+// AppColors.primary for any status the API sends that isn't recognized
+// here, rather than silently looking "unstyled".
+Color quotationStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'approved':
+      return Colors.green;
+    case 'submitted':
+    case 'pending':
+    case 'sent':
+      return Colors.orange;
+    case 'rejected':
+      return Colors.red;
+    case 'draft':
+      return Colors.blueGrey;
+    default:
+      return AppColors.primary;
+  }
+}
 
 class OwnerQuotationsScreen extends StatelessWidget {
   const OwnerQuotationsScreen({super.key});
@@ -301,6 +321,8 @@ class _QuotationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = quotationStatusColor(quotation.status);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -328,10 +350,13 @@ class _QuotationCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.textSecondary.withOpacity(0.12),
+                    color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(quotation.status, style: AppTextStyles.caption()),
+                  child: Text(
+                    quotation.status.isEmpty ? '-' : quotation.status,
+                    style: AppTextStyles.caption(color: statusColor),
+                  ),
                 ),
               ],
             ),
