@@ -17,8 +17,7 @@ class DashboardShell extends StatelessWidget {
   static const _screens = [
     DashboardHomeScreen(),
     MyEstimatesScreen(),
-    OwnerdespatchScreen(),
-    //SalesmanDispatchListScreen(),
+    SalesmanDispatchListScreen(),
     ProfileScreen(),
   ];
 

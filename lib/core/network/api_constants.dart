@@ -214,4 +214,7 @@ class ApiConstants {
 
   //cancel quottation
 static const String quotationsCancel='/quotations/cancel';
+
+//owner all sitevisit get
+  static const String siteVisitsAll = '/site-visits/all';
 }

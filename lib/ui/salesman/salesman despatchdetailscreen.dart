@@ -1,3 +1,5 @@
+
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -13,10 +15,9 @@ import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_bloc.dart';
 import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_event.dart';
 import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_state.dart';
 
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/owner_despatchdetailmodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../widgets/signaturecontroller.dart';
-
 
 class SalesmanDispatchDetailScreen extends StatelessWidget {
   const SalesmanDispatchDetailScreen({super.key, required this.dispatchId});
@@ -41,10 +42,9 @@ class _SalesmanDispatchDetailView extends StatefulWidget {
 }
 
 class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView> {
-  final _customerSigCtrl = SignaturePadController();
-  final _driverSigCtrl = SignaturePadController();
-
-  // Picked image files, used as an alternative to drawing on the pad.
+  // Signature capture is upload-only (no draw pad) and optional — the
+  // salesman can mark a dispatch delivered with either, both, or neither
+  // signature attached.
   File? _customerSigFile;
   File? _driverSigFile;
   final _picker = ImagePicker();
@@ -53,16 +53,18 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child:Scaffold(
+    return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Dispatch Details', style: AppTextStyles.h6())),
+      appBar: AppBar(
+        title: Text('Dispatch Bill Details', style: AppTextStyles.h6()),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
       body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
         listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
         listener: (context, state) {
           if (state.actionStatus == DispatchActionStatus.success) {
             AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
-            _customerSigCtrl.clear();
-            _driverSigCtrl.clear();
             setState(() {
               _customerSigFile = null;
               _driverSigFile = null;
@@ -188,9 +190,11 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
               children: [
                 SizedBox(width: 24, child: Text('#', style: AppTextStyles.captionnew())),
                 Expanded(flex: 3, child: Text('Item', style: AppTextStyles.captionnew())),
+                Expanded(flex: 2, child: Text('Company', style: AppTextStyles.captionnew())),
                 Expanded(flex: 2, child: Text('Size', style: AppTextStyles.captionnew())),
-                SizedBox(width: 44, child: Text('Box', style: AppTextStyles.captionnew())),
-                SizedBox(width: 44, child: Text('Pcs', style: AppTextStyles.captionnew())),
+                SizedBox(width: 40, child: Text('Box', style: AppTextStyles.captionnew())),
+                SizedBox(width: 40, child: Text('Pcs', style: AppTextStyles.captionnew())),
+                SizedBox(width: 48, child: Text('Qty', style: AppTextStyles.captionnew())),
               ],
             ),
           ),
@@ -208,11 +212,20 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
                   ),
                   Expanded(
                     flex: 2,
+                    child: Text(
+                      d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
+                      style: AppTextStyles.body(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
                     child: Text(d.items[i].productSize,
                         style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
                   ),
-                  SizedBox(width: 44, child: Text(d.items[i].boxes.toStringAsFixed(0), style: AppTextStyles.body())),
-                  SizedBox(width: 44, child: Text(d.items[i].pieces.toStringAsFixed(0), style: AppTextStyles.body())),
+                  SizedBox(width: 40, child: Text(d.items[i].boxes.toStringAsFixed(0), style: AppTextStyles.body())),
+                  SizedBox(width: 40, child: Text(d.items[i].pieces.toStringAsFixed(0), style: AppTextStyles.body())),
+                  SizedBox(width: 48, child: Text(d.items[i].quantity.toStringAsFixed(0), style: AppTextStyles.body())),
                 ],
               ),
             ),
@@ -222,8 +235,8 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   }
 
   /// Pending -> "Mark as In Transit" button.
-  /// In transit -> two signature capture blocks (draw OR upload) + "Mark as Delivered".
-  /// Delivered -> read-only signatures, no actions.
+  /// In transit -> two OPTIONAL signature upload blocks + "Mark as Delivered".
+  /// Delivered -> read-only signatures (server-hosted image URLs), no actions.
   Widget _actionSection(BuildContext context, DispatchDetail d, bool isActing) {
     if (d.isDelivered) {
       return Column(
@@ -243,18 +256,19 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Capture Signatures', style: AppTextStyles.h3()),
+          SizedBox(height: Responsive.h(4)),
+          Text('Optional — you can mark as delivered without these.',
+              style: AppTextStyles.caption()),
           SizedBox(height: Responsive.h(10)),
-          _signatureCaptureBlock(
-            label: 'Customer Signature',
-            controller: _customerSigCtrl,
+          _signatureUploadBlock(
+            label: 'Customer Signature (optional)',
             file: _customerSigFile,
             onPick: () => _pickSignatureImage(isCustomer: true),
             onClearFile: () => setState(() => _customerSigFile = null),
           ),
           SizedBox(height: Responsive.h(18)),
-          _signatureCaptureBlock(
-            label: 'Driver Signature',
-            controller: _driverSigCtrl,
+          _signatureUploadBlock(
+            label: 'Driver Signature (optional)',
             file: _driverSigFile,
             onPick: () => _pickSignatureImage(isCustomer: false),
             onClearFile: () => setState(() => _driverSigFile = null),
@@ -291,11 +305,10 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     );
   }
 
-  /// Either the drawing pad, or a preview of the picked image — plus a
-  /// button to switch to "upload instead" / "draw instead".
-  Widget _signatureCaptureBlock({
+  /// Upload-only signature block: shows a picked-image preview, or a tap
+  /// target to pick one from the gallery. No drawing option.
+  Widget _signatureUploadBlock({
     required String label,
-    required SignaturePadController controller,
     required File? file,
     required VoidCallback onPick,
     required VoidCallback onClearFile,
@@ -306,31 +319,34 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
         Text(label, style: AppTextStyles.caption()),
         SizedBox(height: Responsive.h(6)),
         if (file != null)
-          _pickedImagePreview(file, onClear: () {
-            onClearFile();
-            controller.clear();
-          })
+          _pickedImagePreview(file, onClear: onClearFile)
         else
-          SignaturePad(controller: controller),
-        SizedBox(height: Responsive.h(6)),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () {
-              if (file != null) {
-                onClearFile(); // switch back to drawing
-              } else {
-                onPick();
-              }
-            },
-            icon: Icon(
-              file != null ? Icons.edit_rounded : Icons.upload_file_rounded,
-              size: 18,
-            ),
-            label: Text(file != null ? 'Draw signature instead' : 'Upload signature image instead'),
-          ),
-        ),
+          _uploadPlaceholder(onTap: onPick),
       ],
+    );
+  }
+
+  Widget _uploadPlaceholder({required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 100,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.upload_file_rounded, size: 22),
+            SizedBox(height: Responsive.h(4)),
+            Text('Tap to upload signature image', style: AppTextStyles.caption()),
+          ],
+        ),
+      ),
     );
   }
 
@@ -363,21 +379,43 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     );
   }
 
-  Widget _signatureImage(String label, String? base64Data) {
+  /// Renders an already-saved signature. The mark-delivered API returns
+  /// these as plain hosted image URLs (e.g.
+  /// "https://.../storage/signatures/xxx.png") rather than base64 data
+  /// URIs, so we branch on that; base64 handling stays as a fallback for
+  /// any older records that still carry a data URI.
+  Widget _signatureImage(String label, String? sigData) {
     Widget content;
-    if (base64Data == null || base64Data.isEmpty) {
+
+    if (sigData == null || sigData.isEmpty) {
+      content = _placeholderBox('Not captured');
+    } else if (sigData.startsWith('http://') || sigData.startsWith('https://')) {
       content = Container(
         height: 100,
-        alignment: Alignment.center,
+        width: double.infinity,
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Text('Not captured', style: AppTextStyles.caption()),
+        child: Image.network(
+          sigData,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const Center(
+              child: SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => _placeholderBox('Could not load signature'),
+        ),
       );
     } else {
       try {
-        final raw = base64Data.contains(',') ? base64Data.split(',').last : base64Data;
+        final raw = sigData.contains(',') ? sigData.split(',').last : sigData;
         content = Container(
           height: 100,
           width: double.infinity,
@@ -388,15 +426,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
           child: Image.memory(base64Decode(raw), fit: BoxFit.contain),
         );
       } catch (_) {
-        content = Container(
-          height: 100,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text('Could not load signature', style: AppTextStyles.caption()),
-        );
+        content = _placeholderBox('Could not load signature');
       }
     }
 
@@ -407,6 +437,18 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
         SizedBox(height: Responsive.h(6)),
         content,
       ],
+    );
+  }
+
+  Widget _placeholderBox(String text) {
+    return Container(
+      height: 100,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(text, style: AppTextStyles.caption()),
     );
   }
 
@@ -437,49 +479,23 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     return 'data:image/png;base64,$base64Str';
   }
 
-  void _confirmMarkInTransit(BuildContext context, String id) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Mark as In Transit?'),
-        content: const Text('This confirms the dispatch has left for delivery.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogCtx);
-              context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+  void _confirmMarkInTransit(BuildContext context, String id) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Mark as In Transit?',
+      message: 'This confirms the dispatch has left for delivery.',
+      confirmText: 'Confirm',
     );
+    if (confirmed) {
+      context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
+    }
   }
 
+  /// Signatures are optional — whatever was (or wasn't) uploaded just gets
+  /// sent straight through. No blocking validation here.
   Future<void> _confirmMarkDelivered(BuildContext context, String id) async {
-    // Prefer an uploaded image if present, otherwise fall back to the
-    // drawn signature on the pad.
-    String? customerSig;
-    String? driverSig;
-
-    if (_customerSigFile != null) {
-      customerSig = await _fileToBase64(_customerSigFile);
-    } else if (!_customerSigCtrl.isEmpty) {
-      customerSig = await _customerSigCtrl.exportBase64();
-    }
-
-    if (_driverSigFile != null) {
-      driverSig = await _fileToBase64(_driverSigFile);
-    } else if (!_driverSigCtrl.isEmpty) {
-      driverSig = await _driverSigCtrl.exportBase64();
-    }
-
-    if (customerSig == null || driverSig == null) {
-      if (!context.mounted) return;
-      AppSnackbar.error('Please capture or upload both signatures before proceeding.');
-      return;
-    }
+    final customerSig = await _fileToBase64(_customerSigFile);
+    final driverSig = await _fileToBase64(_driverSigFile);
 
     if (!context.mounted) return;
     context.read<DispatchDetailBloc>().add(MarkDeliveredRequested(

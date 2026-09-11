@@ -33,7 +33,7 @@ class ApprovedEstimateTile extends StatelessWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.success.withOpacity(0.1),
-                child: Icon(Icons.local_shipping_outlined, color: AppColors.success, size: 20),
+                child: Icon(Icons.description_outlined, color: AppColors.success, size: 20),
               ),
               SizedBox(width: Responsive.w(12)),
               Expanded(

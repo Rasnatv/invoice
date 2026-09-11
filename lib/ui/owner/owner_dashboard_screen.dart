@@ -21,6 +21,7 @@ import 'owner_driverpage.dart';
 import 'owner_estimates_screen.dart';
 import 'ownercreateesimatescreen.dart';
 import 'ownerestuimatedetailscreen.dart';
+import 'ownergetallsitevisitpage.dart';
 import 'ownerincentivesummarypage.dart';
 import 'ownersalesmanscreen.dart';
 import 'quotations_screen.dart';
@@ -93,7 +94,7 @@ class _OwnerDashboardView extends StatelessWidget {
                         height: Responsive.h(100),
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
-                          itemCount: 12,
+                          itemCount: 13,
                           separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
                           itemBuilder: (context, i) {
                             final actions = <_QuickActionData>[
@@ -170,6 +171,12 @@ class _OwnerDashboardView extends StatelessWidget {
                                 color: const Color(0xFF16A34A),
                                 onTap: ()
                                 => _open(context, const FieldStaffIncentiveScreen()),
+                              ),
+                              _QuickActionData(
+                                icon: Icons.location_on_outlined,
+                                label: 'Site Vists',
+                                color: const Color(0xFF0EA5E9),
+                                onTap: () => _open(context, const OwnerGetAllSiteVisitPage()),
                               ),
                             ];
                             final a = actions[i];

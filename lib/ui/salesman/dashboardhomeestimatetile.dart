@@ -69,6 +69,8 @@ class DashboardRecentEstimateTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
                   ),
+                  SizedBox(height: Responsive.h(2)),
+                  Text(estimate.dateFormatted,style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(11)),)
                 ],
               ),
             ),

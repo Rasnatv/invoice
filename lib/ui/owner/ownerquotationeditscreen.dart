@@ -13,22 +13,10 @@ import '../../core/utils/responsive.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
-
 import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../models/salesmanmodels/quotationupdatemodel.dart';
 
-/// Owner's own edit screen for an existing quotation/estimate.
-///
-/// Structurally mirrors the salesman QuotationEditScreen (same prefill
-/// approach, same item add/edit form, same totals block) but:
-///   * runs on its own OwnerQuotationEditBloc instead of reusing
-///     SalesmanEstimateBloc / SalesmanQuotationBloc,
-///   * leaves customer details editable (the salesman screen locks them
-///     with IgnorePointer — the owner is allowed to correct them),
-///   * submits via the SAME POST /quotations/update endpoint and the SAME
-///     QuotationUpdateRequest/QuotationUpdateItemRequest models, so the
-///     backend contract is unchanged.
 class OwnerQuotationEditScreen extends StatelessWidget {
   const OwnerQuotationEditScreen({super.key, required this.estimate});
 
@@ -46,9 +34,7 @@ class OwnerQuotationEditScreen extends StatelessWidget {
   }
 }
 
-/// One editable line item, covering both pre-existing items and brand
-/// new ones added here. Only product_id / quantity / rate ever go back to
-/// /quotations/update; company/size/MRP are display-only.
+
 class _OwnerEditItem {
   const _OwnerEditItem({
     required this.id,
