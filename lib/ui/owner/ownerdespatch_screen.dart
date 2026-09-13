@@ -88,13 +88,19 @@ class _OwnerdespatchView extends StatelessWidget {
                       itemCount: list.length,
                       itemBuilder: (context, i) {
                         final dispatch = list[i];
-                        return GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => OwnerDispatchDetailScreen(dispatchId: dispatch.id),
-                            ),
-                          ),
+                        return
+                          GestureDetector(
+                            onTap: () async {
+                              final changed = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => OwnerDispatchDetailScreen(dispatchId: dispatch.id),
+                                ),
+                              );
+                              if (changed == true && context.mounted) {
+                                context.read<DispatchListBloc>().add(const RefreshDispatchList());
+                              }
+                            },
                           child: DispatchCard(dispatch: dispatch),
                         );
                       },

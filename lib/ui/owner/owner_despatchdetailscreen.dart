@@ -48,84 +48,108 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
   File? _driverSigFile;
   final _picker = ImagePicker();
 
+  // NEW: becomes true once a mark-in-transit / mark-delivered call
+  // succeeds. We hand this back to the list screen via Navigator.pop so
+  // it knows to re-fetch instead of showing a stale status.
+  bool _statusChanged = false;
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child:Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Dispatch Details', style: AppTextStyles.h6())),
-      body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
-        listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
-        listener: (context, state) {
-          if (state.actionStatus == DispatchActionStatus.success) {
-            AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
-            setState(() {
-              _customerSigFile = null;
-              _driverSigFile = null;
-            });
-            context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
-          } else if (state.actionStatus == DispatchActionStatus.failure) {
-            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
-            context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
-          }
-        },
-        builder: (context, state) {
-          if (state.status == DispatchDetailStatus.initial ||
-              state.status == DispatchDetailStatus.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state.status == DispatchDetailStatus.failure && state.dispatch == null) {
-            return _ErrorView(
-              message: state.errorMessage ?? 'Failed to load dispatch bill',
-              onRetry: () => context
-                  .read<DispatchDetailBloc>()
-                  .add(FetchDispatchDetail(widget.dispatchId)),
-            );
-          }
-
-          final dispatch = state.dispatch!;
-          final isActing = state.actionStatus == DispatchActionStatus.inProgress;
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              final bloc = context.read<DispatchDetailBloc>();
-              bloc.add(RefreshDispatchDetail(widget.dispatchId));
-              await bloc.stream.firstWhere(
-                    (s) => s.status == DispatchDetailStatus.success || s.status == DispatchDetailStatus.failure,
-              );
+    // NEW: WillPopScope intercepts BOTH the AppBar back arrow (whose
+    // onPressed also calls Navigator.pop below) and the system back
+    // gesture/button, making sure _statusChanged is always passed back.
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, _statusChanged);
+        return false;
+      },
+      child: NetworkAwareWrapper(
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text('Dispatch Details', style: AppTextStyles.h6()),
+            // NEW: custom back button so a direct tap also carries the flag.
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context, _statusChanged),
+            ),
+          ),
+          body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
+            listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
+            listener: (context, state) {
+              if (state.actionStatus == DispatchActionStatus.success) {
+                _statusChanged = true; // NEW
+                AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
+                setState(() {
+                  _customerSigFile = null;
+                  _driverSigFile = null;
+                });
+                context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
+              } else if (state.actionStatus == DispatchActionStatus.failure) {
+                AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
+                context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
+              }
             },
-            child: ListView(
-              padding: EdgeInsets.all(Responsive.w(18)),
-              children: [
-                _StatusBanner(dispatch: dispatch),
-                SizedBox(height: Responsive.h(16)),
-                _infoCard(dispatch),
-                SizedBox(height: Responsive.h(18)),
-                Text('Items', style: AppTextStyles.h3()),
-                SizedBox(height: Responsive.h(10)),
-                _itemsTable(dispatch),
-                SizedBox(height: Responsive.h(16)),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            builder: (context, state) {
+              if (state.status == DispatchDetailStatus.initial ||
+                  state.status == DispatchDetailStatus.loading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (state.status == DispatchDetailStatus.failure && state.dispatch == null) {
+                return _ErrorView(
+                  message: state.errorMessage ?? 'Failed to load dispatch bill',
+                  onRetry: () => context
+                      .read<DispatchDetailBloc>()
+                      .add(FetchDispatchDetail(widget.dispatchId)),
+                );
+              }
+
+              final dispatch = state.dispatch!;
+              final isActing = state.actionStatus == DispatchActionStatus.inProgress;
+
+              return RefreshIndicator(
+                onRefresh: () async {
+                  final bloc = context.read<DispatchDetailBloc>();
+                  bloc.add(RefreshDispatchDetail(widget.dispatchId));
+                  await bloc.stream.firstWhere(
+                        (s) => s.status == DispatchDetailStatus.success || s.status == DispatchDetailStatus.failure,
+                  );
+                },
+                child: ListView(
+                  padding: EdgeInsets.all(Responsive.w(18)),
                   children: [
-                    Text('Grand Total', style: AppTextStyles.bodyBold()),
-                    Text(
-                      _currency(dispatch.grandTotal),
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)
-                          .copyWith(fontSize: Responsive.sp(16)),
+                    _StatusBanner(dispatch: dispatch),
+                    SizedBox(height: Responsive.h(16)),
+                    _infoCard(dispatch),
+                    SizedBox(height: Responsive.h(18)),
+                    Text('Items', style: AppTextStyles.h3()),
+                    SizedBox(height: Responsive.h(10)),
+                    _itemsTable(dispatch),
+                    SizedBox(height: Responsive.h(16)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Grand Total', style: AppTextStyles.bodyBold()),
+                        Text(
+                          _currency(dispatch.grandTotal),
+                          style: AppTextStyles.bodyBold(color: AppColors.primary)
+                              .copyWith(fontSize: Responsive.sp(16)),
+                        ),
+                      ],
                     ),
+                    SizedBox(height: Responsive.h(22)),
+                    _actionSection(context, dispatch, isActing),
                   ],
                 ),
-                SizedBox(height: Responsive.h(22)),
-                _actionSection(context, dispatch, isActing),
-              ],
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
-    ));
+    );
   }
 
   // ---------- sections ----------
@@ -167,6 +191,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       ),
     );
   }
+
   Widget _itemsTable(DispatchDetail d) {
     return Container(
       decoration: BoxDecoration(
@@ -472,7 +497,6 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     final base64Str = base64Encode(bytes);
     return 'data:image/png;base64,$base64Str';
   }
-
 
   void _confirmMarkInTransit(BuildContext context, String id) async {
     final confirmed = await showConfirmDialog(
