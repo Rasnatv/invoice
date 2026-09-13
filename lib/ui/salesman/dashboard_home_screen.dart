@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
@@ -34,51 +35,81 @@ class DashboardHomeScreen extends StatelessWidget {
 class _DashboardHomeView extends StatelessWidget {
   const _DashboardHomeView();
 
-  void _openCreateEstimate(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CreateEstimateScreen()),
-    );
+
+  // void _openCreateEstimate(BuildContext context) async {
+  //   final created = await Navigator.of(context).push<bool>(
+  //     MaterialPageRoute(builder: (_) => const CreateEstimateScreen()),
+  //   );
+  //   if (created == true && context.mounted) {
+  //     context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
+  //   }
+  // }
+  //
+  // void _openMyEstimates(BuildContext context) {
+  //   Navigator.of(context).push(
+  //     MaterialPageRoute(builder: (_) => const MyEstimatesScreen()),
+  //   );
+  // }
+  //
+  // void _openIncentives(BuildContext context, DashboardHomeState state) {
+  //
+  //   Navigator.of(context).push(
+  //     MaterialPageRoute(
+  //       builder: (_) => const OwnerSalesmanIncentiveScreen(
+  //         isOwner: false,
+  //       ),
+  //     ),
+  //   );
+  // }
+  //
+  // void _openApprovedBills(BuildContext context) {
+  //   Navigator.of(context).push(
+  //     MaterialPageRoute(builder: (_) => const ApprovedBills()),
+  //   );
+  // }
+  //
+  // void _openQuotationBills(BuildContext context) {
+  //   Navigator.of(context).push(
+  //     MaterialPageRoute(builder: (_) => const QuotationListScreen()),
+  //   );
+  // }
+  //
+  // // Opens the estimate detail screen for a tapped recent-estimate tile.
+  // // Uses /estimates/show directly with the dashboard's own estimate id —
+  // // no id-space mismatch here (unlike QuotationPreviewScreen, which needed
+  // // a quotation-table id, not an estimate id). EstimateDetailsScreen
+  // // creates and owns its own EstimateDetailBloc internally, so no
+  // // BlocProvider wiring is needed at the call site.
+  // void _openEstimateDetail(BuildContext context, String id) {
+  //   Navigator.of(context).push(
+  //     MaterialPageRoute(builder: (_) => SalesmanEstimateDetailsScreen(id: id)),
+  //   );
+  // }
+  void _openCreateEstimate(BuildContext context) async {
+    final created = await context.push<bool>('/create-estimate');
+    if (created == true && context.mounted) {
+      context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
+    }
   }
 
   void _openMyEstimates(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const MyEstimatesScreen()),
-    );
+    context.push('/my-estimates');
   }
 
   void _openIncentives(BuildContext context, DashboardHomeState state) {
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const OwnerSalesmanIncentiveScreen(
-          isOwner: false,
-        ),
-      ),
-    );
+    context.push('/incentives');
   }
 
   void _openApprovedBills(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ApprovedBills()),
-    );
+    context.push('/approved-bills');
   }
 
   void _openQuotationBills(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const QuotationListScreen()),
-    );
+    context.push('/quotation-bills');
   }
 
-  // Opens the estimate detail screen for a tapped recent-estimate tile.
-  // Uses /estimates/show directly with the dashboard's own estimate id —
-  // no id-space mismatch here (unlike QuotationPreviewScreen, which needed
-  // a quotation-table id, not an estimate id). EstimateDetailsScreen
-  // creates and owns its own EstimateDetailBloc internally, so no
-  // BlocProvider wiring is needed at the call site.
   void _openEstimateDetail(BuildContext context, String id) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SalesmanEstimateDetailsScreen(id: id)),
-    );
+    context.push('/estimate-detail/$id');
   }
 
   @override

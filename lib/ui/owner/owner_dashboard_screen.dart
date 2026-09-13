@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/owner/report/ownerreportscreen.dart';
@@ -97,86 +98,166 @@ class _OwnerDashboardView extends StatelessWidget {
                           itemCount: 13,
                           separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
                           itemBuilder: (context, i) {
+                            // final actions = <_QuickActionData>[
+                            //   _QuickActionData(
+                            //     icon: Icons.note_add_rounded,
+                            //     label: 'Create\nEstimate',
+                            //     color: AppColors.primary,
+                            // onTap: () => _open(context, const OwnerCreateEstimateScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.receipt_long_rounded,
+                            //     label: 'Estimates',
+                            //     color: const Color(0xFF0EA5E9),
+                            //     onTap: () => _open(context, const OwnerEstimatesScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.request_quote_outlined,
+                            //     label: 'Quotations',
+                            //     color: const Color(0xFFF59E0B),
+                            //     onTap: () => _open(context, const OwnerQuotationsScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.bar_chart_rounded,
+                            //     label: 'Reports',
+                            //     color: const Color(0xFF16A34A),
+                            //     onTap: ()
+                            //     => _open(context, const OwnerReportsScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.monetization_on,
+                            //     label: 'Incentive',
+                            //     color: const Color(0xFFA02CE1),
+                            //     onTap: () => _open(context, const OwnerSalesmanIncentiveScreen(isOwner: true)),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.inventory_2_outlined,
+                            //     label: 'Product Setup',
+                            //     color: const Color(0xFF9F1A49),
+                            //     onTap: () => _open(context, const IncentiveManagementScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.calendar_month,
+                            //     label: ' Monthely Target',
+                            //     color: const Color(0xFF1EBA95),
+                            //     onTap: () => _open(context, const AddIncentiveScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.badge_outlined,
+                            //     label: 'Designations',
+                            //     color: const Color(0xFF0EA5E9),
+                            //     onTap: () => _open(context, const DesignationListPage()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.groups_2_outlined,
+                            //     label: 'Salesmen',
+                            //     color: const Color(0xFFEC4899),
+                            //     onTap: () => _open(context, const OwnerSalesmenScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.local_shipping_rounded,
+                            //     label: 'Driver',
+                            //     color: const Color(0xFF06B6D4),
+                            //     onTap: () => _open(context, const OwnerDriverScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.assignment_ind_rounded,
+                            //     label: 'Field Staff',
+                            //     color: const Color(0xFF0B4718),
+                            //     onTap: () => _open(context, const OwnerAddFieldStaffScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.bar_chart_rounded,
+                            //     label: 'Fieldstaff incentive',
+                            //     color: const Color(0xFF16A34A),
+                            //     onTap: ()
+                            //     => _open(context, const FieldStaffIncentiveScreen()),
+                            //   ),
+                            //   _QuickActionData(
+                            //     icon: Icons.location_on_outlined,
+                            //     label: 'Site Vists',
+                            //     color: const Color(0xFF0EA5E9),
+                            //     onTap: () => _open(context, const OwnerGetAllSiteVisitPage()),
+                            //   ),
+                            // ];
                             final actions = <_QuickActionData>[
                               _QuickActionData(
                                 icon: Icons.note_add_rounded,
                                 label: 'Create\nEstimate',
                                 color: AppColors.primary,
-                            onTap: () => _open(context, const OwnerCreateEstimateScreen()),
+                                onTap: () => context.push('/owner/create-estimate'),
                               ),
                               _QuickActionData(
                                 icon: Icons.receipt_long_rounded,
                                 label: 'Estimates',
                                 color: const Color(0xFF0EA5E9),
-                                onTap: () => _open(context, const OwnerEstimatesScreen()),
+                                onTap: () => context.push('/owner/estimates'),
                               ),
                               _QuickActionData(
                                 icon: Icons.request_quote_outlined,
                                 label: 'Quotations',
                                 color: const Color(0xFFF59E0B),
-                                onTap: () => _open(context, const OwnerQuotationsScreen()),
+                                onTap: () => context.push('/owner/quotations'),
                               ),
                               _QuickActionData(
                                 icon: Icons.bar_chart_rounded,
                                 label: 'Reports',
                                 color: const Color(0xFF16A34A),
-                                onTap: ()
-                                => _open(context, const OwnerReportsScreen()),
+                                onTap: () => context.push('/owner/reports'),
                               ),
                               _QuickActionData(
                                 icon: Icons.monetization_on,
                                 label: 'Incentive',
                                 color: const Color(0xFFA02CE1),
-                                onTap: () => _open(context, const OwnerSalesmanIncentiveScreen(isOwner: true)),
+                                onTap: () => context.push('/owner/incentives'),
                               ),
                               _QuickActionData(
                                 icon: Icons.inventory_2_outlined,
                                 label: 'Product Setup',
                                 color: const Color(0xFF9F1A49),
-                                onTap: () => _open(context, const IncentiveManagementScreen()),
+                                onTap: () => context.push('/owner/product-setup'),
                               ),
                               _QuickActionData(
                                 icon: Icons.calendar_month,
                                 label: ' Monthely Target',
                                 color: const Color(0xFF1EBA95),
-                                onTap: () => _open(context, const AddIncentiveScreen()),
+                                onTap: () => context.push('/owner/monthly-target'),
                               ),
                               _QuickActionData(
                                 icon: Icons.badge_outlined,
                                 label: 'Designations',
                                 color: const Color(0xFF0EA5E9),
-                                onTap: () => _open(context, const DesignationListPage()),
+                                onTap: () => context.push('/owner/designation-list'),
                               ),
                               _QuickActionData(
                                 icon: Icons.groups_2_outlined,
                                 label: 'Salesmen',
                                 color: const Color(0xFFEC4899),
-                                onTap: () => _open(context, const OwnerSalesmenScreen()),
+                                onTap: () => context.push('/owner/salesmen'),
                               ),
                               _QuickActionData(
                                 icon: Icons.local_shipping_rounded,
                                 label: 'Driver',
                                 color: const Color(0xFF06B6D4),
-                                onTap: () => _open(context, const OwnerDriverScreen()),
+                                onTap: () => context.push('/owner/drivers'),
                               ),
                               _QuickActionData(
                                 icon: Icons.assignment_ind_rounded,
                                 label: 'Field Staff',
                                 color: const Color(0xFF0B4718),
-                                onTap: () => _open(context, const OwnerAddFieldStaffScreen()),
+                                onTap: () => context.push('/field-staff'),
                               ),
                               _QuickActionData(
                                 icon: Icons.bar_chart_rounded,
                                 label: 'Fieldstaff incentive',
                                 color: const Color(0xFF16A34A),
-                                onTap: ()
-                                => _open(context, const FieldStaffIncentiveScreen()),
+                                onTap: () => context.push('/owner/fieldstaff-incentive'),
                               ),
                               _QuickActionData(
                                 icon: Icons.location_on_outlined,
                                 label: 'Site Vists',
                                 color: const Color(0xFF0EA5E9),
-                                onTap: () => _open(context, const OwnerGetAllSiteVisitPage()),
+                                onTap: () => context.push('/owner/site-visits'),
                               ),
                             ];
                             final a = actions[i];
@@ -214,7 +295,8 @@ class _OwnerDashboardView extends StatelessWidget {
                       _SectionTitle(
                         title: 'Recent Estimates',
                         actionLabel: 'View All',
-                        onAction: () => _open(context, const OwnerEstimatesScreen()),
+                        // onAction: () => _open(context, const OwnerEstimatesScreen()),
+                        onAction: () => context.push('/owner/estimates'),
                       ),
                       SizedBox(height: Responsive.h(14)),
                       if (state.status == OwnerDashboardStatus.loading)
@@ -232,16 +314,19 @@ class _OwnerDashboardView extends StatelessWidget {
                           Column(
                             children: [
                               for (int i = 0; i < state.recentEstimates.length; i++) ...[
-                                _RecentEstimateCard(
-                                  estimate: state.recentEstimates[i],
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => OwnerEstimateDetailsScreen(
-                                        estimateId: state.recentEstimates[i].id,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                                // _RecentEstimateCard(
+                                //   estimate: state.recentEstimates[i],
+                                  // onTap: () => Navigator.of(context).push(
+                                  //   MaterialPageRoute(
+                                  //     builder: (_) => OwnerEstimateDetailsScreen(
+                                  //       estimateId: state.recentEstimates[i].id,
+                                  //     ),
+          _RecentEstimateCard(
+          estimate: state.recentEstimates[i],
+          onTap: () => context.push('/owner/estimate-detail/${state.recentEstimates[i].id}'),
+          ),
+
+
                                 if (i != state.recentEstimates.length - 1)
                                   SizedBox(height: Responsive.h(10)),
                               ],

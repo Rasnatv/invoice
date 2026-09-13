@@ -8,12 +8,10 @@ import '../../../../core/utils/responsive.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistbloc.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanownerestimatestate.dart';
+import '../../core/utils/routerobserver.dart';
 import '../../widgets/estimate_card.dart';
-// TODO: point this at wherever SalesmanEstimateDetailsScreen actually lives
-// in your tree (the file you pasted with `class SalesmanEstimateDetailsScreen
-// extends StatefulWidget`). The old 'estimates/presentation/estimate_details_screen.dart'
-// import was the leftover dummy screen and doesn't exist/match anymore.
 import 'estimatedetailscreen_forsalesman.dart';
+
 
 class MyEstimatesScreen extends StatelessWidget {
   const MyEstimatesScreen({super.key});
@@ -27,8 +25,34 @@ class MyEstimatesScreen extends StatelessWidget {
   }
 }
 
-class _MyEstimatesView extends StatelessWidget {
+class _MyEstimatesView extends StatefulWidget {
   const _MyEstimatesView();
+
+  @override
+  State<_MyEstimatesView> createState() => _MyEstimatesViewState();
+}
+
+class _MyEstimatesViewState extends State<_MyEstimatesView> with RouteAware {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  /// Fires automatically whenever a route pushed on top of this screen
+  /// (estimate details, etc.) gets popped and this screen becomes the
+  /// top-most one again — covers edits/status changes made there without
+  /// every caller needing to remember to signal back.
+  @override
+  void didPopNext() {
+    context.read<EstimatesBloc>().add(const EstimatesRefreshRequested());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +84,6 @@ class _MyEstimatesView extends StatelessWidget {
               ),
               SizedBox(height: Responsive.h(12)),
 
-              // Status tab bar - built entirely from whatever statuses the
-              // API actually returned. If the data has 2 statuses you get
-              // "All" + 2 tabs, if it has 5 you get "All" + 5 tabs.
               BlocBuilder<EstimatesBloc, SalesmanownerEstimatesState>(
                 buildWhen: (p, c) => p.filters != c.filters || p.activeFilter != c.activeFilter,
                 builder: (context, state) {
@@ -144,8 +165,6 @@ class _MyEstimatesView extends StatelessWidget {
                       itemCount: list.length,
                       itemBuilder: (context, i) => EstimateCard(
                         estimate: list[i],
-                        // Details screen takes an id, not the whole row -
-                        // pull it straight off the list item.
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => SalesmanEstimateDetailsScreen(id: list[i].id),
