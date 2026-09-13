@@ -47,8 +47,6 @@ import '../ui/owner/addfieldstaffscreen.dart';
 import '../ui/salesman/dashboard_home_screen.dart';
 import '../ui/salesman/dashboard_shell.dart';
 import '../ui/splash/splash_screen.dart';
-
-// Salesman dashboard destinations
 import '../ui/salesman/create_estimate_screen.dart';
 import '../ui/salesman/my_estimates_screen.dart';
 import '../ui/salesman/approvedbills.dart';
@@ -69,6 +67,7 @@ import '../ui/owner/ownergetallsitevisitpage.dart';
 import '../ui/owner/ownersalesmanscreen.dart';
 import '../ui/owner/quotations_screen.dart';
 import '../ui/owner/incentive_management_screen.dart';
+import '../widgets/ownerDashboardshell.dart';
 
 class AppRouter {
   AppRouter._();
@@ -124,6 +123,10 @@ class AppRouter {
       GoRoute(
         path: '/dashboard',
         builder: (context, state) => const DashboardShell(),
+      ),
+      GoRoute(
+        path: '/owner-dashboard',
+        builder: (context, state) => const Ownerdashboardshell(),
       ),
     ],
   );

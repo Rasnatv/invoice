@@ -1,5 +1,6 @@
 
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -862,7 +863,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
           if (state.submitStatus == SubmitStatus.success) {
             AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());
-            Navigator.of(context).pop();
+            context.go('/owner-dashboard');
           } else if (state.submitStatus == SubmitStatus.failure) {
             _showError(state.submitError ?? 'Something went wrong. Please try again.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());

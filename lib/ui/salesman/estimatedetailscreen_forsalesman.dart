@@ -70,12 +70,19 @@ class _EstimateDetailsView extends StatelessWidget {
     }
   }
 
-  void _openDespatchSheet(BuildContext context, EstimateDetailModel estimate) {
-    Navigator.of(context).push(
+
+  void _openDespatchSheet(BuildContext context, EstimateDetailModel estimate) async {
+    final despatched = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => OwnerDespatchSheetScreen(estimateId: estimate.id),
       ),
     );
+
+    if (despatched == true && context.mounted) {
+      // Drops this Estimate Detail screen (and the Estimates list beneath
+      // it) off the stack in one go, landing back on the dashboard shell.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   @override
