@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../bloc/profile/profile_bloc.dart';
@@ -6,7 +5,7 @@ import '../../../bloc/profile/profile_state.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../auth/login_screen.dart';
+import '../../core/utils/logout_helper.dart';
 import 'changepassword.dart';
 import 'viewprofile.dart';
 
@@ -44,8 +43,6 @@ class ProfileScreen extends StatelessWidget {
                             backgroundColor: AppColors.primarySoft,
                             child: Icon(Icons.person, size: Responsive.w(46), color: AppColors.primary),
                           ),
-
-
                         ],
                       ),
                       SizedBox(height: Responsive.h(14)),
@@ -78,12 +75,7 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.logout_rounded,
                   label: 'Logout',
                   color: AppColors.error,
-                  onTap: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          (route) => false,
-                    );
-                  },
+                  onTap: () => logout(context), // <-- uses your helper now
                 ),
               ],
             );

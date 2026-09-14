@@ -364,7 +364,7 @@ class _OwnerEstimateCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Estimate No: ${estimate.estimateNumber}',
+                    ' ${estimate.estimateNumber}',
                     style: AppTextStyles.bodyBold(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -407,7 +407,7 @@ class _OwnerEstimateCard extends StatelessWidget {
                   SizedBox(width: Responsive.w(4)),
                   Expanded(
                     child: Text(
-                      estimate.contractorName,
+                     'Contractor:${estimate.contractorName}',
                       style: AppTextStyles.caption(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

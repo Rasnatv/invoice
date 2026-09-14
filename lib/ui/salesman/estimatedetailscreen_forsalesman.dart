@@ -79,12 +79,11 @@ class _EstimateDetailsView extends StatelessWidget {
     );
 
     if (despatched == true && context.mounted) {
-      // Drops this Estimate Detail screen (and the Estimates list beneath
-      // it) off the stack in one go, landing back on the dashboard shell.
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      // Pop this Estimate Detail screen too, returning to the screen
+      // that opened it (e.g. Approved Bills) instead of the dashboard.
+      Navigator.of(context).pop(true);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);

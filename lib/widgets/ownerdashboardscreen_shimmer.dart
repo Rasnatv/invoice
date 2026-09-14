@@ -179,11 +179,10 @@ class OwnerDashboardHeaderShimmer extends StatelessWidget {
                         ],
                       ),
                     ),
-                    ShimmerWidget.circular(size: 38),
                   ],
                 ),
                 SizedBox(height: Responsive.h(14)),
-                ShimmerWidget.rectangular(width: 150, height: Responsive.sp(12), borderRadius: 4),
+               ShimmerWidget.rectangular(width: 150, height: Responsive.sp(12), borderRadius: 4),
               ],
             ),
           ),
@@ -376,22 +375,6 @@ class RecentEstimateListShimmer extends StatelessWidget {
   }
 }
 
-// ---------------- FULL-PAGE SKELETONS ----------------
-
-/// Full-screen skeleton for OwnerDashboardScreen, self-contained with its
-/// own `Scaffold` — same pattern as `SalesmanDashboardShimmer`.
-///
-/// Drop this in place of the loading branch for the very first load
-/// (before any cached data exists), returned directly ahead of the real
-/// `Scaffold`/`RefreshIndicator`:
-///
-///   if (state.isLoading) {
-///     return const OwnerDashboardShimmer();
-///   }
-///
-/// For pull-to-refresh on a screen that already has data, use
-/// [OwnerDashboardRefreshShimmer] instead — that one has no `Scaffold` of
-/// its own so it can sit inside the existing `RefreshIndicator`.
 class OwnerDashboardShimmer extends StatelessWidget {
   const OwnerDashboardShimmer({super.key});
 

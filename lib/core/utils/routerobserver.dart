@@ -1,3 +1,3 @@
-import 'package:flutter/material.dart';
-
-final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+// import 'package:flutter/material.dart';
+//
+// final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
