@@ -13,8 +13,10 @@ import '../../bloc/driverbloc/driverdashboard/driverdashboard_state.dart';
 import '../../core/utils/logout_helper.dart';
 import '../../models/drivermodels/driverdashboardmodel.dart';
 
+import '../../widgets/driverdashbaordshimmer.dart';
 import 'driverchangepswdscreen.dart';
 import 'driverdetailscreen.dart';
+
 
 
 class DriverDashboardScreen extends StatelessWidget {
@@ -130,9 +132,11 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
       backgroundColor: AppColors.background,
       body: BlocBuilder<DriverDashboardBloc, DriverDashboardState>(
         builder: (context, state) {
+          // First load (or a hard reload with nothing cached yet): show the
+          // full-screen shimmer skeleton instead of a bare spinner.
           if (state.status == DriverDashboardStatus.initial ||
               (state.status == DriverDashboardStatus.loading && state.dashboard == null)) {
-            return const Center(child: CircularProgressIndicator());
+            return const DriverDashboardShimmer();
           }
 
           if (state.status == DriverDashboardStatus.failure && state.dashboard == null) {
@@ -144,6 +148,8 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
 
           final dashboard = state.dashboard!;
           final all = _filtered(dashboard.list);
+          // Pull-to-refresh in flight, with cached data already on screen.
+          final isRefreshing = state.status == DriverDashboardStatus.loading;
 
           return RefreshIndicator(
             color: AppColors.primary,
@@ -156,7 +162,12 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
               s.status == DriverDashboardStatus.success ||
                   s.status == DriverDashboardStatus.failure);
             },
-            child: CustomScrollView(
+            // While refreshing, swap the whole body (header, search bar,
+            // and list) for the shimmer skeleton so the loading state
+            // reads as full-screen, not just the list underneath.
+            child: isRefreshing
+                ? const DriverDashboardRefreshShimmer()
+                : CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
@@ -294,8 +305,12 @@ class _DriverHeader extends StatelessWidget {
                               letterSpacing: 0.2,
                             ),
                           ),
+                          // Just spacing here — the actual date is shown in
+                          // the pill below, not duplicated in this column.
                           SizedBox(height: Responsive.h(6)),
-    ]),),
+                        ],
+                      ),
+                    ),
                     Material(
                       color: Colors.white.withValues(alpha: 0.16),
                       shape: const CircleBorder(),
@@ -333,6 +348,7 @@ class _DriverHeader extends StatelessWidget {
                     ],
                   ),
                 ),
+                SizedBox(height: Responsive.h(10)),
               ],
             ),
           ),

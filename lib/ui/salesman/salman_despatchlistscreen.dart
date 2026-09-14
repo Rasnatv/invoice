@@ -12,6 +12,7 @@ import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchbloc.dart';
 import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchevent.dart';
 import '../../bloc/ownerbloc/despatchlist/ownerlist_despatchstate.dart';
 import '../../models/owner_models/owner_despatchmodellist.dart';
+import '../../widgets/despatchcardshimmer.dart';
 
 class SalesmanDispatchListScreen extends StatelessWidget {
   const SalesmanDispatchListScreen({super.key});
@@ -34,6 +35,12 @@ class _SalesmanDispatchListView extends StatefulWidget {
 
 class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   final _searchCtrl = TextEditingController();
+
+  // True only while a manual pull-to-refresh is in flight — kept separate
+  // from the bloc's own status so the 5s auto-refresh timer and the
+  // refresh-on-return-from-detail don't also trigger the shimmer and
+  // cause the list to flicker every few seconds.
+  bool _isPullRefreshing = false;
 
   // Auto-refreshes the list periodically while this screen is visible, so
   // status changes made on the detail screen (in transit / delivered) show
@@ -77,11 +84,16 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
     // Mirrors the owner list screen: fire the refresh event, then wait for
     // the bloc to settle into success/failure so the RefreshIndicator spinner
     // stays visible for the full round-trip instead of dismissing instantly.
-    final bloc = context.read<DispatchListBloc>();
-    bloc.add(const RefreshDispatchList());
-    await bloc.stream.firstWhere(
-          (s) => s.status == DispatchListStatus.success || s.status == DispatchListStatus.failure,
-    );
+    setState(() => _isPullRefreshing = true);
+    try {
+      final bloc = context.read<DispatchListBloc>();
+      bloc.add(const RefreshDispatchList());
+      await bloc.stream.firstWhere(
+            (s) => s.status == DispatchListStatus.success || s.status == DispatchListStatus.failure,
+      );
+    } finally {
+      if (mounted) setState(() => _isPullRefreshing = false);
+    }
   }
 
   @override
@@ -115,7 +127,7 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
                   ),
                 ),
                 SizedBox(height: Responsive.h(12)),
-                Expanded(child: _buildBody(context, state)),
+                Expanded(child: _buildBody(context, state, _isPullRefreshing)),
               ],
             );
           },
@@ -124,10 +136,10 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
     ));
   }
 
-  Widget _buildBody(BuildContext context, DispatchListState state) {
+  Widget _buildBody(BuildContext context, DispatchListState state, bool isPullRefreshing) {
     if (state.status == DispatchListStatus.initial ||
         (state.status == DispatchListStatus.loading && state.allDispatches.isEmpty)) {
-      return const Center(child: CircularProgressIndicator());
+      return const DispatchListShimmer();
     }
 
     if (state.status == DispatchListStatus.failure && state.allDispatches.isEmpty) {
@@ -164,7 +176,9 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
 
     return RefreshIndicator(
       onRefresh: () => _onPullToRefresh(context),
-      child: ListView.separated(
+      child: isPullRefreshing
+          ? DispatchListShimmer(itemCount: state.filteredDispatches.length)
+          : ListView.separated(
         padding: EdgeInsets.fromLTRB(
             Responsive.w(16), 0, Responsive.w(16), Responsive.h(20)),
         itemCount: state.filteredDispatches.length,

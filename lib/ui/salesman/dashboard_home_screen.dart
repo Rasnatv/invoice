@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
+import 'package:tileshop/ui/salesman/widget/salesman_dashboardshimmer.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -15,10 +16,6 @@ import 'MONTHLYSALE.dart';
 import 'approvedbills.dart';
 import 'create_estimate_screen.dart';
 import 'dashboardhomeestimatetile.dart';
-import 'estimatedetailscreen_forsalesman.dart';
-import 'my_estimates_screen.dart';
-import 'quatationscreen.dart';
-
 
 class DashboardHomeScreen extends StatelessWidget {
   const DashboardHomeScreen({super.key});
@@ -77,10 +74,12 @@ class _DashboardHomeView extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: BlocBuilder<DashboardHomeBloc, DashboardHomeState>(
         builder: (context, state) {
-          // Full-screen loader only on the very first load.
+          // Full-screen shimmer skeleton on first load AND on manual refresh —
+          // same widget both times.
           if (state.status == DashboardHomeStatus.initial ||
-              state.status == DashboardHomeStatus.loading) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              state.status == DashboardHomeStatus.loading ||
+              state.status == DashboardHomeStatus.refreshing) {
+            return const SalesmanDashboardShimmer();
           }
 
           // Full-screen error only when we have nothing to show yet.
@@ -274,7 +273,7 @@ class _DashboardHeader extends StatelessWidget {
                         ],
                       ),
                     ),
-                   // _HeaderIconButton(icon: Icons.notifications_none_rounded, onTap: () {}),
+                    // _HeaderIconButton(icon: Icons.notifications_none_rounded, onTap: () {}),
                   ],
                 ),
                 SizedBox(height: Responsive.h(14)),

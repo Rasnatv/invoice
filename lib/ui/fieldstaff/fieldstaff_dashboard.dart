@@ -16,10 +16,12 @@ import '../../bloc/profile/profile_state.dart';
 import '../../core/utils/logout_helper.dart';
 import '../../models/fieldstaffmodels/fieldstaffsitevisitmodel.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/fieldstaffshimmerwidget.dart';
 import 'addsite.dart';
 import 'fieldstaff_incentivelistscreen.dart';
 import 'fieldstaffchangepasswordscreen.dart';
 import 'visitdetailscreen.dart';
+
 
 class FieldStaffDashboardScreen extends StatefulWidget {
   const FieldStaffDashboardScreen({super.key});
@@ -157,6 +159,16 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         builder: (context, state) {
           final todayVisits = state.todayVisits;
           final allVisits = state.allVisits;
+          final isInitialLoading = state.isListLoading && state.totalVisitsCount == 0;
+          // Pull-to-refresh or manual refresh while data already exists —
+          // shimmer the whole dashboard again, same as first load.
+          final isRefreshing = state.isListLoading && state.totalVisitsCount > 0;
+
+          // Full-screen shimmer on any load — header, stats, search,
+          // tabs, and list all skeleton together instead of real content.
+          if (isInitialLoading || isRefreshing) {
+            return const FieldStaffFullShimmer();
+          }
 
           return RefreshIndicator(
             color: AppColors.primary,
@@ -201,7 +213,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                       SizedBox(height: Responsive.h(14)),
                       if (state.listError != null)
                         Padding(
-                          padding: EdgeInsets.only(bottom: Responsive.h(10)),
+                          padding: EdgeInsets.only(top: Responsive.h(6), bottom: Responsive.h(10)),
                           child: _ListErrorBanner(
                             message: state.listError!,
                             onRetry: () => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
@@ -212,9 +224,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                 ),
                 SliverFillRemaining(
                   hasScrollBody: true,
-                  child: state.isListLoading && state.totalVisitsCount == 0
-                      ? const Center(child: CircularProgressIndicator())
-                      : TabBarView(
+                  child: TabBarView(
                     controller: _tabController,
                     children: [
                       _VisitList(
@@ -271,7 +281,6 @@ class _ListErrorBanner extends StatelessWidget {
     );
   }
 }
-
 
 class _FieldStaffHeader extends StatelessWidget {
   const _FieldStaffHeader({
@@ -428,6 +437,8 @@ class _FieldStaffHeader extends StatelessWidget {
                     ],
                   ),
                 ),
+                // Extra breathing room below the date pill.
+                SizedBox(height: Responsive.h(10)),
               ],
             ),
           ),
