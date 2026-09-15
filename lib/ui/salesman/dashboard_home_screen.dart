@@ -11,21 +11,26 @@ import '../../../core/utils/responsive.dart';
 import '../../bloc/salemanbloc/salemandashboard/salesman_dashboardbloc.dart';
 import '../../bloc/salemanbloc/salemandashboard/salesman_dashboardstate.dart';
 import '../../bloc/salemanbloc/salemandashboard/salesmandashboard_event.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistbloc.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
 import '../owner/ownerincentivesummarypage.dart';
 import 'MONTHLYSALE.dart';
 import 'approvedbills.dart';
 import 'create_estimate_screen.dart';
 import 'dashboardhomeestimatetile.dart';
 
+/// NOTE: DashboardHomeBloc is now provided by DashboardShell (above the
+/// IndexedStack) so it's shared/long-lived across tab switches — this
+/// screen no longer creates its own local instance. Do NOT re-add a
+/// BlocProvider<DashboardHomeBloc> here, or you'll end up with two
+/// separate instances (this one shadowing the shared one) and the
+/// refresh-after-create-estimate flow will silently stop working again.
 class DashboardHomeScreen extends StatelessWidget {
   const DashboardHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => DashboardHomeBloc()..add(const DashboardHomeRequested()),
-      child: const _DashboardHomeView(),
-    );
+    return const _DashboardHomeView();
   }
 }
 
@@ -36,6 +41,7 @@ class _DashboardHomeView extends StatelessWidget {
     final created = await context.push<bool>('/create-estimate');
     if (created == true && context.mounted) {
       context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
+      context.read<EstimatesBloc>().add(const EstimatesRefreshRequested());
     }
   }
 
@@ -273,7 +279,6 @@ class _DashboardHeader extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // _HeaderIconButton(icon: Icons.notifications_none_rounded, onTap: () {}),
                   ],
                 ),
                 SizedBox(height: Responsive.h(14)),
@@ -365,28 +370,6 @@ class _DashboardHeader extends StatelessWidget {
     height: 30,
     color: AppColors.textSecondary.withValues(alpha: 0.12),
   );
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.15),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(9),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-      ),
-    );
-  }
 }
 
 class _MiniStat extends StatelessWidget {

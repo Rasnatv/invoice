@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/salesman/salman_despatchlistscreen.dart';
@@ -6,11 +7,23 @@ import 'cubit/nav_cubit.dart';
 import 'my_estimates_screen.dart';
 import 'dashboard_home_screen.dart';
 import 'profile_screen.dart';
+import '../../bloc/salemanbloc/salemandashboard/salesman_dashboardbloc.dart';
+import '../../bloc/salemanbloc/salemandashboard/salesmandashboard_event.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistbloc.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
 
 /// Root shell for the Salesman Dashboard — hosts the bottom navigation
 /// bar (Dashboard / Estimates / Dispatch / Contractors / Profile) exactly
 /// as laid out across every screen in the reference screenshot, and
 /// swaps the body via [NavCubit] without losing each tab's own state.
+///
+/// [DashboardHomeBloc] and [EstimatesBloc] are provided HERE (above the
+/// IndexedStack) rather than inside DashboardHomeScreen/MyEstimatesScreen
+/// themselves, so both tabs share one long-lived bloc instance each.
+/// That lets CreateEstimateScreen's caller (_openCreateEstimate in
+/// DashboardHomeScreen) refresh both blocs after a new estimate is
+/// created, even though IndexedStack keeps both tabs alive/off-screen
+/// and never rebuilds them on tab switch.
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 
@@ -30,8 +43,12 @@ class DashboardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => NavCubit(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => NavCubit()),
+        BlocProvider(create: (_) => DashboardHomeBloc()..add(const DashboardHomeRequested())),
+        BlocProvider(create: (_) => EstimatesBloc()..add(const EstimatesLoadRequested())),
+      ],
       child: BlocBuilder<NavCubit, int>(
         builder: (context, index) {
           return Scaffold(
@@ -41,9 +58,9 @@ class DashboardShell extends StatelessWidget {
               onTap: (i) => context.read<NavCubit>().changeTab(i),
               items: _items
                   .map((item) => BottomNavigationBarItem(
-                        icon: Icon(item.icon),
-                        label: item.label,
-                      ))
+                icon: Icon(item.icon),
+                label: item.label,
+              ))
                   .toList(),
             ),
           );

@@ -9,20 +9,22 @@ import '../../../../core/utils/responsive.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistbloc.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanownerestimatestate.dart';
-import '../../core/utils/routerobserver.dart';
 import '../../widgets/estimate_card.dart';
 import 'estimatedetailscreen_forsalesman.dart';
 
-
+/// NOTE: EstimatesBloc is now provided by DashboardShell (above the
+/// IndexedStack) so it's shared/long-lived across tab switches — this
+/// screen no longer creates its own local instance. Do NOT re-add a
+/// BlocProvider<EstimatesBloc> here, or you'll end up with two separate
+/// instances (this one shadowing the shared one) and the
+/// refresh-after-create-estimate flow (fired from DashboardHomeScreen's
+/// _openCreateEstimate) will silently stop reaching this screen again.
 class MyEstimatesScreen extends StatelessWidget {
   const MyEstimatesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => EstimatesBloc()..add(const EstimatesLoadRequested()),
-      child: const _MyEstimatesView(),
-    );
+    return const _MyEstimatesView();
   }
 }
 
@@ -33,28 +35,7 @@ class _MyEstimatesView extends StatefulWidget {
   State<_MyEstimatesView> createState() => _MyEstimatesViewState();
 }
 
-class _MyEstimatesViewState extends State<_MyEstimatesView> with RouteAware {
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    //routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
-  }
-
-  @override
-  void dispose() {
-    //routeObserver.unsubscribe(this);
-    super.dispose();
-  }
-
-  /// Fires automatically whenever a route pushed on top of this screen
-  /// (estimate details, etc.) gets popped and this screen becomes the
-  /// top-most one again — covers edits/status changes made there without
-  /// every caller needing to remember to signal back.
-  @override
-  // void didPopNext() {
-  //   context.read<EstimatesBloc>().add(const EstimatesRefreshRequested());
-  // }
-
+class _MyEstimatesViewState extends State<_MyEstimatesView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -174,11 +155,19 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> with RouteAware {
                       itemCount: list.length,
                       itemBuilder: (context, i) => EstimateCard(
                         estimate: list[i],
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SalesmanEstimateDetailsScreen(id: list[i].id),
-                          ),
-                        ),
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SalesmanEstimateDetailsScreen(id: list[i].id),
+                            ),
+                          );
+                          // Refresh when returning from the detail screen,
+                          // in case its status changed there — replaces the
+                          // RouteObserver-based auto-refresh.
+                          if (context.mounted) {
+                            context.read<EstimatesBloc>().add(const EstimatesRefreshRequested());
+                          }
+                        },
                       ),
                     );
                   },

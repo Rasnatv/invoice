@@ -10,6 +10,8 @@ import 'package:tileshop/ui/salesman/widget/salesman%20estimatecreatewidget.dart
 import '../../bloc/salemanbloc/estimate/salesman_estimate_bloc.dart';
 import '../../bloc/salemanbloc/estimate/salesmanestimate_event.dart';
 import '../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
+import '../../bloc/salemanbloc/salemandashboard/salesman_dashboardbloc.dart';
+import '../../bloc/salemanbloc/salemandashboard/salesmandashboard_event.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
@@ -554,17 +556,17 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
 
     return BlocListener<SalesmanEstimateBloc, SalesmanEstimateState>(
       listenWhen: (prev, curr) => prev.submitStatus != curr.submitStatus,
-      listener: (context, state) {
-        if (state.submitStatus == SubmitStatus.success) {
-          AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
-          context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
-          // Both "Save as Quotation" and "Submit for Approval" land on the
-          // dashboard. context.go replaces the whole stack and rebuilds
-          // DashboardHomeScreen fresh (new DashboardHomeBloc,
-          // DashboardHomeRequested fired again), so the dashboard's stats
-          // and recent-estimates list are always up to date after either
-          // action — no manual pop-result/refresh wiring needed.
-          context.go('/dashboard');
+      // listener: (context, state) {
+      //   if (state.submitStatus == SubmitStatus.success) {
+      //     AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
+          // context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
+          // context.go('/salesman');
+          listener: (context, state) {
+            if (state.submitStatus == SubmitStatus.success) {
+              AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
+              context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
+              context.pop(true);   // ← ADD this instead
+
         }
         else if (state.submitStatus == SubmitStatus.failure) {
           _showError(state.submitError ?? 'Something went wrong. Please try again.');

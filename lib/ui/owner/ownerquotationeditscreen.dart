@@ -125,6 +125,17 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
   bool _backfilledFromCatalog = false;
 
+  /// Mirrors OwnerQuotationDetailsScreen._isOwner — incentive figures are
+  /// salesman-facing, so this edit screen hides the incentive preview,
+  /// incentive total, and per-item incentive amounts whenever the
+  /// quotation was created by the Owner. Salesman-created quotations
+  /// still show incentive normally, same as the details screen.
+  bool get _isOwner {
+    final label = widget.estimate.createdBy.roleLabel.trim().toLowerCase();
+    if (label.isNotEmpty) return label == 'owner';
+    return widget.estimate.createdBy.role.trim().toLowerCase() == 'owner';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -686,7 +697,8 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                       ),
                     ),
 
-                    if (_selectedProduct != null || _editingItemIndex != null) ...[
+                    // Incentive preview hidden for owner-created quotations.
+                    if (!_isOwner && (_selectedProduct != null || _editingItemIndex != null)) ...[
                       SizedBox(height: Responsive.h(8)),
                       const _OwnerIncentivePreviewCard(),
                     ],
@@ -760,6 +772,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                           item: item,
                           currency: currency,
                           isEditing: _editingItemIndex == i,
+                          // Per-item incentive line hidden for owner-created
+                          // quotations, same rule as the preview/total above.
+                          showIncentive: !_isOwner,
                           onEdit: () => _editItem(i),
                           onDelete: () => _removeItem(i),
                         );
@@ -831,7 +846,8 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                     ),
                     SizedBox(height: Responsive.h(12)),
 
-                    if (_incentiveTotal > 0)
+                    // Incentive total hidden for owner-created quotations.
+                    if (!_isOwner && _incentiveTotal > 0)
                       Container(
                         padding: EdgeInsets.all(Responsive.w(14)),
                         decoration: BoxDecoration(
@@ -1154,6 +1170,7 @@ class _OwnerEditItemTile extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.isEditing = false,
+    this.showIncentive = true,
   });
 
   final int serialNo;
@@ -1162,6 +1179,7 @@ class _OwnerEditItemTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool isEditing;
+  final bool showIncentive;
 
   @override
   Widget build(BuildContext context) {
@@ -1200,7 +1218,9 @@ class _OwnerEditItemTile extends StatelessWidget {
                       '   Rate: ${item.rate.toStringAsFixed(0)}',
                   style: AppTextStyles.caption(),
                 ),
-                if (item.incentiveEligible && item.incentiveAmount > 0) ...[
+                // Per-item incentive line hidden for owner-created
+                // quotations via showIncentive.
+                if (showIncentive && item.incentiveEligible && item.incentiveAmount > 0) ...[
                   SizedBox(height: Responsive.h(2)),
                   Row(
                     children: [

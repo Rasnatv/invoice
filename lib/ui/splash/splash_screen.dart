@@ -1,13 +1,12 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../router/dashboardrouter.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/network/tokenstorage.dart';
-import '../auth/login_screen.dart';
-import '../onboarding/onboarding_screen.dart';
 
 /// Splash / brand loading screen — modern, elegant look for Dreams Ceramic.
 /// Soft gradient backdrop, glowing logo mark, refined typography.
@@ -54,28 +53,27 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   /// 1. Valid saved session (token + role)  -> straight to that role's dashboard.
   /// 2. No session, but onboarding was seen before -> LoginScreen.
   /// 3. No session, onboarding never seen -> OnboardingScreen (shown once, ever).
+  ///
+  /// Always goes through go_router's context.go(...) — never Navigator
+  /// directly — so go_router's internal route stack stays in sync with
+  /// whatever is actually mounted. Using Navigator here would silently
+  /// desync the two, causing the destination shell to be torn down and
+  /// recreated the next time go_router navigates anywhere.
   Future<void> _navigateNext() async {
     if (!mounted) return;
 
     final token = await TokenStorage.readToken();
     final role = roleFromStoredString(await TokenStorage.readRole());
 
-    Widget destination;
+    if (!mounted) return;
+
     if (token != null && token.isNotEmpty && role != null) {
-      destination = destinationForRole(role);
+      context.go(routeForRole(role));
     } else {
       final seenOnboarding = await TokenStorage.hasSeenOnboarding();
-      destination = seenOnboarding ? const LoginScreen() : const OnboardingScreen();
+      if (!mounted) return;
+      context.go(seenOnboarding ? '/login' : '/onboarding');
     }
-
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (_, anim, __) => destination,
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-      ),
-    );
   }
 
   @override

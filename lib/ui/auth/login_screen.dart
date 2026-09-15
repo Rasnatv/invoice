@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../router/dashboardrouter.dart';
@@ -73,16 +74,12 @@ class _LoginViewState extends State<_LoginView>
         listenWhen: (p, c) => p.status != c.status,
         listener: (context, state) {
           if (state.status == AuthStatus.success && state.role != null) {
-            final destination = destinationForRole(state.role!);
-
-            Navigator.of(context).pushReplacement(
-              PageRouteBuilder(
-                transitionDuration: const Duration(milliseconds: 350),
-                pageBuilder: (_, anim, __) => destination,
-                transitionsBuilder: (_, anim, __, child) =>
-                    FadeTransition(opacity: anim, child: child),
-              ),
-            );
+            // Always navigate through go_router, never Navigator directly —
+            // otherwise go_router's internal stack falls out of sync with
+            // what's mounted, and the dashboard shell (plus every bloc
+            // inside it) gets silently recreated on the next go_router
+            // navigation.
+            context.go(routeForRole(state.role!));
           } else if (state.status == AuthStatus.failure &&
               state.errorMessage != null) {
             AppSnackbar.error(state.errorMessage!);

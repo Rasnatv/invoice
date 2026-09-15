@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -24,6 +25,8 @@ Color quotationStatusColor(String status) {
     case 'sent':
       return Colors.orange;
     case 'rejected':
+      return Colors.red;
+    case 'cancelled':
       return Colors.red;
     case 'draft':
       return Colors.blueGrey;
@@ -57,14 +60,27 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
   // NOTE: /quotations/show expects the record's "id" (e.g. "23"), not the
   // human-readable "quotation_number" (e.g. "QOT0015-08-26"). Adjust
   // `q.id` below if OwnerviewQuotationModel names that field differently.
-  void _openQuotationDetails(OwnerviewQuotationModel q) {
-    Navigator.of(context).push(
+  //
+  // Awaits the detail screen's result: the detail screen returns `true`
+  // via PopScope whenever an edit/approve/cancel actually succeeded, so
+  // we know to refresh this list. Returning without any change (plain
+  // back navigation) returns `false`/null and skips the refresh.
+  Future<void> _openQuotationDetails(OwnerviewQuotationModel q) async {
+    // Captured before the await — reading it off `context` afterwards is
+    // unsafe if this element gets deactivated while the detail screen is open.
+    final bloc = context.read<QuotationBloc>();
+
+    final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => OwnerQuotationDetailsScreen(
           quotationId: q.id,
         ),
       ),
     );
+
+    if (changed == true && mounted) {
+      bloc.add(const RefreshQuotationsEvent());
+    }
   }
 
   @override

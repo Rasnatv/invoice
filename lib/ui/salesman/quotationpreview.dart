@@ -389,11 +389,6 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                         ),
                         SizedBox(height: Responsive.h(12)),
 
-                        // Separate, visually distinct box for incentive so it's
-                        // clear this is internal/salesman info, not part of the
-                        // customer's bill total above. Hidden entirely when the
-                        // quotation's creator is the Owner (derived from
-                        // created_by.role_label/role).
                         if (!isOwner && estimate.items.any((i) => i.incentiveAmount > 0))
                           Container(
                             padding: EdgeInsets.all(Responsive.w(14)),

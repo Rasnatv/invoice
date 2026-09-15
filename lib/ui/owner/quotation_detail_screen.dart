@@ -57,6 +57,10 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
   // run, so this is guaranteed to be set in time.
   late final OwnerQuotationDetailBloc _detailBloc;
 
+  /// Set to true whenever an edit / approve / cancel actually succeeded,
+  /// so the list screen knows it must refresh when this screen pops.
+  bool _didChange = false;
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +155,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
     );
 
     if (saved == true && mounted) {
+      _didChange = true;
       context
           .read<OwnerQuotationDetailBloc>()
           .add(OwnerQuotationDetailRequested(widget.quotationId));
@@ -399,471 +404,486 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Owner Quotation Details', style: AppTextStyles.h6()),
-        actions: [
-          BlocBuilder<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
-            buildWhen: (prev, curr) => prev.detail != curr.detail,
-            builder: (context, state) {
-              final q = state.detail;
-              if (q == null) return const SizedBox.shrink();
+    return NetworkAwareWrapper(
+      child: PopScope(
+        // We intercept every pop attempt (system back button, gesture,
+        // AppBar back arrow) so we can always hand `_didChange` back to
+        // whoever pushed this screen — not just the explicit Navigator.pop
+        // calls inside cancel/approve/edit flows.
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          Navigator.of(context).pop(_didChange);
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text('Owner Quotation Details', style: AppTextStyles.h6()),
+            actions: [
+              BlocBuilder<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
+                buildWhen: (prev, curr) => prev.detail != curr.detail,
+                builder: (context, state) {
+                  final q = state.detail;
+                  if (q == null) return const SizedBox.shrink();
 
-              final status = q.status.toLowerCase();
-              // Edit icon hidden once a quotation is approved or
-              // cancelled — both are final states. Shown for 'draft',
-              // 'send', and any other in-progress status.
-              final hideEditIcon = status == 'approved' || status == 'cancelled';
-              if (hideEditIcon) return const SizedBox.shrink();
+                  final status = q.status.toLowerCase();
+                  // Edit icon hidden once a quotation is approved or
+                  // cancelled — both are final states. Shown for 'draft',
+                  // 'send', and any other in-progress status.
+                  final hideEditIcon = status == 'approved' || status == 'cancelled';
+                  if (hideEditIcon) return const SizedBox.shrink();
 
-              return IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Edit Quotation',
-                onPressed: () => _openEditScreen(q),
-              );
-            },
+                  return IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Edit Quotation',
+                    onPressed: () => _openEditScreen(q),
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: BlocListener<OwnerCancelQuotationBloc, OwnerCancelQuotationState>(
-          listenWhen: (previous, current) => previous.status != current.status,
-          listener: (context, cancelState) async {
-            if (cancelState.status == OwnerCancelQuotationStatus.success) {
-              await _showBackendMessage(cancelState.message);
-              if (mounted) Navigator.of(context).pop(true);
-            } else if (cancelState.status == OwnerCancelQuotationStatus.failure) {
-              await _showBackendMessage(cancelState.errorMessage, isError: true);
-              if (mounted) {
-                context
-                    .read<OwnerCancelQuotationBloc>()
-                    .add(const OwnerCancelQuotationResultConsumed());
-              }
-            }
-          },
-          child: BlocConsumer<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
-            listenWhen: (previous, current) =>
-            previous.approveStatus != current.approveStatus,
-            listener: (context, state) async {
-              if (state.approveStatus == OwnerQuotationApproveStatus.success) {
-                await _showBackendMessage(state.approveMessage);
-                if (mounted) {
-                  context
-                      .read<OwnerQuotationDetailBloc>()
-                      .add(const OwnerQuotationApproveResultConsumed());
+          body: SafeArea(
+            child: BlocListener<OwnerCancelQuotationBloc, OwnerCancelQuotationState>(
+              listenWhen: (previous, current) => previous.status != current.status,
+              listener: (context, cancelState) async {
+                if (cancelState.status == OwnerCancelQuotationStatus.success) {
+                  _didChange = true;
+                  await _showBackendMessage(cancelState.message);
+                  if (mounted) Navigator.of(context).pop(true);
+                } else if (cancelState.status == OwnerCancelQuotationStatus.failure) {
+                  await _showBackendMessage(cancelState.errorMessage, isError: true);
+                  if (mounted) {
+                    context
+                        .read<OwnerCancelQuotationBloc>()
+                        .add(const OwnerCancelQuotationResultConsumed());
+                  }
                 }
-              } else if (state.approveStatus == OwnerQuotationApproveStatus.failure) {
-                await _showBackendMessage(state.approveError, isError: true);
-                if (mounted) {
-                  context
-                      .read<OwnerQuotationDetailBloc>()
-                      .add(const OwnerQuotationApproveResultConsumed());
-                }
-              }
-            },
-            builder: (context, state) {
-              if (state.detailStatus == OwnerQuotationDetailStatus.loading ||
-                  state.detailStatus == OwnerQuotationDetailStatus.initial) {
-                return const Center(child: CircularProgressIndicator());
-              }
+              },
+              child: BlocConsumer<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
+                listenWhen: (previous, current) =>
+                previous.approveStatus != current.approveStatus,
+                listener: (context, state) async {
+                  if (state.approveStatus == OwnerQuotationApproveStatus.success) {
+                    _didChange = true;
+                    await _showBackendMessage(state.approveMessage);
+                    if (mounted) {
+                      context
+                          .read<OwnerQuotationDetailBloc>()
+                          .add(const OwnerQuotationApproveResultConsumed());
+                    }
+                  } else if (state.approveStatus == OwnerQuotationApproveStatus.failure) {
+                    await _showBackendMessage(state.approveError, isError: true);
+                    if (mounted) {
+                      context
+                          .read<OwnerQuotationDetailBloc>()
+                          .add(const OwnerQuotationApproveResultConsumed());
+                    }
+                  }
+                },
+                builder: (context, state) {
+                  if (state.detailStatus == OwnerQuotationDetailStatus.loading ||
+                      state.detailStatus == OwnerQuotationDetailStatus.initial) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-              if (state.detailStatus == OwnerQuotationDetailStatus.failure) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.error_outline, size: 40, color: AppColors.textHint),
-                        const SizedBox(height: 12),
-                        Text(
-                          state.detailError ?? 'Failed to load quotation.',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.body(),
+                  if (state.detailStatus == OwnerQuotationDetailStatus.failure) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline, size: 40, color: AppColors.textHint),
+                            const SizedBox(height: 12),
+                            Text(
+                              state.detailError ?? 'Failed to load quotation.',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.body(),
+                            ),
+                            const SizedBox(height: 16),
+                            PrimaryButton(
+                              label: 'Retry',
+                              height: 44,
+                              onPressed: () => context
+                                  .read<OwnerQuotationDetailBloc>()
+                                  .add(OwnerQuotationDetailRequested(widget.quotationId)),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        PrimaryButton(
-                          label: 'Retry',
-                          height: 44,
-                          onPressed: () => context
-                              .read<OwnerQuotationDetailBloc>()
-                              .add(OwnerQuotationDetailRequested(widget.quotationId)),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
+                      ),
+                    );
+                  }
 
-              final q = state.detail;
-              if (q == null) {
-                return const Center(child: Text('No data found.'));
-              }
+                  final q = state.detail;
+                  if (q == null) {
+                    return const Center(child: Text('No data found.'));
+                  }
 
-              final status = q.status.toLowerCase();
-              final isApproved = status == 'approved';
-              final isCancelled = status == 'cancelled';
-              // Approve + Cancel are only meaningful actions for 'draft'
-              // and 'send'.
-              final showActionButtons = status == 'draft' || status == 'send';
-              final isApproving = state.approveStatus == OwnerQuotationApproveStatus.inProgress;
-              // Derived from created_by.role_label / role in the response —
-              // no separate session/role source. Incentive figures are
-              // salesman-facing, so hide them when the creator is the Owner.
-              final isOwner = _isOwner(q);
-              // Does any item actually carry an MRP from the API? Only show
-              // the column when it's worth showing — this endpoint often
-              // sends "mrp": "0" for every line.
-              final hasAnyMrp = q.items.any((i) => i.mrp > 0);
-              final hasAnyCompany = q.items.any((i) => i.companyName.trim().isNotEmpty);
+                  final status = q.status.toLowerCase();
+                  final isApproved = status == 'approved';
+                  final isCancelled = status == 'cancelled';
+                  // Approve + Cancel are only meaningful actions for 'draft'
+                  // and 'send'.
+                  final showActionButtons = status == 'draft' || status == 'send';
+                  final isApproving = state.approveStatus == OwnerQuotationApproveStatus.inProgress;
+                  // Derived from created_by.role_label / role in the response —
+                  // no separate session/role source. Incentive figures are
+                  // salesman-facing, so hide them when the creator is the Owner.
+                  final isOwner = _isOwner(q);
+                  // Does any item actually carry an MRP from the API? Only show
+                  // the column when it's worth showing — this endpoint often
+                  // sends "mrp": "0" for every line.
+                  final hasAnyMrp = q.items.any((i) => i.mrp > 0);
+                  final hasAnyCompany = q.items.any((i) => i.companyName.trim().isNotEmpty);
 
-              return Column(
-                children: [
-                  Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.all(Responsive.w(18)),
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(Responsive.w(14)),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceAlt,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Quotation No.', style: AppTextStyles.caption()),
-                                  Text(q.quotationNumber, style: AppTextStyles.h3()),
-                                ],
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          padding: EdgeInsets.all(Responsive.w(18)),
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(Responsive.w(14)),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceAlt,
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Date', style: AppTextStyles.caption()),
-                                  Text(
-                                    q.date != null
-                                        ? DateFormat('dd-MM-yyyy').format(q.date!)
-                                        : q.dateRaw,
-                                    style: AppTextStyles.h3(),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Quotation No.', style: AppTextStyles.caption()),
+                                      Text(q.quotationNumber, style: AppTextStyles.h3()),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text('Date', style: AppTextStyles.caption()),
+                                      Text(
+                                        q.date != null
+                                            ? DateFormat('dd-MM-yyyy').format(q.date!)
+                                            : q.dateRaw,
+                                        style: AppTextStyles.h3(),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: Responsive.h(10)),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _statusColor(q.status).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              q.status.isEmpty ? '-' : q.status,
-                              style: AppTextStyles.bodyBold(color: _statusColor(q.status)),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: Responsive.h(16)),
-
-                        _DetailSection(
-                          title: 'Customer Details',
-                          rows: [
-                            _Row('Name', q.customer.name, icon: Icons.groups_2_outlined),
-                            _Row('Address', q.customer.address, icon: Icons.location_on_outlined),
-                            _Row('Phone', q.customer.phone, icon: Icons.phone_outlined),
-                            if (q.customer.email.isNotEmpty)
-                              _Row('Email', q.customer.email, icon: Icons.email_outlined),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(14)),
-                        _DetailSection(
-                          title: 'Contractor Details',
-                          rows: [
-                            _Row('Name', q.contractor.name, icon: Icons.engineering_outlined),
-                            _Row('Mobile', q.contractor.mobile, icon: Icons.phone_outlined),
-                            if (q.contractor.email.isNotEmpty)
-                              _Row('Email', q.contractor.email, icon: Icons.email),
-                          ],
-                        ),
-                        if (q.salesman.employeeCode.isNotEmpty) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _DetailSection(
-                            title: 'Salesman',
-                            rows: [
-                              _Row('Created By', q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
-                                  icon: Icons.person_outline),
-                            ],
-                          ),
-                        ],
-                        if (q.notes.isNotEmpty) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _DetailSection(
-                            title: 'Notes',
-                            rows: [_Row('Notes', q.notes, icon: Icons.notes_outlined)],
-                          ),
-                        ],
-                        SizedBox(height: Responsive.h(20)),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Items', style: AppTextStyles.h3()),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceAlt,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                'Total Items: ${q.itemsCount}',
-                                style: AppTextStyles.bodyBold(color: AppColors.primary),
+                            SizedBox(height: Responsive.h(10)),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _statusColor(q.status).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  q.status.isEmpty ? '-' : q.status,
+                                  style: AppTextStyles.bodyBold(color: _statusColor(q.status)),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(10)),
+                            SizedBox(height: Responsive.h(16)),
 
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(AppColors.surfaceAlt),
-                              headingTextStyle: AppTextStyles.bodyBold(),
-                              dataTextStyle: AppTextStyles.body(),
-                              columnSpacing: 18,
-                              columns: [
-                                const DataColumn(label: Text('Sl.No')),
-                                const DataColumn(label: Text('Item')),
-                                if (hasAnyCompany) const DataColumn(label: Text('Company')),
-                                const DataColumn(label: Text('Size')),
-                                const DataColumn(label: Text('Qty'), numeric: true),
-                                const DataColumn(label: Text('Unit')),
-                                if (hasAnyMrp) const DataColumn(label: Text('MRP'), numeric: true),
-                                const DataColumn(label: Text('Rate'), numeric: true),
-                                const DataColumn(label: Text('Amount'), numeric: true),
-                                if (!isOwner)
-                                  const DataColumn(label: Text('Incentive'), numeric: true),
+                            _DetailSection(
+                              title: 'Customer Details',
+                              rows: [
+                                _Row('Name', q.customer.name, icon: Icons.groups_2_outlined),
+                                _Row('Address', q.customer.address, icon: Icons.location_on_outlined),
+                                _Row('Phone', q.customer.phone, icon: Icons.phone_outlined),
+                                if (q.customer.email.isNotEmpty)
+                                  _Row('Email', q.customer.email, icon: Icons.email_outlined),
                               ],
-                              rows: q.items.asMap().entries.map((entry) {
-                                final i = entry.key;
-                                final item = entry.value;
-                                return DataRow(cells: [
-                                  DataCell(Text('${i + 1}')),
-                                  DataCell(Text(item.productName.isEmpty ? '-' : item.productName)),
-                                  if (hasAnyCompany)
-                                    DataCell(Text(item.companyName.isEmpty ? '-' : item.companyName)),
-                                  DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
-                                  DataCell(Text(number.format(item.quantity))),
-                                  DataCell(Text(item.productUnit)),
-                                  if (hasAnyMrp)
-                                    DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
-                                  DataCell(Text(number.format(item.rate))),
-                                  DataCell(Text(
-                                    currency.format(item.amount),
-                                    style: AppTextStyles.bodyBold(),
-                                  )),
-                                  if (!isOwner)
-                                    DataCell(Text(
-                                      item.isIncentiveEligible
-                                          ? currency.format(item.incentiveAmount)
-                                          : '-',
-                                      style: AppTextStyles.body(color: AppColors.success),
-                                    )),
-                                ]);
-                              }).toList(),
                             ),
-                          ),
-                        ),
-                        SizedBox(height: Responsive.h(16)),
-
-                        Container(
-                          padding: EdgeInsets.all(Responsive.w(14)),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceAlt,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            children: [
-                              _totalRow('Total Items', '${q.itemsCount}'),
-                              SizedBox(height: Responsive.h(6)),
-                              _totalRow('Total Qty', number.format(q.totalQuantity)),
-                              SizedBox(height: Responsive.h(6)),
-                              _totalRow('Subtotal', currency.format(q.subtotal)),
-                              SizedBox(height: Responsive.h(6)),
-                              _totalRow('Handling Charge', currency.format(q.handlingCharge)),
-                              SizedBox(height: Responsive.h(6)),
-                              _totalRow('Total Sqft', number.format(q.totalSquareFeet)),
-                              const Divider(height: 20),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Grand Total', style: AppTextStyles.h3()),
-                                  Text(currency.format(q.grandTotal),
-                                      style: AppTextStyles.h2(color: AppColors.primary)),
+                            SizedBox(height: Responsive.h(14)),
+                            _DetailSection(
+                              title: 'Contractor Details',
+                              rows: [
+                                _Row('Name', q.contractor.name, icon: Icons.engineering_outlined),
+                                _Row('Mobile', q.contractor.mobile, icon: Icons.phone_outlined),
+                                if (q.contractor.email.isNotEmpty)
+                                  _Row('Email', q.contractor.email, icon: Icons.email),
+                              ],
+                            ),
+                            if (q.salesman.employeeCode.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(14)),
+                              _DetailSection(
+                                title: 'Salesman',
+                                rows: [
+                                  _Row('Created By', q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
+                                      icon: Icons.person_outline),
                                 ],
                               ),
                             ],
-                          ),
-                        ),
-                        SizedBox(height: Responsive.h(12)),
+                            if (q.notes.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(14)),
+                              _DetailSection(
+                                title: 'Notes',
+                                rows: [_Row('Notes', q.notes, icon: Icons.notes_outlined)],
+                              ),
+                            ],
+                            SizedBox(height: Responsive.h(20)),
 
-                        // Total incentive across items — internal/salesman
-                        // info, kept visually separate from the customer bill.
-                        // Hidden entirely when the quotation's creator is the
-                        // Owner.
-                        if (!isOwner)
-                          Container(
-                            padding: EdgeInsets.all(Responsive.w(14)),
-                            decoration: BoxDecoration(
-                              color: AppColors.success.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
+                            Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Items', style: AppTextStyles.h3()),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceAlt,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    'Total Items: ${q.itemsCount}',
+                                    style: AppTextStyles.bodyBold(color: AppColors.primary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: Responsive.h(10)),
+
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: DataTable(
+                                  headingRowColor: WidgetStateProperty.all(AppColors.surfaceAlt),
+                                  headingTextStyle: AppTextStyles.bodyBold(),
+                                  dataTextStyle: AppTextStyles.body(),
+                                  columnSpacing: 18,
+                                  columns: [
+                                    const DataColumn(label: Text('Sl.No')),
+                                    const DataColumn(label: Text('Item')),
+                                    if (hasAnyCompany) const DataColumn(label: Text('Company')),
+                                    const DataColumn(label: Text('Size')),
+                                    const DataColumn(label: Text('Qty'), numeric: true),
+                                    const DataColumn(label: Text('Unit')),
+                                    if (hasAnyMrp) const DataColumn(label: Text('MRP'), numeric: true),
+                                    const DataColumn(label: Text('Rate'), numeric: true),
+                                    const DataColumn(label: Text('Amount'), numeric: true),
+                                    if (!isOwner)
+                                      const DataColumn(label: Text('Incentive'), numeric: true),
+                                  ],
+                                  rows: q.items.asMap().entries.map((entry) {
+                                    final i = entry.key;
+                                    final item = entry.value;
+                                    return DataRow(cells: [
+                                      DataCell(Text('${i + 1}')),
+                                      DataCell(Text(item.productName.isEmpty ? '-' : item.productName)),
+                                      if (hasAnyCompany)
+                                        DataCell(Text(item.companyName.isEmpty ? '-' : item.companyName)),
+                                      DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
+                                      DataCell(Text(number.format(item.quantity))),
+                                      DataCell(Text(item.productUnit)),
+                                      if (hasAnyMrp)
+                                        DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
+                                      DataCell(Text(number.format(item.rate))),
+                                      DataCell(Text(
+                                        currency.format(item.amount),
+                                        style: AppTextStyles.bodyBold(),
+                                      )),
+                                      if (!isOwner)
+                                        DataCell(Text(
+                                          item.isIncentiveEligible
+                                              ? currency.format(item.incentiveAmount)
+                                              : '-',
+                                          style: AppTextStyles.body(color: AppColors.success),
+                                        )),
+                                    ]);
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: Responsive.h(16)),
+
+                            Container(
+                              padding: EdgeInsets.all(Responsive.w(14)),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceAlt,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Column(
+                                children: [
+                                  _totalRow('Total Items', '${q.itemsCount}'),
+                                  SizedBox(height: Responsive.h(6)),
+                                  _totalRow('Total Qty', number.format(q.totalQuantity)),
+                                  SizedBox(height: Responsive.h(6)),
+                                  _totalRow('Subtotal', currency.format(q.subtotal)),
+                                  SizedBox(height: Responsive.h(6)),
+                                  _totalRow('Handling Charge', currency.format(q.handlingCharge)),
+                                  SizedBox(height: Responsive.h(6)),
+                                  _totalRow('Total Sqft', number.format(q.totalSquareFeet)),
+                                  const Divider(height: 20),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Grand Total', style: AppTextStyles.h3()),
+                                      Text(currency.format(q.grandTotal),
+                                          style: AppTextStyles.h2(color: AppColors.primary)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: Responsive.h(12)),
+
+                            // Total incentive across items — internal/salesman
+                            // info, kept visually separate from the customer bill.
+                            // Hidden entirely when the quotation's creator is the
+                            // Owner.
+                            if (!isOwner)
+                              Container(
+                                padding: EdgeInsets.all(Responsive.w(14)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.success.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.percent, size: 18, color: AppColors.success),
+                                        SizedBox(width: Responsive.w(8)),
+                                        Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                                      ],
+                                    ),
+                                    Text(
+                                      currency.format(
+                                        q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+                                      ),
+                                      style: AppTextStyles.h3(color: AppColors.success),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (!isOwner) SizedBox(height: Responsive.h(12)),
+                          ],
+                        ),
+                      ),
+
+                      // Bottom action bar. Approve + Cancel are shown only for
+                      // 'draft'/'send' statuses; approved/cancelled show a
+                      // static status indicator instead.
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                            Responsive.w(18), Responsive.h(10), Responsive.w(18), Responsive.h(14)),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          border: Border(top: BorderSide(color: AppColors.border)),
+                        ),
+                        child: BlocBuilder<OwnerCancelQuotationBloc, OwnerCancelQuotationState>(
+                          builder: (context, cancelState) {
+                            final isCancelling =
+                                cancelState.status == OwnerCancelQuotationStatus.inProgress;
+
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.percent, size: 18, color: AppColors.success),
-                                    SizedBox(width: Responsive.w(8)),
-                                    Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                                    _RoundIconButton(
+                                      icon: Icons.share_outlined,
+                                      tooltip: 'Share',
+                                      onPressed: () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(text: _buildShareText(q, currency, number)),
+                                        );
+                                      },
+                                    ),
+                                    SizedBox(width: Responsive.w(10)),
+                                    Expanded(
+                                      child: isApproved
+                                          ? Container(
+                                        height: 48,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.success.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: AppColors.success.withValues(alpha: 0.3)),
+                                        ),
+                                        child: Text(
+                                          'Quotation Approved',
+                                          style: AppTextStyles.bodyBold(color: AppColors.success),
+                                        ),
+                                      )
+                                          : isCancelled
+                                          ? Container(
+                                        height: 48,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: Colors.red.withValues(alpha: 0.3)),
+                                        ),
+                                        child: Text(
+                                          'Quotation Cancelled',
+                                          style: AppTextStyles.bodyBold(color: Colors.red),
+                                        ),
+                                      )
+                                          : showActionButtons
+                                          ? PrimaryButton(
+                                        label: isApproving
+                                            ? 'Approving...'
+                                            : 'Approve Quotation',
+                                        height: 48,
+                                        onPressed: (isApproving || isCancelling)
+                                            ? null
+                                            : () => _showApproveDialog(q),
+                                      )
+                                          : const SizedBox.shrink(),
+                                    ),
                                   ],
                                 ),
-                                Text(
-                                  currency.format(
-                                    q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+                                if (showActionButtons) ...[
+                                  SizedBox(height: Responsive.h(10)),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.red,
+                                        side: const BorderSide(color: Colors.red),
+                                        minimumSize: const Size.fromHeight(48),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      onPressed: (isApproving || isCancelling)
+                                          ? null
+                                          : () => _confirmAndCancel(q),
+                                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                                      label: Text(isCancelling ? 'Cancelling...' : 'Cancel Quotation'),
+                                    ),
                                   ),
-                                  style: AppTextStyles.h3(color: AppColors.success),
-                                ),
+                                ],
                               ],
-                            ),
-                          ),
-                        if (!isOwner) SizedBox(height: Responsive.h(12)),
-                      ],
-                    ),
-                  ),
-
-                  // Bottom action bar. Approve + Cancel are shown only for
-                  // 'draft'/'send' statuses; approved/cancelled show a
-                  // static status indicator instead.
-                  Container(
-                    padding: EdgeInsets.fromLTRB(
-                        Responsive.w(18), Responsive.h(10), Responsive.w(18), Responsive.h(14)),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      border: Border(top: BorderSide(color: AppColors.border)),
-                    ),
-                    child: BlocBuilder<OwnerCancelQuotationBloc, OwnerCancelQuotationState>(
-                      builder: (context, cancelState) {
-                        final isCancelling =
-                            cancelState.status == OwnerCancelQuotationStatus.inProgress;
-
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children: [
-                                _RoundIconButton(
-                                  icon: Icons.share_outlined,
-                                  tooltip: 'Share',
-                                  onPressed: () async {
-                                    await Clipboard.setData(
-                                      ClipboardData(text: _buildShareText(q, currency, number)),
-                                    );
-                                  },
-                                ),
-                                SizedBox(width: Responsive.w(10)),
-                                Expanded(
-                                  child: isApproved
-                                      ? Container(
-                                    height: 48,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: AppColors.success.withValues(alpha: 0.3)),
-                                    ),
-                                    child: Text(
-                                      'Quotation Approved',
-                                      style: AppTextStyles.bodyBold(color: AppColors.success),
-                                    ),
-                                  )
-                                      : isCancelled
-                                      ? Container(
-                                    height: 48,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: Colors.red.withValues(alpha: 0.3)),
-                                    ),
-                                    child: Text(
-                                      'Quotation Cancelled',
-                                      style: AppTextStyles.bodyBold(color: Colors.red),
-                                    ),
-                                  )
-                                      : showActionButtons
-                                      ? PrimaryButton(
-                                    label: isApproving
-                                        ? 'Approving...'
-                                        : 'Approve Quotation',
-                                    height: 48,
-                                    onPressed: (isApproving || isCancelling)
-                                        ? null
-                                        : () => _showApproveDialog(q),
-                                  )
-                                      : const SizedBox.shrink(),
-                                ),
-                              ],
-                            ),
-                            if (showActionButtons) ...[
-                              SizedBox(height: Responsive.h(10)),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                    side: const BorderSide(color: Colors.red),
-                                    minimumSize: const Size.fromHeight(48),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  onPressed: (isApproving || isCancelling)
-                                      ? null
-                                      : () => _confirmAndCancel(q),
-                                  icon: const Icon(Icons.cancel_outlined, size: 18),
-                                  label: Text(isCancelling ? 'Cancelling...' : 'Cancel Quotation'),
-                                ),
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              );
-            },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _totalRow(String label, String value) {

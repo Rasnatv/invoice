@@ -1,20 +1,15 @@
 
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../core/utils/routerobserver.dart';
+
 import '../ui/auth/login_screen.dart';
+import '../ui/splash/splash_screen.dart';
+import '../ui/onboarding/onboarding_screen.dart';
+
 import '../ui/owner/addDesignationpage.dart';
 import '../ui/owner/addfieldstaffscreen.dart';
-import '../ui/salesman/dashboard_home_screen.dart';
-import '../ui/salesman/dashboard_shell.dart';
-import '../ui/splash/splash_screen.dart';
-import '../ui/salesman/create_estimate_screen.dart';
-import '../ui/salesman/my_estimates_screen.dart';
-import '../ui/salesman/approvedbills.dart';
-import '../ui/salesman/quatationscreen.dart';
-import '../ui/salesman/estimatedetailscreen_forsalesman.dart';
-
-// Owner dashboard destinations
 import '../ui/owner/ownerincentivesummarypage.dart';
 import '../ui/owner/report/ownerreportscreen.dart';
 import '../ui/owner/salesmanincentivesetup.dart';
@@ -30,6 +25,17 @@ import '../ui/owner/quotations_screen.dart';
 import '../ui/owner/incentive_management_screen.dart';
 import '../widgets/ownerDashboardshell.dart';
 
+import '../ui/salesman/dashboard_shell.dart';
+import '../ui/salesman/create_estimate_screen.dart';
+import '../ui/salesman/my_estimates_screen.dart';
+import '../ui/salesman/approvedbills.dart';
+import '../ui/salesman/quatationscreen.dart';
+import '../ui/salesman/estimatedetailscreen_forsalesman.dart';
+
+import '../ui/driver_dashboard/driver_dashboard.dart';
+import '../ui/fieldstaff/fieldstaff_dashboard.dart';
+import '../bloc/fieldstaffbloc/sitevist/sitevisit_bloc.dart';
+
 class AppRouter {
   AppRouter._();
 
@@ -37,15 +43,26 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     navigatorKey: navigatorKey,
-    // observers: [routeObserver],
     initialLocation: '/',
     routes: [
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
+
+      GoRoute(path: '/owner', builder: (context, state) => const Ownerdashboardshell()),
+      GoRoute(path: '/salesman', builder: (context, state) => const DashboardShell()),
+      GoRoute(path: '/driver', builder: (context, state) => const DriverDashboardScreen()),
+      GoRoute(
+        path: '/fieldstaff',
+        builder: (context, state) => BlocProvider(
+          create: (context) => SiteVisitBloc(),
+          child: const FieldStaffDashboardScreen(),
+        ),
+      ),
+
       GoRoute(path: '/field-staff', builder: (context, state) => const OwnerAddFieldStaffScreen()),
       GoRoute(path: '/designations', builder: (context, state) => const AddDesignationPage()),
 
-      // ---- Salesman dashboard ----
       GoRoute(path: '/create-estimate', builder: (context, state) => const CreateEstimateScreen()),
       GoRoute(path: '/my-estimates', builder: (context, state) => const MyEstimatesScreen()),
       GoRoute(path: '/approved-bills', builder: (context, state) => const ApprovedBills()),
@@ -60,7 +77,6 @@ class AppRouter {
             SalesmanEstimateDetailsScreen(id: state.pathParameters['id']!),
       ),
 
-      // ---- Owner dashboard ----
       GoRoute(path: '/owner/create-estimate', builder: (context, state) => const OwnerCreateEstimateScreen()),
       GoRoute(path: '/owner/estimates', builder: (context, state) => const OwnerEstimatesScreen()),
       GoRoute(path: '/owner/quotations', builder: (context, state) => const OwnerQuotationsScreen()),

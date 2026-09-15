@@ -863,7 +863,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
           if (state.submitStatus == SubmitStatus.success) {
             AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());
-            context.go('/owner-dashboard');
+            context.go('/owner');
           } else if (state.submitStatus == SubmitStatus.failure) {
             _showError(state.submitError ?? 'Something went wrong. Please try again.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());
