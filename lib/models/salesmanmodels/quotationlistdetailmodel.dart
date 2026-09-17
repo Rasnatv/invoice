@@ -1,4 +1,3 @@
-
 double _asDouble(dynamic v) {
   if (v == null) return 0;
   if (v is num) return v.toDouble();
@@ -32,6 +31,8 @@ class QuotationDetailItem {
   final String companyName;
   final double mrp;
   final double quantity;
+  final double boxQuantity;
+  final double pieceQuantity;
   final double rate;
   final double amount;
   final double incentiveAmount;
@@ -49,6 +50,8 @@ class QuotationDetailItem {
     required this.companyName,
     required this.mrp,
     required this.quantity,
+    required this.boxQuantity,
+    required this.pieceQuantity,
     required this.rate,
     required this.amount,
     required this.incentiveAmount,
@@ -68,6 +71,8 @@ class QuotationDetailItem {
       companyName: _asString(json['company_name']),
       mrp: _asDouble(json['mrp']),
       quantity: _asDouble(json['quantity']),
+      boxQuantity: _asDouble(json['box_quantity']),
+      pieceQuantity: _asDouble(json['piece_quantity']),
       rate: _asDouble(json['rate']),
       amount: _asDouble(json['amount']),
       incentiveAmount: _asDouble(json['incentive_amount']),

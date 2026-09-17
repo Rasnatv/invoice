@@ -37,6 +37,8 @@ class EstimateDetailItem {
   final String unitName;
   final double mrp;
   final double quantity;
+  final double boxQuantity;
+  final double pieceQuantity;
   final double rate;
   final double amount;
   final double incentiveAmount;
@@ -51,6 +53,8 @@ class EstimateDetailItem {
     required this.unitName,
     required this.mrp,
     required this.quantity,
+    required this.boxQuantity,
+    required this.pieceQuantity,
     required this.rate,
     required this.amount,
     required this.incentiveAmount,
@@ -67,6 +71,8 @@ class EstimateDetailItem {
       unitName: _asString(json['unit_name']),
       mrp: _asDouble(json['mrp']),
       quantity: _asDouble(json['quantity']),
+      boxQuantity: _asDouble(json['box_quantity']),
+      pieceQuantity: _asDouble(json['piece_quantity']),
       rate: _asDouble(json['rate']),
       amount: _asDouble(json['amount']),
       incentiveAmount: _asDouble(json['incentive_amount']),
@@ -268,28 +274,52 @@ class EstimateQuotationRef {
   bool get exists => id.isNotEmpty && id != '0';
 }
 
+/// A single payment recorded against an estimate. `method`/`date` mirror
+/// the API's `payment_method`/`payment_date` fields; the `*_formatted`
+/// variants and `payment_reference`/`created_by` are kept as-is since the
+/// UI may want the server's pre-formatted strings directly.
 class EstimatePayment {
   final String id;
   final double amount;
+  final String amountFormatted;
   final String method;
+  final String methodLabel;
+  final String reference;
   final String date;
+  final String dateFormatted;
   final String notes;
+  final String createdAt;
+  final String createdBy;
 
   const EstimatePayment({
     required this.id,
     required this.amount,
+    required this.amountFormatted,
     required this.method,
+    required this.methodLabel,
+    required this.reference,
     required this.date,
+    required this.dateFormatted,
     required this.notes,
+    required this.createdAt,
+    required this.createdBy,
   });
 
   factory EstimatePayment.fromJson(Map<String, dynamic> json) {
     return EstimatePayment(
       id: _asString(json['id']),
       amount: _asDouble(json['amount']),
-      method: _asString(json['method']),
-      date: _asString(json['date']),
+      amountFormatted: _asString(json['amount_formatted']),
+      // API field is `payment_method` (not `method`).
+      method: _asString(json['payment_method']),
+      methodLabel: _asString(json['payment_method_label']),
+      reference: _asString(json['payment_reference']),
+      // API field is `payment_date` (not `date`).
+      date: _asString(json['payment_date']),
+      dateFormatted: _asString(json['payment_date_formatted']),
       notes: _asString(json['notes']),
+      createdAt: _asString(json['created_at']),
+      createdBy: _asString(json['created_by']),
     );
   }
 }

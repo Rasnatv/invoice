@@ -1,5 +1,6 @@
 
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
@@ -7,6 +8,7 @@ import '../../core/constants/app_text_styles.dart';
 import '../../router/dashboardrouter.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/network/tokenstorage.dart';
+import '../../core/apiclient/api_client.dart';
 
 /// Splash / brand loading screen — modern, elegant look for Dreams Ceramic.
 /// Soft gradient backdrop, glowing logo mark, refined typography.
@@ -50,15 +52,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   /// Decides where to go after the splash delay:
-  /// 1. Valid saved session (token + role)  -> straight to that role's dashboard.
-  /// 2. No session, but onboarding was seen before -> LoginScreen.
-  /// 3. No session, onboarding never seen -> OnboardingScreen (shown once, ever).
-  ///
-  /// Always goes through go_router's context.go(...) — never Navigator
-  /// directly — so go_router's internal route stack stays in sync with
-  /// whatever is actually mounted. Using Navigator here would silently
-  /// desync the two, causing the destination shell to be torn down and
-  /// recreated the next time go_router navigates anywhere.
+  /// 1. Valid saved session (token + role), confirmed against the server
+  ///    -> straight to that role's dashboard.
+  /// 2. Saved session exists but the server rejects it (expired/revoked
+  ///    token) -> clear storage, go to LoginScreen.
+  /// 3. No session, but onboarding was seen before -> LoginScreen.
+  /// 4. No session, onboarding never seen -> OnboardingScreen (shown once, ever).
   Future<void> _navigateNext() async {
     if (!mounted) return;
 
@@ -68,11 +67,39 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
 
     if (token != null && token.isNotEmpty && role != null) {
-      context.go(routeForRole(role));
+      final isValid = await _verifyToken();
+      if (!mounted) return;
+
+      if (isValid) {
+        context.go(routeForRole(role));
+      } else {
+        await TokenStorage.clear();
+        if (!mounted) return;
+        context.go('/login');
+      }
     } else {
       final seenOnboarding = await TokenStorage.hasSeenOnboarding();
       if (!mounted) return;
       context.go(seenOnboarding ? '/login' : '/onboarding');
+    }
+  }
+
+  /// Confirms the saved token still works by calling /profile.
+  /// A real auth rejection (401/403) means the token is invalid -> false.
+  /// A network error (timeout, no connection) is NOT treated as invalid
+  /// -> true, so a bad connection at startup doesn't wrongly log the
+  /// user out.
+  Future<bool> _verifyToken() async {
+    try {
+      final response = await ApiClient().getProfile();
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
     }
   }
 

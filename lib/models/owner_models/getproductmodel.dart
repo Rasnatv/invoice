@@ -79,6 +79,11 @@ class ProductModel {
   bool get hasMeasurementQty => measurementQty.isNotEmpty;
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
+    // TEMP DEBUG — remove once packing issue is confirmed fixed.
+    // Prints the raw, unparsed "packing" value straight from the API
+    // response for every product as it's parsed, so we can see exactly
+    // what the server sent before any Dart-side logic touches it.
+    print('RAW packing for id=${json['id']}: "${json['packing']}"');
     return ProductModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',

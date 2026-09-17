@@ -1,4 +1,5 @@
 
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,9 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../widgets/custom_text_field.dart';
 import '../../../widgets/primary_button.dart';
+import '../../bloc/quotationitemremove/quotationitemremove_bloc.dart';
+import '../../bloc/quotationitemremove/quotationitemremove_event.dart';
+import '../../bloc/quotationitemremove/quotationitemremove_state.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
@@ -30,8 +34,13 @@ class QuotationEditScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => SalesmanEstimateBloc()..add(const ActiveProductsRequested()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => SalesmanEstimateBloc()..add(const ActiveProductsRequested()),
+        ),
+        BlocProvider(create: (_) => QuotationItemRemoveBloc()),
+      ],
       child: _QuotationEditView(estimate: estimate),
     );
   }
@@ -48,6 +57,8 @@ class _EditItem {
     this.company = '',
     this.size = '',
     this.mrp = 0,
+    this.boxQuantity = 0,
+    this.pieceQuantity = 0,
     this.incentiveAmount = 0,
     this.incentiveEligible = false,
     this.incentiveReason,
@@ -62,6 +73,8 @@ class _EditItem {
   final double quantity;
   final double rate;
   final double mrp;
+  final double boxQuantity;
+  final double pieceQuantity;
   final double incentiveAmount;
   final bool incentiveEligible;
   final String? incentiveReason;
@@ -82,6 +95,8 @@ class _EditItem {
       company: company ?? this.company,
       size: size,
       mrp: mrp ?? this.mrp,
+      boxQuantity: boxQuantity,
+      pieceQuantity: pieceQuantity,
       incentiveAmount: incentiveAmount,
       incentiveEligible: incentiveEligible,
       incentiveReason: incentiveReason,
@@ -129,10 +144,36 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   final _itemQtyCtrl = TextEditingController();
   final _itemRateCtrl = TextEditingController();
 
+  // For box-unit products, Box Quantity is shown as its own visible field
+  // that auto-updates whenever Quantity changes (kept in sync, not
+  // editable independently). Piece Quantity is also shown as its own
+  // visible field but is entered independently by the user.
+  final _itemBoxQtyCtrl = TextEditingController();
+  final _itemPieceQtyCtrl = TextEditingController();
+
   Timer? _incentiveDebounce;
   static const _incentiveDebounceDuration = Duration(milliseconds: 450);
 
   bool _backfilledFromCatalog = false;
+
+  bool get _isBoxUnitProduct => _selectedProduct?.isBoxUnit ?? false;
+
+  double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
+
+  /// Keeps the visible Box Quantity field in sync with Quantity for
+  /// box-unit products, exactly mirroring whatever is typed there.
+  ///
+  /// NOTE: this is the "live sync while typing" behavior only. It must
+  /// only run in response to the user editing the Quantity field (see the
+  /// Quantity field's onChanged below). It must NOT be used to populate
+  /// the Box Quantity field when an existing item is first loaded into
+  /// the form for editing — that must come from the item's own saved
+  /// `boxQuantity`, not from whatever happens to be in the Quantity field
+  /// at that moment. See _editItem.
+  void _recomputeBoxQtyIfNeeded() {
+    if (!_isBoxUnitProduct) return;
+    _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
+  }
 
   @override
   void initState() {
@@ -156,13 +197,19 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
         .asMap()
         .entries
         .map((entry) => _EditItem(
-      id: 'existing_${entry.key}',
+      // Real backend item id — needed to call POST /quotations/remove-item.
+      // Newly-added items (added on this screen, never saved) instead get
+      // an id prefixed 'new_' — see _saveItemFromForm — which is how
+      // _removeItem tells the two cases apart.
+      id: entry.value.id,
       productId: entry.value.productId,
       name: entry.value.productName,
       unit: entry.value.productUnit,
       size: entry.value.productSize,
       quantity: entry.value.quantity,
       rate: entry.value.rate,
+      boxQuantity: entry.value.boxQuantity,
+      pieceQuantity: entry.value.pieceQuantity,
       incentiveAmount: entry.value.incentiveAmount,
       incentiveEligible: entry.value.incentiveAmount > 0,
     ))
@@ -188,6 +235,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     _itemUnitCtrl.dispose();
     _itemMrpCtrl.dispose();
     _itemQtyCtrl.dispose();
+    _itemBoxQtyCtrl.dispose();
+    _itemPieceQtyCtrl.dispose();
     _itemRateCtrl.dispose();
     super.dispose();
   }
@@ -219,13 +268,18 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   });
 
   double get _currentItemAmount {
-    final qty = double.tryParse(_itemQtyCtrl.text) ?? 0;
     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
-    return qty * rate;
+    return _computedQuantity * rate;
   }
 
   static String _formatPrice(double value) =>
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
+
+  /// Items added on this screen and not yet saved to the server carry an
+  /// id prefixed 'new_' (see _saveItemFromForm). Anything else is a real
+  /// backend item id and must go through POST /quotations/remove-item to
+  /// actually be deleted.
+  bool _isUnsavedItem(_EditItem item) => item.id.startsWith('new_');
 
   void _showError(String msg) {
     AppSnackbar.error(msg);
@@ -302,12 +356,18 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
         _itemUnitCtrl.text = product.unit;
         _itemMrpCtrl.text = _formatPrice(product.mrp);
         _itemRateCtrl.text = _formatPrice(product.rate);
+        _itemQtyCtrl.clear();
+        _itemBoxQtyCtrl.clear();
+        _itemPieceQtyCtrl.clear();
       } else {
         _itemCompanyCtrl.clear();
         _itemSizeCtrl.clear();
         _itemUnitCtrl.clear();
         _itemMrpCtrl.clear();
         _itemRateCtrl.clear();
+        _itemQtyCtrl.clear();
+        _itemBoxQtyCtrl.clear();
+        _itemPieceQtyCtrl.clear();
       }
     });
     _scheduleIncentiveFetch();
@@ -317,7 +377,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     _incentiveDebounce?.cancel();
 
     final product = _selectedProduct;
-    final qty = double.tryParse(_itemQtyCtrl.text) ?? 0;
+    final qty = _computedQuantity;
     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
     final fallbackProductId =
     _editingItemIndex != null ? _items[_editingItemIndex!].productId : null;
@@ -350,6 +410,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       _itemUnitCtrl.clear();
       _itemMrpCtrl.clear();
       _itemQtyCtrl.clear();
+      _itemBoxQtyCtrl.clear();
+      _itemPieceQtyCtrl.clear();
       _itemRateCtrl.clear();
     });
     context.read<SalesmanEstimateBloc>().add(const ProductIncentiveCleared());
@@ -365,7 +427,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       return;
     }
 
-    final qty = double.tryParse(_itemQtyCtrl.text) ?? 0;
+    final qty = _computedQuantity;
     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
 
     String productId;
@@ -381,7 +443,9 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       return;
     }
     if (qty <= 0) {
-      _showError('Please enter a valid quantity');
+      _showError(_isBoxUnitProduct
+          ? 'Please enter a valid box quantity or piece quantity'
+          : 'Please enter a valid quantity');
       return;
     }
     if (rate <= 0) {
@@ -411,6 +475,11 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       quantity: qty,
       rate: rate,
       mrp: formMrp ?? previousMrp,
+      // Box Quantity mirrors Quantity (same convention as the
+      // create-estimate flow); Piece Quantity is entered independently by
+      // the user in its own field. Non-box-unit items keep both at 0.
+      boxQuantity: _isBoxUnitProduct ? qty : 0,
+      pieceQuantity: _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : 0,
       incentiveAmount: matchesCurrentProduct ? liveIncentive.totalIncentive : 0,
       incentiveEligible: matchesCurrentProduct ? liveIncentive.isEligible : false,
       incentiveReason: matchesCurrentProduct ? liveIncentive.eligibilityReason : null,
@@ -440,6 +509,13 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       _itemMrpCtrl.text = _formatPrice(match?.mrp ?? item.mrp);
       _itemQtyCtrl.text = _formatPrice(item.quantity);
       _itemRateCtrl.text = _formatPrice(item.rate);
+      // Show the item's own saved box quantity here — do NOT derive it
+      // from the Quantity field (that's only for live-sync while the
+      // user is actively typing, see the Quantity field's onChanged).
+      // Quantity and Box Quantity are separate stored values and must
+      // each be populated from their own field on the item.
+      _itemBoxQtyCtrl.text = _formatPrice(item.boxQuantity);
+      _itemPieceQtyCtrl.text = _formatPrice(item.pieceQuantity);
     });
 
     context.read<SalesmanEstimateBloc>().add(const ProductIncentiveCleared());
@@ -448,7 +524,42 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
   void _cancelEditItem() => _resetItemForm();
 
+  /// For an unsaved (locally-added) item, removes it from the list
+  /// immediately — there's nothing on the server to delete. For an
+  /// existing item, dispatches the remove-item API call instead; the
+  /// item is only dropped from [_items] once that call succeeds (handled
+  /// in the BlocListener in build()).
   void _removeItem(int index) {
+    final item = _items[index];
+
+    if (_isUnsavedItem(item)) {
+      setState(() {
+        _items.removeAt(index);
+        if (_editingItemIndex != null) {
+          if (_editingItemIndex == index) {
+            _editingItemIndex = null;
+            _resetItemForm();
+          } else if (_editingItemIndex! > index) {
+            _editingItemIndex = _editingItemIndex! - 1;
+          }
+        }
+      });
+      return;
+    }
+
+    context.read<QuotationItemRemoveBloc>().add(QuotationItemRemoveRequested(
+      quotationId: widget.estimate.id,
+      quotationItemId: item.id,
+    ));
+  }
+
+  /// Called once the remove-item API call for [itemId] has succeeded —
+  /// actually drops the item from the local list and fixes up the
+  /// editing index the same way the old synchronous _removeItem did.
+  void _dropItemById(String itemId) {
+    final index = _items.indexWhere((i) => i.id == itemId);
+    if (index == -1) return;
+
     setState(() {
       _items.removeAt(index);
       if (_editingItemIndex != null) {
@@ -507,6 +618,11 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
         productId: i.productId,
         quantity: i.quantity,
         rate: i.rate,
+        // Only sent when actually a box-unit item with a positive
+        // value — QuotationUpdateItemRequest.toJson() omits nulls, so
+        // regular (non-box) items are unaffected.
+        boxQuantity: i.boxQuantity > 0 ? i.boxQuantity : null,
+        pieceQuantity: i.pieceQuantity > 0 ? i.pieceQuantity : null,
       ))
           .toList(),
     );
@@ -545,6 +661,20 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                   prev.productsStatus != curr.productsStatus &&
                   curr.productsStatus == LoadStatus.success,
               listener: (context, state) => _backfillCompanyAndMrp(state.products),
+            ),
+            BlocListener<QuotationItemRemoveBloc, QuotationItemRemoveState>(
+              listenWhen: (prev, curr) => prev.status != curr.status,
+              listener: (context, state) {
+                if (state.status == QuotationItemRemoveStatus.success) {
+                  final removedId = state.removedItemId;
+                  if (removedId != null) _dropItemById(removedId);
+                  AppSnackbar.success(state.message ?? 'Item removed successfully');
+                  context.read<QuotationItemRemoveBloc>().add(const QuotationItemRemoveResultConsumed());
+                } else if (state.status == QuotationItemRemoveStatus.failure) {
+                  _showError(state.errorMessage ?? 'Failed to remove item');
+                  context.read<QuotationItemRemoveBloc>().add(const QuotationItemRemoveResultConsumed());
+                }
+              },
             ),
           ],
           child: Column(
@@ -709,15 +839,54 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                                 inputFormatters: DValidator.decimalNumber,
                                 validator: (v) {
                                   final n = double.tryParse((v ?? '').trim());
-                                  if (n == null || n <= 0) return 'Enter a valid quantity';
+                                  if (n == null || n <= 0) {
+                                    return _isBoxUnitProduct
+                                        ? 'Enter a valid box/piece quantity'
+                                        : 'Enter a valid quantity';
+                                  }
                                   return null;
                                 },
                                 onChanged: (_) {
-                                  setState(() {});
+                                  // Live-sync only: this is the one place Box
+                                  // Quantity should be derived from Quantity —
+                                  // while the user is actively editing it.
+                                  setState(_recomputeBoxQtyIfNeeded);
                                   _scheduleIncentiveFetch();
                                 },
                               ),
                             ),
+                            if (_isBoxUnitProduct)
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: LabeledField(
+                                      label: 'Box Quantity (auto)',
+                                      field: IgnorePointer(
+                                        child: CustomTextField(
+                                          hint: '0',
+                                          icon: Icons.inventory_2_outlined,
+                                          keyboardType: TextInputType.number,
+                                          controller: _itemBoxQtyCtrl,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: Responsive.w(10)),
+                                  Expanded(
+                                    child: LabeledField(
+                                      label: 'Piece Quantity',
+                                      field: CustomTextField(
+                                        hint: 'Enter piece qty',
+                                        icon: Icons.widgets_outlined,
+                                        keyboardType: TextInputType.number,
+                                        controller: _itemPieceQtyCtrl,
+                                        inputFormatters: DValidator.decimalNumber,
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             LabeledField(
                               label: 'Rate',
                               field: CustomTextField(
@@ -823,18 +992,30 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           ),
                         )
                       else
-                        ..._items.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final item = entry.value;
-                          return _EditItemTile(
-                            serialNo: i + 1,
-                            item: item,
-                            currency: currency,
-                            isEditing: _editingItemIndex == i,
-                            onEdit: () => _editItem(i),
-                            onDelete: () => _removeItem(i),
-                          );
-                        }),
+                        BlocBuilder<QuotationItemRemoveBloc, QuotationItemRemoveState>(
+                          buildWhen: (prev, curr) =>
+                          prev.status != curr.status || prev.removedItemId != curr.removedItemId,
+                          builder: (context, removeState) {
+                            final removingId = removeState.status == QuotationItemRemoveStatus.inProgress
+                                ? removeState.removedItemId
+                                : null;
+                            return Column(
+                              children: _items.asMap().entries.map((entry) {
+                                final i = entry.key;
+                                final item = entry.value;
+                                return _EditItemTile(
+                                  serialNo: i + 1,
+                                  item: item,
+                                  currency: currency,
+                                  isEditing: _editingItemIndex == i,
+                                  isRemoving: item.id == removingId,
+                                  onEdit: () => _editItem(i),
+                                  onDelete: () => _removeItem(i),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
                       SizedBox(height: Responsive.h(20)),
 
                       Text('Other Details', style: AppTextStyles.h3()),
@@ -881,7 +1062,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           children: [
                             _totalRow('Total Items', '$_totalItemsCount'),
                             SizedBox(height: Responsive.h(6)),
-                          //  _totalRow('Total Qty', number.format(_totalQty)),
+                            //  _totalRow('Total Qty', number.format(_totalQty)),
                             SizedBox(height: Responsive.h(6)),
                             _totalRow('Total Sq.Ft', number.format(_totalSqft)),
                             if (_mrpTotal > 0) ...[
@@ -1176,6 +1357,7 @@ class _EditItemTile extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.isEditing = false,
+    this.isRemoving = false,
   });
 
   final int serialNo;
@@ -1184,6 +1366,7 @@ class _EditItemTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool isEditing;
+  final bool isRemoving;
 
   @override
   Widget build(BuildContext context) {
@@ -1246,9 +1429,26 @@ class _EditItemTile extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  InkWell(onTap: onEdit, child: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary)),
+                  InkWell(
+                    onTap: isRemoving ? null : onEdit,
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: isRemoving ? AppColors.textHint : AppColors.primary,
+                    ),
+                  ),
                   SizedBox(width: Responsive.w(14)),
-                  // InkWell(onTap: onDelete, child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error)),
+                  if (isRemoving)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    InkWell(
+                      onTap: onDelete,
+                      child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                    ),
                 ],
               ),
             ],

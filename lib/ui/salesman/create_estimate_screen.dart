@@ -67,12 +67,15 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   final _itemCompanyCtrl = TextEditingController();
   final _itemSizeCtrl = TextEditingController();
   final _itemUnitCtrl = TextEditingController();
+  final _itemPackingCtrl = TextEditingController(); // auto-filled packing display
   final _itemMrpCtrl = TextEditingController();
   final _itemQtyCtrl = TextEditingController();
   final _itemRateCtrl = TextEditingController();
 
-  // Box/piece are no longer shown in the UI, but the API still wants
-  // them per item, so they're still tracked — just silently, off-screen.
+  // Box/piece are not shown as separate fields in the UI (same as the
+  // owner flow) — Quantity is the single manual entry even for box-unit
+  // products. The API still wants box_quantity/piece_quantity per item,
+  // so these are kept and silently mirrored from Quantity on submit.
   final _itemBoxQtyCtrl = TextEditingController();
   final _itemPieceQtyCtrl = TextEditingController();
 
@@ -111,6 +114,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _itemCompanyCtrl.dispose();
     _itemSizeCtrl.dispose();
     _itemUnitCtrl.dispose();
+    _itemPackingCtrl.dispose();
     _itemMrpCtrl.dispose();
     _itemQtyCtrl.dispose();
     _itemBoxQtyCtrl.dispose();
@@ -127,8 +131,15 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   double get _handlingCharge => double.tryParse(_handlingChargeCtrl.text) ?? 0;
 
   bool get _isBoxUnitProduct => _selectedProduct?.isBoxUnit ?? false;
+
+  // Quantity is the single manual entry (even for box-unit products),
+  // exactly like the owner flow's _computedQuantity — there's no
+  // separate Box Qty / Piece Qty input in either widget.
   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
 
+  /// For box-unit products, mirrors Quantity into the (hidden) Box
+  /// Quantity field the API still expects, exactly like the owner flow's
+  /// _recomputeBoxQtyIfNeeded. Piece Quantity stays 0.
   void _recomputeBoxQtyIfNeeded() {
     if (!_isBoxUnitProduct) return;
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
@@ -197,28 +208,30 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     return true;
   }
 
+  /// Validates the current item fields (Step 2) — matches the owner
+  /// flow's _validateCurrentItemFields exactly: same single Quantity
+  /// field is read either way, only the label/error wording changes
+  /// when the product is box-unit.
   bool _validateCurrentItemFields() {
     if (_selectedProduct == null) {
       _showError('Please select a product');
       return false;
     }
 
-    final qtyShapeError = DValidator.validateOptionalNumber('Quantity', _itemQtyCtrl.text);
-    if (qtyShapeError != null) {
-      _showError(qtyShapeError);
-      return false;
-    }
-    if (_computedQuantity <= 0) {
-      _showError('Please enter a valid quantity');
+    final qtyShapeError = DValidator.validateOptionalNumber(
+      _isBoxUnitProduct ? 'Box/piece quantity' : 'Quantity',
+      _itemQtyCtrl.text,
+    );
+    if (qtyShapeError != null || _computedQuantity <= 0) {
+      _showError(_isBoxUnitProduct
+          ? 'Please enter a valid box quantity or piece quantity'
+          : 'Please enter a valid quantity');
       return false;
     }
 
     final rateShapeError = DValidator.validateOptionalNumber('Rate', _itemRateCtrl.text);
-    if (rateShapeError != null) {
-      _showError(rateShapeError);
-      return false;
-    }
-    if ((double.tryParse(_itemRateCtrl.text) ?? 0) <= 0) {
+    final rateValue = double.tryParse(_itemRateCtrl.text) ?? 0;
+    if (rateShapeError != null || rateValue <= 0) {
       _showError('Please enter a valid rate');
       return false;
     }
@@ -254,16 +267,17 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
         _itemCompanyCtrl.text = product.company;
         _itemSizeCtrl.text = product.size;
         _itemUnitCtrl.text = product.unit;
+        _itemPackingCtrl.text = product.packing;
         _itemMrpCtrl.text = _formatPrice(product.mrp);
         _itemRateCtrl.text = _formatPrice(product.rate);
         _itemQtyCtrl.clear();
         _itemBoxQtyCtrl.clear();
         _itemPieceQtyCtrl.clear();
-        _recomputeBoxQtyIfNeeded();
       } else {
         _itemCompanyCtrl.clear();
         _itemSizeCtrl.clear();
         _itemUnitCtrl.clear();
+        _itemPackingCtrl.clear();
         _itemMrpCtrl.clear();
         _itemRateCtrl.clear();
         _itemQtyCtrl.clear();
@@ -314,6 +328,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _itemCompanyCtrl.clear();
     _itemSizeCtrl.clear();
     _itemUnitCtrl.clear();
+    _itemPackingCtrl.clear();
     _itemMrpCtrl.clear();
     _itemQtyCtrl.clear();
     _itemBoxQtyCtrl.clear();
@@ -343,6 +358,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
         company: _itemCompanyCtrl.text.trim(),
         size: _itemSizeCtrl.text.trim(),
         unit: _itemUnitCtrl.text.trim(),
+        packing: _itemPackingCtrl.text.trim(),
         quantity: _computedQuantity,
         boxQuantity: _isBoxUnitProduct ? (double.tryParse(_itemBoxQtyCtrl.text) ?? 0) : 0,
         pieceQuantity: _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : 0,
@@ -380,6 +396,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
       _itemCompanyCtrl.text = item.company;
       _itemSizeCtrl.text = item.size;
       _itemUnitCtrl.text = item.unit;
+      _itemPackingCtrl.text = item.packing;
       _itemMrpCtrl.text = item.mrp == item.mrp.roundToDouble()
           ? item.mrp.toStringAsFixed(0)
           : item.mrp.toString();
@@ -556,19 +573,12 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
 
     return BlocListener<SalesmanEstimateBloc, SalesmanEstimateState>(
       listenWhen: (prev, curr) => prev.submitStatus != curr.submitStatus,
-      // listener: (context, state) {
-      //   if (state.submitStatus == SubmitStatus.success) {
-      //     AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
-          // context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
-          // context.go('/salesman');
-          listener: (context, state) {
-            if (state.submitStatus == SubmitStatus.success) {
-              AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
-              context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
-              context.pop(true);   // ← ADD this instead
-
-        }
-        else if (state.submitStatus == SubmitStatus.failure) {
+      listener: (context, state) {
+        if (state.submitStatus == SubmitStatus.success) {
+          AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
+          context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
+          context.pop(true);
+        } else if (state.submitStatus == SubmitStatus.failure) {
           _showError(state.submitError ?? 'Something went wrong. Please try again.');
           context.read<SalesmanEstimateBloc>().add(const QuotationSubmitResultConsumed());
         }
@@ -620,8 +630,11 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                       itemCompanyCtrl: _itemCompanyCtrl,
                       itemSizeCtrl: _itemSizeCtrl,
                       itemUnitCtrl: _itemUnitCtrl,
+                      itemPackingCtrl: _itemPackingCtrl,
                       itemMrpCtrl: _itemMrpCtrl,
                       itemQtyCtrl: _itemQtyCtrl,
+                      itemBoxQtyCtrl: _itemBoxQtyCtrl,
+                      itemPieceQtyCtrl: _itemPieceQtyCtrl,
                       itemRateCtrl: _itemRateCtrl,
                       currentAmount: _currentItemAmount,
                       onQuantityChanged: _onQuantityChanged,

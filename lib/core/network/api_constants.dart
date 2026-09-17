@@ -217,4 +217,9 @@ static const String quotationsCancel='/quotations/cancel';
 
 //owner all sitevisit get
   static const String siteVisitsAll = '/site-visits/all';
+
+
+  //estimate and quotationdeletion
+// In ApiConstants, alongside quotationsCancel etc.
+  static const String quotationsRemoveItem = '/quotations/remove-item';
 }

@@ -1,596 +1,4 @@
-//
-//
-// import 'package:flutter/material.dart';
-// import 'package:flutter_bloc/flutter_bloc.dart';
-// import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-// import '../../../core/constants/app_colors.dart';
-// import '../../../core/constants/app_text_styles.dart';
-// import '../../../core/utils/responsive.dart';
-// import '../../../core/validator/validationfile.dart';
-// import '../../Apiprovider/product_enums.dart';
-// import '../../bloc/ownerbloc/product/product_bloc.dart';
-// import '../../bloc/ownerbloc/product/product_event.dart';
-// import '../../bloc/ownerbloc/product/product_state.dart';
-// import '../../models/owner_models/addproductmodel.dart';
-// import '../../models/owner_models/getproductmodel.dart';
-// import '../../models/owner_models/updateproductmodel.dart';
-// import '../../widgets/appsnackbar.dart';
-//
-//
-// class AddIncentiveProductScreen extends StatelessWidget {
-//   const AddIncentiveProductScreen({super.key, this.product});
-//
-//   final ProductModel? product;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return BlocProvider(
-//       create: (_) => ProductBloc()..add(const LoadProductDropdowns()),
-//       child: _AddIncentiveProductForm(product: product),
-//     );
-//   }
-// }
-//
-// class _AddIncentiveProductForm extends StatefulWidget {
-//   const _AddIncentiveProductForm({this.product});
-//
-//   final ProductModel? product;
-//
-//   @override
-//   State<_AddIncentiveProductForm> createState() => _AddIncentiveProductFormState();
-// }
-//
-// class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
-//   final _formKey = GlobalKey<FormState>();
-//
-//   late final TextEditingController _nameCtrl;
-//   late final TextEditingController _sizeCtrl;
-//   late final TextEditingController _mrpCtrl;
-//   late final TextEditingController _rateCtrl;
-//   late final TextEditingController _incentivePercentCtrl;
-//   late final TextEditingController _incentiveFixedCtrl;
-//   late final TextEditingController _minQuantityCtrl;
-//   late final TextEditingController _piecesPerBoxCtrl;
-//   late final TextEditingController _packingCtrl;
-//
-//   String? _selectedCompanyId;
-//   String? _selectedUnitId;
-//   ProductIncentiveType _incentiveType = ProductIncentiveType.percentage;
-//   ProductBonusType _bonusType = ProductBonusType.single;
-//
-//   // True once we've synced _selectedCompanyId/_selectedUnitId against the
-//   // loaded dropdown lists at least once. Prevents re-running the sync (and
-//   // fighting user edits) on every rebuild.
-//   bool _dropdownSelectionSynced = false;
-//
-//   // True when the currently-selected unit's API record has
-//   // show_pieces_per_box = "1". Controls whether the packing / pieces-per-box
-//   // fields show up and get sent to the API.
-//   bool _isBoxUnit = false;
-//
-//   bool get _isEditing => widget.product != null;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     final p = widget.product;
-//     _nameCtrl = TextEditingController(text: p?.name ?? '');
-//     _sizeCtrl = TextEditingController(text: p?.size ?? '');
-//     _mrpCtrl = TextEditingController(text: p != null ? p.mrp.toString() : '');
-//     _rateCtrl = TextEditingController(text: p != null ? p.rate.toString() : '');
-//     _incentivePercentCtrl =
-//         TextEditingController(text: p != null ? p.incentivePercentage.toString() : '');
-//     _incentiveFixedCtrl =
-//         TextEditingController(text: p != null ? p.incentiveAmount.toString() : '');
-//     _minQuantityCtrl =
-//         TextEditingController(text: p != null ? p.minQuantity.toString() : '0');
-//
-//     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
-//     _packingCtrl = TextEditingController(text: p?.packing ?? '');
-//
-//     // Prefill dropdown selections from the product being edited.
-//     _selectedCompanyId = p?.companyId;
-//     _selectedUnitId = p?.unitId;
-//
-//     // ProductModel.incentiveType is parsed straight from the API's
-//     // incentive_type field ('fixed' / 'percentage' / '' -> none). No
-//     // guessing from which of incentivePercentage/incentiveAmount happens
-//     // to be non-zero.
-//     _incentiveType =
-//     p == null ? ProductIncentiveType.percentage : p.incentiveType;
-//
-//     // ProductModel.bonusType is parsed straight from the API's bonus_type
-//     // field ('bulk' / 'single' / '' -> none). Legacy records with an empty
-//     // bonus_type ("") correctly resolve to ProductBonusType.none here.
-//     _bonusType = p?.bonusType ?? ProductBonusType.single;
-//
-//     // FIX: is_box_unit alone isn't fully reliable — some legacy records
-//     // report is_box_unit: "0" from the API while still having
-//     // pieces_per_box/packing populated (e.g. a product with
-//     // is_box_unit: "0" but packing: "6pcs/Box" and pieces_per_box: "6").
-//     // Trust isBoxUnit when it's true, but fall back to hasBoxPacking so we
-//     // never hide fields that actually contain real data.
-//     _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
-//   }
-//
-//   @override
-//   void dispose() {
-//     _nameCtrl.dispose();
-//     _sizeCtrl.dispose();
-//     _mrpCtrl.dispose();
-//     _rateCtrl.dispose();
-//     _incentivePercentCtrl.dispose();
-//     _incentiveFixedCtrl.dispose();
-//     _minQuantityCtrl.dispose();
-//     _piecesPerBoxCtrl.dispose();
-//     _packingCtrl.dispose();
-//     super.dispose();
-//   }
-//
-//   bool _computeIsBoxUnit(ProductState state) {
-//     if (_selectedUnitId == null) return false;
-//     final matches = state.units.where((u) => u.id == _selectedUnitId);
-//     if (matches.isEmpty) return false;
-//     return matches.first.showPiecesPerBox;
-//   }
-//
-//   void _onUnitChanged(String? unitId, ProductState state) {
-//     setState(() {
-//       _selectedUnitId = unitId;
-//       _isBoxUnit = _computeIsBoxUnit(state);
-//       if (!_isBoxUnit) {
-//         _piecesPerBoxCtrl.clear();
-//         _packingCtrl.clear();
-//       }
-//     });
-//   }
-//
-//   void _syncDropdownSelectionsIfNeeded(ProductState state) {
-//     if (_dropdownSelectionSynced) return;
-//     if (state.dropdownStatus != DropdownStatus.loaded) return;
-//
-//     final companyExists =
-//     state.companies.any((c) => c.id == _selectedCompanyId);
-//     final unitExists = state.units.any((u) => u.id == _selectedUnitId);
-//
-//     setState(() {
-//       if (!companyExists) _selectedCompanyId = null;
-//       if (!unitExists) _selectedUnitId = null;
-//       _dropdownSelectionSynced = true;
-//
-//       // Once the unit list is loaded and the selected unit is confirmed to
-//       // exist in it, the dropdown-driven flag becomes authoritative for
-//       // FUTURE unit changes. But don't let a false negative from this
-//       // recompute clobber a true _isBoxUnit we already derived from the
-//       // product's own data (isBoxUnit / hasBoxPacking) in initState — only
-//       // upgrade to true, never silently downgrade to false here.
-//       if (unitExists) {
-//         final dropdownSaysBox = _computeIsBoxUnit(state);
-//         _isBoxUnit = _isBoxUnit || dropdownSaysBox;
-//       }
-//     });
-//   }
-//
-//   String? _requiredNumberValidator(String? v) {
-//     final requiredError = DValidator.validateRequired(v, message: 'Required');
-//     if (requiredError != null) return requiredError;
-//     if (double.tryParse(v!.trim()) == null) return 'Enter a valid number';
-//     return null;
-//   }
-//
-//   void _save(BuildContext context) {
-//     if (!_formKey.currentState!.validate()) return;
-//     if (_selectedCompanyId == null || _selectedUnitId == null) {
-//       AppSnackbar.error('Please select a company and a unit.');
-//       return;
-//     }
-//
-//     final bloc = context.read<ProductBloc>();
-//
-//     if (_isEditing) {
-//       bloc.add(UpdateProduct(ProductUpdateRequestModel(
-//         id: widget.product!.id,
-//         name: _nameCtrl.text.trim(),
-//         companyId: _selectedCompanyId!,
-//         size: _sizeCtrl.text.trim(),
-//         unitId: _selectedUnitId!,
-//         mrp: double.parse(_mrpCtrl.text.trim()),
-//         rate: double.parse(_rateCtrl.text.trim()),
-//         incentiveType: _incentiveType,
-//         incentivePercentage: _incentiveType == ProductIncentiveType.percentage
-//             ? double.parse(_incentivePercentCtrl.text.trim())
-//             : null,
-//         incentiveAmount: _incentiveType == ProductIncentiveType.fixed
-//             ? double.parse(_incentiveFixedCtrl.text.trim())
-//             : null,
-//         bonusType: _bonusType,
-//         minQuantity: _bonusType == ProductBonusType.bulk
-//             ? _minQuantityCtrl.text.trim()
-//             : '0',
-//         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
-//         packing: _isBoxUnit ? _packingCtrl.text.trim() : null,
-//         isBoxUnit: _isBoxUnit,
-//       )));
-//     } else {
-//       bloc.add(CreateProduct(ProductAddRequestModel(
-//         name: _nameCtrl.text.trim(),
-//         companyId: _selectedCompanyId!,
-//         size: _sizeCtrl.text.trim(),
-//         unitId: _selectedUnitId!,
-//         mrp: double.parse(_mrpCtrl.text.trim()),
-//         rate: double.parse(_rateCtrl.text.trim()),
-//         incentiveType: _incentiveType,
-//         incentivePercentage: _incentiveType == ProductIncentiveType.percentage
-//             ? double.parse(_incentivePercentCtrl.text.trim())
-//             : null,
-//         incentiveAmount: _incentiveType == ProductIncentiveType.fixed
-//             ? double.parse(_incentiveFixedCtrl.text.trim())
-//             : null,
-//         bonusType: _bonusType,
-//         minQuantity: _bonusType == ProductBonusType.bulk
-//             ? (int.tryParse(_minQuantityCtrl.text.trim()) ?? 0)
-//             : 0,
-//         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
-//         packing: _isBoxUnit ? _packingCtrl.text.trim() : null,
-//         isBoxUnit: _isBoxUnit,
-//       )));
-//     }
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     Responsive.init(context);
-//
-//     return NetworkAwareWrapper(child: Scaffold(
-//       backgroundColor: AppColors.background,
-//       appBar: AppBar(
-//         title: Text(_isEditing ? 'Edit Product' : 'Add Product', style: AppTextStyles.h6()),
-//       ),
-//       body: SafeArea(
-//         child: BlocConsumer<ProductBloc, ProductState>(
-//           listenWhen: (previous, current) =>
-//           previous.status != current.status ||
-//               previous.errorMessage != current.errorMessage ||
-//               previous.dropdownStatus != current.dropdownStatus,
-//           listener: (context, state) {
-//             if (state.status == ProductStatus.actionSuccess) {
-//               AppSnackbar.success(state.actionMessage ?? 'Saved successfully.');
-//               Navigator.of(context).pop(true);
-//             } else if (state.status == ProductStatus.error && state.errorMessage != null) {
-//               AppSnackbar.error(state.errorMessage!);
-//             }
-//
-//             if (state.dropdownStatus == DropdownStatus.loaded) {
-//               _syncDropdownSelectionsIfNeeded(state);
-//             }
-//           },
-//           builder: (context, state) {
-//             final isSaving = state.status == ProductStatus.actionInProgress;
-//             final dropdownsLoading = state.dropdownStatus == DropdownStatus.loading;
-//             final dropdownsFailed = state.dropdownStatus == DropdownStatus.error;
-//
-//             // Also try syncing on build (covers the case where dropdowns
-//             // were already loaded before listener ever fired, e.g. hot
-//             // reload during development).
-//             if (state.dropdownStatus == DropdownStatus.loaded && !_dropdownSelectionSynced) {
-//               WidgetsBinding.instance.addPostFrameCallback((_) {
-//                 if (mounted) _syncDropdownSelectionsIfNeeded(state);
-//               });
-//             }
-//
-//             return Form(
-//               key: _formKey,
-//               child: ListView(
-//                 padding: EdgeInsets.fromLTRB(
-//                     Responsive.w(16), Responsive.h(16), Responsive.w(16), Responsive.h(24)),
-//                 children: [
-//                   Text('Product Details',
-//                       style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(15))),
-//                   SizedBox(height: Responsive.h(12)),
-//
-//                   _FieldLabel('Product Name'),
-//                   TextFormField(
-//                     controller: _nameCtrl,
-//                     inputFormatters: DValidator.textWithLimit,
-//                     decoration: const InputDecoration(hintText: 'e.g. Marvel Statuario'),
-//                     validator: (v) =>
-//                         DValidator.validateRequired(v, message: 'Product name is required'),
-//                   ),
-//                   SizedBox(height: Responsive.h(14)),
-//
-//                   _FieldLabel('Company'),
-//                   if (dropdownsFailed)
-//                     _DropdownRetry(
-//                       message: state.errorMessage ?? 'Failed to load companies.',
-//                       onRetry: () =>
-//                           context.read<ProductBloc>().add(const LoadProductDropdowns()),
-//                     )
-//                   else
-//                     DropdownButtonFormField<String>(
-//                       isExpanded: true,
-//                       initialValue: _selectedCompanyId,
-//                       decoration: InputDecoration(
-//                         hintText: dropdownsLoading ? 'Loading...' : 'Select company',
-//                       ),
-//                       items: state.companies
-//                           .map((c) => DropdownMenuItem(
-//                         value: c.id,
-//                         child: Text(c.label, overflow: TextOverflow.ellipsis),
-//                       ))
-//                           .toList(),
-//                       onChanged: dropdownsLoading
-//                           ? null
-//                           : (v) => setState(() => _selectedCompanyId = v),
-//                       validator: (v) => DValidator.validateDropdown('company', v),
-//                     ),
-//                   SizedBox(height: Responsive.h(14)),
-//
-//                   Row(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Expanded(
-//                         flex: 3,
-//                         child: Column(
-//                           crossAxisAlignment: CrossAxisAlignment.start,
-//                           children: [
-//                             _FieldLabel('Size'),
-//                             TextFormField(
-//                               controller: _sizeCtrl,
-//                               inputFormatters: DValidator.textWithLimit,
-//                               decoration: const InputDecoration(hintText: 'e.g. 600x1200'),
-//                               validator: (v) =>
-//                                   DValidator.validateRequired(v, message: 'Size is required'),
-//                             ),
-//                           ],
-//                         ),
-//                       ),
-//                       SizedBox(width: Responsive.w(12)),
-//                       Expanded(
-//                         flex: 2,
-//                         child: Column(
-//                           crossAxisAlignment: CrossAxisAlignment.start,
-//                           children: [
-//                             _FieldLabel('Unit'),
-//                             if (dropdownsFailed)
-//                               const SizedBox.shrink()
-//                             else
-//                               DropdownButtonFormField<String>(
-//                                 isExpanded: true,
-//                                 initialValue: _selectedUnitId,
-//                                 decoration: InputDecoration(
-//                                   hintText: dropdownsLoading ? 'Loading...' : 'Select',
-//                                 ),
-//                                 items: state.units
-//                                     .map((u) => DropdownMenuItem(
-//                                   value: u.id,
-//                                   child: Text(u.label, overflow: TextOverflow.ellipsis),
-//                                 ))
-//                                     .toList(),
-//                                 onChanged: dropdownsLoading
-//                                     ? null
-//                                     : (v) => _onUnitChanged(v, state),
-//                                 validator: (v) => DValidator.validateDropdown('unit', v),
-//                               ),
-//                           ],
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   SizedBox(height: Responsive.h(14)),
-//
-//                   // Packing / pieces-per-box — only shown when the selected
-//                   // unit's show_pieces_per_box flag is true.
-//                   if (_isBoxUnit) ...[
-//                     Row(
-//                       crossAxisAlignment: CrossAxisAlignment.start,
-//                       children: [
-//                         Expanded(
-//                           child: Column(
-//                             crossAxisAlignment: CrossAxisAlignment.start,
-//                             children: [
-//                               _FieldLabel('Packing'),
-//                               TextFormField(
-//                                 controller: _packingCtrl,
-//                                 inputFormatters: DValidator.textWithLimit,
-//                                 decoration: const InputDecoration(hintText: 'e.g. 8pcs/box'),
-//                               ),
-//                             ],
-//                           ),
-//                         ),
-//                         SizedBox(width: Responsive.w(12)),
-//                         Expanded(
-//                           child: Column(
-//                             crossAxisAlignment: CrossAxisAlignment.start,
-//                             children: [
-//                               _FieldLabel('Pieces per Box'),
-//                               TextFormField(
-//                                 controller: _piecesPerBoxCtrl,
-//                                 keyboardType: TextInputType.number,
-//                                 inputFormatters: DValidator.digitsOnly,
-//                                 decoration: const InputDecoration(hintText: 'e.g. 8'),
-//                               ),
-//                             ],
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                     SizedBox(height: Responsive.h(14)),
-//                   ],
-//
-//                   Row(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Expanded(
-//                         child: Column(
-//                           crossAxisAlignment: CrossAxisAlignment.start,
-//                           children: [
-//                             _FieldLabel('MRP (₹)'),
-//                             TextFormField(
-//                               controller: _mrpCtrl,
-//                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-//                               inputFormatters: DValidator.decimalNumber,
-//                               decoration: const InputDecoration(hintText: 'e.g. 650'),
-//                               validator: _requiredNumberValidator,
-//                             ),
-//                           ],
-//                         ),
-//                       ),
-//                       SizedBox(width: Responsive.w(12)),
-//                       Expanded(
-//                         child: Column(
-//                           crossAxisAlignment: CrossAxisAlignment.start,
-//                           children: [
-//                             _FieldLabel('Selling Rate (₹)'),
-//                             TextFormField(
-//                               controller: _rateCtrl,
-//                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-//                               inputFormatters: DValidator.decimalNumber,
-//                               decoration: const InputDecoration(hintText: 'e.g. 50'),
-//                               validator: _requiredNumberValidator,
-//                             ),
-//                           ],
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   SizedBox(height: Responsive.h(20)),
-//
-//                   Text('Incentive',
-//                       style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(15))),
-//                   SizedBox(height: Responsive.h(10)),
-//
-//                   _FieldLabel('Incentive Type'),
-//                   DropdownButtonFormField<ProductIncentiveType>(
-//                     isExpanded: true,
-//                     initialValue: _incentiveType,
-//                     decoration: const InputDecoration(hintText: 'Select incentive type'),
-//                     items: ProductIncentiveType.values
-//                         .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-//                         .toList(),
-//                     onChanged: (v) {
-//                       if (v != null) setState(() => _incentiveType = v);
-//                     },
-//                   ),
-//                   SizedBox(height: Responsive.h(12)),
-//
-//                   // `none` matches neither branch below, so no incentive
-//                   // field is built (and therefore none is validated) when
-//                   // Incentive Type is "None".
-//                   if (_incentiveType == ProductIncentiveType.percentage) ...[
-//                     _FieldLabel('Incentive (%)'),
-//                     TextFormField(
-//                       controller: _incentivePercentCtrl,
-//                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-//                       inputFormatters: DValidator.decimalNumber,
-//                       decoration: const InputDecoration(hintText: 'e.g. 5'),
-//                       validator: _requiredNumberValidator,
-//                     ),
-//                   ] else if (_incentiveType == ProductIncentiveType.fixed) ...[
-//                     _FieldLabel('Incentive Amount (₹)'),
-//                     TextFormField(
-//                       controller: _incentiveFixedCtrl,
-//                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-//                       inputFormatters: DValidator.decimalNumber,
-//                       decoration: const InputDecoration(hintText: 'e.g. 20'),
-//                       validator: _requiredNumberValidator,
-//                     ),
-//                   ],
-//                   SizedBox(height: Responsive.h(20)),
-//
-//                   Text('Bonus',
-//                       style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(15))),
-//                   SizedBox(height: Responsive.h(10)),
-//
-//                   _FieldLabel('Bonus Type'),
-//                   DropdownButtonFormField<ProductBonusType>(
-//                     isExpanded: true,
-//                     initialValue: _bonusType,
-//                     decoration: const InputDecoration(hintText: 'Select bonus type'),
-//                     items: ProductBonusType.values
-//                         .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-//                         .toList(),
-//                     onChanged: (v) {
-//                       if (v != null) setState(() => _bonusType = v);
-//                     },
-//                   ),
-//                   if (_bonusType == ProductBonusType.bulk) ...[
-//                     SizedBox(height: Responsive.h(12)),
-//                     _FieldLabel('Minimum Quantity'),
-//                     TextFormField(
-//                       controller: _minQuantityCtrl,
-//                       keyboardType: TextInputType.number,
-//                       inputFormatters: DValidator.digitsOnly,
-//                       decoration: const InputDecoration(hintText: 'e.g. 5'),
-//                       validator: _requiredNumberValidator,
-//                     ),
-//                   ],
-//                   SizedBox(height: Responsive.h(28)),
-//
-//                   SizedBox(
-//                     width: double.infinity,
-//                     child: ElevatedButton(
-//                       style: ElevatedButton.styleFrom(
-//                         backgroundColor: AppColors.primary,
-//                         padding: EdgeInsets.symmetric(vertical: Responsive.h(14)),
-//                       ),
-//                       onPressed: isSaving ? null : () => _save(context),
-//                       child: isSaving
-//                           ? const SizedBox(
-//                         height: 20,
-//                         width: 20,
-//                         child: CircularProgressIndicator(
-//                           strokeWidth: 2,
-//                           valueColor: AlwaysStoppedAnimation(Colors.white),
-//                         ),
-//                       )
-//                           : Text(
-//                         _isEditing ? 'Save Changes' : 'Add Product',
-//                         style:
-//                         const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-//                       ),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             );
-//           },
-//         ),
-//       ),
-//     ));
-//   }
-// }
-//
-// class _FieldLabel extends StatelessWidget {
-//   const _FieldLabel(this.text);
-//   final String text;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Padding(
-//       padding: EdgeInsets.only(bottom: Responsive.h(6)),
-//       child: Text(text, style: AppTextStyles.caption()),
-//     );
-//   }
-// }
-//
-// class _DropdownRetry extends StatelessWidget {
-//   const _DropdownRetry({required this.message, required this.onRetry});
-//
-//   final String message;
-//   final VoidCallback onRetry;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Row(
-//       children: [
-//         Expanded(
-//           child: Text(message, style: AppTextStyles.caption().copyWith(color: AppColors.error)),
-//         ),
-//         TextButton(onPressed: onRetry, child: const Text('Retry')),
-//       ],
-//     );
-//   }
-// }
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -646,8 +54,12 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
 
   String? _selectedCompanyId;
   String? _selectedUnitId;
-  ProductIncentiveType _incentiveType = ProductIncentiveType.percentage;
-  ProductBonusType _bonusType = ProductBonusType.single;
+
+  // Default for a brand-new product is "None" for both incentive type and
+  // bonus type. Editing an existing product overrides this from the saved
+  // data in initState() below.
+  ProductIncentiveType _incentiveType = ProductIncentiveType.none;
+  ProductBonusType _bonusType = ProductBonusType.none;
 
   // True once we've synced _selectedCompanyId/_selectedUnitId against the
   // loaded dropdown lists at least once. Prevents re-running the sync (and
@@ -681,8 +93,16 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     _minQuantityCtrl =
         TextEditingController(text: p != null ? p.minQuantity.toString() : '0');
 
+    // Packing/pieces-per-box are prefilled straight from the saved product
+    // (ProductModel.packing / .piecesPerBox).
     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
     _packingCtrl = TextEditingController(text: p?.packing ?? '');
+
+    // TEMP DEBUG — remove once packing issue is confirmed fixed.
+    // Prints exactly what value this screen received for `packing` at the
+    // moment the form is built, so we can compare it against the raw API
+    // print in getproductmodel.dart and see where (if anywhere) it's lost.
+    print('EDIT initState packing="${p?.packing}" for id=${p?.id}');
 
     // Auto-fill Pieces per Box from whatever number is typed into Packing
     // (e.g. "8pcs/box" -> "8"), but only while the selected unit is a
@@ -698,17 +118,17 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     // guessing from which of incentivePercentage/incentiveAmount happens
     // to be non-zero.
     _incentiveType =
-    p == null ? ProductIncentiveType.percentage : p.incentiveType;
+    p == null ? ProductIncentiveType.none : p.incentiveType;
 
     // ProductModel.bonusType is parsed straight from the API's bonus_type
     // field ('bulk' / 'single' / '' -> none). Legacy records with an empty
     // bonus_type ("") correctly resolve to ProductBonusType.none here.
-    _bonusType = p?.bonusType ?? ProductBonusType.single;
+    _bonusType = p?.bonusType ?? ProductBonusType.none;
 
-    // FIX: is_box_unit alone isn't fully reliable — some legacy records
-    // report is_box_unit: "0" from the API while still having
-    // pieces_per_box/packing populated (e.g. a product with
-    // is_box_unit: "0" but packing: "6pcs/Box" and pieces_per_box: "6").
+    // is_box_unit alone isn't fully reliable — some legacy records report
+    // is_box_unit: "0" from the API while still having pieces_per_box/
+    // packing populated (e.g. a product with is_box_unit: "0" but
+    // packing: "6pcs/Box" and pieces_per_box: "6").
     // Trust isBoxUnit when it's true, but fall back to hasBoxPacking so we
     // never hide fields that actually contain real data.
     _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
@@ -965,8 +385,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                               controller: _sizeCtrl,
                               inputFormatters: DValidator.textWithLimit,
                               decoration: const InputDecoration(hintText: 'e.g. 600x1200'),
-                              validator: (v) =>
-                                  DValidator.validateRequired(v, message: 'Size is required'),
+                              //validator: (v) =>DValidator.validateRequired(v, message: 'Size is required'),
                             ),
                           ],
                         ),
@@ -1005,7 +424,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                   ),
                   SizedBox(height: Responsive.h(14)),
 
-                  // Packing is now shown for every unit (square feet, box,
+                  // Packing is shown for every unit (square feet, box,
                   // etc). Pieces per Box only appears alongside it — and
                   // gets auto-filled from the number typed in Packing —
                   // when the selected unit is a box/sq-ft type unit.
@@ -1020,7 +439,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             TextFormField(
                               controller: _packingCtrl,
                               inputFormatters: DValidator.textWithLimit,
-                              decoration: const InputDecoration(hintText: 'e.g. 8pcs/box'),
+                              //decoration: const InputDecoration(hintText: 'e.g. 8pcs/box'),
                             ),
                           ],
                         ),

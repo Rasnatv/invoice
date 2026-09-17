@@ -69,10 +69,19 @@ class _OwnerEstimateDetailView extends StatelessWidget {
       appBar: AppBar(title: Text('Owner Estimate Details', style: AppTextStyles.h6())),
       body: SafeArea(
         child: BlocConsumer<OwnerEstimateDetailBloc, OwnerEstimateDetailState>(
+          // listener: (context, state) {
+          //   if (state.actionStatus == OwnerEstimateActionStatus.success) {
+          //     AppSnackbar.success(state.actionMessage ?? 'Done');
+          //     //context.go('/owner-dashboard');
+          //   } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
+          //     AppSnackbar.error(state.actionMessage ?? 'Action failed');
+          //   }
+          // },
           listener: (context, state) {
             if (state.actionStatus == OwnerEstimateActionStatus.success) {
               AppSnackbar.success(state.actionMessage ?? 'Done');
-              //context.go('/owner-dashboard');
+              context.read<OwnerEstimateDetailBloc>()
+                  .add(OwnerEstimateDetailLoadRequested(estimateId));
             } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
               AppSnackbar.error(state.actionMessage ?? 'Action failed');
             }

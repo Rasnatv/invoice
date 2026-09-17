@@ -1,13 +1,16 @@
-
 class QuotationUpdateItemRequest {
   final String productId;
   final double quantity;
   final double rate;
+  final double? boxQuantity;
+  final double? pieceQuantity;
 
   const QuotationUpdateItemRequest({
     required this.productId,
     required this.quantity,
     required this.rate,
+    this.boxQuantity,
+    this.pieceQuantity,
   });
 
   /// Formats a double the same way the rest of the app does when sending
@@ -16,11 +19,16 @@ class QuotationUpdateItemRequest {
   static String _fmt(double value) =>
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
 
-  Map<String, dynamic> toJson() => {
-    'product_id': productId,
-    'quantity': _fmt(quantity),
-    'rate': _fmt(rate),
-  };
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'product_id': productId,
+      'quantity': _fmt(quantity),
+      'rate': _fmt(rate),
+    };
+    if (boxQuantity != null) map['box_quantity'] = _fmt(boxQuantity!);
+    if (pieceQuantity != null) map['piece_quantity'] = _fmt(pieceQuantity!);
+    return map;
+  }
 }
 
 /// Body for POST /quotations/update. `id` is required; every other field

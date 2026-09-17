@@ -1,5 +1,4 @@
-// This is your lib/core/models/loginresponsemodel.dart — the ONLY file that
-// should define LoginResponse / LoginData in the project.
+
 import 'package:tileshop/router/dashboardrouter.dart'; // UserRole, roleFromStoredString
 
 class LoginData {

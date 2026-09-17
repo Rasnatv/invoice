@@ -778,4 +778,12 @@ class ApiClient {
     options: await _authOptions(),
   );
 
+  /// POST /quotations/remove-item — body: { quotation_id, quotation_item_id }.
+  /// Removes a single line item from an existing quotation/estimate.
+  Future<Response> removeQuotationItem(Map<String, dynamic> data) async => dio.delete(
+    ApiConstants.quotationsRemoveItem,
+    data: data,
+    options: await _authOptions(),
+  );
+
 }

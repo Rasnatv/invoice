@@ -1,4 +1,5 @@
 
+
 import 'package:tileshop/models/owner_models/productenums.dart';
 
 import '../../Apiprovider/product_enums.dart';
@@ -49,13 +50,15 @@ class ProductAddRequestModel {
   /// e.g. "8" (number of pieces packed per box).
   final String? piecesPerBox;
 
-  /// Only sent when the selected unit is a "box"-type unit.
-  /// e.g. "8pcs/box".
+  /// Sent for EVERY unit now (square feet, box, kg, etc.) as long as a
+  /// value was typed — not gated to box-type units. e.g. "8pcs/box",
+  /// "30kg/bag".
   final String? packing;
 
   /// Set this to true when the unit picked in [unitId] is a "Box" unit.
-  /// Controls whether [piecesPerBox] / [packing] are sent to the API at all —
-  /// for non-box units these fields are omitted entirely, not sent empty.
+  /// Controls whether [piecesPerBox] is sent to the API at all — for
+  /// non-box units it's omitted entirely, not sent empty. Does NOT gate
+  /// [packing] anymore, since packing applies to every unit.
   final bool isBoxUnit;
 
   Map<String, dynamic> toJson() {
@@ -79,9 +82,15 @@ class ProductAddRequestModel {
       // Only sent when bonusType is bulk.
       if (bonusType == ProductBonusType.bulk)
         'min_quantity': minQuantity,
+      // pieces_per_box only applies to box/sq-ft type units.
       if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
         'pieces_per_box': piecesPerBox,
-      if (isBoxUnit && packing != null && packing!.isNotEmpty)
+      // FIXED: packing is now entered for every unit, not just box units —
+      // this was previously gated behind isBoxUnit, which silently dropped
+      // the typed value from the create request for every non-box unit
+      // (e.g. Kilogram). Send it whenever it's actually present, matching
+      // the already-correct behavior in ProductUpdateRequestModel.
+      if (packing != null && packing!.isNotEmpty)
         'packing': packing,
     };
   }

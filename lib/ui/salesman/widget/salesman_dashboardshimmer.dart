@@ -3,16 +3,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../widgets/ownerdashboardscreen_shimmer.dart';
 
-
-/// Full-screen skeleton for DashboardHomeScreen (salesman).
-///
-/// Drop this in place of the CircularProgressIndicator for the
-/// initial/loading state:
-///
-///   if (state.status == DashboardHomeStatus.initial ||
-///       state.status == DashboardHomeStatus.loading) {
-///     return const SalesmanDashboardShimmer();
-///   }
 class SalesmanDashboardShimmer extends StatelessWidget {
   const SalesmanDashboardShimmer({super.key});
 

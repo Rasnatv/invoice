@@ -1,12 +1,8 @@
 
-// =====================================================================
-// STEP 2 — ADD ITEMS
-// =====================================================================
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/salesman/widget/esalesmanestimatetype.dart';
 import 'package:flutter/material.dart';
-
 import '../../../bloc/salemanbloc/estimate/salesman_estimate_bloc.dart';
 import '../../../bloc/salemanbloc/estimate/salesmanestimate_event.dart';
 import '../../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
@@ -18,6 +14,37 @@ import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../widgets/custom_text_field.dart';
 import '../../../widgets/primary_button.dart';
 
+/// Drives which auto-filled fields are shown in the salesman Add Items
+/// form, based on the selected product. Size now always shows whenever
+/// the product has a size value, for any unit — matching the owner
+/// flow's AddItemsStep, which shows Size unconditionally. Only Packing
+/// stays conditional on whether the product actually has a packing
+/// value. Box Qty / Piece Qty visibility is handled separately (see
+/// _isBoxUnit) and isn't part of this.
+class _UnitFieldVisibility {
+  final bool showSize;
+  final bool showPacking;
+
+  const _UnitFieldVisibility({
+    required this.showSize,
+    required this.showPacking,
+  });
+
+  factory _UnitFieldVisibility.forProduct(ActiveProductModel? product) {
+    if (product == null) {
+      return const _UnitFieldVisibility(showSize: false, showPacking: false);
+    }
+
+    final sizeAvailable = product.size.trim().isNotEmpty;
+    final packingAvailable = product.packing.trim().isNotEmpty;
+
+    return _UnitFieldVisibility(
+      showSize: sizeAvailable,
+      showPacking: packingAvailable,
+    );
+  }
+}
+
 class AddItemsSteps extends StatelessWidget {
   const AddItemsSteps({
     required this.selectedProduct,
@@ -25,8 +52,11 @@ class AddItemsSteps extends StatelessWidget {
     required this.itemCompanyCtrl,
     required this.itemSizeCtrl,
     required this.itemUnitCtrl,
+    required this.itemPackingCtrl,
     required this.itemMrpCtrl,
     required this.itemQtyCtrl,
+    required this.itemBoxQtyCtrl,
+    required this.itemPieceQtyCtrl,
     required this.itemRateCtrl,
     required this.currentAmount,
     required this.onQuantityChanged,
@@ -46,8 +76,11 @@ class AddItemsSteps extends StatelessWidget {
   final TextEditingController itemCompanyCtrl;
   final TextEditingController itemSizeCtrl;
   final TextEditingController itemUnitCtrl;
+  final TextEditingController itemPackingCtrl;
   final TextEditingController itemMrpCtrl;
   final TextEditingController itemQtyCtrl;
+  final TextEditingController itemBoxQtyCtrl;
+  final TextEditingController itemPieceQtyCtrl;
   final TextEditingController itemRateCtrl;
   final double currentAmount;
 
@@ -67,9 +100,14 @@ class AddItemsSteps extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onSaveItems;
 
+  _UnitFieldVisibility get _fieldVisibility => _UnitFieldVisibility.forProduct(selectedProduct);
+
+  bool get _isBoxUnit => selectedProduct?.isBoxUnit ?? false;
+
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final visibility = _fieldVisibility;
 
     return StatefulBuilder(
       builder: (context, setLocalState) {
@@ -248,6 +286,17 @@ class AddItemsSteps extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (visibility.showPacking)
+                    LabeledField(
+                      label: 'Packing (auto)',
+                      field: IgnorePointer(
+                        child: CustomTextField(
+                          hint: 'Select a product first',
+                          icon: Icons.inventory_outlined,
+                          controller: itemPackingCtrl,
+                        ),
+                      ),
+                    ),
                   LabeledField(
                     label: 'MRP (auto)',
                     field: IgnorePointer(
@@ -260,10 +309,10 @@ class AddItemsSteps extends StatelessWidget {
                     ),
                   ),
 
-                  // Quantity is the single manual entry for every product
-                  // — box-unit or not. Box Qty / Piece Qty are no longer
-                  // shown in the UI; they're still computed and sent to
-                  // the API silently in the background.
+                  // Quantity is always shown — box-unit or not. For
+                  // box-unit products, an additional Box Qty (auto) /
+                  // Piece Qty row appears below it, matching the owner
+                  // flow's AddItemsStep exactly.
                   LabeledField(
                     label: 'Quantity',
                     field: CustomTextField(
@@ -278,6 +327,38 @@ class AddItemsSteps extends StatelessWidget {
                       },
                     ),
                   ),
+                  if (_isBoxUnit)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LabeledField(
+                            label: 'Box Qty (auto)',
+                            field: IgnorePointer(
+                              child: CustomTextField(
+                                hint: '0',
+                                icon: Icons.inventory_2_outlined,
+                                keyboardType: TextInputType.number,
+                                controller: itemBoxQtyCtrl,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: Responsive.w(10)),
+                        Expanded(
+                          child: LabeledField(
+                            label: 'Piece Qty',
+                            field: CustomTextField(
+                              hint: '0',
+                              icon: Icons.view_module_outlined,
+                              keyboardType: TextInputType.number,
+                              controller: itemPieceQtyCtrl,
+                              inputFormatters: DValidator.decimalNumber,
+                              onChanged: (_) => setLocalState(() {}),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   LabeledField(
                     label: 'Rate',
                     field: CustomTextField(
@@ -586,7 +667,8 @@ class _AddedItemTile extends StatelessWidget {
                 Text(item.name, style: AppTextStyles.bodyBold()),
                 SizedBox(height: Responsive.h(2)),
                 Text(
-                  '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}',
+                  '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}'
+                      '${item.packing.isNotEmpty ? ' | ${item.packing}' : ''}',
                   style: AppTextStyles.caption(),
                 ),
                 SizedBox(height: Responsive.h(2)),
