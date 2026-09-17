@@ -1,4 +1,5 @@
 
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -17,6 +18,16 @@ import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_state.dart'
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/owner_despatchdetailmodel.dart';
 import '../../widgets/appsnackbar.dart';
+
+// PDF generation + native share sheet (WhatsApp, Email, Drive, etc.)
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart'; // gives us a Unicode font (Noto Sans) that has the ₹ glyph
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+
+// Excel export
+import 'package:excel/excel.dart' as xls;
 
 class OwnerDispatchDetailScreen extends StatelessWidget {
   const OwnerDispatchDetailScreen({super.key, required this.dispatchId});
@@ -48,16 +59,22 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
   File? _driverSigFile;
   final _picker = ImagePicker();
 
-  // NEW: becomes true once a mark-in-transit / mark-delivered call
+  // becomes true once a mark-in-transit / mark-delivered call
   // succeeds. We hand this back to the list screen via Navigator.pop so
   // it knows to re-fetch instead of showing a stale status.
   bool _statusChanged = false;
+
+  // spinner state while the PDF is being built + handed to the share sheet.
+  bool _isGeneratingPdf = false;
+
+  // spinner state while the Excel file is being built + shared.
+  bool _isGeneratingExcel = false;
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    // NEW: WillPopScope intercepts BOTH the AppBar back arrow (whose
+    // WillPopScope intercepts BOTH the AppBar back arrow (whose
     // onPressed also calls Navigator.pop below) and the system back
     // gesture/button, making sure _statusChanged is always passed back.
     return WillPopScope(
@@ -70,17 +87,61 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
           backgroundColor: AppColors.background,
           appBar: AppBar(
             title: Text('Dispatch Details', style: AppTextStyles.h6()),
-            // NEW: custom back button so a direct tap also carries the flag.
+            // custom back button so a direct tap also carries the flag.
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () => Navigator.pop(context, _statusChanged),
             ),
+            actions: [
+              // Share as PDF -> native share sheet -> WhatsApp/etc.
+              IconButton(
+                tooltip: 'Share as PDF',
+                icon: _isGeneratingPdf
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.picture_as_pdf_rounded),
+                onPressed: _isGeneratingPdf
+                    ? null
+                    : () {
+                  final dispatch = context.read<DispatchDetailBloc>().state.dispatch;
+                  if (dispatch == null) {
+                    AppSnackbar.error('Dispatch data not loaded yet');
+                    return;
+                  }
+                  _generateAndSharePdf(dispatch);
+                },
+              ),
+              // Share as Excel -> native share sheet -> WhatsApp/etc.
+              IconButton(
+                tooltip: 'Share as Excel',
+                icon: _isGeneratingExcel
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.grid_on_rounded),
+                onPressed: _isGeneratingExcel
+                    ? null
+                    : () {
+                  final dispatch = context.read<DispatchDetailBloc>().state.dispatch;
+                  if (dispatch == null) {
+                    AppSnackbar.error('Dispatch data not loaded yet');
+                    return;
+                  }
+                  _generateAndShareExcel(dispatch);
+                },
+              ),
+            ],
           ),
           body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
             listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
             listener: (context, state) {
               if (state.actionStatus == DispatchActionStatus.success) {
-                _statusChanged = true; // NEW
+                _statusChanged = true;
                 AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
                 setState(() {
                   _customerSigFile = null;
@@ -171,7 +232,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
           _infoRow('Contact Number', d.contactNumber),
           _infoRow('Delivery Address', d.deliveryAddress),
           _infoRow('Driver Name', d.driverName),
-          _infoRow('Vehicle Number', d.vehicleNumber),
+          // _infoRow('Vehicle Number', d.vehicleNumber),
           if (d.despatchedAt != null) _infoRow('Despatched At', dateFmt.format(d.despatchedAt!)),
           if (d.deliveryNotes.isNotEmpty) _infoRow('Delivery Notes', d.deliveryNotes),
         ],
@@ -200,62 +261,84 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
         border: Border.all(color: AppColors.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Container(
-            color: AppColors.surfaceAlt,
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
-            child: Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          border: TableBorder(
+            horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+            verticalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+          ),
+          // Fixed widths (not Flex) — needed so the table can be wider
+          // than the screen and scroll, instead of squeezing text.
+          columnWidths: const {
+            0: FixedColumnWidth(32),   // #
+            1: FixedColumnWidth(160),  // Item
+            2: FixedColumnWidth(140),  // Company
+            3: FixedColumnWidth(110),  // Size
+            4: FixedColumnWidth(50),   // Box
+            5: FixedColumnWidth(50),   // Pcs
+            6: FixedColumnWidth(60),   // Qty
+          },
+          children: [
+            TableRow(
+              decoration: const BoxDecoration(color: AppColors.surfaceAlt),
               children: [
-                SizedBox(width: 24, child: Text('#', style: AppTextStyles.captionnew())),
-                Expanded(flex: 3, child: Text('Item', style: AppTextStyles.captionnew())),
-                Expanded(flex: 2, child: Text('Company', style: AppTextStyles.captionnew())),
-                Expanded(flex: 2, child: Text('Size', style: AppTextStyles.captionnew())),
-                SizedBox(width: 40, child: Text('Box', style: AppTextStyles.captionnew())),
-                SizedBox(width: 40, child: Text('Pcs', style: AppTextStyles.captionnew())),
-                SizedBox(width: 48, child: Text('Qty', style: AppTextStyles.captionnew())),
+                _headerCell('#'),
+                _headerCell('Item'),
+                _headerCell('Company'),
+                _headerCell('Size'),
+                _headerCell('Box', align: TextAlign.right),
+                _headerCell('Pcs', align: TextAlign.right),
+                _headerCell('Qty', align: TextAlign.right),
               ],
             ),
-          ),
-          for (var i = 0; i < d.items.length; i++)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
-              child: Row(
+            for (var i = 0; i < d.items.length; i++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: i.isEven ? AppColors.surface : AppColors.surfaceAlt.withOpacity(0.35),
+                ),
                 children: [
-                  SizedBox(width: 24, child: Text('${i + 1}', style: AppTextStyles.body())),
-                  Expanded(
-                    flex: 3,
-                    child: Text(d.items[i].productName,
-                        style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
-                      style: AppTextStyles.body(),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(d.items[i].productSize,
-                        style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                  ),
-                  SizedBox(width: 40, child: Text(d.items[i].boxes.toStringAsFixed(0), style: AppTextStyles.body())),
-                  SizedBox(width: 40, child: Text(d.items[i].pieces.toStringAsFixed(0), style: AppTextStyles.body())),
-                  SizedBox(width: 48, child: Text(d.items[i].quantity.toStringAsFixed(0), style: AppTextStyles.body())),
+                  _dataCell('${i + 1}'),
+                  _dataCell(d.items[i].productName),
+                  _dataCell(d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName),
+                  _dataCell(d.items[i].productSize),
+                  _dataCell(d.items[i].boxes.toStringAsFixed(0), align: TextAlign.right),
+                  _dataCell(d.items[i].pieces.toStringAsFixed(0), align: TextAlign.right),
+                  _dataCell(d.items[i].quantity.toStringAsFixed(0), align: TextAlign.right, bold: true),
                 ],
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Pending -> "Mark as In Transit" button.
-  /// In transit -> two OPTIONAL signature upload blocks + "Mark as Delivered".
-  /// Delivered -> read-only signatures (now server-hosted image URLs), no actions.
+  Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis, // header labels are short, fine as-is
+        style: AppTextStyles.captionnew().copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _dataCell(String text, {TextAlign align = TextAlign.left, bool bold = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(8)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 1,                 // single line, fixed row height
+        softWrap: false,
+        overflow: TextOverflow.visible, // don't cut it — table scrolls instead
+        style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
+      ),
+    );
+  }
   Widget _actionSection(BuildContext context, DispatchDetail d, bool isActing) {
     if (d.isDelivered) {
       return Column(
@@ -526,6 +609,217 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
 
   String _currency(double value) =>
       NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(value);
+
+  // ---------- PDF export + share ----------
+
+  /// Builds a PDF mirroring the on-screen info card + items table + grand
+  /// total, saves it to a temp file, then hands it to the OS share sheet.
+  /// WhatsApp shows up there directly (if installed) alongside Email,
+  /// Drive, Bluetooth, etc. — no print dialog is shown anywhere in this
+  /// flow, this purely shares the generated file.
+  Future<void> _generateAndSharePdf(DispatchDetail d) async {
+    setState(() => _isGeneratingPdf = true);
+    try {
+      final dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
+
+      // Noto Sans includes the ₹ glyph, unlike the default Helvetica
+      // font — without this the rupee symbol renders as a blank box.
+      final baseFont = await PdfGoogleFonts.notoSansRegular();
+      final boldFont = await PdfGoogleFonts.notoSansBold();
+
+      final pdf = pw.Document(
+        theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
+      );
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          header: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Dispatch Bill Details',
+                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              pw.Divider(color: PdfColors.grey400),
+            ],
+          ),
+          build: (context) => [
+            _pdfInfoSection(d, dateFmt),
+            pw.SizedBox(height: 18),
+            pw.Text('Items', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 8),
+            _pdfItemsTable(d),
+            pw.SizedBox(height: 14),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Grand Total: ${_currency(d.grandTotal)}',
+                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      final bytes = await pdf.save();
+
+      final safeDs =
+      d.dsNumber.isNotEmpty ? d.dsNumber.replaceAll(RegExp(r'[^\w\-]'), '_') : d.id;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/Dispatch_$safeDs.pdf');
+      await file.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/pdf')],
+        text: 'Dispatch Bill - ${d.dsNumber}',
+      );
+    } catch (e) {
+      if (mounted) AppSnackbar.error('Failed to generate PDF: $e');
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+  pw.Widget _pdfInfoSection(DispatchDetail d, DateFormat dateFmt) {
+    final rows = <List<String>>[
+      ['DS Number', d.dsNumber],
+      ['Ref. No.', d.refNo],
+      ['Party Name', d.partyName],
+      ['Contact Number', d.contactNumber],
+      ['Delivery Address', d.deliveryAddress],
+      ['Driver Name', d.driverName],
+      if (d.despatchedAt != null) ['Despatched At', dateFmt.format(d.despatchedAt!)],
+      if (d.deliveryNotes.isNotEmpty) ['Delivery Notes', d.deliveryNotes],
+    ];
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: rows
+          .map((r) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.Row(
+          children: [
+            pw.SizedBox(
+              width: 120,
+              child: pw.Text(r[0],
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                r[1].isEmpty ? '-' : r[1],
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ))
+          .toList(),
+    );
+  }
+
+  pw.Widget _pdfItemsTable(DispatchDetail d) {
+    final headers = ['#', 'Item', 'Company', 'Size', 'Box', 'Pcs', 'Qty'];
+    final data = <List<String>>[
+      for (var i = 0; i < d.items.length; i++)
+        [
+          '${i + 1}',
+          d.items[i].productName,
+          d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
+          d.items[i].productSize,
+          d.items[i].boxes.toStringAsFixed(0),
+          d.items[i].pieces.toStringAsFixed(0),
+          d.items[i].quantity.toStringAsFixed(0),
+        ],
+    ];
+
+    return pw.TableHelper.fromTextArray(
+      headers: headers,
+      data: data,
+      headerStyle: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
+      cellStyle: const pw.TextStyle(fontSize: 9),
+      cellAlignments: {
+        0: pw.Alignment.center,
+        4: pw.Alignment.centerRight,
+        5: pw.Alignment.centerRight,
+        6: pw.Alignment.centerRight,
+      },
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+      oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+    );
+  }
+
+  // ---------- Excel export + share ----------
+
+  /// Same idea as the PDF flow: build the .xlsx in memory, write it to a
+  /// temp file, then hand it straight to the native share sheet. No
+  /// separate "share" button — this icon both generates and shares.
+  Future<void> _generateAndShareExcel(DispatchDetail d) async {
+    setState(() => _isGeneratingExcel = true);
+    try {
+      final dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
+      final excelFile = xls.Excel.createExcel();
+      final sheetName = 'Dispatch Bill';
+      final sheet = excelFile[sheetName];
+      excelFile.setDefaultSheet(sheetName);
+
+      void addRow(List<dynamic> values) {
+        sheet.appendRow(values.map((v) => xls.TextCellValue(v.toString())).toList());
+      }
+
+      addRow(['Dispatch Bill Details']);
+      addRow([]);
+      addRow(['DS Number', d.dsNumber]);
+      addRow(['Ref. No.', d.refNo]);
+      addRow(['Party Name', d.partyName]);
+      addRow(['Contact Number', d.contactNumber]);
+      addRow(['Delivery Address', d.deliveryAddress]);
+      addRow(['Driver Name', d.driverName]);
+      if (d.despatchedAt != null) addRow(['Despatched At', dateFmt.format(d.despatchedAt!)]);
+      if (d.deliveryNotes.isNotEmpty) addRow(['Delivery Notes', d.deliveryNotes]);
+      addRow([]);
+      addRow(['#', 'Item', 'Company', 'Size', 'Box', 'Pcs', 'Qty']);
+      for (var i = 0; i < d.items.length; i++) {
+        final item = d.items[i];
+        addRow([
+          i + 1,
+          item.productName,
+          item.companyName.isEmpty ? '-' : item.companyName,
+          item.productSize,
+          item.boxes.toStringAsFixed(0),
+          item.pieces.toStringAsFixed(0),
+          item.quantity.toStringAsFixed(0),
+        ]);
+      }
+      addRow([]);
+      addRow(['Grand Total', _currency(d.grandTotal)]);
+
+      final bytes = excelFile.save();
+      if (bytes == null) throw Exception('Could not generate Excel file');
+
+      final safeDs =
+      d.dsNumber.isNotEmpty ? d.dsNumber.replaceAll(RegExp(r'[^\w\-]'), '_') : d.id;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/Dispatch_$safeDs.xlsx');
+      await file.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles(
+        [
+          XFile(
+            file.path,
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ),
+        ],
+        text: 'Dispatch Bill - ${d.dsNumber}',
+      );
+    } catch (e) {
+      if (mounted) AppSnackbar.error('Failed to generate Excel file: $e');
+    } finally {
+      if (mounted) setState(() => _isGeneratingExcel = false);
+    }
+  }
 }
 
 class _StatusBanner extends StatelessWidget {

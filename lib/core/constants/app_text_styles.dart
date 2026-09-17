@@ -54,4 +54,6 @@ class AppTextStyles {
 
   static TextStyle amount({Color color = AppColors.textPrimary}) =>
       _base(size: 20, weight: FontWeight.w700, color: color);
+  static TextStyle captioref({Color color = AppColors.textPrimary}) =>
+      _base(size: 10, weight: FontWeight.w700, color: color);
 }

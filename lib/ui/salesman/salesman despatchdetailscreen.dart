@@ -56,7 +56,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     return NetworkAwareWrapper(child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Dispatch Bill Details', style: AppTextStyles.h6()),
+        title: Text('Despatch Bill Details', style: AppTextStyles.h6()),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -172,7 +172,6 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
       ),
     );
   }
-
   Widget _itemsTable(DispatchDetail d) {
     return Container(
       decoration: BoxDecoration(
@@ -181,55 +180,81 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
         border: Border.all(color: AppColors.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Container(
-            color: AppColors.surfaceAlt,
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
-            child: Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          border: TableBorder(
+            horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+            verticalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+          ),
+          // Fixed widths (not Flex) — needed so the table can be wider
+          // than the screen and scroll, instead of squeezing text.
+          columnWidths: const {
+            0: FixedColumnWidth(32),   // #
+            1: FixedColumnWidth(160),  // Item
+            2: FixedColumnWidth(140),  // Company
+            3: FixedColumnWidth(110),  // Size
+            4: FixedColumnWidth(50),   // Box
+            5: FixedColumnWidth(50),   // Pcs
+            6: FixedColumnWidth(60),   // Qty
+          },
+          children: [
+            TableRow(
+              decoration: const BoxDecoration(color: AppColors.surfaceAlt),
               children: [
-                SizedBox(width: 24, child: Text('#', style: AppTextStyles.captionnew())),
-                Expanded(flex: 3, child: Text('Item', style: AppTextStyles.captionnew())),
-                Expanded(flex: 2, child: Text('Company', style: AppTextStyles.captionnew())),
-                Expanded(flex: 2, child: Text('Size', style: AppTextStyles.captionnew())),
-                SizedBox(width: 40, child: Text('Box', style: AppTextStyles.captionnew())),
-                SizedBox(width: 40, child: Text('Pcs', style: AppTextStyles.captionnew())),
-                SizedBox(width: 48, child: Text('Qty', style: AppTextStyles.captionnew())),
+                _headerCell('#'),
+                _headerCell('Item'),
+                _headerCell('Company'),
+                _headerCell('Size'),
+                _headerCell('Box', align: TextAlign.right),
+                _headerCell('Pcs', align: TextAlign.right),
+                _headerCell('Qty', align: TextAlign.right),
               ],
             ),
-          ),
-          for (var i = 0; i < d.items.length; i++)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
-              child: Row(
+            for (var i = 0; i < d.items.length; i++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: i.isEven ? AppColors.surface : AppColors.surfaceAlt.withOpacity(0.35),
+                ),
                 children: [
-                  SizedBox(width: 24, child: Text('${i + 1}', style: AppTextStyles.body())),
-                  Expanded(
-                    flex: 3,
-                    child: Text(d.items[i].productName,
-                        style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
-                      style: AppTextStyles.body(),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(d.items[i].productSize,
-                        style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                  ),
-                  SizedBox(width: 40, child: Text(d.items[i].boxes.toStringAsFixed(0), style: AppTextStyles.body())),
-                  SizedBox(width: 40, child: Text(d.items[i].pieces.toStringAsFixed(0), style: AppTextStyles.body())),
-                  SizedBox(width: 48, child: Text(d.items[i].quantity.toStringAsFixed(0), style: AppTextStyles.body())),
+                  _dataCell('${i + 1}'),
+                  _dataCell(d.items[i].productName),
+                  _dataCell(d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName),
+                  _dataCell(d.items[i].productSize),
+                  _dataCell(d.items[i].boxes.toStringAsFixed(0), align: TextAlign.right),
+                  _dataCell(d.items[i].pieces.toStringAsFixed(0), align: TextAlign.right),
+                  _dataCell(d.items[i].quantity.toStringAsFixed(0), align: TextAlign.right, bold: true),
                 ],
               ),
-            ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.captionnew().copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _dataCell(String text, {TextAlign align = TextAlign.left, bool bold = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(8)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.visible,
+        style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
       ),
     );
   }

@@ -316,7 +316,6 @@ class _OwnerHeader extends StatelessWidget {
                         ],
                       ),
                     ),
-                    _HeaderIconButton(icon: Icons.notifications_none_rounded, onTap: () {}),
                   ],
                 ),
                 SizedBox(height: Responsive.h(14)),
@@ -695,7 +694,8 @@ class _RecentEstimateCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    estimate.customerName,
+                    '${estimate.estimateNumber}'
+                    ,
                     style: AppTextStyles.bodyBold(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -705,7 +705,7 @@ class _RecentEstimateCard extends StatelessWidget {
               ],
             ),
             SizedBox(height: Responsive.h(4)),
-            Text('Estimate No: ${estimate.estimateNumber}', style: AppTextStyles.caption()),
+            Text( estimate.customerName, style: AppTextStyles.caption()),
             SizedBox(height: Responsive.h(8)),
             const Divider(height: 1, color: AppColors.border),
             SizedBox(height: Responsive.h(8)),
