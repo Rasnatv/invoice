@@ -1,5 +1,7 @@
+//
 // import 'package:equatable/equatable.dart';
 // import '../../../models/owner_models/owner_estimateactionmodel.dart';
+// import '../../../models/owner_models/ownerestimate_updatemodel.dart';
 //
 //
 // abstract class OwnerEstimateDetailEvent extends Equatable {
@@ -25,6 +27,18 @@
 // class OwnerEstimateRejectRequested extends OwnerEstimateDetailEvent {
 //   final OwnerRejectEstimateRequest request;
 //   const OwnerEstimateRejectRequested(this.request);
+//   @override
+//   List<Object?> get props => [request];
+// }
+//
+// /// POST /estimates/update — dispatched from the Owner Estimate Update
+// /// screen. Reuses [OwnerEstimateDetailState.actionStatus] /
+// /// [OwnerEstimateDetailState.actionMessage] to report progress, same as
+// /// approve/reject, so the update screen can drive a button-level spinner
+// /// and a BlocListener can pop back to the detail screen on success.
+// class OwnerEstimateUpdateRequested extends OwnerEstimateDetailEvent {
+//   final OwnerUpdateEstimateRequest request;
+//   const OwnerEstimateUpdateRequested(this.request);
 //   @override
 //   List<Object?> get props => [request];
 // }
@@ -70,4 +84,22 @@ class OwnerEstimateUpdateRequested extends OwnerEstimateDetailEvent {
   const OwnerEstimateUpdateRequested(this.request);
   @override
   List<Object?> get props => [request];
+}
+
+/// POST /estimates/remove-item — dispatched when deleting a *previously
+/// saved* item row from the Owner Estimate Update screen. Items added in
+/// the current form session (no server-side item id yet) are removed
+/// locally without this event; see OwnerEstimateUpdateScreen._removeItem.
+/// Tracked via [OwnerEstimateDetailState.itemRemoveStatus] separately
+/// from [OwnerEstimateDetailState.actionStatus], so removing one row
+/// doesn't put the whole "Save Changes" button into a busy state.
+class OwnerEstimateItemRemoveRequested extends OwnerEstimateDetailEvent {
+  final String estimateId;
+  final String estimateItemId;
+  const OwnerEstimateItemRemoveRequested({
+    required this.estimateId,
+    required this.estimateItemId,
+  });
+  @override
+  List<Object?> get props => [estimateId, estimateItemId];
 }

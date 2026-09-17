@@ -621,11 +621,13 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
             padding: EdgeInsets.all(Responsive.w(16)),
             child: Column(
               children: [
+                _summaryRow('Total Sqrft', number.format(detail.totalSquareFeet)),
+                SizedBox(height: Responsive.h(8)),
                 _summaryRow('Subtotal', currencyFmt.f(detail.subtotal)),
                 SizedBox(height: Responsive.h(8)),
                 _summaryRow('Handling Charge', currencyFmt.f(detail.handlingCharge)),
                 SizedBox(height: Responsive.h(8)),
-                _summaryRow('Total Sqrft', number.format(detail.totalSquareFeet)),
+
                 if (detail.hasDiscount) ...[
                   SizedBox(height: Responsive.h(8)),
                   Row(
@@ -860,22 +862,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: _buildShareText(detail)));
-                      if (context.mounted) {
-                        AppSnackbar.success('Estimate summary copied to clipboard');
-                      }
-                    },
-                    icon: const Icon(Icons.share_outlined, size: 18),
-                    label: const Text('Share'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
+
                 if (detail.isPendingApproval) ...[
                   SizedBox(width: Responsive.w(10)),
                   _RoundIconButton(

@@ -558,11 +558,11 @@ class _EstimateDetailsView extends StatelessWidget {
             padding: EdgeInsets.all(Responsive.w(16)),
             child: Column(
               children: [
-                _totalRow('Total Items', '${estimate.itemsCount}'),
-                SizedBox(height: Responsive.h(8)),
+                // _totalRow('Total Items', '${estimate.itemsCount}'),
+                // SizedBox(height: Responsive.h(8)),
                 _totalRow('Total Sq.Ft', number.format(estimate.totalSquareFeet)),
                 SizedBox(height: Responsive.h(8)),
-                _totalRow('Items Total', currency.format(estimate.subtotal)),
+                _totalRow('Subtotal', currency.format(estimate.subtotal)),
                 SizedBox(height: Responsive.h(8)),
                 _totalRow('Handling Charge', currency.format(estimate.handlingCharge)),
 

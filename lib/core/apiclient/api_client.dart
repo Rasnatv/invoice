@@ -785,5 +785,10 @@ class ApiClient {
     data: data,
     options: await _authOptions(),
   );
+  Future<Response> removeEstimateItem(Map<String, dynamic> data) async => dio.delete(
+    ApiConstants.estimateRemoveitem,
+    data: data,
+    options: await _authOptions(),
+  );
 
 }

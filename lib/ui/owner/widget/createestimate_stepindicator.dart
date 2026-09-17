@@ -1165,8 +1165,8 @@ class PreviewStep extends StatelessWidget {
                           ],
                         ),
                         SizedBox(height: Responsive.h(12)),
-                        _totalRow('Total Items', '${totals?.totalItems ?? 0}'),
-                        SizedBox(height: Responsive.h(6)),
+                        // _totalRow('Total Items', '${totals?.totalItems ?? 0}'),
+                        // SizedBox(height: Responsive.h(6)),
                         SizedBox(height: Responsive.h(6)),
                         _totalRow('Total Sq.Ft', number.format(totals?.totalSquareFeet ?? 0)),
                         if ((totals?.mrpTotal ?? 0) > 0) ...[

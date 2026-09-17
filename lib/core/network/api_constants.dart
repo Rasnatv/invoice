@@ -12,10 +12,10 @@ class ApiConstants {
   static const String driversget = '/drivers';
   static const String updateDriver = '/drivers/update';
   static const String deleteDriver = '/drivers/delete';
+  static const String driversActive = '/drivers/active';
 
   // Designation
-  static const String salemancretaedesignation =
-      '/salesman-designations/create';
+  static const String salemancretaedesignation = '/salesman-designations/create';
   static const String salesmanDesignations = '/salesman-designations';
   static const String updateDesignation = '/salesman-designations/update';
   static const String deleteDesignation = '/salesman-designations/delete';
@@ -25,11 +25,12 @@ class ApiConstants {
   static const String salesmen = '/salesmen';
   static const String updateSalesman = '/salesmen/update';
   static const String deleteSalesman = '/salesmen/delete';
+  static const String salesmenActive = '/salesmen/active';
 
   /// GET — active salesmen (id / name / designation_display only). Used to
   /// populate the "Assign to Salesman" dropdown on the Owner Create
   /// Estimate screen's Preview step when approving an estimate.
-  static const String salesmenActive = '/salesmen/active';
+
 
   // Field Staff
   static const String fieldstaffcreate = '/field-staff/create';
@@ -145,7 +146,7 @@ class ApiConstants {
 //despatch create section
   static const String despatchesSuggest = '/despatches/suggest';
   static const String despatchesCreate = '/despatches/create';
-  static const String driversActive = '/drivers/active';
+
 
   // =================== PAYMENTS ===================
   /// POST — records a new payment against an estimate.
@@ -222,4 +223,6 @@ static const String quotationsCancel='/quotations/cancel';
   //estimate and quotationdeletion
 // In ApiConstants, alongside quotationsCancel etc.
   static const String quotationsRemoveItem = '/quotations/remove-item';
+  static const String estimateRemoveitem = '/estimates/remove-item';
+
 }

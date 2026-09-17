@@ -24,11 +24,6 @@ class QuotationPreviewScreen extends StatefulWidget {
 }
 
 class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
-  // Captured in initState (while context is still valid) and reused in
-  // dispose. Calling context.read<...>() inside dispose() is unsafe —
-  // by then the widget/element is already deactivated, and looking up an
-  // ancestor (the provider) through a deactivated context throws
-  // "Looking up a deactivated widget's ancestor is unsafe."
   late final SalesmanQuotationBloc _bloc;
 
   @override
@@ -363,9 +358,9 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                           ),
                           child: Column(
                             children: [
-                              _totalRow('Total Items', '${estimate.itemsCount}'),
-                              SizedBox(height: Responsive.h(6)),
-                              _totalRow('Total Qty', number.format(estimate.totalQuantity)),
+                              // _totalRow('Total Items', '${estimate.itemsCount}'),
+                              // SizedBox(height: Responsive.h(6)),
+                              // _totalRow('Total Qty', number.format(estimate.totalQuantity)),
                               SizedBox(height: Responsive.h(6)),
                               _totalRow('Total Sq.Ft', number.format(estimate.totalSquareFeet)),
                               if (mrpTotal > 0) ...[
@@ -373,7 +368,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                                 _totalRow('Total MRP', currency.format(mrpTotal)),
                               ],
                               SizedBox(height: Responsive.h(6)),
-                              _totalRow('Items Total', currency.format(estimate.subtotal)),
+                              _totalRow('Sub Total', currency.format(estimate.subtotal)),
                               SizedBox(height: Responsive.h(6)),
                               _totalRow('Handling Charge', currency.format(estimate.handlingCharge)),
                               const Divider(height: 20),

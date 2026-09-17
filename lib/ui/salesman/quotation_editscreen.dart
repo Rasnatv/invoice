@@ -127,7 +127,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   late final TextEditingController _contractorAddress;
   late final TextEditingController _handlingCharge;
   late final TextEditingController _notes;
-  final TextEditingController _termsConditions = TextEditingController();
+
 
   // ---------------- Items ----------------
   late List<_EditItem> _items;
@@ -229,7 +229,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     _contractorAddress.dispose();
     _handlingCharge.dispose();
     _notes.dispose();
-    _termsConditions.dispose();
     _itemCompanyCtrl.dispose();
     _itemSizeCtrl.dispose();
     _itemUnitCtrl.dispose();
@@ -611,8 +610,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       _contractorAddress.text.trim().isEmpty ? null : _contractorAddress.text.trim(),
       handlingCharge: _handling,
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-      termsConditions:
-      _termsConditions.text.trim().isEmpty ? null : _termsConditions.text.trim(),
       items: _items
           .map((i) => QuotationUpdateItemRequest(
         productId: i.productId,
@@ -1041,15 +1038,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           inputFormatters: DValidator.textWithLimit,
                         ),
                       ),
-                      LabeledField(
-                        label: 'Terms & Conditions (optional)',
-                        field: CustomTextField(
-                          hint: 'e.g. Standard terms apply',
-                          icon: Icons.gavel_outlined,
-                          controller: _termsConditions,
-                          inputFormatters: DValidator.textWithLimit,
-                        ),
-                      ),
                       SizedBox(height: Responsive.h(10)),
 
                       Container(
@@ -1060,8 +1048,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                         ),
                         child: Column(
                           children: [
-                            _totalRow('Total Items', '$_totalItemsCount'),
-                            SizedBox(height: Responsive.h(6)),
+                            // _totalRow('Total Items', '$_totalItemsCount'),
+                            // SizedBox(height: Responsive.h(6)),
                             //  _totalRow('Total Qty', number.format(_totalQty)),
                             SizedBox(height: Responsive.h(6)),
                             _totalRow('Total Sq.Ft', number.format(_totalSqft)),

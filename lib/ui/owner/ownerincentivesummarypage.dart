@@ -16,14 +16,6 @@ import '../../widgets/appsnackbar.dart';
 import 'allincentiveproductlistpage.dart';
 import 'billpage.dart';
 
-
-
-/// Owner-facing salesman incentive summary screen.
-///
-/// Replaces the old dummy [SalesmanIncentiveScreen]. Pass [isOwner]=false
-/// (and no dropdown will show) to reuse this same screen for a salesman
-/// looking at their own incentives — the bloc simply omits `salesman_id`
-/// from every request in that mode.
 class OwnerSalesmanIncentiveScreen extends StatelessWidget {
   const OwnerSalesmanIncentiveScreen({
     super.key,
@@ -201,7 +193,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                       final s = salesmen[i];
                       return ListTile(
                         title: Text(s.name, style: AppTextStyles.bodyBold()),
-                        subtitle: s.designationDisplay.isNotEmpty ? Text(s.designationDisplay) : null,
+                       // subtitle: s.designationDisplay.isNotEmpty ? Text(s.designationDisplay) : null,
                         onTap: () => Navigator.of(ctx).pop(s),
                       );
                     },
@@ -326,7 +318,10 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                 SliverToBoxAdapter(
                   child: _IncentiveHeader(
                     isOwner: state.isOwner,
-                    salesmanName: state.selectedSalesmanName ?? summary?.salesmanName ?? '-',
+                    // salesmanName: state.selectedSalesmanName ?? summary?.salesmanName ?? '-',
+                    salesmanName: state.selectedSalesmanName?.isNotEmpty == true
+                        ? state.selectedSalesmanName!
+                        : 'Select Salesman',
                     role: role,
                     selectedMonth: state.selectedMonth,
                     onTapMonth: () => _pickMonth(context, state.selectedMonth),
@@ -584,7 +579,7 @@ class _IncentiveHeader extends StatelessWidget {
                                     child: Text(
                                       salesmanName.isEmpty ? '-' : salesmanName,
                                       style: AppTextStyles.bodyBold(color: Colors.white)
-                                          .copyWith(fontSize: Responsive.sp(19)),
+                                          .copyWith(fontSize: Responsive.sp(15)),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
