@@ -80,8 +80,6 @@ class _OwnerEstimateDetailView extends StatelessWidget {
           listener: (context, state) {
             if (state.actionStatus == OwnerEstimateActionStatus.success) {
               AppSnackbar.success(state.actionMessage ?? 'Done');
-              context.read<OwnerEstimateDetailBloc>()
-                  .add(OwnerEstimateDetailLoadRequested(estimateId));
             } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
               AppSnackbar.error(state.actionMessage ?? 'Action failed');
             }

@@ -56,13 +56,15 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     _searchCtrl.dispose();
     super.dispose();
   }
-
-  void _onCardTap(SalesmanowrEstimateModel estimate) {
-    Navigator.of(context).push(
+  Future<void> _onCardTap(SalesmanowrEstimateModel estimate) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OwnerEstimateDetailsScreen(estimateId: estimate.id),
       ),
     );
+    if (mounted) {
+      context.read<OwnerEstimatesBloc>().add(const OwnerEstimatesRefreshRequested());
+    }
   }
 
   Future<void> _onPayNowTap(SalesmanowrEstimateModel estimate) async {
