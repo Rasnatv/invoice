@@ -558,13 +558,15 @@ class _EstimateDetailsView extends StatelessWidget {
             padding: EdgeInsets.all(Responsive.w(16)),
             child: Column(
               children: [
-                // _totalRow('Total Items', '${estimate.itemsCount}'),
-                // SizedBox(height: Responsive.h(8)),
+
+                SizedBox(height: Responsive.h(8)),
                 _totalRow('Total Sq.Ft', number.format(estimate.totalSquareFeet)),
                 SizedBox(height: Responsive.h(8)),
                 _totalRow('Subtotal', currency.format(estimate.subtotal)),
                 SizedBox(height: Responsive.h(8)),
                 _totalRow('Handling Charge', currency.format(estimate.handlingCharge)),
+                SizedBox(height: Responsive.h(8)),
+                _totalRow('Total Before Discount', currency.format(estimate.grandTotal)),
 
                 // Discount, payment, and balance are only meaningful once
                 // the estimate is approved — while pending, these fields
@@ -588,7 +590,9 @@ class _EstimateDetailsView extends StatelessWidget {
                 if (estimate.isApproved) ...[
                   SizedBox(height: Responsive.h(8)),
                   _totalRow(
-                      'Amount After Discount', currency.format(estimate.amountAfterDiscount)),
+                    large: true,
+                      'Grand Total', currency.format(estimate.amountAfterDiscount),
+                  ),
                   SizedBox(height: Responsive.h(8)),
                   _totalRow('Total Paid', currency.format(estimate.totalPaid),
                       valueColor: AppColors.success),
@@ -597,23 +601,6 @@ class _EstimateDetailsView extends StatelessWidget {
             ),
           ),
           // Grand Total strip
-          Container(
-            width: double.infinity,
-            padding:
-            EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.06),
-              border: Border(top: BorderSide(color: AppColors.border)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Grand Total', style: AppTextStyles.bodyBold()),
-                Text(currency.format(estimate.grandTotal),
-                    style: AppTextStyles.h3(color: AppColors.primary)),
-              ],
-            ),
-          ),
           // Balance strip — only meaningful once approved.
           if (estimate.isApproved)
             Container(
@@ -623,6 +610,7 @@ class _EstimateDetailsView extends StatelessWidget {
               decoration: BoxDecoration(
                 color: estimate.balanceAmount > 0
                     ? Colors.red.withOpacity(0.06)
+
                     : AppColors.success.withOpacity(0.08),
               ),
               child: Row(
@@ -642,12 +630,24 @@ class _EstimateDetailsView extends StatelessWidget {
     );
   }
 
-  Widget _totalRow(String label, String value, {Color? valueColor}) {
+
+  Widget _totalRow(String label, String value, {Color? valueColor, bool large = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.body()),
-        Text(value, style: AppTextStyles.bodyBold(color: valueColor ?? Colors.black)),
+        Text(
+          label,
+          style: large
+              ? AppTextStyles.h3().copyWith(fontWeight: FontWeight.w700)
+              : AppTextStyles.body(),
+        ),
+        Text(
+          value,
+          style: large
+              ? AppTextStyles.h2(color: valueColor ?? AppColors.primary)
+              .copyWith(fontWeight: FontWeight.w800)
+              : AppTextStyles.bodyBold(color: valueColor ?? Colors.black),
+        ),
       ],
     );
   }

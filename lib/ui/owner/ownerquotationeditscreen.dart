@@ -714,14 +714,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                       ),
                     ),
                     LabeledField(
-                      label: 'Address',
-                      field: CustomTextField(
-                        hint: 'Enter contractor address',
-                        icon: Icons.location_on_outlined,
-                        controller: _contractorAddress,
-                      ),
-                    ),
-                    LabeledField(
                       label: 'Email (optional)',
                       field: CustomTextField(
                         hint: 'Enter contractor email',
@@ -974,14 +966,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                         controller: _notes,
                       ),
                     ),
-                    LabeledField(
-                      label: 'Terms & Conditions (optional)',
-                      field: CustomTextField(
-                        hint: 'e.g. Standard terms apply',
-                        icon: Icons.gavel_outlined,
-                        controller: _termsConditions,
-                      ),
-                    ),
                     SizedBox(height: Responsive.h(10)),
 
                     Container(
@@ -992,9 +976,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                       ),
                       child: Column(
                         children: [
-                          _totalRow('Total Items', '$_totalItemsCount'),
-                          SizedBox(height: Responsive.h(6)),
-                          _totalRow('Total Qty', number.format(_totalQty)),
+                          // _totalRow('Total Items', '$_totalItemsCount'),
+                          // SizedBox(height: Responsive.h(6)),
+                          // _totalRow('Total Qty', number.format(_totalQty)),
                           SizedBox(height: Responsive.h(6)),
                           _totalRow('Total Sq.Ft', number.format(_totalSqft)),
                           if (_mrpTotal > 0) ...[

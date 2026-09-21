@@ -228,7 +228,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
         children: [
           _infoRow('DS Number', d.dsNumber),
           _infoRow('Ref. No.', d.refNo),
-          _infoRow('Party Name', d.partyName),
+          _infoRow('Customer Name', d.partyName),
           _infoRow('Contact Number', d.contactNumber),
           _infoRow('Delivery Address', d.deliveryAddress),
           _infoRow('Driver Name', d.driverName),
@@ -685,7 +685,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     final rows = <List<String>>[
       ['DS Number', d.dsNumber],
       ['Ref. No.', d.refNo],
-      ['Party Name', d.partyName],
+      ['Customer Name', d.partyName],
       ['Contact Number', d.contactNumber],
       ['Delivery Address', d.deliveryAddress],
       ['Driver Name', d.driverName],

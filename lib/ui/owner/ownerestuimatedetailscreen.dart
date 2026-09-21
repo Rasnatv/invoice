@@ -372,7 +372,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
   }
 
   // ---------------------------------------------------------------------
-  // Items table (bill-style)
+  // Items table (bill-style) — horizontal-scroll grid, print/export style
   // ---------------------------------------------------------------------
 
   Widget _buildItemsTable(EstimateDetailModel detail, NumberFormat number, bool isOwner) {
@@ -447,17 +447,19 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                   verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
                   bottom: BorderSide(color: AppColors.border),
                 ),
+                // Widened columns so full names like "Wall Tiles" / "Square Feet"
+                // fit on two lines instead of being clipped by the next column.
                 columnWidths: {
-                  0: const FixedColumnWidth(36), // Sl.No
-                  1: const FixedColumnWidth(160), // Item
-                  2: const FixedColumnWidth(130), // Company
+                  0: const FixedColumnWidth(34), // Sl.No
+                  1: const FixedColumnWidth(150), // Item
+                  2: const FixedColumnWidth(120), // Company
                   3: const FixedColumnWidth(90), // Size
-                  4: const FixedColumnWidth(70), // Unit
-                  5: const FixedColumnWidth(60), // Qty
-                  6: const FixedColumnWidth(80), // MRP
-                  7: const FixedColumnWidth(80), // Rate
-                  8: const FixedColumnWidth(100), // Amount
-                  if (!isOwner) 9: const FixedColumnWidth(100), // Incentive
+                  4: const FixedColumnWidth(95), // Unit
+                  5: const FixedColumnWidth(55), // Qty
+                  6: const FixedColumnWidth(75), // MRP
+                  7: const FixedColumnWidth(75), // Rate
+                  8: const FixedColumnWidth(110), // Amount
+                  if (!isOwner) 9: const FixedColumnWidth(110), // Incentive
                 },
                 children: [
                   // ---- Header row ----
@@ -560,11 +562,12 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
 
   Widget _estHeaderCell(String text, {TextAlign align = TextAlign.left}) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(11)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(10)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 1,
+        maxLines: 2,
+        softWrap: true,
         overflow: TextOverflow.ellipsis,
         style: AppTextStyles.captionnew().copyWith(
           fontWeight: FontWeight.w700,
@@ -586,9 +589,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       child: Text(
         text,
         textAlign: align,
-        maxLines: 1,
-        softWrap: false,
-        overflow: TextOverflow.visible,
+        maxLines: 3,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
         style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(color: color),
       ),
     );
@@ -627,6 +630,8 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                 SizedBox(height: Responsive.h(8)),
                 _summaryRow('Handling Charge', currencyFmt.f(detail.handlingCharge)),
                 SizedBox(height: Responsive.h(8)),
+                _summaryRow('Amount Before Discount', number.format(detail.grandTotal)),
+                SizedBox(height: Responsive.h(8)),
 
                 if (detail.hasDiscount) ...[
                   SizedBox(height: Responsive.h(8)),
@@ -645,7 +650,8 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                   ),
                   SizedBox(height: Responsive.h(8)),
                   _summaryRow(
-                      'Amount After Discount', currencyFmt.f(detail.amountAfterDiscount)),
+                      'Grand Total', currencyFmt.f(detail.amountAfterDiscount,),),
+
                 ],
                 SizedBox(height: Responsive.h(8)),
                 _summaryRow('Total Paid', currencyFmt.f(detail.totalPaid),
@@ -666,24 +672,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-          // Grand Total strip
-          Container(
-            width: double.infinity,
-            padding:
-            EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.06),
-              border: Border(top: BorderSide(color: AppColors.border)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Grand Total', style: AppTextStyles.bodyBold()),
-                Text(currencyFmt.f(detail.grandTotal),
-                    style: AppTextStyles.h3(color: AppColors.primary)),
               ],
             ),
           ),
@@ -978,6 +966,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     }
   }
 
+
   Future<void> _showApproveDialog(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
     final formKey = GlobalKey<FormState>();
@@ -985,7 +974,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     final handlingCtrl = TextEditingController(
         text: detail.handlingCharge > 0 ? detail.handlingCharge.toStringAsFixed(0) : '');
     final notesCtrl = TextEditingController();
-    String discountType = 'none'; // none | percentage | flat
+    String discountType = 'none'; // none | percentage | fixed
     final discountValueCtrl = TextEditingController();
     final discountNotesCtrl = TextEditingController();
     final paymentAmountCtrl = TextEditingController();
@@ -994,11 +983,66 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     DateTime? paymentDate;
     final paymentNotesCtrl = TextEditingController();
 
+    // Pure frontend calculation — no API call. Re-run on every keystroke via
+    // setLocal. subtotal + handling - discount = payable; payable - received = balance.
+    ({double handling, double discount, double payable, double received, double balance})
+    calcPreview() {
+      // An empty handling field falls back to the estimate's current charge
+      // (the request sends null in that case, i.e. "leave unchanged").
+      final handling = double.tryParse(handlingCtrl.text.trim()) ?? detail.handlingCharge;
+      final discountValue = double.tryParse(discountValueCtrl.text.trim()) ?? 0;
+      final beforeDiscount = detail.subtotal + handling;
+
+      double discount = 0;
+      if (discountType == 'percentage') {
+        discount = beforeDiscount * (discountValue / 100);
+      } else if (discountType == 'fixed') {
+        discount = discountValue;
+      }
+      // Never let the discount exceed the amount it applies to.
+      if (discount > beforeDiscount) discount = beforeDiscount;
+
+      final payable = beforeDiscount - discount;
+      final received = double.tryParse(paymentAmountCtrl.text.trim()) ?? 0;
+      final balance = (payable - received).clamp(0, double.infinity).toDouble();
+
+      return (
+      handling: handling,
+      discount: discount,
+      payable: payable,
+      received: received,
+      balance: balance,
+      );
+    }
+
+    Widget previewRow(String label, String value,
+        {bool bold = false, Color? color, double size = 0}) {
+      final base = bold ? AppTextStyles.bodyBold() : AppTextStyles.body();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: AppTextStyles.body()),
+            Text(
+              value,
+              style: base.copyWith(
+                color: color,
+                fontSize: size > 0 ? size : null,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setLocal) {
+            final preview = calcPreview();
+
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Text('Approve Estimate'),
@@ -1022,6 +1066,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             prefixText: '₹ ',
                             border: OutlineInputBorder(),
                           ),
+                          onChanged: (_) => setLocal(() {}),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -1055,13 +1100,20 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             decoration: InputDecoration(
                               labelText:
                               discountType == 'percentage' ? 'Discount %' : 'Discount Amount',
-                              prefixText: discountType == 'flat' ? '₹ ' : null,
+                              // was 'flat' before, but the dropdown value is 'fixed'
+                              prefixText: discountType == 'fixed' ? '₹ ' : null,
                               suffixText: discountType == 'percentage' ? '%' : null,
                               border: const OutlineInputBorder(),
                             ),
+                            onChanged: (_) => setLocal(() {}),
                             validator: (v) {
                               if (discountType == 'none') return null;
                               if (v == null || v.trim().isEmpty) return 'Required';
+                              final parsed = double.tryParse(v.trim());
+                              if (parsed == null || parsed < 0) return 'Enter a valid value';
+                              if (discountType == 'percentage' && parsed > 100) {
+                                return 'Cannot exceed 100%';
+                              }
                               return null;
                             },
                           ),
@@ -1074,6 +1126,44 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             ),
                           ),
                         ],
+
+                        // ---- PAYABLE AMOUNT: shown right before Amount Received ----
+                        // Subtotal + handling charge - discount. Updates live as the
+                        // handling charge / discount fields above are edited.
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceAlt,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              previewRow('Subtotal', currencyFmt.f(detail.subtotal)),
+                              previewRow('Handling Charge', '+ ${currencyFmt.f(preview.handling)}'),
+                              if (discountType != 'none')
+                                previewRow(
+                                  discountType == 'percentage'
+                                      ? 'Discount (${discountValueCtrl.text.trim().isEmpty ? '0' : discountValueCtrl.text.trim()}%)'
+                                      : 'Discount',
+                                  '- ${currencyFmt.f(preview.discount)}',
+                                  color: Colors.red,
+                                ),
+                              const Divider(height: 14),
+                              previewRow(
+                                'Payable Amount',
+                                currencyFmt.f(preview.payable),
+                                bold: true,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+
                         const SizedBox(height: 16),
                         const Text('Initial Payment (optional)',
                             style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1088,6 +1178,34 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             labelText: 'Amount Received',
                             prefixText: '₹ ',
                             border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => setLocal(() {}),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null; // optional
+                            final parsed = double.tryParse(v.trim());
+                            if (parsed == null || parsed <= 0) return 'Enter a valid amount';
+                            final payable = calcPreview().payable;
+                            if (parsed > payable + 0.009) {
+                              return 'Cannot exceed payable amount (${currencyFmt.f(payable)})';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        // Live balance after the amount received.
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Balance Due', style: AppTextStyles.bodyBold()),
+                              Text(
+                                currencyFmt.f(preview.balance),
+                                style: AppTextStyles.bodyBold(
+                                  color: preview.balance > 0 ? Colors.red : AppColors.success,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -1170,7 +1288,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                       discountValue: discountType == 'none'
                           ? null
                           : double.tryParse(discountValueCtrl.text.trim()),
-                      discountNotes: discountNotesCtrl.text.trim().isEmpty
+                      discountNotes: discountType == 'none' || discountNotesCtrl.text.trim().isEmpty
                           ? null
                           : discountNotesCtrl.text.trim(),
                       paymentAmount: paymentAmountCtrl.text.trim().isEmpty
@@ -1482,7 +1600,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
           'Discount (${d.discountTypeLabel.isEmpty ? d.discountType : d.discountTypeLabel})',
           '- ${currencyFmt.f(d.discountAmount)}'
         ]);
-        addRow(['Amount After Discount', currencyFmt.f(d.amountAfterDiscount)]);
+        addRow(['Grand Total', currencyFmt.f(d.amountAfterDiscount)]);
       }
       addRow(['Grand Total', currencyFmt.f(d.grandTotal)]);
       addRow(['Total Paid', currencyFmt.f(d.totalPaid)]);
