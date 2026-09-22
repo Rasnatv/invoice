@@ -12,12 +12,6 @@ import '../../bloc/ownerbloc/addincentive/addincentive_state.dart';
 import '../../models/owner_models/owner_incentivesetupmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
-/// SCREEN 1 — "Add Incentive"
-///
-/// Loads the salesman list from GET /salesman-incentive-setup, which
-/// already carries each salesman's current-month setup status
-/// (has_setup / display_text / month_year) — that IS the "active
-/// salesman" list, no separate endpoint needed.
 class AddIncentiveScreen extends StatelessWidget {
   const AddIncentiveScreen({super.key});
 
@@ -68,12 +62,6 @@ class _AddIncentiveViewState extends State<_AddIncentiveView> {
     _isNavigating = true;
     final bloc = context.read<SalesmanIncentiveBloc>();
 
-    // IMPORTANT: clear any leftover actionStatus/detailStatus from a
-    // previous Save/Delete on this shared bloc BEFORE opening the setup
-    // screen. Without this, a stale actionStatus == success can cause
-    // the setup screen to auto-pop itself the instant it finishes
-    // loading the salesman's detail (see the fix inside
-    // SalesmanIncentiveSetupScreen for the other half of this bug).
     bloc.add(const ClearSalesmanIncentiveSetupDetail());
 
     final changed = await Navigator.of(context).push<bool>(
@@ -448,21 +436,7 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
       backgroundColor: AppColors.background,
       appBar: AppBar(title: Text('Salesman Monthly Incentive Setup', style: AppTextStyles.h6())),
       body: SafeArea(
-        // FIX: This used to be a single BlocConsumer with ONE listener
-        // that handled both "detail loaded" and "action succeeded" under
-        // a combined OR listenWhen. That meant simply LOADING the detail
-        // (which happens every time this screen opens) could satisfy the
-        // listenWhen and run the listener body — which then also checked
-        // a STALE `actionStatus == success` left over from a previous
-        // Save/Delete on the same shared bloc, and popped the screen
-        // immediately after it opened.
-        //
-        // Splitting into two independent BlocListeners means loading
-        // detail can NEVER accidentally trigger the "action succeeded ->
-        // pop" logic, and vice versa. Combined with clearing
-        // actionStatus/detailStatus via ClearSalesmanIncentiveSetupDetail
-        // right before this screen opens (see _openSetup in
-        // AddIncentiveScreen), this closes the bug completely.
+
         child: MultiBlocListener(
           listeners: [
             BlocListener<SalesmanIncentiveBloc, SalesmanIncentiveState>(

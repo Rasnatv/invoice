@@ -89,13 +89,10 @@ class _OwnerIncentiveReportScreenState
     Responsive.init(context);
 
     return NetworkAwareWrapper(child: Scaffold(
+      appBar: AppBar(title: Text('Incentive Report', style: AppTextStyles.h6())),
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          ReportHeaderBar(
-            title: 'Incentive Report — ${widget.personName}',
-            showBack: true,
-          ),
           Expanded(
             child: BlocBuilder<IncentiveReportBloc, IncentiveReportState>(
               bloc: _bloc,

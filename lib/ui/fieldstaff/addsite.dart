@@ -370,13 +370,13 @@ class _AddFieldVisitScreenState extends State<AddFieldVisitScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: Responsive.h(14)),
-                    _field(
-                      label: 'Project Type (optional)',
-                      controller: _projectTypeCtrl,
-                      icon: Icons.category_outlined,
-                      inputFormatters: DValidator.textWithLimit,
-                    ),
+                    // SizedBox(height: Responsive.h(14)),
+                    // _field(
+                    //   label: 'Project Type (optional)',
+                    //   controller: _projectTypeCtrl,
+                    //   icon: Icons.category_outlined,
+                    //   inputFormatters: DValidator.textWithLimit,
+                    // ),
                     SizedBox(height: Responsive.h(14)),
                     _field(
                       label: 'Preferred Products (optional)',

@@ -137,10 +137,10 @@ class _OwnerIncentiveReportFilterScreenState
     Responsive.init(context);
 
     return NetworkAwareWrapper(child: Scaffold(
+      appBar: AppBar(title: Text('Incentive Report', style: AppTextStyles.h6())),
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          const ReportHeaderBar(title: 'Incentive Report', showBack: true),
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(Responsive.w(20)),

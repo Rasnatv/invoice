@@ -5,7 +5,6 @@ class DValidator {
   /// Max character limit for all text fields
   static const int maxTextLength = 100;
 
-
   /// Default expected length for a plain (no country code) mobile number.
   static const int defaultPhoneLength = 10;
 
@@ -44,7 +43,6 @@ class DValidator {
     FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s'-]")),
     LengthLimitingTextInputFormatter(maxTextLength),
   ];
-
 
   static String? validateName(String? fieldName, String? value) {
     if (value == null || value.trim().isEmpty) {
@@ -119,7 +117,77 @@ class DValidator {
     LengthLimitingTextInputFormatter(defaultPhoneLength),
   ];
 
+  // ── Vehicle number (India) ─────────────────────────────────
+  /// Standard format: SS DD AA NNNN  e.g. KL07AB1234
+  ///   SS   = 2-letter state code
+  ///   DD   = 1-2 digit RTO/district code
+  ///   AA   = 0-3 letter series (some older plates skip this)
+  ///   NNNN = 4-digit number
+  /// Also matches the newer BH-series: 22BH1234AB
+  static final RegExp _vehicleNumberRegExp = RegExp(
+    r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$|^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$',
+  );
 
+  /// Max raw characters allowed while typing (before/without validation),
+  /// used to cap the field length. Longest valid form (SS+DD+AAA+NNNN) is 11.
+  static const int vehicleNumberMaxLength = 11;
+
+  static String? validateVehicleNumber(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Vehicle number is required';
+    }
+    final v = value.trim().toUpperCase().replaceAll(' ', '').replaceAll('-', '');
+    if (v.length < 9 || v.length > vehicleNumberMaxLength) {
+      return 'Vehicle number must be 9-$vehicleNumberMaxLength characters';
+    }
+    if (!_vehicleNumberRegExp.hasMatch(v)) {
+      return 'Enter a valid vehicle number e.g. KL07AB1234';
+    }
+    return null;
+  }
+
+  /// Letters + digits only, auto-uppercased, capped at 11 chars —
+  /// attach directly to the vehicle number field's inputFormatters.
+  static List<TextInputFormatter> get vehicleNumber => [
+    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+    UpperCaseTextFormatter(),
+    LengthLimitingTextInputFormatter(vehicleNumberMaxLength),
+  ];
+
+  // ── Driving License number (India) ─────────────────────────
+  /// Standard format: SS RR YYYY NNNNNNN  e.g. KL0720230012345
+  ///   SS      = 2-letter state code
+  ///   RR      = 2-digit RTO code
+  ///   YYYY    = 4-digit issue year
+  ///   NNNNNNN = 7-digit serial number
+  /// Total length is always 15 characters.
+  static final RegExp _licenseNumberRegExp = RegExp(
+    r'^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7}$',
+  );
+
+  static const int licenseNumberLength = 15;
+
+  static String? validateLicenseNumber(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'License number is required';
+    }
+    final v = value.trim().toUpperCase().replaceAll(' ', '').replaceAll('-', '');
+    if (v.length != licenseNumberLength) {
+      return 'License number must be exactly $licenseNumberLength characters';
+    }
+    if (!_licenseNumberRegExp.hasMatch(v)) {
+      return 'Enter a valid license number e.g. KL0720230012345';
+    }
+    return null;
+  }
+
+  /// Letters + digits only, auto-uppercased, capped at 15 chars —
+  /// attach directly to the license number field's inputFormatters.
+  static List<TextInputFormatter> get licenseNumber => [
+    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+    UpperCaseTextFormatter(),
+    LengthLimitingTextInputFormatter(licenseNumberLength),
+  ];
 
   // ── Dropdown / selection ──────────────────────────────────
   static String? validateDropdown<T>(String? fieldName, T? value) {
@@ -173,4 +241,16 @@ class DValidator {
     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
     LengthLimitingTextInputFormatter(12),
   ];
+}
+
+/// Forces all typed text to uppercase — used for vehicle/license fields
+/// since Indian registration formats are always uppercase.
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
 }

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../Apiprovider/ownerreportprovider.dart';
@@ -10,14 +11,6 @@ import 'ownerestimatereportscreen.dart';
 import 'ownerquotation_reportfilterscreen.dart'; // ReportEntityType
 import 'ownerreportwidget.dart';
 
-/// Filter screen for the Estimate Report.
-/// Salesman / contractor lists are loaded from the real "active" APIs
-/// (already wired up in OwnerReportsProvider) so the id sent through to
-/// OwnerEstimateReportScreen is a real backend id, not a display name.
-///
-/// Status is NOT selected here — the result screen fetches with
-/// status: 'all' first and derives the status chips from the API
-/// response itself, so nothing about status is hardcoded on this screen.
 class OwnerEstimateReportFilterScreen extends StatefulWidget {
   const OwnerEstimateReportFilterScreen({
     super.key,
@@ -65,6 +58,10 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     _loadPeople();
   }
 
+  // ---------------------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------------------
+
   Future<void> _loadPeople() async {
     setState(() {
       _loadingPeople = true;
@@ -76,12 +73,11 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
       if (!mounted) return;
       if (result.success) {
         setState(() {
-          _salesmen = result.salesmen;
+          // Drop any salesman with a blank/whitespace-only name — a
+          // nameless record should never appear as a selectable row.
+          _salesmen = result.salesmen.where((s) => s.name.trim().isNotEmpty).toList();
           _loadingPeople = false;
-          if (_selectedPersonId == null && _salesmen.isNotEmpty) {
-            _selectedPersonId = _salesmen.first.id;
-            _selectedPersonName = _salesmen.first.name;
-          }
+          _syncSelection();
         });
       } else {
         setState(() {
@@ -94,12 +90,10 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
       if (!mounted) return;
       if (result.success) {
         setState(() {
-          _contractors = result.contractors;
+          // Same guard for contractors — no blank-name rows in the dropdown.
+          _contractors = result.contractors.where((c) => c.name.trim().isNotEmpty).toList();
           _loadingPeople = false;
-          if (_selectedPersonId == null && _contractors.isNotEmpty) {
-            _selectedPersonId = _contractors.first.id;
-            _selectedPersonName = _contractors.first.name;
-          }
+          _syncSelection();
         });
       } else {
         setState(() {
@@ -110,9 +104,65 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     }
   }
 
-  List<String> get _peopleNames => _type == ReportEntityType.salesman
-      ? _salesmen.map((s) => s.name).toList()
-      : _contractors.map((c) => c.name).toList();
+  /// Makes sure the selected person actually exists in the freshly loaded
+  /// list. If the preselected id is missing (inactive, wrong type, blank
+  /// name that got filtered out, etc.) — or nothing was preselected at all
+  /// — the selection is cleared so the dropdown falls back to showing its
+  /// "Select Salesman" / "Select Contractor" hint rather than silently
+  /// defaulting to the first person. Call inside setState.
+  void _syncSelection() {
+    final ids = _peopleIds;
+    final names = _rawNames;
+
+    final index = ids.indexOf(_selectedPersonId ?? '');
+    if (index != -1) {
+      // Keep the name in sync with the real record.
+      _selectedPersonName = names[index];
+      return;
+    }
+
+    // No match (or nothing was preselected) — leave unselected.
+    _selectedPersonId = null;
+    _selectedPersonName = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dropdown helpers
+  // ---------------------------------------------------------------------------
+
+  // _salesmen / _contractors are already filtered to exclude blank names
+  // in _loadPeople, so these stay simple and always in sync by index.
+  List<String> get _rawNames => _type == ReportEntityType.salesman
+      ? _salesmen.map((s) => s.name.trim()).toList()
+      : _contractors.map((c) => c.name.trim()).toList();
+
+  List<String> get _peopleIds => _type == ReportEntityType.salesman
+      ? _salesmen.map((s) => s.id.toString()).toList()
+      : _contractors.map((c) => c.id.toString()).toList();
+
+  /// Unique dropdown labels: "rasna", "rasna (2)", ... so two people with the
+  /// same name never produce duplicate DropdownMenuItem values or resolve
+  /// to the wrong id.
+  List<String> get _peopleNames {
+    final seen = <String, int>{};
+    return _rawNames.map((n) {
+      final count = (seen[n] ?? 0) + 1;
+      seen[n] = count;
+      return count == 1 ? n : '$n ($count)';
+    }).toList();
+  }
+
+  /// Label for the currently selected id, or null if nothing is selected
+  /// or the id isn't in the list. Feeds ReportDropdownField's nullable
+  /// [value] directly — null shows the placeholder hint.
+  String? get _selectedLabel {
+    final i = _peopleIds.indexOf(_selectedPersonId ?? '');
+    return i == -1 ? null : _peopleNames[i];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
 
   void _onTypeChanged(bool isSalesman) {
     setState(() {
@@ -123,16 +173,14 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     _loadPeople();
   }
 
-  // Kept as if/else (not a `? :` across two different model types) so each
-  // branch keeps its real static type and `.id` resolves correctly.
-  void _onPersonChanged(String name) {
+  /// Selects by index in the unique-label list, so duplicate names still
+  /// resolve to the correct backend id.
+  void _onPersonChanged(String label) {
+    final i = _peopleNames.indexOf(label);
+    if (i == -1) return;
     setState(() {
-      _selectedPersonName = name;
-      if (_type == ReportEntityType.salesman) {
-        _selectedPersonId = _salesmen.firstWhere((s) => s.name == name).id;
-      } else {
-        _selectedPersonId = _contractors.firstWhere((c) => c.name == name).id;
-      }
+      _selectedPersonId = _peopleIds[i];
+      _selectedPersonName = _rawNames[i];
     });
   }
 
@@ -153,8 +201,10 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     });
   }
 
+  bool get _canGenerate => _selectedPersonId != null && _selectedPersonName != null;
+
   void _generate() {
-    if (_selectedPersonId == null || _selectedPersonName == null) return;
+    if (!_canGenerate) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => OwnerEstimateReportScreen(
@@ -168,15 +218,21 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
+    final names = _peopleNames;
+
     return NetworkAwareWrapper(child: Scaffold(
+      appBar: AppBar(title: Text('Estimate Report', style: AppTextStyles.h6())),
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          const ReportHeaderBar(title: 'Estimate Report', showBack: true),
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(Responsive.w(20)),
@@ -202,13 +258,24 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
                     )
                   else if (_peopleError != null)
                     Text(_peopleError!, style: AppTextStyles.caption(color: AppColors.error))
-                  else
-                    ReportDropdownField(
-                      options: _peopleNames,
-                      value: _selectedPersonName ?? '',
-                      hint: 'Choose',
-                      onChanged: _onPersonChanged,
-                    ),
+                  else if (names.isEmpty)
+                      Text(
+                        _type == ReportEntityType.salesman
+                            ? 'No active salesmen found.'
+                            : 'No active contractors found.',
+                        style: AppTextStyles.caption(),
+                      )
+                    else
+                      ReportDropdownField(
+                        options: names,
+                        // null until the user actually picks someone — shows
+                        // the "Select Salesman" / "Select Contractor" hint.
+                        value: _selectedLabel,
+                        hint: _type == ReportEntityType.salesman
+                            ? 'Select Salesman'
+                            : 'Select Contractor',
+                        onChanged: _onPersonChanged,
+                      ),
                   SizedBox(height: Responsive.h(20)),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,7 +312,9 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
                     ],
                   ),
                   SizedBox(height: Responsive.h(28)),
-                  GenerateReportButton(onPressed: _generate),
+                  GenerateReportButton(
+                    onPressed: _canGenerate ? _generate : null,
+                  ),
                   SizedBox(height: Responsive.h(20)),
                 ],
               ),

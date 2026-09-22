@@ -142,21 +142,17 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                         TextFormField(
                           controller: licenseController,
                           textCapitalization: TextCapitalization.characters,
-                          inputFormatters: DValidator.textWithLimit,
-                          decoration:
-                          _inputDecoration('License Number', Icons.badge_outlined),
-                          validator: (v) =>
-                              DValidator.validateRequired(v, message: 'Enter license number'),
+                          inputFormatters: DValidator.licenseNumber,
+                          decoration: _inputDecoration('License Number', Icons.badge_outlined),
+                          validator: DValidator.validateLicenseNumber,
                         ),
                         SizedBox(height: Responsive.h(14)),
                         TextFormField(
                           controller: vehicleController,
                           textCapitalization: TextCapitalization.characters,
-                          inputFormatters: DValidator.textWithLimit,
-                          decoration: _inputDecoration(
-                              'Vehicle Number', Icons.local_shipping_outlined),
-                          validator: (v) =>
-                              DValidator.validateRequired(v, message: 'Enter vehicle number'),
+                          inputFormatters: DValidator.vehicleNumber,
+                          decoration: _inputDecoration('Vehicle Number', Icons.local_shipping_outlined),
+                          validator: DValidator.validateVehicleNumber,
                         ),
                         SizedBox(height: Responsive.h(14)),
 

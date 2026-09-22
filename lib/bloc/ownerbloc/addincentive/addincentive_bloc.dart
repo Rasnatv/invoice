@@ -1,16 +1,20 @@
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../Apiprovider/salesman_quotationprovider.dart';
 import '../../../Apiprovider/salesmanincentivesetupprovider.dart';
 import '../../../models/owner_models/owner_incentivesetupmodel.dart';
 import 'addincentive_event.dart';
 import 'addincentive_state.dart';
 
-
 class SalesmanIncentiveBloc extends Bloc<SalesmanIncentiveEvent, SalesmanIncentiveState> {
   final SalesmanIncentiveSetupProvider _provider;
+  final QuotationProvider _quotationProvider;
 
-  SalesmanIncentiveBloc({SalesmanIncentiveSetupProvider? provider})
-      : _provider = provider ?? SalesmanIncentiveSetupProvider(),
+  SalesmanIncentiveBloc({
+    SalesmanIncentiveSetupProvider? provider,
+    QuotationProvider? quotationProvider,
+  })  : _provider = provider ?? SalesmanIncentiveSetupProvider(),
+        _quotationProvider = quotationProvider ?? QuotationProvider(),
         super(const SalesmanIncentiveState()) {
     on<LoadSalesmanIncentiveList>(_onLoadList);
     on<LoadSalesmanIncentiveSetup>(_onLoadSetup);
@@ -19,24 +23,58 @@ class SalesmanIncentiveBloc extends Bloc<SalesmanIncentiveEvent, SalesmanIncenti
     on<ClearSalesmanIncentiveSetupDetail>(_onClearDetail);
   }
 
+  /// Loads the dropdown list. Source of truth for WHO shows up is now
+  /// GET /salesmen/active (QuotationProvider.getActiveSalesmen) so every
+  /// active salesman appears, not just ones with an existing incentive
+  /// record. We separately call the incentive-setup list endpoint to
+  /// annotate each salesman with this month's hasSetup/displayText/
+  /// monthYear, and merge the two by salesman id.
   Future<void> _onLoadList(
       LoadSalesmanIncentiveList event,
       Emitter<SalesmanIncentiveState> emit,
       ) async {
     emit(state.copyWith(listStatus: SalesmanIncentiveListStatus.loading));
-    final result = await _provider.getList();
-    if (result.success) {
-      emit(state.copyWith(
-        listStatus: SalesmanIncentiveListStatus.success,
-        list: result.list,
-        clearListError: true,
-      ));
-    } else {
+
+    final results = await Future.wait([
+      _quotationProvider.getActiveSalesmen(),
+      _provider.getList(),
+    ]);
+    final activeResult = results[0] as SalesmanListResult;
+    final statusResult = results[1] as dynamic; // SalesmanIncentiveListResult from _provider.getList()
+
+    if (!activeResult.success) {
       emit(state.copyWith(
         listStatus: SalesmanIncentiveListStatus.failure,
-        listError: result.errorMessage,
+        listError: activeResult.errorMessage,
       ));
+      return;
     }
+
+    // Index incentive-status rows by salesman id for O(1) lookup while
+    // merging. If the status call failed, we still show the active
+    // salesmen with "no setup yet" rather than blocking the whole screen.
+    final statusById = <String, SalesmanIncentiveListItem>{
+      if (statusResult.success)
+        for (final item in statusResult.list) item.id: item,
+    };
+
+    final merged = <SalesmanIncentiveListItem>[
+      for (final salesman in activeResult.list)
+        statusById[salesman.id] ??
+            SalesmanIncentiveListItem(
+              id: salesman.id,
+              name: salesman.name,
+              hasSetup: false,
+              displayText: '',
+              monthYear: '',
+            ),
+    ];
+
+    emit(state.copyWith(
+      listStatus: SalesmanIncentiveListStatus.success,
+      list: merged,
+      clearListError: true,
+    ));
   }
 
   Future<void> _onLoadSetup(
@@ -69,28 +107,6 @@ class SalesmanIncentiveBloc extends Bloc<SalesmanIncentiveEvent, SalesmanIncenti
     }
   }
 
-  // Future<void> _onSave(
-  //     SaveSalesmanIncentiveSetup event,
-  //     Emitter<SalesmanIncentiveState> emit,
-  //     ) async {
-  //   emit(state.copyWith(
-  //     actionStatus: SalesmanIncentiveActionStatus.submitting,
-  //     clearActionError: true,
-  //     clearActionMessage: true,
-  //   ));
-  //   final result = await _provider.saveSetup(event.request);
-  //   if (result.success) {
-  //     emit(state.copyWith(
-  //       actionStatus: SalesmanIncentiveActionStatus.success,
-  //       actionMessage: result.message,
-  //     ));
-  //   } else {
-  //     emit(state.copyWith(
-  //       actionStatus: SalesmanIncentiveActionStatus.failure,
-  //       actionError: result.message,
-  //     ));
-  //   }
-  // }
   Future<void> _onSave(
       SaveSalesmanIncentiveSetup event,
       Emitter<SalesmanIncentiveState> emit,

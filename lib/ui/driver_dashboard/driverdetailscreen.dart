@@ -114,7 +114,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
                         SizedBox(height: Responsive.h(6)),
                         _infoRow('Ref. No.', bill.refNo),
                         SizedBox(height: Responsive.h(6)),
-                        _infoRow('Party Name', bill.partyName),
+                        _infoRow('P Name', bill.partyName),
                         SizedBox(height: Responsive.h(6)),
                         _infoRow('Contact Number', bill.contactNumber),
                         SizedBox(height: Responsive.h(6)),

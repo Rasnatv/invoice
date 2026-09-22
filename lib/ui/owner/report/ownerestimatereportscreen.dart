@@ -14,17 +14,6 @@ import 'ownerquotation_reportfilterscreen.dart'; // ReportEntityType
 import 'ownerreportwidget.dart';
 
 
-// }
-
-/// Estimate Report results screen.
-/// Everything shown here — summary numbers, row list, and each row's
-/// status label — comes straight from POST /reports/estimates. Nothing
-/// is filtered or re-labelled on the client.
-///
-/// Status chips are NOT hardcoded: the screen fetches with status: 'all'
-/// first, reads the distinct status/status_label pairs off the returned
-/// rows, and uses that as the chip set. Tapping a chip re-fetches with
-/// that status filtered server-side.
 class OwnerEstimateReportScreen extends StatelessWidget {
   const OwnerEstimateReportScreen({
     super.key,

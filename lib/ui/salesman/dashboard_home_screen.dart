@@ -17,6 +17,7 @@ import '../owner/ownerincentivesummarypage.dart';
 import 'MONTHLYSALE.dart';
 import 'approvedbills.dart';
 import 'create_estimate_screen.dart';
+import 'cubit/nav_cubit.dart';
 import 'dashboardhomeestimatetile.dart';
 
 /// NOTE: DashboardHomeBloc is now provided by DashboardShell (above the
@@ -45,8 +46,14 @@ class _DashboardHomeView extends StatelessWidget {
     }
   }
 
+  // "My Estimates" is a tab inside this same DashboardShell, not a
+  // standalone screen — EstimatesBloc only lives above the shell's
+  // IndexedStack. Switching tabs via NavCubit keeps MyEstimatesScreen a
+  // descendant of that provider. Pushing a separate '/my-estimates'
+  // GoRoute here would open it with nothing above it and crash with
+  // ProviderNotFoundException<EstimatesBloc>.
   void _openMyEstimates(BuildContext context) {
-    context.push('/my-estimates');
+    context.read<NavCubit>().changeTab(1); // 1 = Estimates tab in DashboardShell
   }
 
   void _openIncentives(BuildContext context, DashboardHomeState state) {
@@ -80,15 +87,12 @@ class _DashboardHomeView extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: BlocBuilder<DashboardHomeBloc, DashboardHomeState>(
         builder: (context, state) {
-          // Full-screen shimmer skeleton on first load AND on manual refresh —
-          // same widget both times.
           if (state.status == DashboardHomeStatus.initial ||
               state.status == DashboardHomeStatus.loading ||
               state.status == DashboardHomeStatus.refreshing) {
             return const SalesmanDashboardShimmer();
           }
 
-          // Full-screen error only when we have nothing to show yet.
           if (state.status == DashboardHomeStatus.failure && state.recentEstimates.isEmpty) {
             return _ErrorState(
               message: state.errorMessage ?? 'Something went wrong.',
@@ -100,8 +104,6 @@ class _DashboardHomeView extends StatelessWidget {
             color: AppColors.primary,
             onRefresh: () async {
               context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
-              // Wait for the in-flight refresh to settle so the
-              // RefreshIndicator spinner doesn't stop prematurely.
               await context.read<DashboardHomeBloc>().stream.firstWhere(
                     (s) => s.status != DashboardHomeStatus.refreshing,
               );
@@ -297,7 +299,6 @@ class _DashboardHeader extends StatelessWidget {
           ),
         ),
 
-        // Floating stat card strip
         Positioned(
           left: Responsive.w(20),
           right: Responsive.w(20),
@@ -335,7 +336,7 @@ class _DashboardHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$quotations',
                     label: 'Quotations',
-                    color: const Color(0xFF16A34A), // emerald
+                    color: const Color(0xFF16A34A),
                     icon: Icons.receipt_long_rounded,
                   ),
                 ),
@@ -344,7 +345,7 @@ class _DashboardHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$pending',
                     label: 'Pending',
-                    color: const Color(0xFFF59E0B), // amber
+                    color: const Color(0xFFF59E0B),
                     icon: Icons.hourglass_bottom_rounded,
                   ),
                 ),
@@ -353,7 +354,7 @@ class _DashboardHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$dispatchBills',
                     label: 'Dispatch',
-                    color: const Color(0xFF7C3AED), // violet
+                    color: const Color(0xFF7C3AED),
                     icon: Icons.local_shipping_rounded,
                   ),
                 ),
@@ -412,8 +413,6 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-// ---------------- SECTION TITLE ----------------
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, this.actionLabel, this.onAction});
   final String title;
@@ -469,31 +468,29 @@ class _QuickActionsRow extends StatelessWidget {
       _QuickActionData(
         icon: Icons.folder_copy_rounded,
         label: 'My\nEstimates',
-        color: const Color(0xFF0EA5E9), // blue
+        color: const Color(0xFF0EA5E9),
         onTap: onMyEstimates,
       ),
       _QuickActionData(
         icon: Icons.local_shipping_rounded,
         label: 'Approved\nBills',
-        color: const Color(0xFF16A34A), // green
+        color: const Color(0xFF16A34A),
         onTap: onApprovedBills,
       ),
       _QuickActionData(
         icon: Icons.receipt_long_rounded,
         label: 'Quotation\nBills',
-        color: const Color(0xFFF59E0B), // amber
+        color: const Color(0xFFF59E0B),
         onTap: onQuotationBills,
       ),
       _QuickActionData(
         icon: Icons.currency_rupee_rounded,
         label: 'Incentive',
-        color: const Color(0xFF7C3AED), // purple
+        color: const Color(0xFF7C3AED),
         onTap: onIncentives,
       ),
     ];
 
-    // A little extra height as headroom so text scaling / smaller devices
-    // don't push the content past the card bounds.
     return SizedBox(
       height: Responsive.h(100),
       child: ListView.separated(
@@ -620,8 +617,6 @@ class _CardWrapper extends StatelessWidget {
   }
 }
 
-// ---------------- EMPTY STATE ----------------
-
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -642,8 +637,6 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-// ---------------- ERROR STATES ----------------
 
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.message, required this.onRetry});
