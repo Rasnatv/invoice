@@ -187,16 +187,15 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
             horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
             verticalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
           ),
-          // Fixed widths (not Flex) — needed so the table can be wider
-          // than the screen and scroll, instead of squeezing text.
           columnWidths: const {
             0: FixedColumnWidth(32),   // #
             1: FixedColumnWidth(160),  // Item
             2: FixedColumnWidth(140),  // Company
             3: FixedColumnWidth(110),  // Size
-            4: FixedColumnWidth(50),   // Box
-            5: FixedColumnWidth(50),   // Pcs
-            6: FixedColumnWidth(60),   // Qty
+            4: FixedColumnWidth(70),   // Unit
+            5: FixedColumnWidth(50),   // Box
+            6: FixedColumnWidth(50),   // Pcs
+            7: FixedColumnWidth(70),   // Qty
           },
           children: [
             TableRow(
@@ -206,6 +205,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
                 _headerCell('Item'),
                 _headerCell('Company'),
                 _headerCell('Size'),
+                _headerCell('Unit'),
                 _headerCell('Box', align: TextAlign.right),
                 _headerCell('Pcs', align: TextAlign.right),
                 _headerCell('Qty', align: TextAlign.right),
@@ -221,6 +221,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
                   _dataCell(d.items[i].productName),
                   _dataCell(d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName),
                   _dataCell(d.items[i].productSize),
+                  _dataCell(d.items[i].packing.isEmpty ? '-' : d.items[i].packing),
                   _dataCell(d.items[i].boxes.toStringAsFixed(0), align: TextAlign.right),
                   _dataCell(d.items[i].pieces.toStringAsFixed(0), align: TextAlign.right),
                   _dataCell(d.items[i].quantity.toStringAsFixed(0), align: TextAlign.right, bold: true),
@@ -231,7 +232,6 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
       ),
     );
   }
-
   Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),

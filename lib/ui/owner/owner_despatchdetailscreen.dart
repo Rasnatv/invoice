@@ -253,6 +253,10 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     );
   }
 
+  /// Items table — includes a "Unit" column (from `packing`) between
+  /// Size and Box so quantity/unit context is visible on screen, in
+  /// addition to Qty. Falls back to "-" when packing is empty (older
+  /// records / items created without a packing unit set).
   Widget _itemsTable(DispatchDetail d) {
     return Container(
       decoration: BoxDecoration(
@@ -275,9 +279,10 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
             1: FixedColumnWidth(160),  // Item
             2: FixedColumnWidth(140),  // Company
             3: FixedColumnWidth(110),  // Size
-            4: FixedColumnWidth(50),   // Box
-            5: FixedColumnWidth(50),   // Pcs
-            6: FixedColumnWidth(60),   // Qty
+            4: FixedColumnWidth(70),   // Unit
+            5: FixedColumnWidth(50),   // Box
+            6: FixedColumnWidth(50),   // Pcs
+            7: FixedColumnWidth(60),   // Qty
           },
           children: [
             TableRow(
@@ -287,6 +292,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
                 _headerCell('Item'),
                 _headerCell('Company'),
                 _headerCell('Size'),
+                _headerCell('Unit'),
                 _headerCell('Box', align: TextAlign.right),
                 _headerCell('Pcs', align: TextAlign.right),
                 _headerCell('Qty', align: TextAlign.right),
@@ -302,6 +308,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
                   _dataCell(d.items[i].productName),
                   _dataCell(d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName),
                   _dataCell(d.items[i].productSize),
+                  _dataCell(d.items[i].packing.isEmpty ? '-' : d.items[i].packing),
                   _dataCell(d.items[i].boxes.toStringAsFixed(0), align: TextAlign.right),
                   _dataCell(d.items[i].pieces.toStringAsFixed(0), align: TextAlign.right),
                   _dataCell(d.items[i].quantity.toStringAsFixed(0), align: TextAlign.right, bold: true),
@@ -718,8 +725,11 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     );
   }
 
+  /// PDF items table — includes the "Unit" column (from `packing`)
+  /// alongside Box/Pcs/Qty, matching the on-screen table and the
+  /// Excel export.
   pw.Widget _pdfItemsTable(DispatchDetail d) {
-    final headers = ['#', 'Item', 'Company', 'Size', 'Box', 'Pcs', 'Qty'];
+    final headers = ['#', 'Item', 'Company', 'Size', 'Unit', 'Box', 'Pcs', 'Qty'];
     final data = <List<String>>[
       for (var i = 0; i < d.items.length; i++)
         [
@@ -727,6 +737,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
           d.items[i].productName,
           d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
           d.items[i].productSize,
+          d.items[i].packing.isEmpty ? '-' : d.items[i].packing,
           d.items[i].boxes.toStringAsFixed(0),
           d.items[i].pieces.toStringAsFixed(0),
           d.items[i].quantity.toStringAsFixed(0),
@@ -741,9 +752,9 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       cellStyle: const pw.TextStyle(fontSize: 9),
       cellAlignments: {
         0: pw.Alignment.center,
-        4: pw.Alignment.centerRight,
         5: pw.Alignment.centerRight,
         6: pw.Alignment.centerRight,
+        7: pw.Alignment.centerRight,
       },
       border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
       rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
@@ -756,6 +767,8 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
   /// Same idea as the PDF flow: build the .xlsx in memory, write it to a
   /// temp file, then hand it straight to the native share sheet. No
   /// separate "share" button — this icon both generates and shares.
+  /// Includes the "Unit" column (from `packing`) alongside Box/Pcs/Qty,
+  /// matching the on-screen table and the PDF export.
   Future<void> _generateAndShareExcel(DispatchDetail d) async {
     setState(() => _isGeneratingExcel = true);
     try {
@@ -780,7 +793,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       if (d.despatchedAt != null) addRow(['Despatched At', dateFmt.format(d.despatchedAt!)]);
       if (d.deliveryNotes.isNotEmpty) addRow(['Delivery Notes', d.deliveryNotes]);
       addRow([]);
-      addRow(['#', 'Item', 'Company', 'Size', 'Box', 'Pcs', 'Qty']);
+      addRow(['#', 'Item', 'Company', 'Size', 'Unit', 'Box', 'Pcs', 'Qty']);
       for (var i = 0; i < d.items.length; i++) {
         final item = d.items[i];
         addRow([
@@ -788,6 +801,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
           item.productName,
           item.companyName.isEmpty ? '-' : item.companyName,
           item.productSize,
+          item.packing.isEmpty ? '-' : item.packing,
           item.boxes.toStringAsFixed(0),
           item.pieces.toStringAsFixed(0),
           item.quantity.toStringAsFixed(0),
