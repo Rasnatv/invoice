@@ -86,15 +86,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  // =================== FORGOT PASSWORD ===================
-  // Requires two new entries in ApiConstants (mirroring `login` above):
-  //   static const String forgotPassword = 'forgot-password';
-  //   static const String verifyOtp = 'verify-otp';
-  //   static const String resetPassword = 'reset-password';
-  //
-  // These three run before the user is authenticated, so — unlike almost
-  // everything else in this file — they deliberately do NOT pass
-  // `options: await _authOptions()`.
 
   /// POST /forgot-password — body: { email }
   Future<Response> forgotPassword(Map<String, dynamic> data) async => dio.post(
@@ -281,8 +272,8 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  Future<Response> mySiteVisits() async => dio.get(
-    ApiConstants.siteVisitsMy,
+  Future<Response> mySiteVisits({int page = 1, int perPage = 10}) async => dio.get(
+    '${ApiConstants.siteVisitsMy}?page=$page&per_page=$perPage',
     options: await _authOptions(),
   );
 

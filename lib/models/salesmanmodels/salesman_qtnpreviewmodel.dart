@@ -100,7 +100,7 @@ class QuotationPreviewParty {
     );
   }
 }
-
+//
 // class QuotationPreviewItem {
 //   final String productId;
 //   final String productName;
@@ -114,7 +114,7 @@ class QuotationPreviewParty {
 //   final double incentiveAmount;
 //   final bool isIncentiveEligible;
 //   final double perUnitIncentive;
-//   final String product_company;
+//   final String productCompany;
 //
 //   const QuotationPreviewItem({
 //     required this.productId,
@@ -128,7 +128,8 @@ class QuotationPreviewParty {
 //     required this.mrpTotal,
 //     required this.incentiveAmount,
 //     required this.isIncentiveEligible,
-//     required this.perUnitIncentive, required this.product_company,
+//     required this.perUnitIncentive,
+//     required this.productCompany,
 //   });
 //
 //   factory QuotationPreviewItem.fromJson(Map<String, dynamic> json) {
@@ -144,7 +145,8 @@ class QuotationPreviewParty {
 //       amount: _asDouble(json['amount']),
 //       mrpTotal: _asDouble(json['mrp_total']),
 //       incentiveAmount: _asDouble(json['incentive_amount']),
-//       isIncentiveEligible: _asString(json['is_incentive_eligible']) == '1',
+//       isIncentiveEligible:
+//       _asString(json['is_incentive_eligible']) == '1',
 //       perUnitIncentive: _asDouble(json['per_unit_incentive']),
 //     );
 //   }
@@ -163,6 +165,8 @@ class QuotationPreviewItem {
   final bool isIncentiveEligible;
   final double perUnitIncentive;
   final String productCompany;
+  final double boxQuantity;
+  final double pieceQuantity;
 
   const QuotationPreviewItem({
     required this.productId,
@@ -178,6 +182,8 @@ class QuotationPreviewItem {
     required this.isIncentiveEligible,
     required this.perUnitIncentive,
     required this.productCompany,
+    required this.boxQuantity,
+    required this.pieceQuantity,
   });
 
   factory QuotationPreviewItem.fromJson(Map<String, dynamic> json) {
@@ -193,9 +199,10 @@ class QuotationPreviewItem {
       amount: _asDouble(json['amount']),
       mrpTotal: _asDouble(json['mrp_total']),
       incentiveAmount: _asDouble(json['incentive_amount']),
-      isIncentiveEligible:
-      _asString(json['is_incentive_eligible']) == '1',
+      isIncentiveEligible: _asString(json['is_incentive_eligible']) == '1',
       perUnitIncentive: _asDouble(json['per_unit_incentive']),
+      boxQuantity: _asDouble(json['box_quantity']),
+      pieceQuantity: _asDouble(json['piece_quantity']),
     );
   }
 }

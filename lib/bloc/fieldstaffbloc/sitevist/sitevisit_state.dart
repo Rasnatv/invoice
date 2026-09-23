@@ -1,7 +1,8 @@
+
+
 import 'package:equatable/equatable.dart';
 import '../../../models/fieldstaffmodels/fieldstaffshowsitevisitmodel.dart';
 import '../../../models/fieldstaffmodels/fieldstaffsitevisitmodel.dart';
-
 
 enum SiteVisitActionStatus { idle, inProgress, success, failure }
 
@@ -16,6 +17,9 @@ class SiteVisitState extends Equatable {
     this.actionStatus = SiteVisitActionStatus.idle,
     this.actionMessage,
     this.actionUnauthorized = false,
+    this.currentPage = 1,
+    this.hasMoreAll = true,
+    this.isLoadingMore = false,
   });
 
   // ---- GET /site-visits/my ----
@@ -32,6 +36,16 @@ class SiteVisitState extends Equatable {
   final SiteVisitActionStatus actionStatus;
   final String? actionMessage;
   final bool actionUnauthorized;
+
+  // ---- pagination (the "All" tab) ----
+  /// The page number of the "all" list that was fetched last.
+  final int currentPage;
+  /// False once the loaded "all" list length reaches myData.totalVisits.
+  final bool hasMoreAll;
+  /// True only while a "load more" (scroll-triggered) fetch is in
+  /// flight — distinct from [isListLoading], which is the full-screen
+  /// shimmer for first load / pull-to-refresh.
+  final bool isLoadingMore;
 
   List<SiteVisitListItemModel> get todayVisits => myData.today.list;
   List<SiteVisitListItemModel> get allVisits => myData.all.list;
@@ -52,6 +66,9 @@ class SiteVisitState extends Equatable {
     String? actionMessage,
     bool clearActionMessage = false,
     bool? actionUnauthorized,
+    int? currentPage,
+    bool? hasMoreAll,
+    bool? isLoadingMore,
   }) {
     return SiteVisitState(
       isListLoading: isListLoading ?? this.isListLoading,
@@ -63,6 +80,9 @@ class SiteVisitState extends Equatable {
       actionStatus: actionStatus ?? this.actionStatus,
       actionMessage: clearActionMessage ? null : (actionMessage ?? this.actionMessage),
       actionUnauthorized: actionUnauthorized ?? this.actionUnauthorized,
+      currentPage: currentPage ?? this.currentPage,
+      hasMoreAll: hasMoreAll ?? this.hasMoreAll,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
@@ -77,5 +97,8 @@ class SiteVisitState extends Equatable {
     actionStatus,
     actionMessage,
     actionUnauthorized,
+    currentPage,
+    hasMoreAll,
+    isLoadingMore,
   ];
 }

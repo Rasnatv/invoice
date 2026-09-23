@@ -54,10 +54,14 @@ class SiteVisitProvider {
 
   SiteVisitProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
-  /// GET /site-visits/my
-  Future<SiteVisitListResult> getMySiteVisits() async {
+  /// GET /site-visits/my?page=&per_page=
+  ///
+  /// [page]/[perPage] drive pagination of the "all" list. The bloc passes
+  /// the next page number when the user scrolls to the bottom of the
+  /// "All" tab, and merges the returned items onto the existing list.
+  Future<SiteVisitListResult> getMySiteVisits({int page = 1, int perPage = 10}) async {
     try {
-      final response = await _apiClient.mySiteVisits();
+      final response = await _apiClient.mySiteVisits(page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = SiteVisitMyResponseModel.fromJson(response.data);

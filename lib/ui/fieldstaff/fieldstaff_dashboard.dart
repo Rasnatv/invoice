@@ -22,7 +22,6 @@ import 'fieldstaff_incentivelistscreen.dart';
 import 'fieldstaffchangepasswordscreen.dart';
 import 'visitdetailscreen.dart';
 
-
 class FieldStaffDashboardScreen extends StatefulWidget {
   const FieldStaffDashboardScreen({super.key});
 
@@ -34,6 +33,10 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _searchCtrl = TextEditingController();
+  // Only the "All" tab is paginated (the "today" list is short and comes
+  // back in full on every /site-visits/my call), so only that list needs
+  // a scroll listener.
+  final _allListScrollCtrl = ScrollController();
   String _query = '';
 
   @override
@@ -42,12 +45,32 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     _tabController = TabController(length: 2, vsync: this);
     context.read<SiteVisitBloc>().add(const FetchMySiteVisits());
     context.read<ProfileBloc>().add(const LoadProfile());
+
+    _allListScrollCtrl.addListener(_onAllListScroll);
+  }
+
+  void _onAllListScroll() {
+    if (!_allListScrollCtrl.hasClients) return;
+    // Fire the next page a bit before hitting the true bottom so the
+    // next page is ready before the user runs out of items.
+    final nearBottom = _allListScrollCtrl.position.pixels >=
+        _allListScrollCtrl.position.maxScrollExtent - 200;
+    if (!nearBottom) return;
+
+    final state = context.read<SiteVisitBloc>().state;
+    if (state.isLoadingMore || !state.hasMoreAll || state.isListLoading) return;
+
+    context.read<SiteVisitBloc>().add(
+      FetchMySiteVisits(page: state.currentPage + 1, loadMore: true),
+    );
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchCtrl.dispose();
+    _allListScrollCtrl.removeListener(_onAllListScroll);
+    _allListScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -147,111 +170,121 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddVisit,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
-        label: const Text('Add Visit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-      ),
-      body: BlocBuilder<SiteVisitBloc, SiteVisitState>(
-        builder: (context, state) {
-          final todayVisits = state.todayVisits;
-          final allVisits = state.allVisits;
-          final isInitialLoading = state.isListLoading && state.totalVisitsCount == 0;
-          // Pull-to-refresh or manual refresh while data already exists —
-          // shimmer the whole dashboard again, same as first load.
-          final isRefreshing = state.isListLoading && state.totalVisitsCount > 0;
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _openAddVisit,
+          backgroundColor: AppColors.primary,
+          icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
+          label: const Text('Add Visit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        ),
+        body: BlocBuilder<SiteVisitBloc, SiteVisitState>(
+          builder: (context, state) {
+            final todayVisits = state.todayVisits;
+            final allVisits = state.allVisits;
+            final isInitialLoading = state.isListLoading && state.totalVisitsCount == 0;
+            // Pull-to-refresh or manual refresh while data already exists —
+            // shimmer the whole dashboard again, same as first load.
+            final isRefreshing = state.isListLoading && state.totalVisitsCount > 0;
 
-          // Full-screen shimmer on any load — header, stats, search,
-          // tabs, and list all skeleton together instead of real content.
-          if (isInitialLoading || isRefreshing) {
-            return const FieldStaffFullShimmer();
-          }
+            // Full-screen shimmer on any load — header, stats, search,
+            // tabs, and list all skeleton together instead of real content.
+            if (isInitialLoading || isRefreshing) {
+              return const FieldStaffFullShimmer();
+            }
 
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () async => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: BlocBuilder<ProfileBloc, ProfileState>(
-                    builder: (context, profileState) {
-                      final name = profileState.profile?.name;
-                      return _FieldStaffHeader(
-                        greeting: greeting,
-                        name: profileState.isLoading
-                            ? 'Loading...'
-                            : (name == null || name.isEmpty ? 'Field Staff' : name),
-                        dateLabel: today,
-                        total: state.totalVisitsCount,
-                        today: state.todayVisitsCount,
-                        incentive: state.totalIncentive,
-                        onAccountTap: _openAccountSheet,
-                        onIncentiveTap: _openIncentiveList,
-                      );
-                    },
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: BlocBuilder<ProfileBloc, ProfileState>(
+                      builder: (context, profileState) {
+                        final name = profileState.profile?.name;
+                        return _FieldStaffHeader(
+                          greeting: greeting,
+                          name: profileState.isLoading
+                              ? 'Loading...'
+                              : (name == null || name.isEmpty ? 'Field Staff' : name),
+                          dateLabel: today,
+                          total: state.totalVisitsCount,
+                          today: state.todayVisitsCount,
+                          incentive: state.totalIncentive,
+                          onAccountTap: _openAccountSheet,
+                          onIncentiveTap: _openIncentiveList,
+                        );
+                      },
+                    ),
                   ),
-                ),
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      SizedBox(height: Responsive.h(55)),
-                      _SearchField(
-                        controller: _searchCtrl,
-                        onChanged: (v) => setState(() => _query = v),
-                      ),
-                      SizedBox(height: Responsive.h(16)),
-                      _FieldStaffTabBar(
-                        controller: _tabController,
-                        todayCount: state.todayVisitsCount,
-                        totalCount: state.totalVisitsCount,
-                      ),
-                      SizedBox(height: Responsive.h(14)),
-                      if (state.listError != null)
-                        Padding(
-                          padding: EdgeInsets.only(top: Responsive.h(6), bottom: Responsive.h(10)),
-                          child: _ListErrorBanner(
-                            message: state.listError!,
-                            onRetry: () => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
-                          ),
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        SizedBox(height: Responsive.h(55)),
+                        _SearchField(
+                          controller: _searchCtrl,
+                          onChanged: (v) => setState(() => _query = v),
                         ),
-                    ]),
+                        SizedBox(height: Responsive.h(16)),
+                        _FieldStaffTabBar(
+                          controller: _tabController,
+                          todayCount: state.todayVisitsCount,
+                          totalCount: state.totalVisitsCount,
+                        ),
+                        SizedBox(height: Responsive.h(14)),
+                        if (state.listError != null)
+                          Padding(
+                            padding: EdgeInsets.only(top: Responsive.h(6), bottom: Responsive.h(10)),
+                            child: _ListErrorBanner(
+                              message: state.listError!,
+                              onRetry: () => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
+                            ),
+                          ),
+                      ]),
+                    ),
                   ),
-                ),
-                SliverFillRemaining(
-                  hasScrollBody: true,
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _VisitList(
-                        visits: _filtered(todayVisits),
-                        emptyIcon: Icons.today_rounded,
-                        emptyLabel: 'No visits logged today',
-                        emptySubLabel: 'Tap "Add Visit" once you reach a party.',
-                        onTapVisit: _openDetail,
-                        onCallTap: _callNumber,
-                      ),
-                      _VisitList(
-                        visits: _filtered(allVisits),
-                        emptyIcon: Icons.map_outlined,
-                        emptyLabel: 'No visits logged yet',
-                        emptySubLabel: 'Every party you visit will be listed here.',
-                        onTapVisit: _openDetail,
-                        onCallTap: _callNumber,
-                      ),
-                    ],
+                  SliverFillRemaining(
+                    hasScrollBody: true,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _VisitList(
+                          visits: _filtered(todayVisits),
+                          emptyIcon: Icons.today_rounded,
+                          emptyLabel: 'No visits logged today',
+                          emptySubLabel: 'Tap "Add Visit" once you reach a party.',
+                          onTapVisit: _openDetail,
+                          onCallTap: _callNumber,
+                        ),
+                        _VisitList(
+                          visits: _filtered(allVisits),
+                          emptyIcon: Icons.map_outlined,
+                          emptyLabel: 'No visits logged yet',
+                          emptySubLabel: 'Every party you visit will be listed here.',
+                          onTapVisit: _openDetail,
+                          onCallTap: _callNumber,
+                          scrollController: _allListScrollCtrl,
+                          isLoadingMore: state.isLoadingMore,
+                          // Only show the "no more" footer once there's
+                          // something loaded and the search box isn't
+                          // filtering the list down.
+                          showEndReached: !state.hasMoreAll &&
+                              allVisits.isNotEmpty &&
+                              _query.trim().isEmpty,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -378,28 +411,29 @@ class _FieldStaffHeader extends StatelessWidget {
                     SizedBox(width: Responsive.w(12)),
                     Expanded(
                       child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              greeting,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.78),
-                                fontSize: Responsive.sp(11.5),
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.2,
-                              ),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            greeting,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.78),
+                              fontSize: Responsive.sp(11.5),
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2,
                             ),
-                            SizedBox(height: Responsive.h(2)),
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.bodyBold(color: Colors.white)
-                                  .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
-                            ),
-                            SizedBox(height: Responsive.h(4)),
-
-                          ]),),
+                          ),
+                          SizedBox(height: Responsive.h(2)),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyBold(color: Colors.white)
+                                .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
+                          ),
+                          SizedBox(height: Responsive.h(4)),
+                        ],
+                      ),
+                    ),
                     Material(
                       color: Colors.white.withOpacity(0.16),
                       shape: const CircleBorder(),
@@ -669,7 +703,6 @@ class _AccountSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
-
             const SizedBox(height: 8),
             const Divider(height: 1),
             _AccountTile(
@@ -862,6 +895,9 @@ class _VisitList extends StatelessWidget {
     required this.emptySubLabel,
     required this.onTapVisit,
     required this.onCallTap,
+    this.scrollController,
+    this.isLoadingMore = false,
+    this.showEndReached = false,
   });
 
   final List<SiteVisitListItemModel> visits;
@@ -870,6 +906,15 @@ class _VisitList extends StatelessWidget {
   final String emptySubLabel;
   final ValueChanged<SiteVisitListItemModel> onTapVisit;
   final ValueChanged<String> onCallTap;
+  /// Only passed for the paginated "All" tab so it can detect
+  /// scroll-to-bottom and request the next page.
+  final ScrollController? scrollController;
+  /// Shows a small spinner row below the last item while the next page
+  /// is being fetched.
+  final bool isLoadingMore;
+  /// Shows a "You're all caught up" footer once every page has been
+  /// loaded — only meaningful on the paginated "All" tab.
+  final bool showEndReached;
 
   @override
   Widget build(BuildContext context) {
@@ -907,16 +952,47 @@ class _VisitList extends StatelessWidget {
       );
     }
 
+    // +1 trailing row for the loading spinner / "end reached" footer,
+    // shown only when relevant.
+    final showFooter = isLoadingMore || showEndReached;
+    final itemCount = visits.length + (showFooter ? 1 : 0);
+
     return ListView.separated(
+      controller: scrollController,
       padding: EdgeInsets.fromLTRB(
         Responsive.w(20),
         Responsive.h(4),
         Responsive.w(20),
         Responsive.h(90),
       ),
-      itemCount: visits.length,
+      itemCount: itemCount,
       separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
       itemBuilder: (context, i) {
+        if (i >= visits.length) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+            child: Center(
+              child: isLoadingMore
+                  ? SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: AppColors.primary,
+                ),
+              )
+                  : Text(
+                "You're all caught up",
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: Responsive.sp(11.5),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        }
+
         final visit = visits[i];
         return _VisitTile(
           visit: visit,

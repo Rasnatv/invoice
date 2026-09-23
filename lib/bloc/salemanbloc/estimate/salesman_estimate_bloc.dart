@@ -1,4 +1,3 @@
-
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/bloc/salemanbloc/estimate/salesmanestimate_event.dart';
@@ -111,6 +110,8 @@ class SalesmanEstimateBloc extends Bloc<SalesmanEstimateEvent, SalesmanEstimateS
       productId: event.productId,
       quantity: event.quantity,
       rate: event.rate,
+      boxQuantity: event.boxQuantity,
+      pieceQuantity: event.pieceQuantity,
     ));
     if (result.success) {
       emit(state.copyWith(incentiveStatus: LoadStatus.success, incentive: result.incentive));
