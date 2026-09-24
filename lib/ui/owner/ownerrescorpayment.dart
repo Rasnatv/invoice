@@ -1,4 +1,3 @@
-// lib/presentation/owner/payments/record_payment_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

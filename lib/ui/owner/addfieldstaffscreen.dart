@@ -482,27 +482,6 @@ class _FieldStaffTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (staff.employeeCode.isNotEmpty) ...[
-                      SizedBox(width: Responsive.w(6)),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: Responsive.w(8),
-                          vertical: Responsive.h(3),
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          staff.employeeCode,
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: Responsive.sp(10.5),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
                     if (!staff.isActive) ...[
                       SizedBox(width: Responsive.w(6)),
                       Container(

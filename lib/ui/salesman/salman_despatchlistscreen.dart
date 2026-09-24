@@ -1,5 +1,3 @@
-
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -36,30 +34,11 @@ class _SalesmanDispatchListView extends StatefulWidget {
 class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   final _searchCtrl = TextEditingController();
 
-  // True only while a manual pull-to-refresh is in flight — kept separate
-  // from the bloc's own status so the 5s auto-refresh timer and the
-  // refresh-on-return-from-detail don't also trigger the shimmer and
-  // cause the list to flicker every few seconds.
+  // True only while a manual pull-to-refresh is in flight.
   bool _isPullRefreshing = false;
-
-  // Auto-refreshes the list periodically while this screen is visible, so
-  // status changes made on the detail screen (in transit / delivered) show
-  // up here without needing a manual pull-to-refresh.
-  Timer? _autoRefreshTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) {
-        context.read<DispatchListBloc>().add(const RefreshDispatchList());
-      }
-    });
-  }
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -71,9 +50,7 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
       ),
     ).then((_) {
       // Always refresh on return — regardless of how the detail screen was
-      // popped (AppBar back button, system back gesture, etc). The detail
-      // screen never pops with a `true` result, so relying on that left the
-      // list stale until the next 5s auto-refresh tick.
+      // popped (AppBar back button, system back gesture, etc).
       if (mounted) {
         context.read<DispatchListBloc>().add(const RefreshDispatchList());
       }
@@ -81,9 +58,9 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   }
 
   Future<void> _onPullToRefresh(BuildContext context) async {
-    // Mirrors the owner list screen: fire the refresh event, then wait for
-    // the bloc to settle into success/failure so the RefreshIndicator spinner
-    // stays visible for the full round-trip instead of dismissing instantly.
+    // Fire the refresh event, then wait for the bloc to settle into
+    // success/failure so the RefreshIndicator spinner stays visible for the
+    // full round-trip instead of dismissing instantly.
     setState(() => _isPullRefreshing = true);
     try {
       final bloc = context.read<DispatchListBloc>();
@@ -100,40 +77,42 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Dispatch Bills', style: AppTextStyles.h6()),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: SafeArea(
-        child: BlocBuilder<DispatchListBloc, DispatchListState>(
-          builder: (context, state) {
-            return Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (v) => context
-                        .read<DispatchListBloc>()
-                        .add(SearchDispatchQueryChanged(v)),
-                    decoration: const InputDecoration(
-                      hintText: 'Search DS number, party or estimate no.',
-                      prefixIcon: Icon(Icons.search_rounded),
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('Dispatch Bills', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: BlocBuilder<DispatchListBloc, DispatchListState>(
+            builder: (context, state) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (v) => context
+                          .read<DispatchListBloc>()
+                          .add(SearchDispatchQueryChanged(v)),
+                      decoration: const InputDecoration(
+                        hintText: 'Search DS number, party or estimate no.',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(height: Responsive.h(12)),
-                Expanded(child: _buildBody(context, state, _isPullRefreshing)),
-              ],
-            );
-          },
+                  SizedBox(height: Responsive.h(12)),
+                  Expanded(child: _buildBody(context, state, _isPullRefreshing)),
+                ],
+              );
+            },
+          ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _buildBody(BuildContext context, DispatchListState state, bool isPullRefreshing) {
@@ -202,7 +181,7 @@ class _DispatchCard extends StatelessWidget {
   final DispatchListItem dispatch;
   final VoidCallback onTap;
 
-  // NEW: maps the raw status to a label + color for the badge below.
+  // Maps the raw status to a label + color for the badge below.
   ({String label, Color color, IconData icon}) get _statusMeta {
     if (dispatch.isDelivered) {
       return (label: 'Delivered', color: AppColors.info, icon: Icons.check_circle_rounded);
@@ -261,7 +240,7 @@ class _DispatchCard extends StatelessWidget {
             SizedBox(height: Responsive.h(4)),
             Text('Estimate No: ${dispatch.estimateNumber}', style: AppTextStyles.caption()),
             SizedBox(height: Responsive.h(8)),
-            // NEW: visible status badge so a refresh actually shows a change.
+            // Visible status badge so a refresh actually shows a change.
             Container(
               padding: EdgeInsets.symmetric(
                   horizontal: Responsive.w(8), vertical: Responsive.h(4)),

@@ -106,33 +106,27 @@ class _OwnerDashboardView extends StatelessWidget {
                                 onTap: () => context.push('/owner/quotations'),
                               ),
                               _QuickActionData(
-                                icon: Icons.bar_chart_rounded,
-                                label: 'Reports',
-                                color: const Color(0xFF16A34A),
-                                onTap: () => context.push('/owner/reports'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.monetization_on,
-                                label: 'Incentive',
-                                color: const Color(0xFFA02CE1),
-                                onTap: () => context.push('/owner/incentives'),
-                              ),
-                              _QuickActionData(
                                 icon: Icons.inventory_2_outlined,
                                 label: 'Product Setup',
                                 color: const Color(0xFF9F1A49),
                                 onTap: () => context.push('/owner/product-setup'),
                               ),
                               _QuickActionData(
+                                icon: Icons.bar_chart_rounded,
+                                label: 'Reports',
+                                color: const Color(0xFF16A34A),
+                                onTap: () => context.push('/owner/reports'),
+                              ),
+                              _QuickActionData(
                                 icon: Icons.calendar_month,
-                                label: ' Monthely Target',
+                                label: 'Monthly Target',
                                 color: const Color(0xFF1EBA95),
                                 onTap: () => context.push('/owner/monthly-target'),
                               ),
                               _QuickActionData(
                                 icon: Icons.badge_outlined,
                                 label: 'Designations',
-                                color: const Color(0xFF0EA5E9),
+                                color: const Color(0xFFB19D18),
                                 onTap: () => context.push('/owner/designation-list'),
                               ),
                               _QuickActionData(
@@ -142,10 +136,10 @@ class _OwnerDashboardView extends StatelessWidget {
                                 onTap: () => context.push('/owner/salesmen'),
                               ),
                               _QuickActionData(
-                                icon: Icons.local_shipping_rounded,
-                                label: 'Driver',
-                                color: const Color(0xFF06B6D4),
-                                onTap: () => context.push('/owner/drivers'),
+                                icon: Icons.monetization_on,
+                                label: 'Salesman Incentive',
+                                color: const Color(0xFFA02CE1),
+                                onTap: () => context.push('/owner/incentives'),
                               ),
                               _QuickActionData(
                                 icon: Icons.assignment_ind_rounded,
@@ -155,16 +149,23 @@ class _OwnerDashboardView extends StatelessWidget {
                               ),
                               _QuickActionData(
                                 icon: Icons.bar_chart_rounded,
-                                label: 'Fieldstaff incentive',
+                                label: 'Field Staff Incentive',
                                 color: const Color(0xFF16A34A),
                                 onTap: () => context.push('/owner/fieldstaff-incentive'),
                               ),
                               _QuickActionData(
                                 icon: Icons.location_on_outlined,
-                                label: 'Site Vists',
-                                color: const Color(0xFF0EA5E9),
+                                label: 'Site Visits',
+                                color: const Color(0xFF1A348A),
                                 onTap: () => context.push('/owner/site-visits'),
                               ),
+                              _QuickActionData(
+                                icon: Icons.local_shipping_rounded,
+                                label: 'Driver',
+                                color: const Color(0xFF06B6D4),
+                                onTap: () => context.push('/owner/drivers'),
+                              ),
+
                             ];
 
                             final a = actions[i];

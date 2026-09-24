@@ -384,7 +384,7 @@ class _EstimateDetailsView extends StatelessWidget {
     final cols = <(String, double, TextAlign)>[
       ('Sl.No', 50, TextAlign.center),
       ('Item', 170, TextAlign.left),
-      ('Company', 110, TextAlign.left),
+      ('Company', 110, TextAlign.left,),
       ('Size', 90, TextAlign.center),
       ('Qty', 70, TextAlign.right),
       ('Unit', 60, TextAlign.center),

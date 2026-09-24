@@ -193,7 +193,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                       final s = salesmen[i];
                       return ListTile(
                         title: Text(s.name, style: AppTextStyles.bodyBold()),
-                       // subtitle: s.designationDisplay.isNotEmpty ? Text(s.designationDisplay) : null,
+                        // subtitle: s.designationDisplay.isNotEmpty ? Text(s.designationDisplay) : null,
                         onTap: () => Navigator.of(ctx).pop(s),
                       );
                     },

@@ -83,25 +83,7 @@ class DispatchProvider {
         }),
       );
 
-  /// Shared response handling for /show, /mark-in-transit and
-//   /// /mark-delivered — all three return the same envelope shape.
-//   Future<DispatchDetailResult> _detailCall(
-//       Future<Response> Function() request,
-//       ) async {
-//     try {
-//       final response = await request();
-//
-//       if (response.statusCode == 200 || response.statusCode == 201) {
-//         final parsed = DispatchDetailResponseModel.fromJson(response.data);
-//         return DispatchDetailResult.success(parsed.data);
-//       }
-//       return DispatchDetailResult.failure(response.statusCode.toString());
-//     } on DioException catch (e) {
-//       final message = await ApiErrorHandler.handleDioError(e);
-//       return DispatchDetailResult.failure(message);
-//     }
-//   }
-// }
+  
   Future<DispatchDetailResult> _detailCall(
       Future<Response> Function() request,
       ) async {

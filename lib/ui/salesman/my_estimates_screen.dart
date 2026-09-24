@@ -12,13 +12,6 @@ import '../../bloc/salemanbloc/estimatelistview/salesmanownerestimatestate.dart'
 import '../../widgets/estimate_card.dart';
 import 'estimatedetailscreen_forsalesman.dart';
 
-/// NOTE: EstimatesBloc is now provided by DashboardShell (above the
-/// IndexedStack) so it's shared/long-lived across tab switches — this
-/// screen no longer creates its own local instance. Do NOT re-add a
-/// BlocProvider<EstimatesBloc> here, or you'll end up with two separate
-/// instances (this one shadowing the shared one) and the
-/// refresh-after-create-estimate flow (fired from DashboardHomeScreen's
-/// _openCreateEstimate) will silently stop reaching this screen again.
 class MyEstimatesScreen extends StatelessWidget {
   const MyEstimatesScreen({super.key});
 
