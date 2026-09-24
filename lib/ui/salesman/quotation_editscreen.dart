@@ -24,7 +24,14 @@
 // import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 // import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 // import '../../models/salesmanmodels/quotationupdatemodel.dart';
+// import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 // import '../../widgets/appsnackbar.dart';
+// // NOTE: adjust this path to match wherever QuotationProvider actually lives
+// // relative to this file — it mirrors CreateEstimateScreen's own import of
+// // the same provider, used the same way here: a fresh, one-shot call to
+// // POST /quotations/product-incentive fired the moment Add/Update Item is
+// // tapped, bypassing any cached/debounced bloc state.
+// import '../../Apiprovider/salesman_quotationprovider.dart';
 //
 // /// CreateEstimateScreen uses.
 // class QuotationEditScreen extends StatelessWidget {
@@ -46,6 +53,13 @@
 //   }
 // }
 //
+// /// Mirrors CreateEstimateScreen's AddedItem model and the reasoning behind
+// /// it: `amount` is always the server's own figure — from
+// /// POST /quotations/product-incentive when adding/editing an item here, or
+// /// straight from QuotationDetailItem.amount for items already saved on the
+// /// quotation — never recomputed locally as quantity * rate, since the
+// /// server may derive it from square feet or a box/piece breakdown instead
+// /// of a flat multiplication.
 // class _EditItem {
 //   const _EditItem({
 //     required this.id,
@@ -54,6 +68,7 @@
 //     required this.unit,
 //     required this.quantity,
 //     required this.rate,
+//     required this.amount,
 //     this.company = '',
 //     this.size = '',
 //     this.mrp = 0,
@@ -72,14 +87,13 @@
 //   final String unit;
 //   final double quantity;
 //   final double rate;
+//   final double amount;
 //   final double mrp;
 //   final double boxQuantity;
 //   final double pieceQuantity;
 //   final double incentiveAmount;
 //   final bool incentiveEligible;
 //   final String? incentiveReason;
-//
-//   double get amount => quantity * rate;
 //
 //   _EditItem copyWith({
 //     String? company,
@@ -92,6 +106,7 @@
 //       unit: unit,
 //       quantity: quantity,
 //       rate: rate,
+//       amount: amount,
 //       company: company ?? this.company,
 //       size: size,
 //       mrp: mrp ?? this.mrp,
@@ -156,7 +171,39 @@
 //
 //   bool _backfilledFromCatalog = false;
 //
-//   bool get _isBoxUnitProduct => _selectedProduct?.isBoxUnit ?? false;
+//   // Used ONLY for the Add/Update Item call — a fresh, one-shot request
+//   // fired straight from QuotationProvider (bypassing the bloc's cached
+//   // state entirely), so the item that gets added/updated always matches
+//   // exactly what's on screen at the moment the button is tapped. Same
+//   // approach as CreateEstimateScreen's _addItemToList.
+//   final QuotationProvider _quotationProvider = QuotationProvider();
+//   bool _isAddingItem = false;
+//
+//   /// Whether the current add/edit-item form should be treated as a
+//   /// box-unit product (and therefore show the Box Quantity / Piece
+//   /// Quantity fields).
+//   ///
+//   /// Order matters here:
+//   /// 1. When editing an EXISTING item, its own saved quantities are the
+//   ///    source of truth. _editItem always finds a catalog match when the
+//   ///    product is still active, which used to make this getter check
+//   ///    `_selectedProduct!.isBoxUnit` FIRST and return early — so even
+//   ///    though the item clearly had box_quantity/piece_quantity saved on
+//   ///    it, the row stayed hidden whenever the catalog's current
+//   ///    `is_box_unit` flag for that product happened to be false (unit
+//   ///    changed since the quotation was created, flag toggled on the
+//   ///    backend, etc). Checking the saved item first fixes that.
+//   /// 2. Only when there's no saved item to check (adding a brand-new
+//   ///    item, or editing an item that genuinely has no box/piece data)
+//   ///    do we fall back to the catalog-matched product's own flag.
+//   bool get _isBoxUnitProduct {
+//     if (_editingItemIndex != null) {
+//       final item = _items[_editingItemIndex!];
+//       if (item.boxQuantity > 0 || item.pieceQuantity > 0) return true;
+//     }
+//     if (_selectedProduct != null) return _selectedProduct!.isBoxUnit;
+//     return false;
+//   }
 //
 //   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
 //
@@ -208,6 +255,7 @@
 //       size: entry.value.productSize,
 //       quantity: entry.value.quantity,
 //       rate: entry.value.rate,
+//       amount: entry.value.amount,
 //       boxQuantity: entry.value.boxQuantity,
 //       pieceQuantity: entry.value.pieceQuantity,
 //       incentiveAmount: entry.value.incentiveAmount,
@@ -266,10 +314,10 @@
 //     return s + (isSqft ? i.quantity : 0);
 //   });
 //
-//   double get _currentItemAmount {
-//     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
-//     return _computedQuantity * rate;
-//   }
+//   // REMOVED: _currentItemAmount getter — the pre-add "Amount" preview box
+//   // is gone (see below), so nothing reads a local qty*rate approximation
+//   // that could disagree with what the server actually calculates. Same
+//   // change CreateEstimateScreen already made.
 //
 //   static String _formatPrice(double value) =>
 //       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
@@ -418,7 +466,16 @@
 //     _itemFormKey.currentState?.reset();
 //   }
 //
-//   void _saveItemFromForm() {
+//   /// Fires a FRESH, one-shot POST /quotations/product-incentive with
+//   /// exactly what's on the form right now (product_id, quantity, rate,
+//   /// box_quantity, piece_quantity), waits for the real response, and
+//   /// builds/updates the item using ONLY that response's amount/incentive
+//   /// fields. No cached bloc state, no local qty*rate math — identical
+//   /// approach to CreateEstimateScreen's _addItemToList, so an item added
+//   /// or edited here always reflects exactly what the server computed.
+//   Future<void> _saveItemFromForm() async {
+//     if (_isAddingItem) return;
+//
 //     // Validate quantity/rate formatting via the item form before doing
 //     // anything else. Product-selection and >0 checks stay as explicit
 //     // checks below since they aren't plain text-field concerns.
@@ -429,13 +486,13 @@
 //     final qty = _computedQuantity;
 //     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
 //
-//     String productId;
+//     String productIdStr;
 //     String name;
 //     if (_selectedProduct != null) {
-//       productId = _selectedProduct!.id;
+//       productIdStr = _selectedProduct!.id;
 //       name = _selectedProduct!.name;
 //     } else if (_editingItemIndex != null) {
-//       productId = _items[_editingItemIndex!].productId;
+//       productIdStr = _items[_editingItemIndex!].productId;
 //       name = _items[_editingItemIndex!].name;
 //     } else {
 //       _showError('Please select a product');
@@ -452,11 +509,38 @@
 //       return;
 //     }
 //
-//     final incentiveState = context.read<SalesmanEstimateBloc>().state;
-//     final liveIncentive = incentiveState.incentive;
-//     final matchesCurrentProduct =
-//         liveIncentive != null && liveIncentive.productId == productId;
+//     final productId = int.tryParse(productIdStr);
+//     if (productId == null) {
+//       _showError('Invalid product selected.');
+//       return;
+//     }
 //
+//     // Box Quantity mirrors Quantity (same convention as Create Estimate);
+//     // Piece Quantity is entered independently by the user in its own
+//     // field. Non-box-unit items send null for both.
+//     _recomputeBoxQtyIfNeeded();
+//     final boxQuantity = _isBoxUnitProduct ? (double.tryParse(_itemBoxQtyCtrl.text) ?? 0) : null;
+//     final pieceQuantity = _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : null;
+//
+//     setState(() => _isAddingItem = true);
+//
+//     final result = await _quotationProvider.getProductIncentive(ProductIncentiveRequest(
+//       productId: productId,
+//       quantity: qty,
+//       rate: rate,
+//       boxQuantity: boxQuantity,
+//       pieceQuantity: pieceQuantity,
+//     ));
+//
+//     if (!mounted) return;
+//     setState(() => _isAddingItem = false);
+//
+//     if (!result.success || result.incentive == null) {
+//       _showError(result.errorMessage ?? 'Could not calculate the amount for this item. Please try again.');
+//       return;
+//     }
+//
+//     final incentive = result.incentive!;
 //     final editingIndex = _editingItemIndex;
 //
 //     final formCompany = _itemCompanyCtrl.text.trim();
@@ -466,22 +550,20 @@
 //
 //     final newItem = _EditItem(
 //       id: editingIndex != null ? _items[editingIndex].id : 'new_${_newItemCounter++}',
-//       productId: productId,
+//       productId: productIdStr,
 //       name: name,
 //       company: formCompany.isNotEmpty ? formCompany : previousCompany,
 //       size: _itemSizeCtrl.text.trim(),
 //       unit: _itemUnitCtrl.text.trim(),
 //       quantity: qty,
 //       rate: rate,
+//       amount: incentive.amount,
 //       mrp: formMrp ?? previousMrp,
-//       // Box Quantity mirrors Quantity (same convention as the
-//       // create-estimate flow); Piece Quantity is entered independently by
-//       // the user in its own field. Non-box-unit items keep both at 0.
-//       boxQuantity: _isBoxUnitProduct ? qty : 0,
-//       pieceQuantity: _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : 0,
-//       incentiveAmount: matchesCurrentProduct ? liveIncentive.totalIncentive : 0,
-//       incentiveEligible: matchesCurrentProduct ? liveIncentive.isEligible : false,
-//       incentiveReason: matchesCurrentProduct ? liveIncentive.eligibilityReason : null,
+//       boxQuantity: _isBoxUnitProduct ? (boxQuantity ?? 0) : 0,
+//       pieceQuantity: _isBoxUnitProduct ? (pieceQuantity ?? 0) : 0,
+//       incentiveAmount: incentive.totalIncentive,
+//       incentiveEligible: incentive.isEligible,
+//       incentiveReason: incentive.eligibilityReason,
 //     );
 //
 //     setState(() {
@@ -907,21 +989,13 @@
 //                         ),
 //                       ),
 //                       SizedBox(height: Responsive.h(6)),
-//                       Container(
-//                         padding: EdgeInsets.all(Responsive.w(12)),
-//                         decoration: BoxDecoration(
-//                           color: AppColors.surfaceAlt,
-//                           borderRadius: BorderRadius.circular(12),
-//                         ),
-//                         child: Row(
-//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                           children: [
-//                             Text('Amount', style: AppTextStyles.bodyBold()),
-//                             Text(currency.format(_currentItemAmount),
-//                                 style: AppTextStyles.bodyBold(color: AppColors.primary)),
-//                           ],
-//                         ),
-//                       ),
+//                       // REMOVED: pre-add "Amount" preview box. It used to
+//                       // show a local quantity*rate approximation, which
+//                       // could disagree with what the server actually
+//                       // calculates (square feet, box/piece breakdown,
+//                       // incentive rules). The server's own `amount` is now
+//                       // only ever read after Add/Update Item succeeds —
+//                       // see the Items list below, and _saveItemFromForm.
 //
 //                       if (_selectedProduct != null || _editingItemIndex != null) ...[
 //                         SizedBox(height: Responsive.h(8)),
@@ -963,12 +1037,22 @@
 //                       SizedBox(
 //                         width: double.infinity,
 //                         child: ElevatedButton.icon(
-//                           onPressed: _saveItemFromForm,
-//                           icon: Icon(
+//                           onPressed: _isAddingItem ? null : _saveItemFromForm,
+//                           icon: _isAddingItem
+//                               ? const SizedBox(
+//                             width: 16,
+//                             height: 16,
+//                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+//                           )
+//                               : Icon(
 //                             _editingItemIndex != null ? Icons.save_outlined : Icons.add,
 //                             color: Colors.white,
 //                           ),
-//                           label: Text(_editingItemIndex != null ? 'Update Item' : 'Add Item'),
+//                           label: Text(
+//                             _isAddingItem
+//                                 ? 'Calculating…'
+//                                 : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
+//                           ),
 //                           style: ElevatedButton.styleFrom(
 //                             backgroundColor: AppColors.primary,
 //                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1417,15 +1501,11 @@
 //               Row(
 //                 mainAxisSize: MainAxisSize.min,
 //                 children: [
-//                   InkWell(
-//                     onTap: isRemoving ? null : onEdit,
-//                     child: Icon(
-//                       Icons.edit_outlined,
-//                       size: 20,
-//                       color: isRemoving ? AppColors.textHint : AppColors.primary,
-//                     ),
-//                   ),
-//                   SizedBox(width: Responsive.w(14)),
+//                   // Edit pencil removed — existing items can only be
+//                   // deleted here, not edited in place. To re-enable,
+//                   // restore the InkWell(onTap: onEdit, ...) block that
+//                   // used to sit here (see version history / previous copy
+//                   // of this file).
 //                   if (isRemoving)
 //                     const SizedBox(
 //                       width: 20,
@@ -1446,8 +1526,8 @@
 //     );
 //   }
 // }
-
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -1673,6 +1753,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   void initState() {
     super.initState();
     final e = widget.estimate;
+
+    debugPrint('EDIT SCREEN OPENED: contractor=${e.contractor.name}');
 
     _customerName = TextEditingController(text: e.customer.name);
     _customerPhone = TextEditingController(text: e.customer.phone);
@@ -2153,6 +2235,10 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
           .toList(),
     );
 
+    // DEBUG: shows exactly what is sent to POST /quotations/update.
+    // Remove once the contractor issue is resolved.
+    debugPrint('UPDATE BODY: ${jsonEncode(request.toJson())}');
+
     context.read<SalesmanQuotationBloc>().add(QuotationUpdateSubmitted(request));
   }
 
@@ -2293,6 +2379,19 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           keyboardType: TextInputType.emailAddress,
                           controller: _contractorEmail,
                           validator: _validateOptionalEmail,
+                        ),
+                      ),
+                      // NEW: contractor address field. The controller was
+                      // always created and sent in _submit, but there was
+                      // no input for it, so an empty address could never
+                      // be filled in from this screen.
+                      LabeledField(
+                        label: 'Address (optional)',
+                        field: CustomTextField(
+                          hint: 'Enter contractor address',
+                          icon: Icons.location_on_outlined,
+                          controller: _contractorAddress,
+                          inputFormatters: DValidator.textWithLimit,
                         ),
                       ),
                       SizedBox(height: Responsive.h(20)),

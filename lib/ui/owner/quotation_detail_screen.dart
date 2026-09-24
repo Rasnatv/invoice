@@ -189,12 +189,13 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
           .add(OwnerQuotationDetailRequested(widget.quotationId));
     }
   }
+
+
   Future<void> _showApproveDialog(QuotationDetailModel q) async {
     final formKey = GlobalKey<FormState>();
     final handlingCtrl = TextEditingController(
       text: q.handlingCharge > 0 ? q.handlingCharge.toStringAsFixed(2) : '',
     );
-    final approvalNotesCtrl = TextEditingController();
 
     String? discountType; // null | 'percentage' | 'fixed'
     final discountValueCtrl = TextEditingController();
@@ -257,15 +258,8 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                         ),
                         onChanged: (_) => setDialogState(() {}),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: approvalNotesCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Approval Notes (optional)',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
+
+                      // ---- Discount (unchanged) ----
                       const Divider(height: 28),
                       Text('Discount (optional)', style: AppTextStyles.bodyBold()),
                       const SizedBox(height: 8),
@@ -293,15 +287,43 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                         ),
                         onChanged: (_) => setDialogState(() {}),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: discountNotesCtrl,
-                        enabled: discountType != null,
-                        decoration: const InputDecoration(
-                          labelText: 'Discount Notes',
-                          border: OutlineInputBorder(),
+
+                      // ---- LIVE PREVIEW: now ABOVE Initial Payment ----
+                      // Pure frontend calc, updates on every edit (handling,
+                      // discount, and the payment amount typed below).
+                      const Divider(height: 28),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceAlt,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Preview', style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                            const SizedBox(height: 8),
+                            _previewRow('Subtotal', currency.format(q.subtotal)),
+                            _previewRow('Handling Charge', currency.format(preview.handling)),
+                            if (discountType != null)
+                              _previewRow('Discount', '- ${currency.format(preview.discount)}',
+                                  color: Colors.red),
+                            const Divider(height: 16),
+                            _previewRow('Grand Total', currency.format(preview.grandTotal), bold: true),
+                            _previewRow('Amount Received', currency.format(preview.payment)),
+                            _previewRow(
+                              'Balance Due',
+                              currency.format(preview.balance),
+                              bold: true,
+                              color: preview.balance > 0 ? Colors.red : AppColors.success,
+                            ),
+                          ],
                         ),
                       ),
+
+                      // ---- Initial Payment ----
                       const Divider(height: 28),
                       Text('Initial Payment (optional)', style: AppTextStyles.bodyBold()),
                       const SizedBox(height: 8),
@@ -379,39 +401,6 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                         ),
                         maxLines: 2,
                       ),
-
-                      // ---- LIVE PREVIEW: pure frontend calc, updates on every edit ----
-                      const Divider(height: 28),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceAlt,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Preview', style: AppTextStyles.bodyBold(color: AppColors.primary)),
-                            const SizedBox(height: 8),
-                            _previewRow('Subtotal', currency.format(q.subtotal)),
-                            _previewRow('Handling Charge', currency.format(preview.handling)),
-                            if (discountType != null)
-                              _previewRow('Discount', '- ${currency.format(preview.discount)}',
-                                  color: Colors.red),
-                            const Divider(height: 16),
-                            _previewRow('Grand Total', currency.format(preview.grandTotal), bold: true),
-                            _previewRow('Amount Received', currency.format(preview.payment)),
-                            _previewRow(
-                              'Balance Due',
-                              currency.format(preview.balance),
-                              bold: true,
-                              color: preview.balance > 0 ? Colors.red : AppColors.success,
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -441,7 +430,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
     final request = QuotationApproveRequest(
       id: widget.quotationId,
       handlingCharge: handlingCharge,
-      approvalNotes: approvalNotesCtrl.text,
+      // approvalNotes removed — no longer collected or sent.
       discountType: discountType,
       discountValue: discountType != null ? discountValue : null,
       discountNotes: discountType != null ? discountNotesCtrl.text : null,
@@ -456,7 +445,6 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
 
     context.read<OwnerQuotationDetailBloc>().add(OwnerQuotationApproveRequested(request));
   }
-
   Widget _previewRow(String label, String value, {bool bold = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -712,15 +700,6 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                               ],
                             ),
                             SizedBox(height: Responsive.h(14)),
-                            // _DetailSection(
-                            //   title: 'Contractor Details',
-                            //   rows: [
-                            //     _Row('Name', q.contractor.name, icon: Icons.engineering_outlined),
-                            //     _Row('Mobile', q.contractor.mobile, icon: Icons.phone_outlined),
-                            //     if (q.contractor.email.isNotEmpty)
-                            //       _Row('Email', q.contractor.email, icon: Icons.email),
-                            //   ],
-                            // ),
                             _DetailSection(
                               title: 'Contractor Details',
                               rows: [
