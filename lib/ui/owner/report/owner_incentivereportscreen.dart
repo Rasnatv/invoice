@@ -73,10 +73,11 @@ class _OwnerIncentiveReportScreenState
       personId: widget.personId,
       fromDate: _apiDate(widget.startDate),
       toDate: _apiDate(widget.endDate),
-      status: widget.status.toLowerCase() == 'all' ? null : widget.status,
+      status: widget.status.toLowerCase() == 'all'
+          ? null
+          : widget.status.toLowerCase(),   // <-- lowercase it here too
     ));
   }
-
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {

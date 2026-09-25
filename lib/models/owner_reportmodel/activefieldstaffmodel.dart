@@ -1,16 +1,3 @@
-/// GET /field-staff/active
-///
-/// {
-///   "status": "1",
-///   "status_code": "200",
-///   "data": {
-///     "list": [
-///       { "id": "27", "name": "Field Staff" },
-///       { "id": "78", "name": "Kannan" }
-///     ]
-///   },
-///   "message": "Active field staff fetched successfully"
-/// }
 
 class ActiveFieldStaffModel {
   final String id;

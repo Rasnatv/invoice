@@ -1,7 +1,9 @@
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import '../core/apiclient/api_client.dart';
 import '../core/errors/apierrorhandler.dart';
+import '../models/owner_models/estmateitemupdatemodel.dart';
 import '../models/owner_models/owner_estimateactionmodel.dart';
 import '../models/owner_models/ownerestimate_updatemodel.dart';
 import '../models/salesmanmodels/salesmanownerestimatemodel.dart';
@@ -171,28 +173,34 @@ class OwnerEstimateProvider {
     double pieceQuantity = 0,
   }) async {
     try {
-      final response = await _apiClient.updateEstimateItem({
-        'estimate_id': estimateId,
-        'estimate_item_id': estimateItemId,
-        'quantity': quantity,
-        'rate': rate,
-        'box_quantity': boxQuantity,
-        'piece_quantity': pieceQuantity,
-      });
+      final request = UpdateEstimateItemRequest(
+        estimateId: int.parse(estimateId),
+        estimateItemId: int.parse(estimateItemId),
+        quantity: quantity.toInt(),
+        rate: rate,
+        boxQuantity: boxQuantity.toInt(),
+        pieceQuantity: pieceQuantity.toInt(),
+      );
+
+      debugPrint(
+          'OwnerEstimateProvider.updateItem: PUT estimates/update-item -> ${request
+              .toJson()}');
+
+      final response = await _apiClient.updateEstimateItem(request.toJson());
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final body = response.data;
-        final status = body['status']?.toString();
-        final message = body['message']?.toString();
-        return OwnerActionResult(success: status == '1', message: message);
+        final parsed = UpdateEstimateItemResponse.fromJson(response.data);
+        debugPrint(
+            'OwnerEstimateProvider.updateItem: response -> status=${parsed
+                .status} message=${parsed.message}');
+        return OwnerActionResult(
+            success: parsed.isSuccess, message: parsed.message);
       }
       return OwnerActionResult(
-        success: false,
-        message: response.statusCode.toString(),
-      );
+          success: false, message: response.statusCode.toString());
     } on DioException catch (e) {
       final message = await ApiErrorHandler.handleDioError(e);
+      debugPrint('OwnerEstimateProvider.updateItem: DioException -> $message');
       return OwnerActionResult(success: false, message: message);
     }
-  }
-}
+  }}

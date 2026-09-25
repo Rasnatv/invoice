@@ -1,7 +1,5 @@
 
 
-import 'package:tileshop/models/owner_models/productenums.dart';
-
 import '../../Apiprovider/product_enums.dart';
 
 /// Request body for POST /products/create.

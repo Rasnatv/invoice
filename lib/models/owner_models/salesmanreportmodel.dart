@@ -1,19 +1,4 @@
-/// Request/response models for:
-///   POST /reports/salesman-performance
-///   body: { "salesman_id": 10, "from_date": "2026-08-01", "to_date": "2026-08-31" }
-///
-/// Matches the sample payload shape:
-/// {
-///   "status": "1",
-///   "status_code": "200",
-///   "data": {
-///     "salesman_name": "...",
-///     "summary": { "quotations_made": "13", "estimates_made": "17", ... },
-///     "quotations": [ { "id": "18", "quotation_number": "QOT0013-08-26", ... } ],
-///     "estimates":  [ { "id": "41", "estimate_number": "REF0037-08-26", ... } ]
-///   },
-///   "message": "Salesman performance report"
-/// }
+
 
 class SalesmanPerformanceReportRequest {
   final String salesmanId;

@@ -1,8 +1,4 @@
-// Models for GET/POST /salesman-incentives/* endpoints.
-// Mirrors the response-model pattern already used by DriverGetResponseModel etc.
-// All numeric fields from the API arrive as strings, so they are kept as
-// String on the model (matches server contract) with `...Value` getters
-// that parse to double where you need to do math / formatting.
+
 
 class IncentiveTarget {
   final String targetAmount;

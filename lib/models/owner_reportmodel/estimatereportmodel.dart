@@ -1,7 +1,4 @@
-// POST /reports/estimates?page=&per_page=
-// Body:  { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
-// Response shape matches the sample you shared:
-// { status, status_code, data: { summary, list }, message }
+
 
 /// Request body for the estimate report endpoint.
 class EstimateReportRequest {
