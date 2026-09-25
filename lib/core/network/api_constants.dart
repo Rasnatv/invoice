@@ -194,7 +194,7 @@ class ApiConstants {
 
   //profile
   static const String profile = '/profile';
-  static const String profileUpdate = '/profile';
+  static const String profileUpdate = '/update-profile';
   static const String changePassword = '/change-password';
 
 
@@ -224,5 +224,8 @@ static const String quotationsCancel='/quotations/cancel';
 // In ApiConstants, alongside quotationsCancel etc.
   static const String quotationsRemoveItem = '/quotations/remove-item';
   static const String estimateRemoveitem = '/estimates/remove-item';
+
+  static const String estimateUpdateItem = '/estimates/update-item';
+  static const String quotationsUpdateItem='/quotations/update-item';
 
 }

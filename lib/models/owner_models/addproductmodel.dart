@@ -61,6 +61,40 @@ class ProductAddRequestModel {
   /// [packing] anymore, since packing applies to every unit.
   final bool isBoxUnit;
 
+//   Map<String, dynamic> toJson() {
+//     return {
+//       'name': name,
+//       'company_id': companyId,
+//       'size': size,
+//       'unit_id': unitId,
+//       'mrp': mrp.toString(),
+//       'rate': rate.toString(),
+//       // Omitted entirely (not sent as null) when incentiveType is none.
+//       if (incentiveType != ProductIncentiveType.none)
+//         'incentive_type': incentiveType.apiValue,
+//       if (incentiveType == ProductIncentiveType.fixed && incentiveAmount != null)
+//         'incentive_amount': incentiveAmount!.toString(),
+//       if (incentiveType == ProductIncentiveType.percentage && incentivePercentage != null)
+//         'incentive_percentage': incentivePercentage,
+//       // Omitted entirely (not sent as null) when bonusType is none.
+//       if (bonusType != ProductBonusType.none)
+//         'bonus_type': bonusType.apiValue,
+//       // Only sent when bonusType is bulk.
+//       if (bonusType == ProductBonusType.bulk)
+//         'min_quantity': minQuantity,
+//       // pieces_per_box only applies to box/sq-ft type units.
+//       if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
+//         'pieces_per_box': piecesPerBox,
+//       // FIXED: packing is now entered for every unit, not just box units —
+//       // this was previously gated behind isBoxUnit, which silently dropped
+//       // the typed value from the create request for every non-box unit
+//       // (e.g. Kilogram). Send it whenever it's actually present, matching
+//       // the already-correct behavior in ProductUpdateRequestModel.
+//       if (packing != null && packing!.isNotEmpty)
+//         'packing': packing,
+//     };
+//   }
+// }
   Map<String, dynamic> toJson() {
     return {
       'name': name,
@@ -69,33 +103,33 @@ class ProductAddRequestModel {
       'unit_id': unitId,
       'mrp': mrp.toString(),
       'rate': rate.toString(),
-      // Omitted entirely (not sent as null) when incentiveType is none.
-      if (incentiveType != ProductIncentiveType.none)
-        'incentive_type': incentiveType.apiValue,
-      if (incentiveType == ProductIncentiveType.fixed && incentiveAmount != null)
+      // FIX: always send incentive_type, as '' for none — previously this
+      // key was omitted entirely when incentiveType was none, which didn't
+      // match the API's expected create-request shape (see sample payload:
+      // "incentive_type": ""). Matches ProductUpdateRequestModel now.
+      'incentive_type': incentiveType.apiValue ?? '',
+      if (incentiveType == ProductIncentiveType.fixed &&
+          incentiveAmount != null)
         'incentive_amount': incentiveAmount!.toString(),
-      if (incentiveType == ProductIncentiveType.percentage && incentivePercentage != null)
+      if (incentiveType == ProductIncentiveType.percentage &&
+          incentivePercentage != null)
         'incentive_percentage': incentivePercentage,
-      // Omitted entirely (not sent as null) when bonusType is none.
-      if (bonusType != ProductBonusType.none)
-        'bonus_type': bonusType.apiValue,
+      // FIX: same issue as incentive_type above — always send bonus_type,
+      // as '' for none, instead of omitting the key entirely.
+      'bonus_type': bonusType.apiValue ?? '',
       // Only sent when bonusType is bulk.
       if (bonusType == ProductBonusType.bulk)
         'min_quantity': minQuantity,
       // pieces_per_box only applies to box/sq-ft type units.
       if (isBoxUnit && piecesPerBox != null && piecesPerBox!.isNotEmpty)
         'pieces_per_box': piecesPerBox,
-      // FIXED: packing is now entered for every unit, not just box units —
-      // this was previously gated behind isBoxUnit, which silently dropped
-      // the typed value from the create request for every non-box unit
-      // (e.g. Kilogram). Send it whenever it's actually present, matching
-      // the already-correct behavior in ProductUpdateRequestModel.
+      // packing is entered for every unit, not just box units — send it
+      // whenever it's actually present.
       if (packing != null && packing!.isNotEmpty)
         'packing': packing,
     };
   }
 }
-
 class ProductAddResponseModel {
   const ProductAddResponseModel({
     required this.status,

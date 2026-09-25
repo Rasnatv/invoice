@@ -164,16 +164,30 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
       }
     }
 
-    if (_contractorNameCtrl.text.trim().isNotEmpty) {
-      final contractorNameError = DValidator.validateAlphaOnly('Contractor name', _contractorNameCtrl.text);
+    // --- Contractor name/phone mutual requirement ---
+    final contractorName = _contractorNameCtrl.text.trim();
+    final contractorPhone = _contractorPhoneCtrl.text.trim();
+
+    if (contractorName.isNotEmpty && contractorPhone.isEmpty) {
+      _showError('Contractor phone number is required when contractor name is entered');
+      return false;
+    }
+
+    if (contractorPhone.isNotEmpty && contractorName.isEmpty) {
+      _showError('Contractor name is required when contractor phone number is entered');
+      return false;
+    }
+
+    if (contractorName.isNotEmpty) {
+      final contractorNameError = DValidator.validateAlphaOnly('Contractor name', contractorName);
       if (contractorNameError != null) {
         _showError(contractorNameError);
         return false;
       }
     }
 
-    if (_contractorPhoneCtrl.text.trim().isNotEmpty) {
-      final contractorPhoneError = DValidator.validatePhoneNumber(_contractorPhoneCtrl.text);
+    if (contractorPhone.isNotEmpty) {
+      final contractorPhoneError = DValidator.validatePhoneNumber(contractorPhone);
       if (contractorPhoneError != null) {
         _showError(contractorPhoneError);
         return false;

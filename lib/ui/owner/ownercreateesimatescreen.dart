@@ -153,7 +153,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   }
 
   bool _validateDetails() {
-    final nameError = DValidator.validateName('Party name', _partyNameCtrl.text);
+    final nameError = DValidator.validateName('Customer name', _partyNameCtrl.text);
     if (nameError != null) {
       _showError(nameError);
       return false;
@@ -173,9 +173,46 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
       }
     }
 
+    // --- Contractor name/phone mutual requirement ---
+    final contractorName = _contractorNameCtrl.text.trim();
+    final contractorPhone = _contractorPhoneCtrl.text.trim();
+
+    if (contractorName.isNotEmpty && contractorPhone.isEmpty) {
+      _showError('Contractor phone number is required when contractor name is entered');
+      return false;
+    }
+
+    if (contractorPhone.isNotEmpty && contractorName.isEmpty) {
+      _showError('Contractor name is required when contractor phone number is entered');
+      return false;
+    }
+
+    if (contractorPhone.isNotEmpty) {
+      final contractorPhoneError = DValidator.validatePhoneNumber(contractorPhone);
+      if (contractorPhoneError != null) {
+        _showError(contractorPhoneError);
+        return false;
+      }
+    }
+
+    if (contractorName.isNotEmpty) {
+      final contractorNameError = DValidator.validateName('Contractor name', contractorName);
+      if (contractorNameError != null) {
+        _showError(contractorNameError);
+        return false;
+      }
+    }
+
+    if (_contractorEmailCtrl.text.trim().isNotEmpty) {
+      final contractorEmailError = DValidator.validateEmail(_contractorEmailCtrl.text);
+      if (contractorEmailError != null) {
+        _showError(contractorEmailError);
+        return false;
+      }
+    }
+
     return true;
   }
-
   bool _validateCurrentItemFields() {
     if (_selectedProduct == null) {
       _showError('Please select a product');

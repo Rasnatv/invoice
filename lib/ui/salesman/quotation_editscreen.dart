@@ -1,6 +1,6 @@
 //
-//
 // import 'dart:async';
+// import 'dart:convert';
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
 // import 'package:flutter_bloc/flutter_bloc.dart';
@@ -227,6 +227,8 @@
 //     super.initState();
 //     final e = widget.estimate;
 //
+//     debugPrint('EDIT SCREEN OPENED: contractor=${e.contractor.name}');
+//
 //     _customerName = TextEditingController(text: e.customer.name);
 //     _customerPhone = TextEditingController(text: e.customer.phone);
 //     _customerEmail = TextEditingController(text: e.customer.email);
@@ -377,16 +379,31 @@
 //     return DValidator.validateEmail(v);
 //   }
 //
-//   /// Contractor name is optional — only enforce alpha/format if filled in.
+//   /// Contractor name is optional — but becomes required once contractor
+//   /// phone is filled in, since a phone without a name to attach it to
+//   /// isn't useful on the quotation.
 //   String? _validateOptionalName(String fieldName, String? v) {
-//     if (v == null || v.trim().isEmpty) return null;
-//     return DValidator.validateAlphaOnly(fieldName, v);
+//     final name = (v ?? '').trim();
+//     final phone = _contractorPhone.text.trim();
+//
+//     if (name.isEmpty && phone.isNotEmpty) {
+//       return '$fieldName is required when contractor phone number is entered';
+//     }
+//     if (name.isEmpty) return null;
+//     return DValidator.validateAlphaOnly(fieldName, name);
 //   }
 //
-//   /// Contractor phone is optional — validate as a 10-digit number if filled.
+//   /// Contractor phone is optional — but becomes required once contractor
+//   /// name is filled in, mirroring _validateOptionalName above.
 //   String? _validateOptionalPhone(String? v) {
-//     if (v == null || v.trim().isEmpty) return null;
-//     return DValidator.validatePhoneNumber(v);
+//     final phone = (v ?? '').trim();
+//     final name = _contractorName.text.trim();
+//
+//     if (phone.isEmpty && name.isNotEmpty) {
+//       return 'Contractor phone number is required when contractor name is entered';
+//     }
+//     if (phone.isEmpty) return null;
+//     return DValidator.validatePhoneNumber(phone);
 //   }
 //
 //   String? _validateHandlingCharge(String? v) =>
@@ -706,6 +723,10 @@
 //           .toList(),
 //     );
 //
+//     // DEBUG: shows exactly what is sent to POST /quotations/update.
+//     // Remove once the contractor issue is resolved.
+//     debugPrint('UPDATE BODY: ${jsonEncode(request.toJson())}');
+//
 //     context.read<SalesmanQuotationBloc>().add(QuotationUpdateSubmitted(request));
 //   }
 //
@@ -825,6 +846,7 @@
 //                           controller: _contractorName,
 //                           inputFormatters: DValidator.lettersOnly,
 //                           validator: (v) => _validateOptionalName('Contractor name', v),
+//                           onChanged: (_) => _formKey.currentState?.validate(),
 //                         ),
 //                       ),
 //                       LabeledField(
@@ -836,6 +858,7 @@
 //                           controller: _contractorPhone,
 //                           inputFormatters: DValidator.phoneNumber,
 //                           validator: _validateOptionalPhone,
+//                           onChanged: (_) => _formKey.currentState?.validate(),
 //                         ),
 //                       ),
 //                       LabeledField(
@@ -846,6 +869,19 @@
 //                           keyboardType: TextInputType.emailAddress,
 //                           controller: _contractorEmail,
 //                           validator: _validateOptionalEmail,
+//                         ),
+//                       ),
+//                       // NEW: contractor address field. The controller was
+//                       // always created and sent in _submit, but there was
+//                       // no input for it, so an empty address could never
+//                       // be filled in from this screen.
+//                       LabeledField(
+//                         label: 'Address (optional)',
+//                         field: CustomTextField(
+//                           hint: 'Enter contractor address',
+//                           icon: Icons.location_on_outlined,
+//                           controller: _contractorAddress,
+//                           inputFormatters: DValidator.textWithLimit,
 //                         ),
 //                       ),
 //                       SizedBox(height: Responsive.h(20)),
@@ -1706,23 +1742,17 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   final QuotationProvider _quotationProvider = QuotationProvider();
   bool _isAddingItem = false;
 
+  // Holds the item built from the /quotations/product-incentive response
+  // while a PUT /quotations/update-item call for that same item is in
+  // flight (existing, already-saved items only — see _saveItemFromForm).
+  // Applied to _items only once the bloc reports itemUpdateStatus success;
+  // discarded on failure so the on-screen list never shows a change the
+  // server didn't actually accept.
+  _EditItem? _pendingItemUpdate;
+
   /// Whether the current add/edit-item form should be treated as a
   /// box-unit product (and therefore show the Box Quantity / Piece
   /// Quantity fields).
-  ///
-  /// Order matters here:
-  /// 1. When editing an EXISTING item, its own saved quantities are the
-  ///    source of truth. _editItem always finds a catalog match when the
-  ///    product is still active, which used to make this getter check
-  ///    `_selectedProduct!.isBoxUnit` FIRST and return early — so even
-  ///    though the item clearly had box_quantity/piece_quantity saved on
-  ///    it, the row stayed hidden whenever the catalog's current
-  ///    `is_box_unit` flag for that product happened to be false (unit
-  ///    changed since the quotation was created, flag toggled on the
-  ///    backend, etc). Checking the saved item first fixes that.
-  /// 2. Only when there's no saved item to check (adding a brand-new
-  ///    item, or editing an item that genuinely has no box/piece data)
-  ///    do we fall back to the catalog-matched product's own flag.
   bool get _isBoxUnitProduct {
     if (_editingItemIndex != null) {
       final item = _items[_editingItemIndex!];
@@ -1734,16 +1764,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
 
-  /// Keeps the visible Box Quantity field in sync with Quantity for
-  /// box-unit products, exactly mirroring whatever is typed there.
-  ///
-  /// NOTE: this is the "live sync while typing" behavior only. It must
-  /// only run in response to the user editing the Quantity field (see the
-  /// Quantity field's onChanged below). It must NOT be used to populate
-  /// the Box Quantity field when an existing item is first loaded into
-  /// the form for editing — that must come from the item's own saved
-  /// `boxQuantity`, not from whatever happens to be in the Quantity field
-  /// at that moment. See _editItem.
   void _recomputeBoxQtyIfNeeded() {
     if (!_isBoxUnitProduct) return;
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
@@ -1773,10 +1793,10 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
         .asMap()
         .entries
         .map((entry) => _EditItem(
-      // Real backend item id — needed to call POST /quotations/remove-item.
-      // Newly-added items (added on this screen, never saved) instead get
-      // an id prefixed 'new_' — see _saveItemFromForm — which is how
-      // _removeItem tells the two cases apart.
+      // Real backend item id — needed to call POST /quotations/remove-item
+      // and PUT /quotations/update-item. Newly-added items (added on this
+      // screen, never saved) instead get an id prefixed 'new_' — see
+      // _saveItemFromForm.
       id: entry.value.id,
       productId: entry.value.productId,
       name: entry.value.productName,
@@ -1843,18 +1863,14 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     return s + (isSqft ? i.quantity : 0);
   });
 
-  // REMOVED: _currentItemAmount getter — the pre-add "Amount" preview box
-  // is gone (see below), so nothing reads a local qty*rate approximation
-  // that could disagree with what the server actually calculates. Same
-  // change CreateEstimateScreen already made.
-
   static String _formatPrice(double value) =>
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
 
   /// Items added on this screen and not yet saved to the server carry an
   /// id prefixed 'new_' (see _saveItemFromForm). Anything else is a real
-  /// backend item id and must go through POST /quotations/remove-item to
-  /// actually be deleted.
+  /// backend item id — deleting it goes through POST /quotations/remove-item
+  /// and editing it goes through PUT /quotations/update-item, both of which
+  /// hit the server immediately rather than only updating local state.
   bool _isUnsavedItem(_EditItem item) => item.id.startsWith('new_');
 
   void _showError(String msg) {
@@ -1899,23 +1915,31 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   String? _validateCustomerAddress(String? v) =>
       DValidator.validateRequired(v, message: 'Site address is required');
 
-  /// Email is optional on this screen — only validate format if something
-  /// was typed.
   String? _validateOptionalEmail(String? v) {
     if (v == null || v.trim().isEmpty) return null;
     return DValidator.validateEmail(v);
   }
 
-  /// Contractor name is optional — only enforce alpha/format if filled in.
   String? _validateOptionalName(String fieldName, String? v) {
-    if (v == null || v.trim().isEmpty) return null;
-    return DValidator.validateAlphaOnly(fieldName, v);
+    final name = (v ?? '').trim();
+    final phone = _contractorPhone.text.trim();
+
+    if (name.isEmpty && phone.isNotEmpty) {
+      return '$fieldName is required when contractor phone number is entered';
+    }
+    if (name.isEmpty) return null;
+    return DValidator.validateAlphaOnly(fieldName, name);
   }
 
-  /// Contractor phone is optional — validate as a 10-digit number if filled.
   String? _validateOptionalPhone(String? v) {
-    if (v == null || v.trim().isEmpty) return null;
-    return DValidator.validatePhoneNumber(v);
+    final phone = (v ?? '').trim();
+    final name = _contractorName.text.trim();
+
+    if (phone.isEmpty && name.isNotEmpty) {
+      return 'Contractor phone number is required when contractor name is entered';
+    }
+    if (phone.isEmpty) return null;
+    return DValidator.validatePhoneNumber(phone);
   }
 
   String? _validateHandlingCharge(String? v) =>
@@ -1991,23 +2015,26 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       _itemRateCtrl.clear();
     });
     context.read<SalesmanEstimateBloc>().add(const ProductIncentiveCleared());
-    // Clear any stale validation messages left on the item form.
     _itemFormKey.currentState?.reset();
   }
 
   /// Fires a FRESH, one-shot POST /quotations/product-incentive with
-  /// exactly what's on the form right now (product_id, quantity, rate,
-  /// box_quantity, piece_quantity), waits for the real response, and
-  /// builds/updates the item using ONLY that response's amount/incentive
-  /// fields. No cached bloc state, no local qty*rate math — identical
-  /// approach to CreateEstimateScreen's _addItemToList, so an item added
-  /// or edited here always reflects exactly what the server computed.
+  /// exactly what's on the form right now, waits for the real response,
+  /// and builds/updates the item using ONLY that response's amount/
+  /// incentive fields.
+  ///
+  /// For an item that's already saved on the server (a real backend id,
+  /// not one of this screen's own 'new_' ids), the resulting
+  /// quantity/rate/box/piece are ALSO persisted right away via PUT
+  /// /quotations/update-item (see QuotationItemUpdateSubmitted below) —
+  /// the item is only applied to [_items] once that call succeeds, so the
+  /// on-screen list never shows a change the server rejected. A brand-new
+  /// (never-saved) item has nothing to persist yet and is simply added to
+  /// local state, same as before — it's saved for the first time only
+  /// when "Save Changes" submits the whole quotation.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
-    // Validate quantity/rate formatting via the item form before doing
-    // anything else. Product-selection and >0 checks stay as explicit
-    // checks below since they aren't plain text-field concerns.
     if (!(_itemFormKey.currentState?.validate() ?? true)) {
       return;
     }
@@ -2044,9 +2071,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       return;
     }
 
-    // Box Quantity mirrors Quantity (same convention as Create Estimate);
-    // Piece Quantity is entered independently by the user in its own
-    // field. Non-box-unit items send null for both.
     _recomputeBoxQtyIfNeeded();
     final boxQuantity = _isBoxUnitProduct ? (double.tryParse(_itemBoxQtyCtrl.text) ?? 0) : null;
     final pieceQuantity = _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : null;
@@ -2062,9 +2086,9 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     ));
 
     if (!mounted) return;
-    setState(() => _isAddingItem = false);
 
     if (!result.success || result.incentive == null) {
+      setState(() => _isAddingItem = false);
       _showError(result.errorMessage ?? 'Could not calculate the amount for this item. Please try again.');
       return;
     }
@@ -2095,7 +2119,30 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       incentiveReason: incentive.eligibilityReason,
     );
 
+    final existingItem = editingIndex != null ? _items[editingIndex] : null;
+
+    if (existingItem != null && !_isUnsavedItem(existingItem)) {
+      // Existing, already-saved item — persist the change immediately via
+      // PUT /quotations/update-item. _isAddingItem stays true (button
+      // keeps its spinner) until the itemUpdateStatus BlocListener below
+      // reports success or failure; only on success is [newItem] applied
+      // to [_items] and the form reset.
+      _pendingItemUpdate = newItem;
+      context.read<SalesmanEstimateBloc>().add(QuotationItemUpdateSubmitted(
+        quotationId: widget.estimate.id,
+        quotationItemId: existingItem.id,
+        quantity: qty,
+        rate: rate,
+        boxQuantity: boxQuantity,
+        pieceQuantity: pieceQuantity,
+      ));
+      return;
+    }
+
+    // Brand-new item (or one added earlier on this screen and not yet
+    // saved) — nothing to persist yet, keep it purely local as before.
     setState(() {
+      _isAddingItem = false;
       if (editingIndex != null) {
         _items[editingIndex] = newItem;
       } else {
@@ -2119,11 +2166,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       _itemMrpCtrl.text = _formatPrice(match?.mrp ?? item.mrp);
       _itemQtyCtrl.text = _formatPrice(item.quantity);
       _itemRateCtrl.text = _formatPrice(item.rate);
-      // Show the item's own saved box quantity here — do NOT derive it
-      // from the Quantity field (that's only for live-sync while the
-      // user is actively typing, see the Quantity field's onChanged).
-      // Quantity and Box Quantity are separate stored values and must
-      // each be populated from their own field on the item.
       _itemBoxQtyCtrl.text = _formatPrice(item.boxQuantity);
       _itemPieceQtyCtrl.text = _formatPrice(item.pieceQuantity);
     });
@@ -2134,11 +2176,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
   void _cancelEditItem() => _resetItemForm();
 
-  /// For an unsaved (locally-added) item, removes it from the list
-  /// immediately — there's nothing on the server to delete. For an
-  /// existing item, dispatches the remove-item API call instead; the
-  /// item is only dropped from [_items] once that call succeeds (handled
-  /// in the BlocListener in build()).
   void _removeItem(int index) {
     final item = _items[index];
 
@@ -2163,9 +2200,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     ));
   }
 
-  /// Called once the remove-item API call for [itemId] has succeeded —
-  /// actually drops the item from the local list and fixes up the
-  /// editing index the same way the old synchronous _removeItem did.
   void _dropItemById(String itemId) {
     final index = _items.indexWhere((i) => i.id == itemId);
     if (index == -1) return;
@@ -2183,12 +2217,29 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     });
   }
 
+  /// Called once the PUT /quotations/update-item call for the item
+  /// currently being edited has succeeded — applies the item built from
+  /// the /quotations/product-incentive response (see _saveItemFromForm)
+  /// to [_items] and resets the add/edit-item form, mirroring what the
+  /// brand-new-item branch of _saveItemFromForm does synchronously.
+  void _applyPendingItemUpdate() {
+    final pending = _pendingItemUpdate;
+    final editingIndex = _editingItemIndex;
+    _pendingItemUpdate = null;
+    if (pending == null || editingIndex == null) {
+      setState(() => _isAddingItem = false);
+      return;
+    }
+    setState(() {
+      _isAddingItem = false;
+      _items[editingIndex] = pending;
+    });
+    _resetItemForm();
+  }
+
   // ---------------- Submit ----------------
 
   bool _validate() {
-    // Runs every validator attached to the customer/contractor/other-details
-    // Form below (party name, phone, address, optional email/contractor
-    // fields, handling charge).
     final formValid = _formKey.currentState?.validate() ?? true;
     if (!formValid) {
       _showError('Please fix the highlighted fields');
@@ -2226,17 +2277,12 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
         productId: i.productId,
         quantity: i.quantity,
         rate: i.rate,
-        // Only sent when actually a box-unit item with a positive
-        // value — QuotationUpdateItemRequest.toJson() omits nulls, so
-        // regular (non-box) items are unaffected.
         boxQuantity: i.boxQuantity > 0 ? i.boxQuantity : null,
         pieceQuantity: i.pieceQuantity > 0 ? i.pieceQuantity : null,
       ))
           .toList(),
     );
 
-    // DEBUG: shows exactly what is sent to POST /quotations/update.
-    // Remove once the contractor issue is resolved.
     debugPrint('UPDATE BODY: ${jsonEncode(request.toJson())}');
 
     context.read<SalesmanQuotationBloc>().add(QuotationUpdateSubmitted(request));
@@ -2264,6 +2310,27 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                 } else if (state.submitStatus == QuotationActionStatus.failure) {
                   _showError(state.submitError ?? 'Failed to update quotation.');
                   context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
+                }
+              },
+            ),
+            // Reacts to PUT /quotations/update-item, fired from
+            // _saveItemFromForm whenever "Update Item" is tapped on an
+            // item that's already saved on the server. Only on success is
+            // the locally-built item (held in _pendingItemUpdate) actually
+            // applied to _items — a failure leaves the list untouched and
+            // the form open so the salesman can retry or cancel.
+            BlocListener<SalesmanEstimateBloc, SalesmanEstimateState>(
+              listenWhen: (prev, curr) => prev.itemUpdateStatus != curr.itemUpdateStatus,
+              listener: (context, state) {
+                if (state.itemUpdateStatus == ItemUpdateStatus.success) {
+                  _applyPendingItemUpdate();
+                  AppSnackbar.success(state.itemUpdateMessage ?? 'Item updated successfully');
+                  context.read<SalesmanEstimateBloc>().add(const QuotationItemUpdateResultConsumed());
+                } else if (state.itemUpdateStatus == ItemUpdateStatus.failure) {
+                  _pendingItemUpdate = null;
+                  setState(() => _isAddingItem = false);
+                  _showError(state.itemUpdateError ?? 'Failed to update item.');
+                  context.read<SalesmanEstimateBloc>().add(const QuotationItemUpdateResultConsumed());
                 }
               },
             ),
@@ -2358,6 +2425,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           controller: _contractorName,
                           inputFormatters: DValidator.lettersOnly,
                           validator: (v) => _validateOptionalName('Contractor name', v),
+                          onChanged: (_) => _formKey.currentState?.validate(),
                         ),
                       ),
                       LabeledField(
@@ -2369,6 +2437,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           controller: _contractorPhone,
                           inputFormatters: DValidator.phoneNumber,
                           validator: _validateOptionalPhone,
+                          onChanged: (_) => _formKey.currentState?.validate(),
                         ),
                       ),
                       LabeledField(
@@ -2381,10 +2450,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           validator: _validateOptionalEmail,
                         ),
                       ),
-                      // NEW: contractor address field. The controller was
-                      // always created and sent in _submit, but there was
-                      // no input for it, so an empty address could never
-                      // be filled in from this screen.
                       LabeledField(
                         label: 'Address (optional)',
                         field: CustomTextField(
@@ -2472,9 +2537,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                                   return null;
                                 },
                                 onChanged: (_) {
-                                  // Live-sync only: this is the one place Box
-                                  // Quantity should be derived from Quantity —
-                                  // while the user is actively editing it.
                                   setState(_recomputeBoxQtyIfNeeded);
                                   _scheduleIncentiveFetch();
                                 },
@@ -2535,13 +2597,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                         ),
                       ),
                       SizedBox(height: Responsive.h(6)),
-                      // REMOVED: pre-add "Amount" preview box. It used to
-                      // show a local quantity*rate approximation, which
-                      // could disagree with what the server actually
-                      // calculates (square feet, box/piece breakdown,
-                      // incentive rules). The server's own `amount` is now
-                      // only ever read after Add/Update Item succeeds —
-                      // see the Items list below, and _saveItemFromForm.
 
                       if (_selectedProduct != null || _editingItemIndex != null) ...[
                         SizedBox(height: Responsive.h(8)),
@@ -2596,7 +2651,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           ),
                           label: Text(
                             _isAddingItem
-                                ? 'Calculating…'
+                                ? (_editingItemIndex != null ? 'Updating…' : 'Calculating…')
                                 : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
                           ),
                           style: ElevatedButton.styleFrom(
@@ -2678,9 +2733,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                         ),
                         child: Column(
                           children: [
-                            // _totalRow('Total Items', '$_totalItemsCount'),
-                            // SizedBox(height: Responsive.h(6)),
-                            //  _totalRow('Total Qty', number.format(_totalQty)),
                             SizedBox(height: Responsive.h(6)),
                             _totalRow('Total Sq.Ft', number.format(_totalSqft)),
                             if (_mrpTotal > 0) ...[
@@ -2846,8 +2898,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     );
   }
 }
-
-// _IncentivePreviewCard and _EditItemTile are unchanged from your original file.
 
 /// Shows the live /quotations/product-incentive result for whatever is
 /// currently in the product/quantity/rate fields on the add-item form.
@@ -3047,11 +3097,19 @@ class _EditItemTile extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Edit pencil removed — existing items can only be
-                  // deleted here, not edited in place. To re-enable,
-                  // restore the InkWell(onTap: onEdit, ...) block that
-                  // used to sit here (see version history / previous copy
-                  // of this file).
+                  // Edit tap goes through onEdit — reopens an already-saved
+                  // item into the add/edit form, where "Update Item" now
+                  // persists it immediately via PUT /quotations/update-item
+                  // (see _saveItemFromForm / QuotationItemUpdateSubmitted).
+                  InkWell(
+                    onTap: isRemoving ? null : onEdit,
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: isRemoving ? AppColors.textHint : AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(width: Responsive.w(14)),
                   if (isRemoving)
                     const SizedBox(
                       width: 20,

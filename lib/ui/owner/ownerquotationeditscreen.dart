@@ -13,12 +13,19 @@
 // import '../../core/constants/app_colors.dart';
 // import '../../core/constants/app_text_styles.dart';
 // import '../../core/utils/responsive.dart';
+// import '../../core/validator/validationfile.dart';
 // import '../../widgets/appsnackbar.dart';
 // import '../../widgets/custom_text_field.dart';
 // import '../../widgets/primary_button.dart';
 // import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 // import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 // import '../../models/salesmanmodels/quotationupdatemodel.dart';
+// import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
+// // Same fresh, one-shot provider CreateEstimateScreen / QuotationEditScreen
+// // use for POST /quotations/product-incentive — fired the moment Add/Update
+// // Item is tapped, bypassing any cached/debounced bloc state, so what gets
+// // added/updated always matches exactly what the server computed.
+// import '../../Apiprovider/salesman_quotationprovider.dart';
 //
 // class OwnerQuotationEditScreen extends StatelessWidget {
 //   const OwnerQuotationEditScreen({super.key, required this.estimate});
@@ -42,7 +49,13 @@
 //   }
 // }
 //
-//
+// /// Mirrors QuotationEditScreen's _EditItem and the reasoning behind it:
+// /// `amount` is always the server's own figure — from
+// /// POST /quotations/product-incentive when adding/editing an item here, or
+// /// straight from QuotationDetailItem.amount for items already saved on the
+// /// quotation — never recomputed locally as quantity * rate, since the
+// /// server may derive it from square feet or a box/piece breakdown instead
+// /// of a flat multiplication.
 // class _OwnerEditItem {
 //   const _OwnerEditItem({
 //     required this.id,
@@ -51,6 +64,7 @@
 //     required this.unit,
 //     required this.quantity,
 //     required this.rate,
+//     required this.amount,
 //     this.company = '',
 //     this.size = '',
 //     this.mrp = 0,
@@ -58,6 +72,7 @@
 //     this.pieceQuantity = 0,
 //     this.incentiveAmount = 0,
 //     this.incentiveEligible = false,
+//     this.incentiveReason,
 //   });
 //
 //   final String id;
@@ -68,13 +83,13 @@
 //   final String unit;
 //   final double quantity;
 //   final double rate;
+//   final double amount;
 //   final double mrp;
 //   final double boxQuantity;
 //   final double pieceQuantity;
 //   final double incentiveAmount;
 //   final bool incentiveEligible;
-//
-//   double get amount => quantity * rate;
+//   final String? incentiveReason;
 //
 //   _OwnerEditItem copyWith({String? company, double? mrp}) {
 //     return _OwnerEditItem(
@@ -84,6 +99,7 @@
 //       unit: unit,
 //       quantity: quantity,
 //       rate: rate,
+//       amount: amount,
 //       company: company ?? this.company,
 //       size: size,
 //       mrp: mrp ?? this.mrp,
@@ -91,6 +107,7 @@
 //       pieceQuantity: pieceQuantity,
 //       incentiveAmount: incentiveAmount,
 //       incentiveEligible: incentiveEligible,
+//       incentiveReason: incentiveReason,
 //     );
 //   }
 // }
@@ -104,6 +121,14 @@
 // }
 //
 // class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
+//   // Form key for the customer/other-details section.
+//   final _formKey = GlobalKey<FormState>();
+//
+//   // Separate Form for just the contractor name/phone pair, so they can be
+//   // re-validated against each other on every keystroke without re-running
+//   // (and flashing errors on) the customer fields in the main Form above.
+//   final _contractorFormKey = GlobalKey<FormState>();
+//
 //   // ---- Customer / contractor / other details (all editable for owner) ----
 //   late final TextEditingController _customerName;
 //   late final TextEditingController _customerPhone;
@@ -123,6 +148,7 @@
 //   int? _editingItemIndex;
 //
 //   // ---- Add / edit item form ----
+//   final _itemFormKey = GlobalKey<FormState>();
 //   ActiveProductModel? _selectedProduct;
 //   final _productSearchCtrl = TextEditingController();
 //   final _productSearchFocus = FocusNode();
@@ -146,7 +172,34 @@
 //
 //   bool _backfilledFromCatalog = false;
 //
-//   bool get _isBoxUnitProduct => _selectedProduct?.isBoxUnit ?? false;
+//   // Used ONLY for the Add/Update Item call — a fresh, one-shot request
+//   // fired straight from QuotationProvider (bypassing the bloc's cached
+//   // state entirely), so the item that gets added/updated always matches
+//   // exactly what's on screen at the moment the button is tapped. Same
+//   // approach as QuotationEditScreen / CreateEstimateScreen.
+//   final QuotationProvider _quotationProvider = QuotationProvider();
+//   bool _isAddingItem = false;
+//
+//   /// Whether the current add/edit-item form should be treated as a
+//   /// box-unit product (and therefore show the Box Quantity / Piece
+//   /// Quantity fields).
+//   ///
+//   /// Order matters here — mirrors QuotationEditScreen._isBoxUnitProduct:
+//   /// 1. When editing an EXISTING item, its own saved quantities are the
+//   ///    source of truth, so a saved box_quantity/piece_quantity keeps the
+//   ///    row visible even if the catalog's current `is_box_unit` flag for
+//   ///    that product has since changed.
+//   /// 2. Only when there's no saved item to check (adding a brand-new
+//   ///    item, or editing an item that genuinely has no box/piece data) do
+//   ///    we fall back to the catalog-matched product's own flag.
+//   bool get _isBoxUnitProduct {
+//     if (_editingItemIndex != null) {
+//       final item = _items[_editingItemIndex!];
+//       if (item.boxQuantity > 0 || item.pieceQuantity > 0) return true;
+//     }
+//     if (_selectedProduct != null) return _selectedProduct!.isBoxUnit;
+//     return false;
+//   }
 //
 //   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
 //
@@ -198,6 +251,12 @@
 //     _contractorEmail = TextEditingController(text: e.contractor.email);
 //     _contractorAddress = TextEditingController(text: e.contractor.address);
 //
+//     // Re-run the contractor Form's validators on every keystroke in
+//     // either field, so "name requires phone" / "phone requires name"
+//     // errors show up immediately instead of waiting for Save.
+//     _contractorName.addListener(_revalidateContractorFields);
+//     _contractorPhone.addListener(_revalidateContractorFields);
+//
 //     _handlingCharge = TextEditingController(text: _formatPrice(e.handlingCharge));
 //     _notes = TextEditingController(text: e.notes);
 //
@@ -216,6 +275,7 @@
 //       size: entry.value.productSize,
 //       quantity: entry.value.quantity,
 //       rate: entry.value.rate,
+//       amount: entry.value.amount,
 //       boxQuantity: entry.value.boxQuantity,
 //       pieceQuantity: entry.value.pieceQuantity,
 //       incentiveAmount: entry.value.incentiveAmount,
@@ -224,9 +284,18 @@
 //         .toList();
 //   }
 //
+//   /// Re-runs the contractor name/phone Form's validators on every
+//   /// keystroke in either field — mirrors why _scheduleIncentiveFetch
+//   /// listens on quantity/rate changes.
+//   void _revalidateContractorFields() {
+//     _contractorFormKey.currentState?.validate();
+//   }
+//
 //   @override
 //   void dispose() {
 //     _incentiveDebounce?.cancel();
+//     _contractorName.removeListener(_revalidateContractorFields);
+//     _contractorPhone.removeListener(_revalidateContractorFields);
 //     _customerName.dispose();
 //     _customerPhone.dispose();
 //     _customerEmail.dispose();
@@ -274,10 +343,13 @@
 //     return s + (isSqft ? i.quantity : 0);
 //   });
 //
-//   double get _currentItemAmount {
-//     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
-//     return _computedQuantity * rate;
-//   }
+//   // REMOVED: _currentItemAmount getter and the pre-add "Amount" preview
+//   // box. It used to show a local quantity*rate approximation, which could
+//   // disagree with what the server actually calculates (square feet,
+//   // box/piece breakdown, incentive rules). The server's own `amount` is
+//   // now only ever read after Add/Update Item succeeds — see the Items
+//   // list below, and _saveItemFromForm. Same change QuotationEditScreen /
+//   // CreateEstimateScreen already made.
 //
 //   static String _formatPrice(double value) =>
 //       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
@@ -315,6 +387,52 @@
 //       _backfilledFromCatalog = true;
 //     }
 //   }
+//
+//   // ---------------- Field-level validators (DValidator) ----------------
+//
+//   String? _validatePartyName(String? v) => DValidator.validateName('Customer name', v);
+//
+//   String? _validateCustomerPhone(String? v) => DValidator.validatePhoneNumber(v);
+//
+//   String? _validateCustomerAddress(String? v) =>
+//       DValidator.validateRequired(v, message: 'Site address is required');
+//
+//   /// Email is optional on this screen — only validate format if something
+//   /// was typed.
+//   String? _validateOptionalEmail(String? v) {
+//     if (v == null || v.trim().isEmpty) return null;
+//     return DValidator.validateEmail(v);
+//   }
+//
+//   /// Contractor name is optional — but becomes required once contractor
+//   /// phone is filled in, since a phone without a name to attach it to
+//   /// isn't useful on the quotation.
+//   String? _validateOptionalName(String fieldName, String? v) {
+//     final name = (v ?? '').trim();
+//     final phone = _contractorPhone.text.trim();
+//
+//     if (name.isEmpty && phone.isNotEmpty) {
+//       return '$fieldName is required when contractor phone number is entered';
+//     }
+//     if (name.isEmpty) return null;
+//     return DValidator.validateAlphaOnly(fieldName, name);
+//   }
+//
+//   /// Contractor phone is optional — but becomes required once contractor
+//   /// name is filled in, mirroring _validateOptionalName above.
+//   String? _validateOptionalPhone(String? v) {
+//     final phone = (v ?? '').trim();
+//     final name = _contractorName.text.trim();
+//
+//     if (phone.isEmpty && name.isNotEmpty) {
+//       return 'Contractor phone number is required when contractor name is entered';
+//     }
+//     if (phone.isEmpty) return null;
+//     return DValidator.validatePhoneNumber(phone);
+//   }
+//
+//   String? _validateHandlingCharge(String? v) =>
+//       DValidator.validateOptionalNumber('Handling charge', v);
 //
 //   // ---- Add-item form wiring ----
 //   static String _productDisplayString(ActiveProductModel p) => '${p.name} — ${p.company}';
@@ -400,19 +518,38 @@
 //       _itemRateCtrl.clear();
 //     });
 //     context.read<OwnerQuotationEditBloc>().add(const OwnerEditProductIncentiveCleared());
+//     // Clear any stale validation messages left on the item form.
+//     _itemFormKey.currentState?.reset();
 //   }
 //
-//   void _saveItemFromForm() {
+//   /// Fires a FRESH, one-shot POST /quotations/product-incentive with
+//   /// exactly what's on the form right now (product_id, quantity, rate,
+//   /// box_quantity, piece_quantity), waits for the real response, and
+//   /// builds/updates the item using ONLY that response's amount/incentive
+//   /// fields. No cached bloc state, no local qty*rate math — identical
+//   /// approach to QuotationEditScreen / CreateEstimateScreen's
+//   /// _addItemToList, so an item added or edited here always reflects
+//   /// exactly what the server computed.
+//   Future<void> _saveItemFromForm() async {
+//     if (_isAddingItem) return;
+//
+//     // Validate quantity/rate formatting via the item form before doing
+//     // anything else. Product-selection and >0 checks stay as explicit
+//     // checks below since they aren't plain text-field concerns.
+//     if (!(_itemFormKey.currentState?.validate() ?? true)) {
+//       return;
+//     }
+//
 //     final qty = _computedQuantity;
 //     final rate = double.tryParse(_itemRateCtrl.text) ?? 0;
 //
-//     String productId;
+//     String productIdStr;
 //     String name;
 //     if (_selectedProduct != null) {
-//       productId = _selectedProduct!.id;
+//       productIdStr = _selectedProduct!.id;
 //       name = _selectedProduct!.name;
 //     } else if (_editingItemIndex != null) {
-//       productId = _items[_editingItemIndex!].productId;
+//       productIdStr = _items[_editingItemIndex!].productId;
 //       name = _items[_editingItemIndex!].name;
 //     } else {
 //       _showError('Please select a product');
@@ -429,12 +566,40 @@
 //       return;
 //     }
 //
-//     final incentiveState = context.read<OwnerQuotationEditBloc>().state;
-//     final liveIncentive = incentiveState.incentive;
-//     final matchesCurrentProduct =
-//         liveIncentive != null && liveIncentive.productId == productId;
+//     final productId = int.tryParse(productIdStr);
+//     if (productId == null) {
+//       _showError('Invalid product selected.');
+//       return;
+//     }
 //
+//     // Box Quantity mirrors Quantity (same convention as Create Estimate);
+//     // Piece Quantity is entered independently by the user in its own
+//     // field. Non-box-unit items send null for both.
+//     _recomputeBoxQtyIfNeeded();
+//     final boxQuantity = _isBoxUnitProduct ? (double.tryParse(_itemBoxQtyCtrl.text) ?? 0) : null;
+//     final pieceQuantity = _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : null;
+//
+//     setState(() => _isAddingItem = true);
+//
+//     final result = await _quotationProvider.getProductIncentive(ProductIncentiveRequest(
+//       productId: productId,
+//       quantity: qty,
+//       rate: rate,
+//       boxQuantity: boxQuantity,
+//       pieceQuantity: pieceQuantity,
+//     ));
+//
+//     if (!mounted) return;
+//     setState(() => _isAddingItem = false);
+//
+//     if (!result.success || result.incentive == null) {
+//       _showError(result.errorMessage ?? 'Could not calculate the amount for this item. Please try again.');
+//       return;
+//     }
+//
+//     final incentive = result.incentive!;
 //     final editingIndex = _editingItemIndex;
+//
 //     final formCompany = _itemCompanyCtrl.text.trim();
 //     final formMrp = double.tryParse(_itemMrpCtrl.text);
 //     final previousCompany = editingIndex != null ? _items[editingIndex].company : '';
@@ -442,21 +607,23 @@
 //
 //     final newItem = _OwnerEditItem(
 //       id: editingIndex != null ? _items[editingIndex].id : 'new_${_newItemCounter++}',
-//       productId: productId,
+//       productId: productIdStr,
 //       name: name,
 //       company: formCompany.isNotEmpty ? formCompany : previousCompany,
 //       size: _itemSizeCtrl.text.trim(),
 //       unit: _itemUnitCtrl.text.trim(),
 //       quantity: qty,
 //       rate: rate,
+//       amount: incentive.amount,
 //       mrp: formMrp ?? previousMrp,
-//       // Box Quantity mirrors Quantity (kept in sync in the UI); Piece
-//       // Quantity is entered independently by the user in its own field.
-//       // Non-box-unit items keep both at 0.
-//       boxQuantity: _isBoxUnitProduct ? qty : 0,
-//       pieceQuantity: _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : 0,
-//       incentiveAmount: matchesCurrentProduct ? liveIncentive.totalIncentive : 0,
-//       incentiveEligible: matchesCurrentProduct ? liveIncentive.isEligible : false,
+//       boxQuantity: _isBoxUnitProduct ? (boxQuantity ?? 0) : 0,
+//       pieceQuantity: _isBoxUnitProduct ? (pieceQuantity ?? 0) : 0,
+//       // Incentive is salesman-facing; still stored here so per-item /
+//       // total incentive views stay correct if this quotation is later
+//       // reassigned, but the UI hides it whenever _isOwner is true.
+//       incentiveAmount: incentive.totalIncentive,
+//       incentiveEligible: incentive.isEligible,
+//       incentiveReason: incentive.eligibilityReason,
 //     );
 //
 //     setState(() {
@@ -552,12 +719,15 @@
 //
 //   // ---- Submit ----
 //   bool _validate() {
-//     if (_customerName.text.trim().isEmpty) {
-//       _showError('Please enter the customer name');
-//       return false;
-//     }
-//     if (_customerPhone.text.trim().isEmpty) {
-//       _showError('Please enter the customer phone number');
+//     // Runs every validator attached to the customer/other-details Form
+//     // (customer name, phone, address, optional email, handling charge).
+//     final formValid = _formKey.currentState?.validate() ?? true;
+//     // Contractor name/phone now live in their own Form so they can be
+//     // cross-validated live — checked separately here.
+//     final contractorValid = _contractorFormKey.currentState?.validate() ?? true;
+//
+//     if (!formValid || !contractorValid) {
+//       _showError('Please fix the highlighted fields');
 //       return false;
 //     }
 //     if (_items.isEmpty) {
@@ -594,6 +764,9 @@
 //         productId: i.productId,
 //         quantity: i.quantity,
 //         rate: i.rate,
+//         // Only sent when actually a box-unit item with a positive
+//         // value — QuotationUpdateItemRequest.toJson() omits nulls, so
+//         // regular (non-box) items are unaffected.
 //         boxQuantity: i.boxQuantity > 0 ? i.boxQuantity : null,
 //         pieceQuantity: i.pieceQuantity > 0 ? i.pieceQuantity : null,
 //       ))
@@ -653,382 +826,437 @@
 //           child: Column(
 //             children: [
 //               Expanded(
-//                 child: ListView(
-//                   padding: EdgeInsets.all(Responsive.w(18)),
-//                   children: [
-//                     Text('Customer Details', style: AppTextStyles.h3()),
-//                     SizedBox(height: Responsive.h(12)),
-//                     LabeledField(
-//                       label: 'Customer Name',
-//                       field: CustomTextField(
-//                         hint: 'Enter customer name',
-//                         icon: Icons.groups_2_outlined,
-//                         controller: _customerName,
+//                 child: Form(
+//                   key: _formKey,
+//                   autovalidateMode: AutovalidateMode.onUserInteraction,
+//                   child: ListView(
+//                     padding: EdgeInsets.all(Responsive.w(18)),
+//                     children: [
+//                       Text('Customer Details', style: AppTextStyles.h3()),
+//                       SizedBox(height: Responsive.h(12)),
+//                       LabeledField(
+//                         label: 'Customer Name',
+//                         field: CustomTextField(
+//                           hint: 'Enter customer name',
+//                           icon: Icons.groups_2_outlined,
+//                           controller: _customerName,
+//                           validator: _validatePartyName,
+//                         ),
 //                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Contact No.',
-//                       field: CustomTextField(
-//                         hint: 'Enter phone number',
-//                         icon: Icons.phone_outlined,
-//                         keyboardType: TextInputType.phone,
-//                         controller: _customerPhone,
+//                       LabeledField(
+//                         label: 'Contact No.',
+//                         field: CustomTextField(
+//                           hint: 'Enter phone number',
+//                           icon: Icons.phone_outlined,
+//                           keyboardType: TextInputType.phone,
+//                           controller: _customerPhone,
+//                           inputFormatters: DValidator.phoneNumber,
+//                           validator: _validateCustomerPhone,
+//                         ),
 //                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Address',
-//                       field: CustomTextField(
-//                         hint: 'Enter site address',
-//                         icon: Icons.location_on_outlined,
-//                         controller: _customerAddress,
+//                       LabeledField(
+//                         label: 'Address',
+//                         field: CustomTextField(
+//                           hint: 'Enter site address',
+//                           icon: Icons.location_on_outlined,
+//                           controller: _customerAddress,
+//                           validator: _validateCustomerAddress,
+//                         ),
 //                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Email',
-//                       field: CustomTextField(
-//                         hint: 'Enter customer email',
-//                         icon: Icons.alternate_email,
-//                         keyboardType: TextInputType.emailAddress,
-//                         controller: _customerEmail,
+//                       LabeledField(
+//                         label: 'Email',
+//                         field: CustomTextField(
+//                           hint: 'Enter customer email',
+//                           icon: Icons.alternate_email,
+//                           keyboardType: TextInputType.emailAddress,
+//                           controller: _customerEmail,
+//                           validator: _validateOptionalEmail,
+//                         ),
 //                       ),
-//                     ),
-//                     SizedBox(height: Responsive.h(16)),
+//                       SizedBox(height: Responsive.h(16)),
 //
-//                     Text('Contractor Details', style: AppTextStyles.h3()),
-//                     SizedBox(height: Responsive.h(12)),
-//                     LabeledField(
-//                       label: 'Contractor Name',
-//                       field: CustomTextField(
-//                         hint: 'Enter contractor name',
-//                         icon: Icons.engineering_outlined,
-//                         controller: _contractorName,
+//                       Text('Contractor Details', style: AppTextStyles.h3()),
+//                       SizedBox(height: Responsive.h(12)),
+//                       Form(
+//                         key: _contractorFormKey,
+//                         child: Column(
+//                           children: [
+//                             LabeledField(
+//                               label: 'Contractor Name',
+//                               field: CustomTextField(
+//                                 hint: 'Enter contractor name',
+//                                 icon: Icons.engineering_outlined,
+//                                 controller: _contractorName,
+//                                 inputFormatters: DValidator.lettersOnly,
+//                                 validator: (v) => _validateOptionalName('Contractor name', v),
+//                               ),
+//                             ),
+//                             LabeledField(
+//                               label: 'Contact No.',
+//                               field: CustomTextField(
+//                                 hint: 'Enter contractor phone number',
+//                                 icon: Icons.phone_outlined,
+//                                 keyboardType: TextInputType.phone,
+//                                 controller: _contractorPhone,
+//                                 inputFormatters: DValidator.phoneNumber,
+//                                 validator: _validateOptionalPhone,
+//                               ),
+//                             ),
+//                           ],
+//                         ),
 //                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Contact No.',
-//                       field: CustomTextField(
-//                         hint: 'Enter contractor phone number',
-//                         icon: Icons.phone_outlined,
-//                         keyboardType: TextInputType.phone,
-//                         controller: _contractorPhone,
+//                       LabeledField(
+//                         label: 'Email (optional)',
+//                         field: CustomTextField(
+//                           hint: 'Enter contractor email',
+//                           icon: Icons.alternate_email,
+//                           keyboardType: TextInputType.emailAddress,
+//                           controller: _contractorEmail,
+//                           validator: _validateOptionalEmail,
+//                         ),
 //                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Email (optional)',
-//                       field: CustomTextField(
-//                         hint: 'Enter contractor email',
-//                         icon: Icons.alternate_email,
-//                         keyboardType: TextInputType.emailAddress,
-//                         controller: _contractorEmail,
-//                       ),
-//                     ),
-//                     SizedBox(height: Responsive.h(20)),
+//                       SizedBox(height: Responsive.h(20)),
 //
-//                     Text('Add / Edit Item', style: AppTextStyles.h3()),
-//                     SizedBox(height: Responsive.h(10)),
-//                     _buildProductDropdown(),
-//                     SizedBox(height: Responsive.h(10)),
-//                     LabeledField(
-//                       label: 'Company (auto)',
-//                       field: IgnorePointer(
-//                         child: CustomTextField(
-//                           hint: 'Select a product first',
-//                           icon: Icons.factory_outlined,
-//                           controller: _itemCompanyCtrl,
-//                         ),
-//                       ),
-//                     ),
-//                     Row(
-//                       children: [
-//                         Expanded(
-//                           child: LabeledField(
-//                             label: 'Size (auto)',
-//                             field: CustomTextField(
-//                               hint: 'e.g. 600x1200',
-//                               icon: Icons.straighten_outlined,
-//                               controller: _itemSizeCtrl,
-//                             ),
-//                           ),
-//                         ),
-//                         SizedBox(width: Responsive.w(10)),
-//                         Expanded(
-//                           child: LabeledField(
-//                             label: 'Unit (auto)',
-//                             field: CustomTextField(
-//                               hint: 'e.g. sqft',
-//                               icon: Icons.square_foot_outlined,
-//                               controller: _itemUnitCtrl,
-//                             ),
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                     LabeledField(
-//                       label: 'MRP (auto)',
-//                       field: CustomTextField(
-//                         hint: '0',
-//                         icon: Icons.currency_rupee,
-//                         keyboardType: TextInputType.number,
-//                         controller: _itemMrpCtrl,
-//                         onChanged: (_) => setState(() {}),
-//                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Quantity',
-//                       field: CustomTextField(
-//                         hint: 'Enter quantity',
-//                         icon: Icons.numbers_outlined,
-//                         keyboardType: TextInputType.number,
-//                         controller: _itemQtyCtrl,
-//                         onChanged: (_) {
-//                           // Live-sync only: this is the one place Box
-//                           // Quantity should be derived from Quantity —
-//                           // while the user is actively editing it.
-//                           setState(_recomputeBoxQtyIfNeeded);
-//                           _scheduleIncentiveFetch();
-//                         },
-//                       ),
-//                     ),
-//                     if (_isBoxUnitProduct)
-//                       Row(
-//                         children: [
-//                           Expanded(
-//                             child: LabeledField(
-//                               label: 'Box Quantity (auto)',
+//                       Text('Add / Edit Item', style: AppTextStyles.h3()),
+//                       SizedBox(height: Responsive.h(10)),
+//                       Form(
+//                         key: _itemFormKey,
+//                         autovalidateMode: AutovalidateMode.onUserInteraction,
+//                         child: Column(
+//                           children: [
+//                             _buildProductDropdown(),
+//                             SizedBox(height: Responsive.h(10)),
+//                             LabeledField(
+//                               label: 'Company (auto)',
 //                               field: IgnorePointer(
 //                                 child: CustomTextField(
-//                                   hint: '0',
-//                                   icon: Icons.inventory_2_outlined,
-//                                   keyboardType: TextInputType.number,
-//                                   controller: _itemBoxQtyCtrl,
+//                                   hint: 'Select a product first',
+//                                   icon: Icons.factory_outlined,
+//                                   controller: _itemCompanyCtrl,
 //                                 ),
 //                               ),
 //                             ),
-//                           ),
-//                           SizedBox(width: Responsive.w(10)),
-//                           Expanded(
-//                             child: LabeledField(
-//                               label: 'Piece Quantity',
+//                             Row(
+//                               children: [
+//                                 Expanded(
+//                                   child: LabeledField(
+//                                     label: 'Size (auto)',
+//                                     field: CustomTextField(
+//                                       hint: 'e.g. 600x1200',
+//                                       icon: Icons.straighten_outlined,
+//                                       controller: _itemSizeCtrl,
+//                                       inputFormatters: DValidator.textWithLimit,
+//                                     ),
+//                                   ),
+//                                 ),
+//                                 SizedBox(width: Responsive.w(10)),
+//                                 Expanded(
+//                                   child: LabeledField(
+//                                     label: 'Unit (auto)',
+//                                     field: CustomTextField(
+//                                       hint: 'e.g. sqft',
+//                                       icon: Icons.square_foot_outlined,
+//                                       controller: _itemUnitCtrl,
+//                                       inputFormatters: DValidator.textWithLimit,
+//                                     ),
+//                                   ),
+//                                 ),
+//                               ],
+//                             ),
+//                             LabeledField(
+//                               label: 'MRP (auto)',
 //                               field: CustomTextField(
-//                                 hint: 'Enter piece qty',
-//                                 icon: Icons.widgets_outlined,
+//                                 hint: '0',
+//                                 icon: Icons.currency_rupee,
 //                                 keyboardType: TextInputType.number,
-//                                 controller: _itemPieceQtyCtrl,
+//                                 controller: _itemMrpCtrl,
+//                                 inputFormatters: DValidator.decimalNumber,
+//                                 validator: (v) => DValidator.validateOptionalNumber('MRP', v),
 //                                 onChanged: (_) => setState(() {}),
 //                               ),
 //                             ),
-//                           ),
-//                         ],
-//                       ),
-//                     LabeledField(
-//                       label: 'Rate',
-//                       field: CustomTextField(
-//                         hint: 'Enter rate per unit',
-//                         icon: Icons.currency_rupee,
-//                         keyboardType: TextInputType.number,
-//                         controller: _itemRateCtrl,
-//                         onChanged: (_) {
-//                           setState(() {});
-//                           _scheduleIncentiveFetch();
-//                         },
-//                       ),
-//                     ),
-//                     SizedBox(height: Responsive.h(6)),
-//                     Container(
-//                       padding: EdgeInsets.all(Responsive.w(12)),
-//                       decoration: BoxDecoration(
-//                         color: AppColors.surfaceAlt,
-//                         borderRadius: BorderRadius.circular(12),
-//                       ),
-//                       child: Row(
-//                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                         children: [
-//                           Text('Amount', style: AppTextStyles.bodyBold()),
-//                           Text(currency.format(_currentItemAmount),
-//                               style: AppTextStyles.bodyBold(color: AppColors.primary)),
-//                         ],
-//                       ),
-//                     ),
-//
-//                     // Incentive preview hidden for owner-created quotations.
-//                     if (!_isOwner && (_selectedProduct != null || _editingItemIndex != null)) ...[
-//                       SizedBox(height: Responsive.h(8)),
-//                       const _OwnerIncentivePreviewCard(),
-//                     ],
-//
-//                     SizedBox(height: Responsive.h(14)),
-//
-//                     if (_editingItemIndex != null) ...[
-//                       Container(
-//                         width: double.infinity,
-//                         padding: EdgeInsets.symmetric(
-//                             horizontal: Responsive.w(12), vertical: Responsive.h(8)),
-//                         margin: EdgeInsets.only(bottom: Responsive.h(10)),
-//                         decoration: BoxDecoration(
-//                           color: AppColors.primary.withOpacity(0.08),
-//                           borderRadius: BorderRadius.circular(10),
-//                         ),
-//                         child: Row(
-//                           children: [
-//                             const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
-//                             SizedBox(width: Responsive.w(6)),
-//                             Expanded(
-//                               child: Text(
-//                                 'Editing item #${_editingItemIndex! + 1}',
-//                                 style: AppTextStyles.caption(),
+//                             LabeledField(
+//                               label: 'Quantity',
+//                               field: CustomTextField(
+//                                 hint: 'Enter quantity',
+//                                 icon: Icons.numbers_outlined,
+//                                 keyboardType: TextInputType.number,
+//                                 controller: _itemQtyCtrl,
+//                                 inputFormatters: DValidator.decimalNumber,
+//                                 validator: (v) {
+//                                   final n = double.tryParse((v ?? '').trim());
+//                                   if (n == null || n <= 0) {
+//                                     return _isBoxUnitProduct
+//                                         ? 'Enter a valid box/piece quantity'
+//                                         : 'Enter a valid quantity';
+//                                   }
+//                                   return null;
+//                                 },
+//                                 onChanged: (_) {
+//                                   // Live-sync only: this is the one place Box
+//                                   // Quantity should be derived from Quantity —
+//                                   // while the user is actively editing it.
+//                                   setState(_recomputeBoxQtyIfNeeded);
+//                                   _scheduleIncentiveFetch();
+//                                 },
 //                               ),
 //                             ),
-//                             InkWell(
-//                               onTap: _cancelEditItem,
-//                               child: Text('Cancel',
-//                                   style: AppTextStyles.bodyBold(color: AppColors.error)),
+//                             if (_isBoxUnitProduct)
+//                               Row(
+//                                 children: [
+//                                   Expanded(
+//                                     child: LabeledField(
+//                                       label: 'Box Quantity (auto)',
+//                                       field: IgnorePointer(
+//                                         child: CustomTextField(
+//                                           hint: '0',
+//                                           icon: Icons.inventory_2_outlined,
+//                                           keyboardType: TextInputType.number,
+//                                           controller: _itemBoxQtyCtrl,
+//                                         ),
+//                                       ),
+//                                     ),
+//                                   ),
+//                                   SizedBox(width: Responsive.w(10)),
+//                                   Expanded(
+//                                     child: LabeledField(
+//                                       label: 'Piece Quantity',
+//                                       field: CustomTextField(
+//                                         hint: 'Enter piece qty',
+//                                         icon: Icons.widgets_outlined,
+//                                         keyboardType: TextInputType.number,
+//                                         controller: _itemPieceQtyCtrl,
+//                                         inputFormatters: DValidator.decimalNumber,
+//                                         onChanged: (_) => setState(() {}),
+//                                       ),
+//                                     ),
+//                                   ),
+//                                 ],
+//                               ),
+//                             LabeledField(
+//                               label: 'Rate',
+//                               field: CustomTextField(
+//                                 hint: 'Enter rate per unit',
+//                                 icon: Icons.currency_rupee,
+//                                 keyboardType: TextInputType.number,
+//                                 controller: _itemRateCtrl,
+//                                 inputFormatters: DValidator.decimalNumber,
+//                                 validator: (v) {
+//                                   final n = double.tryParse((v ?? '').trim());
+//                                   if (n == null || n <= 0) return 'Enter a valid rate';
+//                                   return null;
+//                                 },
+//                                 onChanged: (_) {
+//                                   setState(() {});
+//                                   _scheduleIncentiveFetch();
+//                                 },
+//                               ),
 //                             ),
 //                           ],
 //                         ),
 //                       ),
-//                     ],
+//                       SizedBox(height: Responsive.h(6)),
+//                       // REMOVED: pre-add "Amount" preview box. It used to
+//                       // show a local quantity*rate approximation, which
+//                       // could disagree with what the server actually
+//                       // calculates (square feet, box/piece breakdown,
+//                       // incentive rules). The server's own `amount` is now
+//                       // only ever read after Add/Update Item succeeds —
+//                       // see the Items list below, and _saveItemFromForm.
 //
-//                     SizedBox(
-//                       width: double.infinity,
-//                       child: ElevatedButton.icon(
-//                         onPressed: _saveItemFromForm,
-//                         icon: Icon(
-//                           _editingItemIndex != null ? Icons.save_outlined : Icons.add,
-//                           color: Colors.white,
-//                         ),
-//                         label: Text(_editingItemIndex != null ? 'Update Item' : 'Add Item'),
-//                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: AppColors.primary,
-//                           padding: const EdgeInsets.symmetric(vertical: 14),
-//                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-//                         ),
-//                       ),
-//                     ),
-//                     SizedBox(height: Responsive.h(20)),
+//                       // Incentive preview hidden for owner-created quotations.
+//                       if (!_isOwner && (_selectedProduct != null || _editingItemIndex != null)) ...[
+//                         SizedBox(height: Responsive.h(8)),
+//                         const _OwnerIncentivePreviewCard(),
+//                       ],
 //
-//                     Text('Items (${_items.length})', style: AppTextStyles.h3()),
-//                     SizedBox(height: Responsive.h(10)),
-//                     if (_items.isEmpty)
-//                       Padding(
-//                         padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
-//                         child: Center(
-//                           child: Text('No items added yet',
-//                               style: AppTextStyles.body(color: AppColors.textHint)),
-//                         ),
-//                       )
-//                     else
-//                       BlocBuilder<QuotationItemRemoveBloc, QuotationItemRemoveState>(
-//                         buildWhen: (prev, curr) =>
-//                         prev.status != curr.status || prev.removedItemId != curr.removedItemId,
-//                         builder: (context, removeState) {
-//                           final removingId = removeState.status == QuotationItemRemoveStatus.inProgress
-//                               ? removeState.removedItemId
-//                               : null;
-//                           return Column(
-//                             children: _items.asMap().entries.map((entry) {
-//                               final i = entry.key;
-//                               final item = entry.value;
-//                               return _OwnerEditItemTile(
-//                                 serialNo: i + 1,
-//                                 item: item,
-//                                 currency: currency,
-//                                 isEditing: _editingItemIndex == i,
-//                                 isRemoving: item.id == removingId,
-//                                 // Per-item incentive line hidden for owner-created
-//                                 // quotations, same rule as the preview/total above.
-//                                 showIncentive: !_isOwner,
-//                                 onEdit: () => _editItem(i),
-//                                 onDelete: () => _removeItem(i),
-//                               );
-//                             }).toList(),
-//                           );
-//                         },
-//                       ),
-//                     SizedBox(height: Responsive.h(20)),
+//                       SizedBox(height: Responsive.h(14)),
 //
-//                     Text('Other Details', style: AppTextStyles.h3()),
-//                     SizedBox(height: Responsive.h(12)),
-//                     LabeledField(
-//                       label: 'Handling Charge',
-//                       field: CustomTextField(
-//                         hint: 'Enter handling charge',
-//                         icon: Icons.currency_rupee,
-//                         keyboardType: TextInputType.number,
-//                         controller: _handlingCharge,
-//                         onChanged: (_) => setState(() {}),
-//                       ),
-//                     ),
-//                     LabeledField(
-//                       label: 'Notes (optional)',
-//                       field: CustomTextField(
-//                         hint: 'e.g. Customer enquiry for new project',
-//                         icon: Icons.notes_outlined,
-//                         controller: _notes,
-//                       ),
-//                     ),
-//                     SizedBox(height: Responsive.h(10)),
-//
-//                     Container(
-//                       padding: EdgeInsets.all(Responsive.w(14)),
-//                       decoration: BoxDecoration(
-//                         color: AppColors.surfaceAlt,
-//                         borderRadius: BorderRadius.circular(14),
-//                       ),
-//                       child: Column(
-//                         children: [
-//                           // _totalRow('Total Items', '$_totalItemsCount'),
-//                           // SizedBox(height: Responsive.h(6)),
-//                           // _totalRow('Total Qty', number.format(_totalQty)),
-//                           SizedBox(height: Responsive.h(6)),
-//                           _totalRow('Total Sq.Ft', number.format(_totalSqft)),
-//                           if (_mrpTotal > 0) ...[
-//                             SizedBox(height: Responsive.h(6)),
-//                             _totalRow('Total MRP', currency.format(_mrpTotal)),
-//                           ],
-//                           SizedBox(height: Responsive.h(6)),
-//                           _totalRow('Items Total', currency.format(_itemsTotal)),
-//                           SizedBox(height: Responsive.h(6)),
-//                           _totalRow('Handling Charge', currency.format(_handling)),
-//                           const Divider(height: 20),
-//                           Row(
-//                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                       if (_editingItemIndex != null) ...[
+//                         Container(
+//                           width: double.infinity,
+//                           padding: EdgeInsets.symmetric(
+//                               horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+//                           margin: EdgeInsets.only(bottom: Responsive.h(10)),
+//                           decoration: BoxDecoration(
+//                             color: AppColors.primary.withOpacity(0.08),
+//                             borderRadius: BorderRadius.circular(10),
+//                           ),
+//                           child: Row(
 //                             children: [
-//                               Text('Grand Total', style: AppTextStyles.h3()),
-//                               Text(currency.format(_grandTotal),
-//                                   style: AppTextStyles.h2(color: AppColors.primary)),
+//                               const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+//                               SizedBox(width: Responsive.w(6)),
+//                               Expanded(
+//                                 child: Text(
+//                                   'Editing item #${_editingItemIndex! + 1}',
+//                                   style: AppTextStyles.caption(),
+//                                 ),
+//                               ),
+//                               InkWell(
+//                                 onTap: _cancelEditItem,
+//                                 child: Text('Cancel',
+//                                     style: AppTextStyles.bodyBold(color: AppColors.error)),
+//                               ),
 //                             ],
 //                           ),
-//                         ],
-//                       ),
-//                     ),
-//                     SizedBox(height: Responsive.h(12)),
+//                         ),
+//                       ],
 //
-//                     // Incentive total hidden for owner-created quotations.
-//                     if (!_isOwner && _incentiveTotal > 0)
+//                       SizedBox(
+//                         width: double.infinity,
+//                         child: ElevatedButton.icon(
+//                           onPressed: _isAddingItem ? null : _saveItemFromForm,
+//                           icon: _isAddingItem
+//                               ? const SizedBox(
+//                             width: 16,
+//                             height: 16,
+//                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+//                           )
+//                               : Icon(
+//                             _editingItemIndex != null ? Icons.save_outlined : Icons.add,
+//                             color: Colors.white,
+//                           ),
+//                           label: Text(
+//                             _isAddingItem
+//                                 ? 'Calculating…'
+//                                 : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
+//                           ),
+//                           style: ElevatedButton.styleFrom(
+//                             backgroundColor: AppColors.primary,
+//                             padding: const EdgeInsets.symmetric(vertical: 14),
+//                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+//                           ),
+//                         ),
+//                       ),
+//                       SizedBox(height: Responsive.h(20)),
+//
+//                       Text('Items (${_items.length})', style: AppTextStyles.h3()),
+//                       SizedBox(height: Responsive.h(10)),
+//                       if (_items.isEmpty)
+//                         Padding(
+//                           padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
+//                           child: Center(
+//                             child: Text('No items added yet',
+//                                 style: AppTextStyles.body(color: AppColors.textHint)),
+//                           ),
+//                         )
+//                       else
+//                         BlocBuilder<QuotationItemRemoveBloc, QuotationItemRemoveState>(
+//                           buildWhen: (prev, curr) =>
+//                           prev.status != curr.status || prev.removedItemId != curr.removedItemId,
+//                           builder: (context, removeState) {
+//                             final removingId = removeState.status == QuotationItemRemoveStatus.inProgress
+//                                 ? removeState.removedItemId
+//                                 : null;
+//                             return Column(
+//                               children: _items.asMap().entries.map((entry) {
+//                                 final i = entry.key;
+//                                 final item = entry.value;
+//                                 return _OwnerEditItemTile(
+//                                   serialNo: i + 1,
+//                                   item: item,
+//                                   currency: currency,
+//                                   isEditing: _editingItemIndex == i,
+//                                   isRemoving: item.id == removingId,
+//                                   // Per-item incentive line hidden for owner-created
+//                                   // quotations, same rule as the preview/total above.
+//                                   showIncentive: !_isOwner,
+//                                   onEdit: () => _editItem(i),
+//                                   onDelete: () => _removeItem(i),
+//                                 );
+//                               }).toList(),
+//                             );
+//                           },
+//                         ),
+//                       SizedBox(height: Responsive.h(20)),
+//
+//                       Text('Other Details', style: AppTextStyles.h3()),
+//                       SizedBox(height: Responsive.h(12)),
+//                       LabeledField(
+//                         label: 'Handling Charge',
+//                         field: CustomTextField(
+//                           hint: 'Enter handling charge',
+//                           icon: Icons.currency_rupee,
+//                           keyboardType: TextInputType.number,
+//                           controller: _handlingCharge,
+//                           inputFormatters: DValidator.decimalNumber,
+//                           validator: _validateHandlingCharge,
+//                           onChanged: (_) => setState(() {}),
+//                         ),
+//                       ),
+//                       LabeledField(
+//                         label: 'Notes (optional)',
+//                         field: CustomTextField(
+//                           hint: 'e.g. Customer enquiry for new project',
+//                           icon: Icons.notes_outlined,
+//                           controller: _notes,
+//                           inputFormatters: DValidator.textWithLimit,
+//                         ),
+//                       ),
+//                       SizedBox(height: Responsive.h(10)),
+//
 //                       Container(
 //                         padding: EdgeInsets.all(Responsive.w(14)),
 //                         decoration: BoxDecoration(
-//                           color: AppColors.success.withOpacity(0.08),
+//                           color: AppColors.surfaceAlt,
 //                           borderRadius: BorderRadius.circular(14),
-//                           border: Border.all(color: AppColors.success.withOpacity(0.3)),
 //                         ),
-//                         child: Row(
-//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                         child: Column(
 //                           children: [
+//                             // _totalRow('Total Items', '$_totalItemsCount'),
+//                             // SizedBox(height: Responsive.h(6)),
+//                             // _totalRow('Total Qty', number.format(_totalQty)),
+//                             SizedBox(height: Responsive.h(6)),
+//                             _totalRow('Total Sq.Ft', number.format(_totalSqft)),
+//                             if (_mrpTotal > 0) ...[
+//                               SizedBox(height: Responsive.h(6)),
+//                               _totalRow('Total MRP', currency.format(_mrpTotal)),
+//                             ],
+//                             SizedBox(height: Responsive.h(6)),
+//                             _totalRow('Items Total', currency.format(_itemsTotal)),
+//                             SizedBox(height: Responsive.h(6)),
+//                             _totalRow('Handling Charge', currency.format(_handling)),
+//                             const Divider(height: 20),
 //                             Row(
+//                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //                               children: [
-//                                 Icon(Icons.percent, size: 18, color: AppColors.success),
-//                                 SizedBox(width: Responsive.w(8)),
-//                                 Text('Incentive Total',
-//                                     style: AppTextStyles.bodyBold(color: AppColors.success)),
+//                                 Text('Grand Total', style: AppTextStyles.h3()),
+//                                 Text(currency.format(_grandTotal),
+//                                     style: AppTextStyles.h2(color: AppColors.primary)),
 //                               ],
 //                             ),
-//                             Text(currency.format(_incentiveTotal),
-//                                 style: AppTextStyles.h3(color: AppColors.success)),
 //                           ],
 //                         ),
 //                       ),
-//                   ],
+//                       SizedBox(height: Responsive.h(12)),
+//
+//                       // Incentive total hidden for owner-created quotations.
+//                       if (!_isOwner && _incentiveTotal > 0)
+//                         Container(
+//                           padding: EdgeInsets.all(Responsive.w(14)),
+//                           decoration: BoxDecoration(
+//                             color: AppColors.success.withOpacity(0.08),
+//                             borderRadius: BorderRadius.circular(14),
+//                             border: Border.all(color: AppColors.success.withOpacity(0.3)),
+//                           ),
+//                           child: Row(
+//                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                             children: [
+//                               Row(
+//                                 children: [
+//                                   Icon(Icons.percent, size: 18, color: AppColors.success),
+//                                   SizedBox(width: Responsive.w(8)),
+//                                   Text('Incentive Total',
+//                                       style: AppTextStyles.bodyBold(color: AppColors.success)),
+//                                 ],
+//                               ),
+//                               Text(currency.format(_incentiveTotal),
+//                                   style: AppTextStyles.h3(color: AppColors.success)),
+//                             ],
+//                           ),
+//                         ),
+//                     ],
+//                   ),
 //                 ),
 //               ),
 //               BlocBuilder<OwnerQuotationEditBloc, OwnerQuotationEditState>(
@@ -1109,7 +1337,7 @@
 //           field: Column(
 //             crossAxisAlignment: CrossAxisAlignment.start,
 //             children: [
-//               TextField(
+//               TextFormField(
 //                 controller: _productSearchCtrl,
 //                 focusNode: _productSearchFocus,
 //                 decoration: InputDecoration(
@@ -1134,6 +1362,7 @@
 //                     borderSide: BorderSide(color: AppColors.border),
 //                   ),
 //                 ),
+//                 validator: (v) => DValidator.validateDropdown('product', _selectedProduct?.id),
 //                 onChanged: (text) {
 //                   if (_selectedProduct != null &&
 //                       text != _productDisplayString(_selectedProduct!)) {
@@ -1555,8 +1784,13 @@ class _OwnerQuotationEditView extends StatefulWidget {
 }
 
 class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
-  // Form key for the customer/contractor/other-details section.
+  // Form key for the customer/other-details section.
   final _formKey = GlobalKey<FormState>();
+
+  // Separate Form for just the contractor name/phone pair, so they can be
+  // re-validated against each other on every keystroke without re-running
+  // (and flashing errors on) the customer fields in the main Form above.
+  final _contractorFormKey = GlobalKey<FormState>();
 
   // ---- Customer / contractor / other details (all editable for owner) ----
   late final TextEditingController _customerName;
@@ -1608,6 +1842,14 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   // approach as QuotationEditScreen / CreateEstimateScreen.
   final QuotationProvider _quotationProvider = QuotationProvider();
   bool _isAddingItem = false;
+
+  // Holds the item built from the /quotations/product-incentive response
+  // while a PUT /quotations/update-item call for that same item is in
+  // flight (existing, already-saved items only — see _saveItemFromForm).
+  // Applied to _items only once the bloc reports itemUpdateStatus success;
+  // discarded on failure so the on-screen list never shows a change the
+  // server didn't actually accept.
+  _OwnerEditItem? _pendingItemUpdate;
 
   /// Whether the current add/edit-item form should be treated as a
   /// box-unit product (and therefore show the Box Quantity / Piece
@@ -1661,8 +1903,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
   /// Items added on this screen and not yet saved to the server carry an
   /// id prefixed 'new_' (see _saveItemFromForm). Anything else is a real
-  /// backend item id and must go through POST /quotations/remove-item to
-  /// actually be deleted.
+  /// backend item id — deleting it goes through POST /quotations/remove-item
+  /// and editing it goes through PUT /quotations/update-item, both of which
+  /// hit the server immediately rather than only updating local state.
   bool _isUnsavedItem(_OwnerEditItem item) => item.id.startsWith('new_');
 
   @override
@@ -1680,6 +1923,12 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     _contractorEmail = TextEditingController(text: e.contractor.email);
     _contractorAddress = TextEditingController(text: e.contractor.address);
 
+    // Re-run the contractor Form's validators on every keystroke in
+    // either field, so "name requires phone" / "phone requires name"
+    // errors show up immediately instead of waiting for Save.
+    _contractorName.addListener(_revalidateContractorFields);
+    _contractorPhone.addListener(_revalidateContractorFields);
+
     _handlingCharge = TextEditingController(text: _formatPrice(e.handlingCharge));
     _notes = TextEditingController(text: e.notes);
 
@@ -1687,10 +1936,11 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         .asMap()
         .entries
         .map((entry) => _OwnerEditItem(
-      // Real backend item id — needed to call POST /quotations/remove-item.
-      // Newly-added items (added on this screen, never saved) instead get
-      // an id prefixed 'new_' — see _saveItemFromForm — which is how
-      // _removeItem tells the two cases apart.
+      // Real backend item id — needed to call POST /quotations/remove-item
+      // and PUT /quotations/update-item. Newly-added items (added on this
+      // screen, never saved) instead get an id prefixed 'new_' — see
+      // _saveItemFromForm — which is how _removeItem / _saveItemFromForm
+      // tell the two cases apart.
       id: entry.value.id,
       productId: entry.value.productId,
       name: entry.value.productName,
@@ -1707,9 +1957,18 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         .toList();
   }
 
+  /// Re-runs the contractor name/phone Form's validators on every
+  /// keystroke in either field — mirrors why _scheduleIncentiveFetch
+  /// listens on quantity/rate changes.
+  void _revalidateContractorFields() {
+    _contractorFormKey.currentState?.validate();
+  }
+
   @override
   void dispose() {
     _incentiveDebounce?.cancel();
+    _contractorName.removeListener(_revalidateContractorFields);
+    _contractorPhone.removeListener(_revalidateContractorFields);
     _customerName.dispose();
     _customerPhone.dispose();
     _customerEmail.dispose();
@@ -1818,16 +2077,31 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     return DValidator.validateEmail(v);
   }
 
-  /// Contractor name is optional — only enforce alpha/format if filled in.
+  /// Contractor name is optional — but becomes required once contractor
+  /// phone is filled in, since a phone without a name to attach it to
+  /// isn't useful on the quotation.
   String? _validateOptionalName(String fieldName, String? v) {
-    if (v == null || v.trim().isEmpty) return null;
-    return DValidator.validateAlphaOnly(fieldName, v);
+    final name = (v ?? '').trim();
+    final phone = _contractorPhone.text.trim();
+
+    if (name.isEmpty && phone.isNotEmpty) {
+      return '$fieldName is required when contractor phone number is entered';
+    }
+    if (name.isEmpty) return null;
+    return DValidator.validateAlphaOnly(fieldName, name);
   }
 
-  /// Contractor phone is optional — validate as a 10-digit number if filled.
+  /// Contractor phone is optional — but becomes required once contractor
+  /// name is filled in, mirroring _validateOptionalName above.
   String? _validateOptionalPhone(String? v) {
-    if (v == null || v.trim().isEmpty) return null;
-    return DValidator.validatePhoneNumber(v);
+    final phone = (v ?? '').trim();
+    final name = _contractorName.text.trim();
+
+    if (phone.isEmpty && name.isNotEmpty) {
+      return 'Contractor phone number is required when contractor name is entered';
+    }
+    if (phone.isEmpty) return null;
+    return DValidator.validatePhoneNumber(phone);
   }
 
   String? _validateHandlingCharge(String? v) =>
@@ -1929,6 +2203,16 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   /// approach to QuotationEditScreen / CreateEstimateScreen's
   /// _addItemToList, so an item added or edited here always reflects
   /// exactly what the server computed.
+  ///
+  /// For an item that's already saved on the server (a real backend id,
+  /// not one of this screen's own 'new_' ids), the resulting
+  /// quantity/rate/box/piece are ALSO persisted right away via PUT
+  /// /quotations/update-item (see OwnerQuotationItemUpdateSubmitted below)
+  /// — the item is only applied to [_items] once that call succeeds, so
+  /// the on-screen list never shows a change the server rejected. A
+  /// brand-new (never-saved) item has nothing to persist yet and is
+  /// simply added to local state, same as before — it's saved for the
+  /// first time only when "Save Changes" submits the whole quotation.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
@@ -1989,9 +2273,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     ));
 
     if (!mounted) return;
-    setState(() => _isAddingItem = false);
 
     if (!result.success || result.incentive == null) {
+      setState(() => _isAddingItem = false);
       _showError(result.errorMessage ?? 'Could not calculate the amount for this item. Please try again.');
       return;
     }
@@ -2025,7 +2309,30 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
       incentiveReason: incentive.eligibilityReason,
     );
 
+    final existingItem = editingIndex != null ? _items[editingIndex] : null;
+
+    if (existingItem != null && !_isUnsavedItem(existingItem)) {
+      // Existing, already-saved item — persist the change immediately via
+      // PUT /quotations/update-item. _isAddingItem stays true (button keeps
+      // its spinner) until the itemUpdateStatus BlocListener below reports
+      // success or failure; only on success is [newItem] applied to
+      // [_items] and the form reset.
+      _pendingItemUpdate = newItem;
+      context.read<OwnerQuotationEditBloc>().add(OwnerQuotationItemUpdateSubmitted(
+        quotationId: widget.estimate.id,
+        quotationItemId: existingItem.id,
+        quantity: qty,
+        rate: rate,
+        boxQuantity: boxQuantity,
+        pieceQuantity: pieceQuantity,
+      ));
+      return;
+    }
+
+    // Brand-new item (or one added earlier on this screen and not yet
+    // saved) — nothing to persist yet, keep it purely local as before.
     setState(() {
+      _isAddingItem = false;
       if (editingIndex != null) {
         _items[editingIndex] = newItem;
       } else {
@@ -2116,13 +2423,36 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     });
   }
 
+  /// Called once the PUT /quotations/update-item call for the item
+  /// currently being edited has succeeded — applies the item built from
+  /// the /quotations/product-incentive response (see _saveItemFromForm)
+  /// to [_items] and resets the add/edit-item form, mirroring what the
+  /// brand-new-item branch of _saveItemFromForm does synchronously.
+  void _applyPendingItemUpdate() {
+    final pending = _pendingItemUpdate;
+    final editingIndex = _editingItemIndex;
+    _pendingItemUpdate = null;
+    if (pending == null || editingIndex == null) {
+      setState(() => _isAddingItem = false);
+      return;
+    }
+    setState(() {
+      _isAddingItem = false;
+      _items[editingIndex] = pending;
+    });
+    _resetItemForm();
+  }
+
   // ---- Submit ----
   bool _validate() {
-    // Runs every validator attached to the customer/contractor/other-details
-    // Form below (customer name, phone, address, optional email/contractor
-    // fields, handling charge).
+    // Runs every validator attached to the customer/other-details Form
+    // (customer name, phone, address, optional email, handling charge).
     final formValid = _formKey.currentState?.validate() ?? true;
-    if (!formValid) {
+    // Contractor name/phone now live in their own Form so they can be
+    // cross-validated live — checked separately here.
+    final contractorValid = _contractorFormKey.currentState?.validate() ?? true;
+
+    if (!formValid || !contractorValid) {
       _showError('Please fix the highlighted fields');
       return false;
     }
@@ -2194,6 +2524,27 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                 } else if (state.updateStatus == OwnerQuotationUpdateStatus.failure) {
                   _showError(state.updateError ?? 'Failed to update quotation.');
                   context.read<OwnerQuotationEditBloc>().add(const OwnerQuotationUpdateResultConsumed());
+                }
+              },
+            ),
+            // Reacts to PUT /quotations/update-item, fired from
+            // _saveItemFromForm whenever "Update Item" is tapped on an
+            // item that's already saved on the server. Only on success is
+            // the locally-built item (held in _pendingItemUpdate) actually
+            // applied to _items — a failure leaves the list untouched and
+            // the form open so the owner can retry or cancel.
+            BlocListener<OwnerQuotationEditBloc, OwnerQuotationEditState>(
+              listenWhen: (prev, curr) => prev.itemUpdateStatus != curr.itemUpdateStatus,
+              listener: (context, state) {
+                if (state.itemUpdateStatus == OwnerItemUpdateStatus.success) {
+                  _applyPendingItemUpdate();
+                  AppSnackbar.success(state.itemUpdateMessage ?? 'Item updated successfully');
+                  context.read<OwnerQuotationEditBloc>().add(const OwnerQuotationItemUpdateResultConsumed());
+                } else if (state.itemUpdateStatus == OwnerItemUpdateStatus.failure) {
+                  _pendingItemUpdate = null;
+                  setState(() => _isAddingItem = false);
+                  _showError(state.itemUpdateError ?? 'Failed to update item.');
+                  context.read<OwnerQuotationEditBloc>().add(const OwnerQuotationItemUpdateResultConsumed());
                 }
               },
             ),
@@ -2273,25 +2624,32 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
                       Text('Contractor Details', style: AppTextStyles.h3()),
                       SizedBox(height: Responsive.h(12)),
-                      LabeledField(
-                        label: 'Contractor Name',
-                        field: CustomTextField(
-                          hint: 'Enter contractor name',
-                          icon: Icons.engineering_outlined,
-                          controller: _contractorName,
-                          inputFormatters: DValidator.lettersOnly,
-                          validator: (v) => _validateOptionalName('Contractor name', v),
-                        ),
-                      ),
-                      LabeledField(
-                        label: 'Contact No.',
-                        field: CustomTextField(
-                          hint: 'Enter contractor phone number',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          controller: _contractorPhone,
-                          inputFormatters: DValidator.phoneNumber,
-                          validator: _validateOptionalPhone,
+                      Form(
+                        key: _contractorFormKey,
+                        child: Column(
+                          children: [
+                            LabeledField(
+                              label: 'Contractor Name',
+                              field: CustomTextField(
+                                hint: 'Enter contractor name',
+                                icon: Icons.engineering_outlined,
+                                controller: _contractorName,
+                                inputFormatters: DValidator.lettersOnly,
+                                validator: (v) => _validateOptionalName('Contractor name', v),
+                              ),
+                            ),
+                            LabeledField(
+                              label: 'Contact No.',
+                              field: CustomTextField(
+                                hint: 'Enter contractor phone number',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                controller: _contractorPhone,
+                                inputFormatters: DValidator.phoneNumber,
+                                validator: _validateOptionalPhone,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       LabeledField(
@@ -2507,7 +2865,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                           ),
                           label: Text(
                             _isAddingItem
-                                ? 'Calculating…'
+                                ? (_editingItemIndex != null ? 'Updating…' : 'Calculating…')
                                 : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
                           ),
                           style: ElevatedButton.styleFrom(

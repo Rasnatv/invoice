@@ -63,7 +63,8 @@ class OwnerEstimateProvider {
       final response = await _apiClient.estimates(page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final parsed = SalesmanownrEstimateListResponseModel.fromJson(response.data);
+        final parsed = SalesmanownrEstimateListResponseModel.fromJson(
+            response.data);
         return OwnerEstimateListResult.success(parsed.list);
       }
       return OwnerEstimateListResult.failure(response.statusCode.toString());
@@ -92,27 +93,6 @@ class OwnerEstimateProvider {
     }
   }
 
-  /// POST /estimates/update — partial update; only send fields you want
-  /// changed (see [OwnerUpdateEstimateRequest]).
-  ///
-  /// The response shape is `{ status, status_code, data, message }` — same
-  /// shape as /estimates/show — so it's parsed with the same
-  /// [EstimateDetailResponseModel]. Some backends may return `data: {}`
-  /// on update rather than the full refreshed estimate; callers should
-  /// treat `detail == null` on a successful result as "re-fetch the
-  /// estimate to get the latest state" rather than as a failure.
-  ///
-  /// IMPORTANT: some backends return HTTP 200/201 even when the update
-  /// itself failed validation, signalling the real outcome only in the
-  /// response body's own `status` field (e.g. `{"status": "0", "message":
-  /// "Invalid product_id", "data": null}`). Previously this method treated
-  /// any 200/201 as success, which meant a body-level failure silently
-  /// looked like "success with no data" to callers (screen would pop and
-  /// re-fetch as if the update worked, discarding the real error message).
-  /// This now also checks the body's own status before declaring success.
-  /// Adjust the `bodyStatus != '1'` comparison below if your API's
-  /// success/failure convention differs (confirm against a known-bad
-  /// /estimates/show response to see the exact field/value used).
   Future<OwnerEstimateDetailResult> updateEstimate(
       OwnerUpdateEstimateRequest request) async {
     try {
@@ -141,25 +121,64 @@ class OwnerEstimateProvider {
     }
   }
 
+
   /// POST /estimates/approve
   Future<OwnerActionResult> approveEstimate(
-      OwnerApproveEstimateRequest request) => _actionCall(
-        () => _apiClient.approveEstimate(request.toJson()),
-  );
+      OwnerApproveEstimateRequest request) =>
+      _actionCall(
+            () => _apiClient.approveEstimate(request.toJson()),
+      );
 
   /// POST /quotations/reject
   Future<OwnerActionResult> rejectEstimate(
-      OwnerRejectEstimateRequest request) => _actionCall(
-        () => _apiClient.rejectEstimate(request.toJson()),
-  );
+      OwnerRejectEstimateRequest request) =>
+      _actionCall(
+            () => _apiClient.rejectEstimate(request.toJson()),
+      );
 
   /// Shared response handling for /estimates/approve and /quotations/reject
   /// — both return `{ status, message }`.
   Future<OwnerActionResult> _actionCall(
-      Future<Response> Function() request,
-      ) async {
+      Future<Response> Function() request,) async {
     try {
       final response = await request();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = response.data;
+        final status = body['status']?.toString();
+        final message = body['message']?.toString();
+        return OwnerActionResult(success: status == '1', message: message);
+      }
+      return OwnerActionResult(
+        success: false,
+        message: response.statusCode.toString(),
+      );
+    } on DioException catch (e) {
+      final message = await ApiErrorHandler.handleDioError(e);
+      return OwnerActionResult(success: false, message: message);
+    }
+  }
+
+  /// POST /estimates/update-item — body: { estimate_id, estimate_item_id,
+  /// quantity, rate, box_quantity, piece_quantity }. Updates a single
+  /// saved line item without touching the rest of the estimate.
+  Future<OwnerActionResult> updateItem({
+    required String estimateId,
+    required String estimateItemId,
+    required double quantity,
+    required double rate,
+    double boxQuantity = 0,
+    double pieceQuantity = 0,
+  }) async {
+    try {
+      final response = await _apiClient.updateEstimateItem({
+        'estimate_id': estimateId,
+        'estimate_item_id': estimateItemId,
+        'quantity': quantity,
+        'rate': rate,
+        'box_quantity': boxQuantity,
+        'piece_quantity': pieceQuantity,
+      });
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;

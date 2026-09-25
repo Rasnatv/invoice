@@ -781,5 +781,20 @@ class ApiClient {
     data: data,
     options: await _authOptions(),
   );
+  /// POST /estimates/update-item — body: { estimate_id, estimate_item_id,
+  /// quantity, rate, box_quantity, piece_quantity }. Updates one existing
+  /// line item on an estimate without touching the rest of the estimate
+  /// or its other items (unlike /estimates/update, which replaces the
+  /// whole item list if `items` is present at all).
+  Future<Response> updateEstimateItem(Map<String, dynamic> data) async => dio.put(
+    ApiConstants.estimateUpdateItem,
+    data: data,
+    options: await _authOptions(),
+  );
+  Future<Response> updateQuotationItem(Map<String, dynamic> data) async => dio.put(
+    ApiConstants.quotationsUpdateItem,
+    data: data,
+    options: await _authOptions(),
+  );
 
 }

@@ -1037,8 +1037,6 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
             padding: EdgeInsets.all(Responsive.w(14)),
             child: Column(
               children: [
-                _totalRow('Mrp Total', number.format(q.mrp)),
-                gap,
                 _totalRow('Total Sqft', number.format(q.totalSquareFeet)),
                 gap,
                 _totalRow('Subtotal', money.format(q.subtotal)),

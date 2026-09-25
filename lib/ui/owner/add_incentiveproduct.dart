@@ -120,17 +120,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     _incentiveType =
     p == null ? ProductIncentiveType.none : p.incentiveType;
 
-    // ProductModel.bonusType is parsed straight from the API's bonus_type
-    // field ('bulk' / 'single' / '' -> none). Legacy records with an empty
-    // bonus_type ("") correctly resolve to ProductBonusType.none here.
     _bonusType = p?.bonusType ?? ProductBonusType.none;
 
-    // is_box_unit alone isn't fully reliable — some legacy records report
-    // is_box_unit: "0" from the API while still having pieces_per_box/
-    // packing populated (e.g. a product with is_box_unit: "0" but
-    // packing: "6pcs/Box" and pieces_per_box: "6").
-    // Trust isBoxUnit when it's true, but fall back to hasBoxPacking so we
-    // never hide fields that actually contain real data.
     _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
   }
 

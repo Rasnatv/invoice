@@ -1,4 +1,5 @@
 //
+//
 // import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 // import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 // import '../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
@@ -113,7 +114,6 @@
 //     );
 //   }
 // }
-
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
@@ -123,6 +123,12 @@ import '../../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 enum LoadStatus { initial, loading, success, failure }
 
 enum SubmitStatus { idle, submitting, success, failure }
+
+/// Status for the single-item PUT /quotations/update-item call, kept
+/// separate from SubmitStatus (the whole-quotation create/save/submit)
+/// so the two don't stomp on each other's UI state. Used by the Salesman
+/// Quotation Edit screen's "Update Item" action.
+enum ItemUpdateStatus { idle, submitting, success, failure }
 
 class SalesmanEstimateState {
   final LoadStatus productsStatus;
@@ -158,6 +164,11 @@ class SalesmanEstimateState {
   /// used — lets the UI show a spinner on the right button.
   final String? submitAction;
 
+  // ---- single item update (PUT /quotations/update-item) ----
+  final ItemUpdateStatus itemUpdateStatus;
+  final String? itemUpdateMessage;
+  final String? itemUpdateError;
+
   const SalesmanEstimateState({
     this.productsStatus = LoadStatus.initial,
     this.products = const [],
@@ -176,6 +187,9 @@ class SalesmanEstimateState {
     this.submitMessage,
     this.submitError,
     this.submitAction,
+    this.itemUpdateStatus = ItemUpdateStatus.idle,
+    this.itemUpdateMessage,
+    this.itemUpdateError,
   });
 
   SalesmanEstimateState copyWith({
@@ -205,6 +219,11 @@ class SalesmanEstimateState {
     String? submitError,
     bool clearSubmitError = false,
     String? submitAction,
+    ItemUpdateStatus? itemUpdateStatus,
+    String? itemUpdateMessage,
+    bool clearItemUpdateMessage = false,
+    String? itemUpdateError,
+    bool clearItemUpdateError = false,
   }) {
     return SalesmanEstimateState(
       productsStatus: productsStatus ?? this.productsStatus,
@@ -225,6 +244,9 @@ class SalesmanEstimateState {
       submitMessage: clearSubmitMessage ? null : (submitMessage ?? this.submitMessage),
       submitError: clearSubmitError ? null : (submitError ?? this.submitError),
       submitAction: submitAction ?? this.submitAction,
+      itemUpdateStatus: itemUpdateStatus ?? this.itemUpdateStatus,
+      itemUpdateMessage: clearItemUpdateMessage ? null : (itemUpdateMessage ?? this.itemUpdateMessage),
+      itemUpdateError: clearItemUpdateError ? null : (itemUpdateError ?? this.itemUpdateError),
     );
   }
 }

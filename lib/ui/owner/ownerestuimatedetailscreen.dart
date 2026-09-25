@@ -187,19 +187,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                           ),
                           SizedBox(height: Responsive.h(14)),
                         ],
-                        // _DetailSection(
-                        //   title: 'Customer Details',
-                        //   icon: Icons.groups_2_outlined,
-                        //   rows: [
-                        //     _Row('Name', detail.customerName, icon: Icons.groups_2_outlined),
-                        //     _Row('Phone', detail.customerPhone, icon: Icons.phone_outlined),
-                        //     if (detail.customerEmail.isNotEmpty)
-                        //       _Row('Email', detail.customerEmail, icon: Icons.email_outlined),
-                        //     if (detail.customerAddress.isNotEmpty)
-                        //       _Row('Address', detail.customerAddress,
-                        //           icon: Icons.location_on_outlined),
-                        //   ],
-                        // ),
                         _DetailSection(
                           title: 'Customer Details',
                           icon: Icons.groups_2_outlined,
@@ -210,21 +197,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             _Row('Address', detail.customerAddress, icon: Icons.location_on_outlined),
                           ],
                         ),
-                        // if (detail.customer.name.isNotEmpty) ...[
-                        //   SizedBox(height: Responsive.h(14)),
-                        //   _DetailSection(
-                        //     title: 'Contractor Details',
-                        //     icon: Icons.person_outline,
-                        //     rows: [
-                        //       _Row('Name', detail.customer.name, icon: Icons.person_outline),
-                        //       _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
-                        //       if (detail.customer.email.isNotEmpty)
-                        //         _Row('Email', detail.customer.email, icon: Icons.email_outlined),
-                        //       if (detail.customer.address.isNotEmpty)
-                        //         _Row('Address', detail.customer.address,
-                        //             icon: Icons.location_on_outlined),
-                        //     ],
-                        //   ),
+
               SizedBox(height: Responsive.h(14)),
               _DetailSection(
               title: 'Contractor Details',
@@ -233,7 +206,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
               _Row('Name', detail.customer.name, icon: Icons.person_outline),
               _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
               _Row('Email', detail.customer.email, icon: Icons.email_outlined),
-              _Row('Address', detail.customer.address, icon: Icons.location_on_outlined),
               ],
               ),
 
@@ -712,22 +684,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                 SizedBox(height: Responsive.h(8)),
                 _summaryRow('Total Paid', currencyFmt.f(detail.totalPaid),
                     valueColor: AppColors.success),
-                if (canManagePayment && detail.balanceAmount > 0) ...[
-                  SizedBox(height: Responsive.h(8)),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => _showAddPaymentDialog(context, detail),
-                      icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                      label: const Text('Add Payment'),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1122,15 +1078,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             prefixText: '₹ ',
                             border: OutlineInputBorder(),
                           ),
-                          onChanged: (_) => setLocal(() {}),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: notesCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Approval Notes (optional)',
-                            border: OutlineInputBorder(),
-                          ),
+                          onChanged: (_) => setLocal(() {})
                         ),
                         const SizedBox(height: 16),
                         const Text('Discount', style: TextStyle(fontWeight: FontWeight.bold)),

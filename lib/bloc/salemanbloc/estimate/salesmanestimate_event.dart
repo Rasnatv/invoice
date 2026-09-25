@@ -45,10 +45,14 @@
 //   final int productId;
 //   final double quantity;
 //   final double rate;
+//   final double? boxQuantity;
+//   final double? pieceQuantity;
 //   const ProductIncentiveRequested({
 //     required this.productId,
 //     required this.quantity,
 //     required this.rate,
+//     this.boxQuantity,
+//     this.pieceQuantity,
 //   });
 // }
 //
@@ -176,4 +180,36 @@ class QuotationSubmitRequested extends SalesmanEstimateEvent {
 /// fire again on the next rebuild.
 class QuotationSubmitResultConsumed extends SalesmanEstimateEvent {
   const QuotationSubmitResultConsumed();
+}
+
+/// Persists a single existing line item via PUT /quotations/update-item,
+/// independently of the whole-quotation create/save/submit flow above.
+/// Used by the Salesman Quotation Edit screen's "Update Item" action for
+/// an item that's already saved on the server (a real backend id, not a
+/// locally-added one still awaiting the first save) — so the change is
+/// persisted immediately rather than only living in local state until
+/// the whole quotation is resubmitted.
+class QuotationItemUpdateSubmitted extends SalesmanEstimateEvent {
+  final String quotationId;
+  final String quotationItemId;
+  final double quantity;
+  final double rate;
+  final double? boxQuantity;
+  final double? pieceQuantity;
+
+  const QuotationItemUpdateSubmitted({
+    required this.quotationId,
+    required this.quotationItemId,
+    required this.quantity,
+    required this.rate,
+    this.boxQuantity,
+    this.pieceQuantity,
+  });
+}
+
+/// Resets itemUpdateStatus back to idle after the screen has already
+/// reacted to a success/failure, mirroring QuotationSubmitResultConsumed
+/// above.
+class QuotationItemUpdateResultConsumed extends SalesmanEstimateEvent {
+  const QuotationItemUpdateResultConsumed();
 }

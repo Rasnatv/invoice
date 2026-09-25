@@ -1,8 +1,10 @@
+//
 // import 'package:flutter_bloc/flutter_bloc.dart';
 // import '../../../Apiprovider/salesman_quotationprovider.dart';
 // import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 // import 'owner_qtneditestate.dart';
 // import 'owner_qtneditevent.dart';
+//
 //
 //
 // /// Bloc for the Owner Edit Quotation screen.
@@ -45,7 +47,7 @@
 //     } else {
 //       emit(state.copyWith(
 //         productsStatus: OwnerEditLoadStatus.failure,
-//         productsError: result.errorMessage ?? 'Failed to load products.',
+//         productsError: result.errorMessage,
 //       ));
 //     }
 //   }
@@ -71,7 +73,7 @@
 //     } else {
 //       emit(state.copyWith(
 //         incentiveStatus: OwnerEditLoadStatus.failure,
-//         incentiveError: result.errorMessage ?? 'Couldn\'t fetch incentive for this item.',
+//         incentiveError: result.errorMessage,
 //       ));
 //     }
 //   }
@@ -99,12 +101,12 @@
 //     if (result.success) {
 //       emit(state.copyWith(
 //         updateStatus: OwnerQuotationUpdateStatus.success,
-//         updateMessage: result.message ?? 'Quotation updated successfully.',
+//         updateMessage: result.message,
 //       ));
 //     } else {
 //       emit(state.copyWith(
 //         updateStatus: OwnerQuotationUpdateStatus.failure,
-//         updateError: result.errorMessage ?? 'Failed to update quotation.',
+//         updateError: result.message,
 //       ));
 //     }
 //   }
@@ -125,8 +127,6 @@ import '../../../Apiprovider/salesman_quotationprovider.dart';
 import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import 'owner_qtneditestate.dart';
 import 'owner_qtneditevent.dart';
-
-
 
 /// Bloc for the Owner Edit Quotation screen.
 ///
@@ -149,6 +149,8 @@ class OwnerQuotationEditBloc
     on<OwnerEditProductIncentiveCleared>(_onProductIncentiveCleared);
     on<OwnerQuotationUpdateSubmitted>(_onUpdateSubmitted);
     on<OwnerQuotationUpdateResultConsumed>(_onUpdateResultConsumed);
+    on<OwnerQuotationItemUpdateSubmitted>(_onItemUpdateSubmitted);
+    on<OwnerQuotationItemUpdateResultConsumed>(_onItemUpdateResultConsumed);
   }
 
   Future<void> _onActiveProductsRequested(
@@ -240,6 +242,51 @@ class OwnerQuotationEditBloc
       updateStatus: OwnerQuotationUpdateStatus.idle,
       clearUpdateMessage: true,
       clearUpdateError: true,
+    ));
+  }
+
+  /// PUT /quotations/update-item — persists a single existing line item
+  /// (quantity/rate/box_quantity/piece_quantity) without touching the rest
+  /// of the quotation. Kept as its own submitting/success/failure status so
+  /// the screen can react to it independently of the whole-quotation save.
+  Future<void> _onItemUpdateSubmitted(
+      OwnerQuotationItemUpdateSubmitted event,
+      Emitter<OwnerQuotationEditState> emit,
+      ) async {
+    emit(state.copyWith(
+      itemUpdateStatus: OwnerItemUpdateStatus.submitting,
+      clearItemUpdateMessage: true,
+      clearItemUpdateError: true,
+    ));
+    final result = await _provider.updateQuotationItem(QuotationItemUpdateRequest(
+      quotationId: event.quotationId,
+      quotationItemId: event.quotationItemId,
+      quantity: event.quantity,
+      rate: event.rate,
+      boxQuantity: event.boxQuantity,
+      pieceQuantity: event.pieceQuantity,
+    ));
+    if (result.success) {
+      emit(state.copyWith(
+        itemUpdateStatus: OwnerItemUpdateStatus.success,
+        itemUpdateMessage: result.message,
+      ));
+    } else {
+      emit(state.copyWith(
+        itemUpdateStatus: OwnerItemUpdateStatus.failure,
+        itemUpdateError: result.message,
+      ));
+    }
+  }
+
+  void _onItemUpdateResultConsumed(
+      OwnerQuotationItemUpdateResultConsumed event,
+      Emitter<OwnerQuotationEditState> emit,
+      ) {
+    emit(state.copyWith(
+      itemUpdateStatus: OwnerItemUpdateStatus.idle,
+      clearItemUpdateMessage: true,
+      clearItemUpdateError: true,
     ));
   }
 }
