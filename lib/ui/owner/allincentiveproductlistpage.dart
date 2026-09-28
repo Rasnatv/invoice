@@ -89,9 +89,6 @@ class _AllProductsViewState extends State<_AllProductsView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Text(widget.salesmanName, style: AppTextStyles.bodyBold(), overflow: TextOverflow.ellipsis),
-                  ),
                   Text(monthFmt.format(widget.month), style: AppTextStyles.caption()),
                 ],
               ),

@@ -1,4 +1,6 @@
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -39,8 +41,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
+
+    // API may return "+91 98765 43210" — keep only the last 10 digits so it
+    // passes the 10-digit formatter and validator.
+    var phone = widget.initialPhone.replaceAll(RegExp(r'\D'), '');
+    if (phone.length > DValidator.defaultPhoneLength) {
+      phone = phone.substring(phone.length - DValidator.defaultPhoneLength);
+    }
+
     _nameController = TextEditingController(text: widget.initialName);
-    _phoneController = TextEditingController(text: widget.initialPhone);
+    _phoneController = TextEditingController(text: phone);
     _emailController = TextEditingController(text: widget.initialEmail);
   }
 
@@ -124,6 +134,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       hint: 'Your full name',
                       icon: Icons.person_outline_rounded,
                       keyboardType: TextInputType.name,
+                      inputFormatters: DValidator.lettersOnly,
                       validator: (v) => DValidator.validateName('Name', v),
                     ),
                     SizedBox(height: Responsive.h(20)),
@@ -133,23 +144,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _BrandField(
                       controller: _phoneController,
                       focusNode: _phoneFocus,
-                      hint: '+91 98765 43210',
+                      hint: '98765 43210',
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: DValidator.phoneNumber, // digits only, max 10
                       validator: (v) {
-                        final value = v?.trim() ?? '';
-                        // Some roles (e.g. owners in this API) legitimately
-                        // have no phone on file — only validate format if
-                        // something was actually entered. DValidator's
-                        // phone validator expects an exact-length local
-                        // number, so we keep this screen's own looser
-                        // regex to allow the "+91 ..." format shown above.
-                        if (value.isEmpty) return null;
-                        final phoneRegex = RegExp(r'^\+?[0-9\s]{7,15}$');
-                        if (!phoneRegex.hasMatch(value)) {
-                          return 'Invalid phone number';
-                        }
-                        return null;
+                        // Optional: some roles (e.g. owners) have no phone on file
+                        if (v == null || v.trim().isEmpty) return null;
+                        return DValidator.validatePhoneNumber(v); // exactly 10 digits
                       },
                     ),
                     SizedBox(height: Responsive.h(20)),
@@ -162,13 +164,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       hint: 'you@company.com',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      inputFormatters: DValidator.textWithLimit, // max 100 chars
                       validator: (v) {
-                        final value = v?.trim() ?? '';
-                        // Some roles (e.g. drivers in this API) legitimately
-                        // have no email on file, so DValidator.validateEmail
-                        // (which requires a value) doesn't fit here directly.
-                        if (value.isEmpty) return null;
-                        return DValidator.validateEmail(value);
+                        // Optional: some roles (e.g. drivers) have no email on file
+                        if (v == null || v.trim().isEmpty) return null;
+                        return DValidator.validateEmail(v);
                       },
                     ),
                     SizedBox(height: Responsive.h(32)),
@@ -215,6 +215,7 @@ class _BrandField extends StatefulWidget {
   final IconData icon;
   final bool obscureText;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
   final String? Function(String?)? validator;
   final Widget? suffix;
@@ -228,6 +229,7 @@ class _BrandField extends StatefulWidget {
     this.validator,
     this.obscureText = false,
     this.keyboardType,
+    this.inputFormatters,
     this.suffix,
   });
 
@@ -259,7 +261,9 @@ class _BrandFieldState extends State<_BrandField> {
     // underneath it (outside the border), not inside it.
     return FormField<String>(
       initialValue: widget.controller?.text ?? '',
-      validator: widget.validator,
+      // Always validate the controller's current text so the result is
+      // never stale.
+      validator: (_) => widget.validator?.call(widget.controller?.text),
       builder: (field) {
         final hasError = field.hasError;
         return Column(
@@ -283,6 +287,7 @@ class _BrandFieldState extends State<_BrandField> {
                 focusNode: widget.focusNode,
                 obscureText: widget.obscureText,
                 keyboardType: widget.keyboardType,
+                inputFormatters: widget.inputFormatters,
                 onChanged: (v) {
                   field.didChange(v);
                   widget.onChanged?.call(v);

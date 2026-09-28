@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,29 +35,41 @@ class _ViewProfileScreenState extends State<ViewProfileScreen> {
     super.dispose();
   }
 
+  /// API may return "+91 98765 43210" — keep only the last 10 digits so it
+  /// passes the 10-digit formatter and validator.
+  String _normalizePhone(String? raw) {
+    var phone = (raw ?? '').replaceAll(RegExp(r'\D'), '');
+    if (phone.length > DValidator.defaultPhoneLength) {
+      phone = phone.substring(phone.length - DValidator.defaultPhoneLength);
+    }
+    return phone;
+  }
+
   void _enterEditMode(ProfileModel? profile) {
     _nameController.text = profile?.name ?? '';
     _emailController.text = profile?.email ?? '';
-    _mobileController.text = profile?.mobile ?? '';
+    _mobileController.text = _normalizePhone(profile?.mobile);
     setState(() => _isEditing = true);
   }
 
   void _cancelEdit() {
+    FocusScope.of(context).unfocus();
     setState(() => _isEditing = false);
   }
 
   void _save() {
-    if (_formKey.currentState!.validate()) {
-      context.read<ProfileBloc>().add(
-        UpdateProfileRequested(
-          ProfileModel(
-            name: _nameController.text.trim(),
-            email: _emailController.text.trim(),
-            mobile: _mobileController.text.trim(),
-          ),
+    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+
+    context.read<ProfileBloc>().add(
+      UpdateProfileRequested(
+        ProfileModel(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          mobile: _mobileController.text.trim(),
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -106,30 +119,42 @@ class _ViewProfileScreenState extends State<ViewProfileScreen> {
                         if (_isEditing) ...[
                           _EditField(
                             label: 'Full Name',
+                            hint: 'Your full name',
                             controller: _nameController,
+                            keyboardType: TextInputType.name,
                             inputFormatters: DValidator.lettersOnly,
                             validator: (v) => DValidator.validateName('Name', v),
                           ),
                           SizedBox(height: Responsive.h(16)),
                           _EditField(
                             label: 'Email',
+                            hint: 'you@company.com',
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
-                            inputFormatters: DValidator.textWithLimit,
-                            validator: DValidator.validateEmail,
+                            inputFormatters: DValidator.textWithLimit, // max 100 chars
+                            validator: (v) {
+                              // Optional: some roles (e.g. drivers) have no email on file
+                              if (v == null || v.trim().isEmpty) return null;
+                              return DValidator.validateEmail(v);
+                            },
                           ),
                           SizedBox(height: Responsive.h(16)),
                           _EditField(
                             label: 'Phone Number',
+                            hint: '98765 43210',
                             controller: _mobileController,
                             keyboardType: TextInputType.phone,
-                            inputFormatters: DValidator.phoneNumber,
-                            validator: (v) => DValidator.validatePhoneNumber(v),
+                            inputFormatters: DValidator.phoneNumber, // digits only, max 10
+                            validator: (v) {
+                              // Optional: some roles (e.g. owners) have no phone on file
+                              if (v == null || v.trim().isEmpty) return null;
+                              return DValidator.validatePhoneNumber(v); // exactly 10 digits
+                            },
                           ),
                         ] else ...[
-                          _ProfileField(label: 'Full Name', value: profile?.name ?? '-'),
-                          _ProfileField(label: 'Phone Number', value: profile?.mobile ?? '-'),
-                          _ProfileField(label: 'Email', value: profile?.email ?? '-'),
+                          _ProfileField(label: 'Full Name', value: _display(profile?.name)),
+                          _ProfileField(label: 'Phone Number', value: _display(profile?.mobile)),
+                          _ProfileField(label: 'Email', value: _display(profile?.email)),
                         ],
                       ],
                     ),
@@ -173,6 +198,9 @@ class _ViewProfileScreenState extends State<ViewProfileScreen> {
       ),
     );
   }
+
+  /// Shows '-' for null or empty values in view mode.
+  String _display(String? v) => (v == null || v.trim().isEmpty) ? '-' : v;
 }
 
 class _ProfileField extends StatelessWidget {
@@ -204,6 +232,7 @@ class _ProfileField extends StatelessWidget {
 
 class _EditField extends StatelessWidget {
   final String label;
+  final String? hint;
   final TextEditingController controller;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
@@ -213,6 +242,7 @@ class _EditField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.validator,
+    this.hint,
     this.keyboardType,
     this.inputFormatters,
   });
@@ -229,11 +259,12 @@ class _EditField extends StatelessWidget {
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           validator: validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           style: AppTextStyles.body(),
           decoration: InputDecoration(
             isDense: true,
             contentPadding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(12)),
-            hintText: 'Enter ${label.toLowerCase()}',
+            hintText: hint ?? 'Enter ${label.toLowerCase()}',
             hintStyle: AppTextStyles.caption(),
             filled: true,
             fillColor: AppColors.surface,
@@ -244,6 +275,18 @@ class _EditField extends StatelessWidget {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.6),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.error, width: 1.6),
             ),
           ),
         ),

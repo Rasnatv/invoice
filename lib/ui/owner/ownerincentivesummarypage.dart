@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/responsive.dart';
@@ -193,7 +192,9 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                       final s = salesmen[i];
                       return ListTile(
                         title: Text(s.name, style: AppTextStyles.bodyBold()),
-                        // subtitle: s.designationDisplay.isNotEmpty ? Text(s.designationDisplay) : null,
+                        subtitle: s.designationDisplay.isNotEmpty
+                            ? Text(s.designationDisplay)
+                            : null,
                         onTap: () => Navigator.of(ctx).pop(s),
                       );
                     },
@@ -232,6 +233,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                   children: [
                     TextField(
                       controller: refController,
+                      onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(labelText: 'Payment Reference'),
                     ),
                     const SizedBox(height: 12),
@@ -307,169 +309,189 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
       builder: (context, state) {
         final summary = state.summary;
 
-        return NetworkAwareWrapper(child: Scaffold(
-          backgroundColor: AppColors.background,
-          body: RefreshIndicator(
-            onRefresh: () async {
-              context.read<OwnerIncentiveBloc>().add(const RefreshIncentiveSummary());
-            },
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _IncentiveHeader(
-                    isOwner: state.isOwner,
-                    // salesmanName: state.selectedSalesmanName ?? summary?.salesmanName ?? '-',
-                    salesmanName: state.selectedSalesmanName?.isNotEmpty == true
-                        ? state.selectedSalesmanName!
-                        : 'Select Salesman',
-                    role: role,
-                    selectedMonth: state.selectedMonth,
-                    onTapMonth: () => _pickMonth(context, state.selectedMonth),
-                    onTapSalesman: state.isOwner ? () => _pickSalesman(context, state.activeSalesmen) : null,
-                    loadingSalesmen: state.loadingSalesmen,
-                    onBack: () => Navigator.of(context).maybePop(),
-                    totalSales: currency.format(summary?.totalSalesValue ?? 0),
-                    totalIncentive: currency.format(summary?.totalIncentiveValue ?? 0),
-                    onTapMarkPaid: state.isOwner && state.canLoadSummary
-                        ? () => _openMarkPaidDialog(context)
-                        : null,
-                    markingPaid: state.markPaidStatus == MarkPaidStatus.submitting,
+        // Designation of the currently selected salesman (owner mode).
+        // Empty until a salesman is selected, so nothing is shown before that.
+        String designation = '';
+        if (state.isOwner && (state.selectedSalesmanId?.isNotEmpty ?? false)) {
+          for (final s in state.activeSalesmen) {
+            if (s.id.toString() == state.selectedSalesmanId) {
+              designation = s.designationDisplay;
+              break;
+            }
+          }
+        }
+
+        return NetworkAwareWrapper(
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            body: RefreshIndicator(
+              onRefresh: () async {
+                context.read<OwnerIncentiveBloc>().add(const RefreshIncentiveSummary());
+              },
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _IncentiveHeader(
+                      isOwner: state.isOwner,
+                      // Only the owner sees the salesman selector.
+                      // Salesman mode passes an empty name and the section is hidden.
+                      salesmanName: state.isOwner
+                          ? (state.selectedSalesmanName?.isNotEmpty == true
+                          ? state.selectedSalesmanName!
+                          : 'Select Salesman')
+                          : '',
+                      role: designation,
+                      selectedMonth: state.selectedMonth,
+                      onTapMonth: () => _pickMonth(context, state.selectedMonth),
+                      onTapSalesman: state.isOwner
+                          ? () => _pickSalesman(context, state.activeSalesmen)
+                          : null,
+                      loadingSalesmen: state.loadingSalesmen,
+                      onBack: () => Navigator.of(context).maybePop(),
+                      totalSales: currency.format(summary?.totalSalesValue ?? 0),
+                      totalIncentive: currency.format(summary?.totalIncentiveValue ?? 0),
+                      onTapMarkPaid: state.isOwner && state.canLoadSummary
+                          ? () => _openMarkPaidDialog(context)
+                          : null,
+                      markingPaid: state.markPaidStatus == MarkPaidStatus.submitting,
+                    ),
                   ),
-                ),
-                if (!state.canLoadSummary)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Padding(
-                      padding: EdgeInsets.only(top: Responsive.h(70)),
-                      child: Center(
-                        child: Text(
-                          'Select a salesman to view their incentives.',
-                          style: AppTextStyles.caption(color: AppColors.textSecondary),
-                        ),
-                      ),
-                    ),
-                  )
-                else if (state.status == SalesmanIncentiveStatus.loading && summary == null)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Padding(
-                      padding: EdgeInsets.only(top: Responsive.h(90)),
-                      child: const Center(child: CircularProgressIndicator()),
-                    ),
-                  )
-                else if (state.status == SalesmanIncentiveStatus.error && summary == null)
+                  if (!state.canLoadSummary)
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: Padding(
-                        padding: EdgeInsets.only(top: Responsive.h(80)),
+                        padding: EdgeInsets.only(top: Responsive.h(70)),
                         child: Center(
                           child: Text(
-                            state.errorMessage ?? 'Failed to load incentive summary.',
+                            'Select a salesman to view their incentives.',
                             style: AppTextStyles.caption(color: AppColors.textSecondary),
-                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
                     )
-                  else
-                    SliverPadding(
-                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-                      sliver: SliverList(
-                        delegate: SliverChildListDelegate([
-                          SizedBox(height: Responsive.h(66)),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Product Wise Incentive', style: AppTextStyles.h3()),
-                              // Opens the full paginated list from
-                              // POST /salesman-incentives/products — same
-                              // API for owner and salesman, salesman_id is
-                              // simply omitted in salesman mode.
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => AllProductsScreen(
-                                        salesmanId: state.isOwner
-                                            ? int.tryParse(state.selectedSalesmanId ?? '')
-                                            : null,
-                                        salesmanName:
-                                        state.selectedSalesmanName ?? summary?.salesmanName ?? '-',
-                                        month: state.selectedMonth,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: const Text('View All'),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: Responsive.h(10)),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: AppColors.border),
+                  else if (state.status == SalesmanIncentiveStatus.loading && summary == null)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: Responsive.h(90)),
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                    )
+                  else if (state.status == SalesmanIncentiveStatus.error && summary == null)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Padding(
+                          padding: EdgeInsets.only(top: Responsive.h(80)),
+                          child: Center(
+                            child: Text(
+                              state.errorMessage ?? 'Failed to load incentive summary.',
+                              style: AppTextStyles.caption(color: AppColors.textSecondary),
+                              textAlign: TextAlign.center,
                             ),
-                            clipBehavior: Clip.antiAlias,
-                            child: state.productList.isEmpty
-                                ? Padding(
-                              padding: EdgeInsets.all(Responsive.w(20)),
-                              child: Text(
-                                'No product sales for this period.',
-                                style: AppTextStyles.caption(color: AppColors.textSecondary),
-                              ),
-                            )
-                                : Column(
+                          ),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate([
+                            SizedBox(height: Responsive.h(66)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                for (int i = 0; i < state.productList.length; i++) ...[
-                                  _ProductIncentiveTile(
-                                    item: state.productList[i],
-                                    currency: currency,
-                                    onTap: () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => OwnerProductBillsPage(
-                                            product: state.productList[i],
-                                            month: state.selectedMonth,
-                                            salesmanId: state.isOwner ? state.selectedSalesmanId : null,
-                                          ),
+                                Text('Product Wise Incentive', style: AppTextStyles.h3()),
+                                // Opens the full paginated list from
+                                // POST /salesman-incentives/products — same
+                                // API for owner and salesman, salesman_id is
+                                // simply omitted in salesman mode.
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => AllProductsScreen(
+                                          salesmanId: state.isOwner
+                                              ? int.tryParse(state.selectedSalesmanId ?? '')
+                                              : null,
+                                          salesmanName:
+                                          state.selectedSalesmanName ?? summary?.salesmanName ?? '-',
+                                          month: state.selectedMonth,
                                         ),
-                                      );
-                                    },
-                                  ),
-                                  if (i != state.productList.length - 1)
-                                    Divider(
-                                      height: 1,
-                                      indent: Responsive.w(16),
-                                      endIndent: Responsive.w(16),
-                                      color: AppColors.border,
-                                    ),
-                                ],
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('View All'),
+                                ),
                               ],
                             ),
-                          ),
-                          SizedBox(height: Responsive.h(20)),
-                          if (summary != null)
-                            _TargetProgressCard(
-                              title: 'Monthly Sales Target',
-                              icon: Icons.track_changes_rounded,
-                              color: AppColors.success,
-                              headlineValue: currency.format(summary.target.targetAmountValue),
-                              achievedAmount: currency.format(summary.totalSalesValue),
-                              targetTotal: currency.format(summary.target.targetAmountValue),
-                              fraction: summary.target.progressFraction,
-                              achievedLabel: summary.target.achieved,
-                              bonusDisplay: summary.target.bonusDisplay,
+                            SizedBox(height: Responsive.h(10)),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: state.productList.isEmpty
+                                  ? Padding(
+                                padding: EdgeInsets.all(Responsive.w(20)),
+                                child: Text(
+                                  'No product sales for this period.',
+                                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                                ),
+                              )
+                                  : Column(
+                                children: [
+                                  for (int i = 0; i < state.productList.length; i++) ...[
+                                    _ProductIncentiveTile(
+                                      item: state.productList[i],
+                                      currency: currency,
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => OwnerProductBillsPage(
+                                              product: state.productList[i],
+                                              month: state.selectedMonth,
+                                              salesmanId:
+                                              state.isOwner ? state.selectedSalesmanId : null,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    if (i != state.productList.length - 1)
+                                      Divider(
+                                        height: 1,
+                                        indent: Responsive.w(16),
+                                        endIndent: Responsive.w(16),
+                                        color: AppColors.border,
+                                      ),
+                                  ],
+                                ],
+                              ),
                             ),
-                          SizedBox(height: Responsive.h(50)),
-                        ]),
+                            SizedBox(height: Responsive.h(20)),
+                            if (summary != null)
+                              _TargetProgressCard(
+                                title: 'Monthly Sales Target',
+                                icon: Icons.track_changes_rounded,
+                                color: AppColors.success,
+                                headlineValue: currency.format(summary.target.targetAmountValue),
+                                achievedAmount: currency.format(summary.totalSalesValue),
+                                targetTotal: currency.format(summary.target.targetAmountValue),
+                                fraction: summary.target.progressFraction,
+                                achievedLabel: summary.target.achieved,
+                                bonusDisplay: summary.target.bonusDisplay,
+                              ),
+                            SizedBox(height: Responsive.h(50)),
+                          ]),
+                        ),
                       ),
-                    ),
-              ],
+                ],
+              ),
             ),
           ),
-        ));
+        );
       },
     );
   }
@@ -567,48 +589,59 @@ class _IncentiveHeader extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: onTapSalesman,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      salesmanName.isEmpty ? '-' : salesmanName,
-                                      style: AppTextStyles.bodyBold(color: Colors.white)
-                                          .copyWith(fontSize: Responsive.sp(15)),
-                                      overflow: TextOverflow.ellipsis,
+                      // Salesman name / role / picker — OWNER ONLY.
+                      // For a salesman this whole block is hidden and only
+                      // the month chip is shown (pushed to the right).
+                      if (isOwner)
+                        Expanded(
+                          child: InkWell(
+                            onTap: onTapSalesman,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        salesmanName.isEmpty ? '-' : salesmanName,
+                                        style: AppTextStyles.bodyBold(color: Colors.white)
+                                            .copyWith(fontSize: Responsive.sp(15)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                  if (isOwner) ...[
                                     SizedBox(width: Responsive.w(4)),
                                     loadingSalesmen
                                         ? const SizedBox(
                                       width: 14,
                                       height: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
                                     )
-                                        : const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 20),
+                                        : const Icon(Icons.keyboard_arrow_down_rounded,
+                                        color: Colors.white, size: 20),
                                   ],
+                                ),
+                                if (role.isNotEmpty) ...[
+                                  SizedBox(height: Responsive.h(2)),
+                                  Text(
+                                    role,
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.85),
+                                        fontSize: Responsive.sp(13)),
+                                  ),
                                 ],
-                              ),
-                              SizedBox(height: Responsive.h(2)),
-                              Text(
-                                role,
-                                style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: Responsive.sp(13)),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
+                        )
+                      else
+                        const Spacer(),
                       InkWell(
                         onTap: onTapMonth,
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Responsive.w(10), vertical: Responsive.h(8)),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.white.withOpacity(0.5)),
                             borderRadius: BorderRadius.circular(12),
@@ -687,9 +720,14 @@ class _SummaryCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _SummaryStat(label: 'Total Sales', value: totalSales, sub: 'This Month', color: AppColors.primary),
+                child: _SummaryStat(
+                    label: 'Total Sales', value: totalSales, sub: 'This Month', color: AppColors.primary),
               ),
-              Container(width: 1, height: 50, color: AppColors.border, margin: EdgeInsets.symmetric(horizontal: Responsive.w(6))),
+              Container(
+                  width: 1,
+                  height: 50,
+                  color: AppColors.border,
+                  margin: EdgeInsets.symmetric(horizontal: Responsive.w(6))),
               Expanded(
                 child: _SummaryStat(
                   label: 'Total Incentive Earned',
@@ -764,7 +802,8 @@ class _ProductIncentiveTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.productName, style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(item.productName,
+                      style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
                   SizedBox(height: Responsive.h(2)),
                   Text(
                     'Incentive: ${item.incentiveRate}%',
@@ -778,9 +817,11 @@ class _ProductIncentiveTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(currency.format(item.totalSalesValue), style: AppTextStyles.body(), textAlign: TextAlign.right),
+                  Text(currency.format(item.totalSalesValue),
+                      style: AppTextStyles.body(), textAlign: TextAlign.right),
                   SizedBox(height: Responsive.h(2)),
-                  Text('${item.totalUnitsInt} Units', style: AppTextStyles.caption(), textAlign: TextAlign.right),
+                  Text('${item.totalUnitsInt} Units',
+                      style: AppTextStyles.caption(), textAlign: TextAlign.right),
                 ],
               ),
             ),
@@ -873,7 +914,8 @@ class _TargetProgressCard extends StatelessWidget {
                     ),
                     if (bonusDisplay != null && bonusDisplay!.isNotEmpty)
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(4)),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.w(8), vertical: Responsive.h(4)),
                         decoration: BoxDecoration(
                           color: color.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(8),
@@ -897,7 +939,8 @@ class _TargetProgressCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
-                      child: Text('$achievedAmount / $targetTotal', style: AppTextStyles.caption(), overflow: TextOverflow.ellipsis),
+                      child: Text('$achievedAmount / $targetTotal',
+                          style: AppTextStyles.caption(), overflow: TextOverflow.ellipsis),
                     ),
                     Text(achievedLabel, style: AppTextStyles.caption(color: color)),
                   ],
