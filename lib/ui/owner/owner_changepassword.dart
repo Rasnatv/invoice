@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -304,6 +305,7 @@ class _PasswordField extends StatelessWidget {
           obscureText: obscureText,
           style: AppTextStyles.body(),
           validator: validator,
+          inputFormatters: DValidator.passwordLimit, // NEW: max 18 characters
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.surface,

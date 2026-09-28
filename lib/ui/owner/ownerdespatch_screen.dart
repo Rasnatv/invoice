@@ -92,13 +92,15 @@ class _OwnerdespatchViewState extends State<_OwnerdespatchView> {
                       child: list.isEmpty
                           ? ListView(
                         children: [
-                          SizedBox(height: Responsive.h(120)),
+                          SizedBox(height: Responsive.h(270)),
+                          Icon(Icons.local_shipping_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+                          SizedBox(height: Responsive.h(10)),
                           Center(
                             child: Text(
                               state.searchQuery.isEmpty
                                   ? 'No dispatch bills yet'
                                   : 'No dispatch bills match your search',
-                              style: AppTextStyles.body(),
+                              style: AppTextStyles.subtitle(),
                             ),
                           ),
                         ],
@@ -149,11 +151,11 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 40, color: Colors.redAccent),
-            SizedBox(height: Responsive.h(10)),
+            Icon(Icons.error_outline_rounded, color: AppColors.error, size: Responsive.w(40)),
+            SizedBox(height: Responsive.h(12)),
             Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
-            SizedBox(height: Responsive.h(14)),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            SizedBox(height: Responsive.h(16)),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

@@ -1,5 +1,4 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -17,18 +16,15 @@ import '../../bloc/ownerbloc/ownersalesman/salesman_event.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_state.dart';
 import 'owneraddsalesmanscreen.dart';
 
-
 class OwnerSalesmenScreen extends StatelessWidget {
   const OwnerSalesmenScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) =>
-      SalesmanBloc(
+      create: (_) => SalesmanBloc(
         provider: SalesmanProvider(),
-      )
-        ..add(FetchSalesmen()),
+      )..add(FetchSalesmen()),
       child: const _OwnerSalesmenView(),
     );
   }
@@ -95,7 +91,8 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
     final confirmed = await showConfirmDialog(
       context,
       title: 'Delete Salesman?',
-      message: 'This will remove "${salesman.name}" from your salesman list. This cannot be undone.',
+      message:
+      'This will remove "${salesman.name}" from your salesman list. This cannot be undone.',
       confirmText: 'Delete',
       confirmColor: AppColors.error,
     );
@@ -104,129 +101,226 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
     }
   }
 
+  /// Wraps [child] in a scrollable so pull-to-refresh works even when
+  /// there is nothing to scroll (empty / no-results states).
+  Widget _scrollableCenter(Widget child) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<SalesmanBloc>().add(FetchSalesmen());
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: constraints.maxHeight, child: child),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Salesmen', style: AppTextStyles.h6()),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: _openAddSalesman,
-        icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
-        label: const Text(
-          'Add Salesman',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('Salesmen', style: AppTextStyles.h6()),
         ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Search salesman by name, phone or email',
-                  prefixIcon: Icon(Icons.search_rounded),
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: AppColors.primary,
+          onPressed: _openAddSalesman,
+          icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
+          label: const Text(
+            'Add Salesman',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    hintText: 'Search salesman by name, phone or email',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: Responsive.h(12)),
-            Expanded(
-              child: BlocConsumer<SalesmanBloc, SalesmanState>(
-                listener: (context, state) {
-                  if (state is SalesmanActionSuccess) {
-                    AppSnackbar.success(state.message ?? '');
-                  } else if (state is SalesmanActionFailure) {
-                    AppSnackbar.error(state.message ?? '');
-                  } else if (state is SalesmanError) {
-                    AppSnackbar.error(state.message ?? '');
-                  }
-                },
-                builder: (context, state) {
-                  if (state is SalesmanLoading || state is SalesmanInitial) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              SizedBox(height: Responsive.h(12)),
+              Expanded(
+                child: BlocConsumer<SalesmanBloc, SalesmanState>(
+                  listener: (context, state) {
+                    if (state is SalesmanActionSuccess) {
+                      AppSnackbar.success(state.message ?? '');
+                    } else if (state is SalesmanActionFailure) {
+                      AppSnackbar.error(state.message ?? '');
+                    } else if (state is SalesmanError) {
+                      AppSnackbar.error(state.message ?? '');
+                    }
+                  },
+                  builder: (context, state) {
+                    if (state is SalesmanLoading || state is SalesmanInitial) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                  if (state is SalesmanError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                            const SizedBox(height: 12),
-                            Text(state.message ?? '', textAlign: TextAlign.center, style: AppTextStyles.caption()),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () => context.read<SalesmanBloc>().add(FetchSalesmen()),
-                              child: const Text('Retry'),
-                            ),
-                          ],
+                    if (state is SalesmanError) {
+                      return _ErrorView(
+                        message: state.message ?? 'Failed to load salesmen.',
+                        onRetry: () =>
+                            context.read<SalesmanBloc>().add(FetchSalesmen()),
+                      );
+                    }
+
+                    // Default to whatever we last had (e.g. while a delete
+                    // is in flight as SalesmanActionLoading), only replacing
+                    // it once a fresh list actually arrives.
+                    List<HSalesmanModel> all = _lastKnownSalesmen;
+                    if (state is SalesmanLoaded) all = state.salesmen;
+                    if (state is SalesmanActionSuccess) all = state.salesmen;
+                    _lastKnownSalesmen = all;
+
+                    // 1) No salesmen exist at all -> empty state
+                    if (all.isEmpty) {
+                      return _scrollableCenter(
+                        _EmptyStaffState(onAdd: _openAddSalesman),
+                      );
+                    }
+
+                    final items = _apply(all);
+
+                    // 2) Salesmen exist but search matched none
+                    if (items.isEmpty) {
+                      return _scrollableCenter(const _NoSearchResults());
+                    }
+
+                    // 3) Normal list
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        context.read<SalesmanBloc>().add(FetchSalesmen());
+                      },
+                      child: ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(Responsive.w(16), 0,
+                            Responsive.w(16), Responsive.h(80)),
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) =>
+                            SizedBox(height: Responsive.h(10)),
+                        itemBuilder: (context, i) => _OwnerSalesmanCard(
+                          salesman: items[i],
+                          onEdit: () => _openEditSalesman(items[i]),
+                          onDelete: () => _confirmDeleteSalesman(items[i]),
                         ),
                       ),
                     );
-                  }
-
-                  // Default to whatever we last had (e.g. while a delete
-                  // is in flight as SalesmanActionLoading), only replacing
-                  // it once a fresh list actually arrives.
-                  List<HSalesmanModel> all = _lastKnownSalesmen;
-                  if (state is SalesmanLoaded) all = state.salesmen;
-                  if (state is SalesmanActionSuccess) all = state.salesmen;
-                  _lastKnownSalesmen = all;
-
-                  final items = _apply(all);
-
-
-
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      context.read<SalesmanBloc>().add(FetchSalesmen());
-                    },
-                    child: ListView.separated(
-                      padding: EdgeInsets.fromLTRB(Responsive.w(16), 0, Responsive.w(16), Responsive.h(20)),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
-                      itemBuilder: (context, i) => _OwnerSalesmanCard(
-                        salesman: items[i],
-                        onEdit: () => _openEditSalesman(items[i]),
-                        onDelete: () => _confirmDeleteSalesman(items[i]),
-                      ),
-                    ),
-                  );
-                },
+                  },
+                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when there are no salesmen at all.
+class _EmptyStaffState extends StatelessWidget {
+  const _EmptyStaffState({required this.onAdd});
+
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.person_add_alt_1_sharp, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
+            Text(
+              'Add your first salesman to get started',
+                style: AppTextStyles.subtitle()
             ),
           ],
         ),
       ),
-    ));
+    );
   }
 }
+
+/// Shown when the search box matches nothing.
+class _NoSearchResults extends StatelessWidget {
+  const _NoSearchResults();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 48,
+              color: AppColors.textSecondary.withOpacity(0.4),
+            ),
+            SizedBox(height: Responsive.h(12)),
+            Text(
+              'No salesmen match your search',
+              style: AppTextStyles.subtitle(),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Error state shown when the salesmen list fails to load.
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: Responsive.w(40)),
+            SizedBox(height: Responsive.h(12)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.body()),
+            SizedBox(height: Responsive.h(16)),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _OwnerSalesmanCard extends StatelessWidget {
-  const _OwnerSalesmanCard({required this.salesman, required this.onEdit, required this.onDelete});
+  const _OwnerSalesmanCard(
+      {required this.salesman, required this.onEdit, required this.onDelete});
   final HSalesmanModel salesman;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-
-  Color get _accentColor {
-    const palette = [
-      Color(0xFF1565C0),
-      Color(0xFFAD1457),
-      Color(0xFF00838F),
-      Color(0xFF6D4C41),
-      Color(0xFF558B2F),
-    ];
-    final index = salesman.id.hashCode.abs() % palette.length;
-    return palette[index];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,9 +351,10 @@ class _OwnerSalesmanCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Add salary badge
+              // Salary badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -279,7 +374,8 @@ class _OwnerSalesmanCard extends StatelessWidget {
               SizedBox(width: Responsive.w(4)),
               PopupMenuButton<String>(
                 padding: EdgeInsets.zero,
-                icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+                icon: const Icon(Icons.more_vert,
+                    size: 18, color: AppColors.textSecondary),
                 onSelected: (value) {
                   if (value == 'edit') onEdit();
                   if (value == 'delete') onDelete();
@@ -289,7 +385,8 @@ class _OwnerSalesmanCard extends StatelessWidget {
                     value: 'edit',
                     child: Row(
                       children: [
-                        Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
+                        Icon(Icons.edit_outlined,
+                            size: 18, color: AppColors.textPrimary),
                         SizedBox(width: 8),
                         Text('Edit'),
                       ],
@@ -299,9 +396,11 @@ class _OwnerSalesmanCard extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                        Icon(Icons.delete_outline,
+                            size: 18, color: AppColors.error),
                         SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: AppColors.error)),
+                        Text('Delete',
+                            style: TextStyle(color: AppColors.error)),
                       ],
                     ),
                   ),
@@ -316,22 +415,24 @@ class _OwnerSalesmanCard extends StatelessWidget {
             children: [
               if (salesman.designationName.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     salesman.designationName,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
                   ),
                 ),
-              // Add Active/Inactive status badge
-              // In the _OwnerSalesmanCard build method, update the status badge
-
-// Replace the status badge section with this:
+              // Active / Inactive status badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: salesman.isActive
                       ? Colors.green.withOpacity(0.1)
@@ -361,26 +462,31 @@ class _OwnerSalesmanCard extends StatelessWidget {
                   ],
                 ),
               ),
-
             ],
           ),
           SizedBox(height: Responsive.h(4)),
           Row(
             children: [
-              const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+              const Icon(Icons.phone_outlined,
+                  size: 14, color: AppColors.textSecondary),
               SizedBox(width: Responsive.w(4)),
               Expanded(
-                child: Text(salesman.mobile, style: AppTextStyles.caption(), overflow: TextOverflow.ellipsis),
+                child: Text(salesman.mobile,
+                    style: AppTextStyles.caption(),
+                    overflow: TextOverflow.ellipsis),
               ),
             ],
           ),
           SizedBox(height: Responsive.h(2)),
           Row(
             children: [
-              const Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
+              const Icon(Icons.email_outlined,
+                  size: 14, color: AppColors.textSecondary),
               SizedBox(width: Responsive.w(4)),
               Expanded(
-                child: Text(salesman.email, style: AppTextStyles.caption(), overflow: TextOverflow.ellipsis),
+                child: Text(salesman.email,
+                    style: AppTextStyles.caption(),
+                    overflow: TextOverflow.ellipsis),
               ),
             ],
           ),
@@ -392,7 +498,8 @@ class _OwnerSalesmanCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
+                  const Icon(Icons.calendar_today_outlined,
+                      size: 14, color: AppColors.textSecondary),
                   SizedBox(width: Responsive.w(4)),
                   Text(
                     salesman.joiningDate != null
@@ -405,7 +512,8 @@ class _OwnerSalesmanCard extends StatelessWidget {
               // Employee Code if available
               if (salesman.employeeCode.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.grey.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),

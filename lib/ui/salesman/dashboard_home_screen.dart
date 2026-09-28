@@ -651,23 +651,11 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.wifi_off_rounded, size: 44, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+            Icon(Icons.error_outline_rounded, color: AppColors.error, size: Responsive.w(40)),
             SizedBox(height: Responsive.h(12)),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
             SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Retry'),
-            ),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

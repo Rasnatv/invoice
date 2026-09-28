@@ -301,6 +301,7 @@ class _FSPasswordField extends StatelessWidget {
           obscureText: obscureText,
           style: AppTextStyles.body(),
           validator: validator,
+          inputFormatters: DValidator.passwordLimit, // NEW: max 18 characters
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.surface,

@@ -288,28 +288,39 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   }
 }
 
+
 class _ListErrorBanner extends StatelessWidget {
   const _ListErrorBanner({required this.message, required this.onRetry});
+
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(message, style: TextStyle(color: Colors.red.shade700, fontSize: Responsive.sp(12))),
-          ),
-          TextButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.error,
+              size: Responsive.w(40),
+            ),
+            SizedBox(height: Responsive.h(12)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(),
+            ),
+            SizedBox(height: Responsive.h(16)),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

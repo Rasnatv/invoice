@@ -7,6 +7,11 @@ class DValidator {
 
   /// Default expected length for a plain (no country code) mobile number.
   static const int defaultPhoneLength = 10;
+  static const int maxPasswordLength = 18;
+
+  static List<TextInputFormatter> get passwordLimit => [
+    LengthLimitingTextInputFormatter(maxPasswordLength),
+  ];
 
   // ── Generic empty check ───────────────────────────────────
   static String? validateEmptyText(String? fieldName, String? value) {

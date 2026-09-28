@@ -682,12 +682,11 @@ class _EmptyIncentiveState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.payments_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
-            SizedBox(height: Responsive.h(12)),
+            Icon(Icons.bar_chart_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
             Text(
               'No incentives found',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
+                style: AppTextStyles.subtitle()),
           ],
         ),
       ),

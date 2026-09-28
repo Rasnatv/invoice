@@ -85,6 +85,27 @@ class _DesignationListView extends StatelessWidget {
                 designations = state.designations;
               }
 
+              // Empty state (still pull-to-refresh enabled)
+              if (designations.isEmpty) {
+                return RefreshIndicator(
+                  color: _primary,
+                  onRefresh: () async {
+                    context.read<DesignationBloc>().add(FetchDesignations());
+                  },
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: constraints.maxHeight,
+                          child: const _EmptyDesignationState(),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               return RefreshIndicator(
                 color: _primary,
                 onRefresh: () async {
@@ -137,17 +158,16 @@ class _DesignationListView extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            BlocProvider.value(
-              value: context.read<DesignationBloc>(),
-              child: AddDesignationPage(designation: designation),
-            ),
+        builder: (_) => BlocProvider.value(
+          value: context.read<DesignationBloc>(),
+          child: AddDesignationPage(designation: designation),
+        ),
       ),
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context,
-      DesignationModel designation) async {
+  Future<void> _confirmDelete(
+      BuildContext context, DesignationModel designation) async {
     final bloc = context.read<DesignationBloc>();
     await deleteItem(
       context,
@@ -156,6 +176,7 @@ class _DesignationListView extends StatelessWidget {
     );
   }
 }
+
 class _DesignationCard extends StatelessWidget {
   final DesignationModel designation;
   final Color primary;
@@ -238,6 +259,32 @@ class _DesignationCard extends StatelessWidget {
   }
 }
 
+/// Shown when there are no designations at all.
+class _EmptyDesignationState extends StatelessWidget {
+  const _EmptyDesignationState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.badge_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
+            Text(
+              'Add your first designation to get started',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.subtitle(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ErrorView extends StatelessWidget {
   final String? message;
   final VoidCallback onRetry;
@@ -267,10 +314,7 @@ class _ErrorView extends StatelessWidget {
                 ),
               ),
             SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: Text('Retry', style: TextStyle(fontSize: Responsive.sp(14))),
-            ),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

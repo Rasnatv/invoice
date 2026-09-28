@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -15,7 +14,6 @@ import '../../bloc/ownerbloc/driver/driver_event.dart';
 import '../../bloc/ownerbloc/driver/driver_state.dart';
 
 
-/// Public entry point — provides the bloc and loads the drivers list.
 class OwnerDriverScreen extends StatelessWidget {
   const OwnerDriverScreen({super.key});
 
@@ -36,6 +34,11 @@ class _OwnerDriverView extends StatefulWidget {
 }
 
 class _OwnerDriverViewState extends State<_OwnerDriverView> {
+  // The listener clears the bloc's errorMessage right after showing the
+  // snackbar (ClearDriverFeedback), so we remember the last error here to
+  // keep showing the real message inside the full-screen error view.
+  String? _lastErrorMessage;
+
   // ---- Add / Edit sheet (shared) ----
   void _openDriverSheet({DriverGetModel? existing}) {
     final bloc = context.read<DriverBloc>();
@@ -267,12 +270,12 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
       bloc.add(DeleteDriver(driver.id));
     }
   }
+
   static String _formatDate(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
   }
-
 
   static String _displayDate(String raw) {
     if (raw.isEmpty) return '—';
@@ -299,79 +302,85 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text('Drivers', style: AppTextStyles.h6()),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: () => _openDriverSheet(),
-        icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
-        label: Text(
-          'Add Driver',
-          style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          centerTitle: true,
+          title: Text('Drivers', style: AppTextStyles.h6()),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: AppColors.primary,
+          onPressed: () => _openDriverSheet(),
+          icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
+          label: Text(
+            'Add Driver',
+            style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
+          ),
+        ),
+        body: BlocConsumer<DriverBloc, DriverState>(
+          listener: (context, state) {
+            if (state.successMessage != null) {
+              AppSnackbar.success(state.successMessage!);
+              context.read<DriverBloc>().add(const ClearDriverFeedback());
+            } else if (state.errorMessage != null) {
+              _lastErrorMessage = state.errorMessage;
+              AppSnackbar.error(state.errorMessage!);
+              context.read<DriverBloc>().add(const ClearDriverFeedback());
+            }
+          },
+          builder: (context, state) {
+            if (state.status == DriverStatus.loading && state.drivers.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state.isUnauthorized) {
+              // Redirect to /login is already in flight — don't flash
+              // an error screen behind it.
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state.status == DriverStatus.error && state.drivers.isEmpty) {
+              return _ErrorView(
+                message: state.errorMessage ??
+                    _lastErrorMessage ??
+                    'Could not load drivers.',
+                onRetry: () => context.read<DriverBloc>().add(const LoadDrivers()),
+              );
+            }
+
+            if (state.drivers.isEmpty) {
+              return _EmptyDriverState(onAdd: () => _openDriverSheet());
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async => context.read<DriverBloc>().add(const LoadDrivers()),
+              child: ListView.separated(
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.w(20),
+                  Responsive.h(16),
+                  Responsive.w(20),
+                  Responsive.h(100),
+                ),
+                itemCount: state.drivers.length,
+                separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
+                itemBuilder: (context, index) {
+                  final driver = state.drivers[index];
+                  return _DriverTile(
+                    driver: driver,
+                    onEdit: () => _openDriverSheet(existing: driver),
+                    onDelete: () => _confirmDeleteDriver(driver),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ),
-      body: BlocConsumer<DriverBloc, DriverState>(
-        listener: (context, state) {
-          if (state.successMessage != null) {
-            AppSnackbar.success(state.successMessage!);
-            context.read<DriverBloc>().add(const ClearDriverFeedback());
-          } else if (state.errorMessage != null) {
-            AppSnackbar.error(state.errorMessage!);
-            context.read<DriverBloc>().add(const ClearDriverFeedback());
-          }
-        },
-        builder: (context, state) {
-          if (state.status == DriverStatus.loading && state.drivers.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state.isUnauthorized) {
-            // Redirect to /login is already in flight — don't flash
-            // an error screen behind it.
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state.status == DriverStatus.error && state.drivers.isEmpty) {
-            return _ErrorState(
-              onRetry: () => context.read<DriverBloc>().add(const LoadDrivers()),
-            );
-          }
-
-          if (state.drivers.isEmpty) {
-            return _EmptyDriverState(onAdd: () => _openDriverSheet());
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async => context.read<DriverBloc>().add(const LoadDrivers()),
-            child: ListView.separated(
-              padding: EdgeInsets.fromLTRB(
-                Responsive.w(20),
-                Responsive.h(16),
-                Responsive.w(20),
-                Responsive.h(100),
-              ),
-              itemCount: state.drivers.length,
-              separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
-              itemBuilder: (context, index) {
-                final driver = state.drivers[index];
-                return _DriverTile(
-                  driver: driver,
-                  onEdit: () => _openDriverSheet(existing: driver),
-                  onDelete: () => _confirmDeleteDriver(driver),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    ));
+    );
   }
 }
 
@@ -614,26 +623,12 @@ class _EmptyDriverState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.local_shipping_outlined,
-                size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
-            SizedBox(height: Responsive.h(12)),
+            Icon(Icons.local_shipping_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
             Text(
               'No drivers added yet',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
-            SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: onAdd,
-              child: Text(
-                'Add Driver',
-                style: AppTextStyles.bodyBold(color: Colors.white)
-                    .copyWith(fontSize: Responsive.sp(13)),
-              ),
-            ),
+            style: AppTextStyles.subtitle()),
+
           ],
         ),
       ),
@@ -641,33 +636,26 @@ class _EmptyDriverState extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
+/// Error state shown when the drivers list fails to load.
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+        padding: EdgeInsets.all(Responsive.w(24)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: Responsive.w(40)),
             SizedBox(height: Responsive.h(12)),
-            Text(
-              'Could not load drivers',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
             SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: onRetry,
-              child: const Text('Retry', style: TextStyle(color: Colors.white)),
-            ),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

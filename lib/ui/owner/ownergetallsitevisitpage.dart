@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -9,7 +10,6 @@ import '../../bloc/ownerbloc/ownerallsitevisitget/ownerallsitevisitget_bloc.dart
 import '../../bloc/ownerbloc/ownerallsitevisitget/ownerallsitevisitget_event.dart';
 import '../../bloc/ownerbloc/ownerallsitevisitget/ownerallsitevisitget_state.dart';
 import '../../models/owner_models/ownergetallsitevisitmodel.dart';
-
 
 class OwnerGetAllSiteVisitPage extends StatelessWidget {
   const OwnerGetAllSiteVisitPage({super.key});
@@ -52,31 +52,23 @@ class _OwnerGetAllSiteVisitView extends StatelessWidget {
                 }
 
                 if (state is OwnerGetAllSiteVisitError) {
-                  return ListView(
-                    children: [
-                      SizedBox(height: Responsive.h(100)),
-                      Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: Responsive.w(24)),
-                          child: Column(
-                            children: [
-                              Text(
-                                state.message,
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.caption(color: AppColors.textSecondary),
-                              ),
-                              SizedBox(height: Responsive.h(14)),
-                              ElevatedButton(
-                                onPressed: () => context
-                                    .read<OwnerGetAllSiteVisitBloc>()
-                                    .add(const RetryOwnerGetAllSiteVisit()),
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
+                  // Wrapped in a scrollable so pull-to-refresh still works
+                  // on the error screen, while the view stays vertically centered.
+                  return LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: _ErrorView(
+                          message: state.message.isNotEmpty
+                              ? state.message
+                              : 'Failed to load site visits.',
+                          onRetry: () => context
+                              .read<OwnerGetAllSiteVisitBloc>()
+                              .add(const RetryOwnerGetAllSiteVisit()),
                         ),
                       ),
-                    ],
+                    ),
                   );
                 }
 
@@ -97,15 +89,15 @@ class _OwnerGetAllSiteVisitView extends StatelessWidget {
                         style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(15))),
                     SizedBox(height: Responsive.h(10)),
                     if (visits.isEmpty)
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: Responsive.h(30)),
-                        child: Center(
-                          child: Text(
+                      Column(children: [
+                        SizedBox(height: 250,),
+                        Icon(Icons.location_on, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+                        SizedBox(height: Responsive.h(10)),
+                       Text(
                             'No site visits found.',
-                            style: AppTextStyles.caption(color: AppColors.textSecondary),
+                            style: AppTextStyles.subtitle(),
                           ),
-                        ),
-                      )
+                      ])
                     else
                       for (final visit in visits)
                         _SiteVisitTile(visit: visit, currency: currency, dateFmt: dateFmt),
@@ -114,6 +106,33 @@ class _OwnerGetAllSiteVisitView extends StatelessWidget {
               },
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Error state shown when the site visits fail to load.
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: Responsive.w(40)),
+            SizedBox(height: Responsive.h(12)),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
+            SizedBox(height: Responsive.h(16)),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
         ),
       ),
     );

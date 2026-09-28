@@ -5,11 +5,6 @@ import '../models/owner_models/activefieldstaffmodel.dart';
 import '../models/owner_models/fieldstaffincentivemodel.dart';
 import '../models/owner_models/incentivesummarymodel.dart';
 
-/// Result of POST /field-staff-incentives/summary.
-///
-/// NOTE: the real endpoint returns BOTH the summary counts AND the
-/// (query-param paginated) incentive list in one payload — see
-/// FieldStaffIncentiveSummaryResponse for the combined shape.
 class IncentiveSummaryResult {
   final bool success;
   final FieldStaffIncentiveSummaryResponse? data;

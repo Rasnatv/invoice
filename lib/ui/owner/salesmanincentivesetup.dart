@@ -169,7 +169,11 @@ class _AddIncentiveViewState extends State<_AddIncentiveView> {
 
             final list = state.list;
             if (list.isEmpty) {
-              return Center(child: Text('No salesmen found.', style: AppTextStyles.caption()));
+              return Column(children: [
+                SizedBox(height:350),
+                Icon(Icons.person, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+                SizedBox(height: Responsive.h(10)),
+                Center(child: Text('No salesmen found.', style: AppTextStyles.subtitle()))]);
             }
 
             _ensureSelection(list);

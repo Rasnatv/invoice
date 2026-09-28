@@ -597,20 +597,8 @@ class _EmptyStaffState extends StatelessWidget {
             SizedBox(height: Responsive.h(12)),
             Text(
               'No field staff added yet',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
-            SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: onAdd,
-              child: Text(
-                'Add Field Staff',
-                style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
-              ),
-            ),
+                style: AppTextStyles.subtitle()),
+
           ],
         ),
       ),
@@ -631,25 +619,11 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red.withOpacity(0.5)),
+            Icon(Icons.error_outline_rounded, color: AppColors.error, size: Responsive.w(40)),
             SizedBox(height: Responsive.h(12)),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
             SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              onPressed: onRetry,
-              child: Text(
-                'Retry',
-                style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
-              ),
-            ),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

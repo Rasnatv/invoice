@@ -56,6 +56,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     _searchCtrl.dispose();
     super.dispose();
   }
+
   Future<void> _onCardTap(SalesmanowrEstimateModel estimate) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -111,80 +112,89 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Estimates', style: AppTextStyles.h6()),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: SafeArea(
-        child: BlocBuilder<OwnerEstimatesBloc, OwnerEstimatesState>(
-          builder: (context, state) {
-            // True on the very first load AND on every subsequent
-            // pull-to-refresh, so the chip row shimmers alongside the list.
-            final bool isLoadingChips =
-                state.status == OwnerEstimatesStatus.loading;
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('Estimates', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: BlocBuilder<OwnerEstimatesBloc, OwnerEstimatesState>(
+            builder: (context, state) {
+              // True on the very first load AND on every subsequent
+              // pull-to-refresh, so the chip row shimmers alongside the list.
+              final bool isLoadingChips =
+                  state.status == OwnerEstimatesStatus.loading;
 
-            return Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (v) => context
-                        .read<OwnerEstimatesBloc>()
-                        .add(OwnerEstimatesSearchQueryChanged(v)),
-                    decoration: const InputDecoration(
-                      hintText: 'Search salesman, contractor or phone',
-                      prefixIcon: Icon(Icons.search_rounded),
+              return Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (v) => context
+                          .read<OwnerEstimatesBloc>()
+                          .add(OwnerEstimatesSearchQueryChanged(v)),
+                      decoration: const InputDecoration(
+                        hintText: 'Search salesman, contractor or phone',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(height: Responsive.h(12)),
-                if (isLoadingChips)
-                  _buildFilterChipsSkeleton(
-                    chipCount: state.filters.isNotEmpty ? state.filters.length : 4,
-                  )
-                else if (state.filters.isNotEmpty)
-                  SizedBox(
-                    height: 42,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
-                      itemCount: state.filters.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) {
-                        final f = state.filters[i];
-                        final selected = f.key == state.activeFilter;
-                        return ChoiceChip(
-                          label: Text('${f.label} (${f.count})'),
-                          selected: selected,
-                          selectedColor: AppColors.primary,
-                          backgroundColor: AppColors.surface,
-                          labelStyle: AppTextStyles.bodyBold(
-                              color: selected ? Colors.white : AppColors.textPrimary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(
-                                color: selected ? AppColors.primary : AppColors.border),
-                          ),
-                          onSelected: (_) => context
-                              .read<OwnerEstimatesBloc>()
-                              .add(OwnerEstimatesFilterChanged(f.key)),
-                        );
-                      },
-                    ),
-                  ),
-                SizedBox(height: Responsive.h(12)),
-                Expanded(child: _buildBody(context, state)),
-              ],
-            );
-          },
+                  SizedBox(height: Responsive.h(12)),
+                  if (isLoadingChips)
+                    _buildFilterChipsSkeleton(
+                      chipCount: state.filters.isNotEmpty ? state.filters.length : 4,
+                    )
+                  else if (state.allEstimates.isNotEmpty &&
+                      state.filters.isNotEmpty)
+                    _buildFilterChips(context, state),
+                  SizedBox(height: Responsive.h(12)),
+                  Expanded(child: _buildBody(context, state)),
+                ],
+              );
+            },
+          ),
         ),
       ),
-    ));
+    );
+  }
+
+  /// Filter chip row. Only built when at least one estimate exists
+  /// (the caller hides it entirely for an empty list).
+  Widget _buildFilterChips(BuildContext context, OwnerEstimatesState state) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+        itemCount: state.filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final f = state.filters[i];
+          final selected = f.key == state.activeFilter;
+          return ChoiceChip(
+            label: Text('${f.label} (${f.count})'),
+            selected: selected,
+            selectedColor: AppColors.primary,
+            backgroundColor: AppColors.surface,
+            labelStyle: AppTextStyles.bodyBold(
+                color: selected ? Colors.white : AppColors.textPrimary),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                  color: selected ? AppColors.primary : AppColors.border),
+            ),
+            onSelected: (_) => context
+                .read<OwnerEstimatesBloc>()
+                .add(OwnerEstimatesFilterChanged(f.key)),
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildFilterChipsSkeleton({int chipCount = 4}) {
@@ -230,26 +240,44 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     }
 
     if (state.status == OwnerEstimatesStatus.failure) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(state.errorMessage ?? 'Failed to load estimates.',
-                style: AppTextStyles.subtitle()),
-            SizedBox(height: Responsive.h(10)),
-            ElevatedButton(
-              onPressed: () => context
-                  .read<OwnerEstimatesBloc>()
-                  .add(const OwnerEstimatesRefreshRequested()),
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+      return _ErrorView(
+        message: state.errorMessage ?? 'Failed to load estimates.',
+        onRetry: () => context
+            .read<OwnerEstimatesBloc>()
+            .add(const OwnerEstimatesRefreshRequested()),
       );
     }
 
+    // Empty state: centered in the available space, and still supports
+    // pull-to-refresh.
     if (state.filteredEstimates.isEmpty) {
-      return Center(child: Text('No estimates found', style: AppTextStyles.subtitle()));
+      return RefreshIndicator(
+        onRefresh: () async => context
+            .read<OwnerEstimatesBloc>()
+            .add(const OwnerEstimatesRefreshRequested()),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.description_outlined,
+                      size: Responsive.w(48),
+                      color: AppColors.textSecondary.withOpacity(0.4),
+                    ),
+                    SizedBox(height: Responsive.h(10)),
+                    Text('No estimates found', style: AppTextStyles.subtitle()),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -271,6 +299,34 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
             onHistoryTap: () => _onPaymentHistoryTap(e),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Error state shown when the estimates list fails to load.
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: Responsive.w(40)),
+            SizedBox(height: Responsive.h(12)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.body()),
+            SizedBox(height: Responsive.h(16)),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
       ),
     );
   }
@@ -405,11 +461,12 @@ class _OwnerEstimateCard extends StatelessWidget {
               SizedBox(height: Responsive.h(4)),
               Row(
                 children: [
-                  const Icon(Icons.engineering_outlined, size: 14, color: AppColors.textSecondary),
+                  const Icon(Icons.engineering_outlined,
+                      size: 14, color: AppColors.textSecondary),
                   SizedBox(width: Responsive.w(4)),
                   Expanded(
                     child: Text(
-                     'Contractor:${estimate.contractorName}',
+                      'Contractor:${estimate.contractorName}',
                       style: AppTextStyles.caption(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -423,7 +480,8 @@ class _OwnerEstimateCard extends StatelessWidget {
               SizedBox(height: Responsive.h(4)),
               Row(
                 children: [
-                  const Icon(Icons.verified_outlined, size: 14, color: AppColors.primary),
+                  const Icon(Icons.verified_outlined,
+                      size: 14, color: AppColors.primary),
                   SizedBox(width: Responsive.w(4)),
                   Expanded(
                     child: Text(
@@ -490,6 +548,7 @@ class _OwnerEstimateCard extends StatelessWidget {
     );
   }
 }
+
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.label, required this.statusKey});
   final String label;

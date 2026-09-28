@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-
 import '../../../core/apiclient/api_client.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -15,7 +14,6 @@ import '../../../core/validator/validationfile.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_bloc.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
-
 import '../../models/owner_models/ownerestimate_updatemodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
@@ -76,15 +74,6 @@ class _ActiveProduct {
   }
 }
 
-/// One saved line item in the estimate being edited.
-///
-/// NEW: [id] is the server-side estimate_item id. An empty string means
-/// this row only exists in local state (added in this session, not yet
-/// persisted) — such rows are still handled purely locally until "Save
-/// Changes" is tapped. A non-empty [id] means this row already exists on
-/// the server, so editing/removing it now goes through
-/// PUT /estimates/update-item and POST /estimates/remove-item
-/// immediately, the same way the quotation edit screen behaves.
 class _EstimateEditItem {
   const _EstimateEditItem({
     required this.id,
@@ -713,11 +702,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                 final idx =
                 _items.indexWhere((i) => i.id == state.updatedEstimateItemId);
                 if (idx != -1) {
-                  // The update-item endpoint doesn't return a recalculated
-                  // amount, so the qty/rate/box/piece the user submitted
-                  // are applied locally. If your backend can return a new
-                  // `amount` for sqft-derived products, prefer refreshing
-                  // via OwnerEstimateDetailLoadRequested instead.
                   setState(() {
                     _items[idx] = _items[idx].copyWith(
                       quantity: double.tryParse(_itemQtyCtrl.text) ?? _items[idx].quantity,

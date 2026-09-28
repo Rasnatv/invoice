@@ -12,10 +12,6 @@ import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_bloc.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_event.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotations_state.dart';
 
-// Shared status -> color mapping so every quotation status badge (across
-// the list and detail screens) reads the same way. Falls back to
-// AppColors.primary for any status the API sends that isn't recognized
-// here, rather than silently looking "unstyled".
 Color quotationStatusColor(String status) {
   switch (status.toLowerCase()) {
     case 'approved':
@@ -92,158 +88,179 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final currency =
+    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Quotations', style: AppTextStyles.h6()),
-      ),
-      body: SafeArea(
-        child: BlocBuilder<QuotationBloc, QuotationState>(
-          builder: (context, state) {
-            if (state is QuotationLoading || state is QuotationInitial) {
-              return const Center(child: CircularProgressIndicator());
-            }
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('Quotations', style: AppTextStyles.h6()),
+        ),
+        body: SafeArea(
+          child: BlocBuilder<QuotationBloc, QuotationState>(
+            builder: (context, state) {
+              if (state is QuotationLoading || state is QuotationInitial) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (state is QuotationError) {
-              return Center(
-                child: Padding(
-                  padding: EdgeInsets.all(Responsive.w(24)),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary),
-                      SizedBox(height: Responsive.h(12)),
-                      Text(
-                        state.message ?? 'Failed to load quotations.',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.subtitle(),
-                      ),
-                      SizedBox(height: Responsive.h(16)),
-                      ElevatedButton(
-                        onPressed: () => context
-                            .read<QuotationBloc>()
-                            .add(const FetchQuotationsEvent()),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+              if (state is QuotationError) {
+                return _ErrorView(
+                  message: state.message ?? 'Failed to load quotations.',
+                  onRetry: () => context
+                      .read<QuotationBloc>()
+                      .add(const FetchQuotationsEvent()),
+                );
+              }
 
-            final loaded = state as QuotationLoaded;
-            final filteredQuotations = loaded.visibleQuotations;
-            // Only auto-load-more when there's no active search filter —
-            // pagination fetches raw pages from the API, which won't line up
-            // with a client-side filtered/searched view.
-            final canLoadMore = loaded.searchQuery.trim().isEmpty;
+              final loaded = state as QuotationLoaded;
+              final filteredQuotations = loaded.visibleQuotations;
+              // Only auto-load-more when there's no active search filter —
+              // pagination fetches raw pages from the API, which won't line up
+              // with a client-side filtered/searched view.
+              final canLoadMore = loaded.searchQuery.trim().isEmpty;
 
-            return Column(
-              children: [
-                // My Quotations / Salesman Quotations toggle
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    Responsive.w(16),
-                    Responsive.h(14),
-                    Responsive.w(16),
-                    Responsive.h(10),
-                  ),
-                  child: _QuotationFilterToggle(
-                    value: loaded.filter,
-                    onChanged: (value) =>
-                        context.read<QuotationBloc>().add(FilterQuotationsEvent(value)),
-                  ),
-                ),
-
-                // Search Bar
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    Responsive.w(16),
-                    0,
-                    Responsive.w(16),
-                    Responsive.h(10),
-                  ),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (value) =>
-                        context.read<QuotationBloc>().add(SearchQuotationsEvent(value)),
-                    decoration: const InputDecoration(
-                      hintText: 'Search by customer, ID or salesman',
-                      prefixIcon: Icon(Icons.search_rounded),
+              return Column(
+                children: [
+                  // My Quotations / Salesman Quotations toggle
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      Responsive.w(16),
+                      Responsive.h(14),
+                      Responsive.w(16),
+                      Responsive.h(10),
+                    ),
+                    child: _QuotationFilterToggle(
+                      value: loaded.filter,
+                      onChanged: (value) => context
+                          .read<QuotationBloc>()
+                          .add(FilterQuotationsEvent(value)),
                     ),
                   ),
-                ),
 
-                // Quotation List
-                Expanded(
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (canLoadMore &&
-                          notification.metrics.pixels >=
-                              notification.metrics.maxScrollExtent - 200) {
-                        context.read<QuotationBloc>().add(const LoadMoreQuotationsEvent());
-                      }
-                      return false;
-                    },
-                    child: RefreshIndicator(
-                      onRefresh: () async {
-                        context.read<QuotationBloc>().add(const RefreshQuotationsEvent());
+                  // Search Bar
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      Responsive.w(16),
+                      0,
+                      Responsive.w(16),
+                      Responsive.h(10),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (value) => context
+                          .read<QuotationBloc>()
+                          .add(SearchQuotationsEvent(value)),
+                      decoration: const InputDecoration(
+                        hintText: 'Search by customer, ID or salesman',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+                  ),
+
+                  // Quotation List
+                  Expanded(
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (canLoadMore &&
+                            notification.metrics.pixels >=
+                                notification.metrics.maxScrollExtent - 200) {
+                          context
+                              .read<QuotationBloc>()
+                              .add(const LoadMoreQuotationsEvent());
+                        }
+                        return false;
                       },
-                      child: filteredQuotations.isEmpty
-                          ? ListView(
-                        padding: EdgeInsets.only(top: Responsive.h(80)),
-                        children: [
-                          Icon(
-                            Icons.description_outlined,
-                            size: 64,
-                            color: AppColors.textSecondary.withOpacity(0.5),
-                          ),
-                          SizedBox(height: Responsive.h(16)),
-                          Center(
-                            child: Text(
-                              'No quotations found',
-                              style: AppTextStyles.subtitle(),
-                            ),
-                          ),
-                        ],
-                      )
-                          : ListView.separated(
-                        padding: EdgeInsets.fromLTRB(
-                          Responsive.w(16),
-                          0,
-                          Responsive.w(16),
-                          Responsive.h(20),
-                        ),
-                        itemCount: filteredQuotations.length +
-                            (canLoadMore && loaded.isLoadingMore ? 1 : 0),
-                        separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
-                        itemBuilder: (context, index) {
-                          if (index >= filteredQuotations.length) {
-                            return Padding(
-                              padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
-                              child: const Center(child: CircularProgressIndicator()),
-                            );
-                          }
-                          final q = filteredQuotations[index];
-                          return _QuotationCard(
-                            quotation: q,
-                            currency: currency,
-                            showSalesman: loaded.filter == QuotationFilterType.salesman,
-                            onTap: () => _openQuotationDetails(q),
-                          );
+                      child: RefreshIndicator(
+                        onRefresh: () async {
+                          context
+                              .read<QuotationBloc>()
+                              .add(const RefreshQuotationsEvent());
                         },
+                        child: filteredQuotations.isEmpty
+                            ? ListView(
+                          padding: EdgeInsets.only(top: Responsive.h(270)),
+                          children: [
+                            Icon(Icons.description_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+                            SizedBox(height: Responsive.h(10)),
+                            Center(
+                              child: Text(
+                                'No quotations found',
+                                style: AppTextStyles.subtitle(),
+                              ),
+                            ),
+                          ],
+                        )
+                            : ListView.separated(
+                          padding: EdgeInsets.fromLTRB(
+                            Responsive.w(16),
+                            0,
+                            Responsive.w(16),
+                            Responsive.h(20),
+                          ),
+                          itemCount: filteredQuotations.length +
+                              (canLoadMore && loaded.isLoadingMore
+                                  ? 1
+                                  : 0),
+                          separatorBuilder: (_, __) =>
+                              SizedBox(height: Responsive.h(10)),
+                          itemBuilder: (context, index) {
+                            if (index >= filteredQuotations.length) {
+                              return Padding(
+                                padding: EdgeInsets.symmetric(
+                                    vertical: Responsive.h(16)),
+                                child: const Center(
+                                    child: CircularProgressIndicator()),
+                              );
+                            }
+                            final q = filteredQuotations[index];
+                            return _QuotationCard(
+                              quotation: q,
+                              currency: currency,
+                              showSalesman: loaded.filter ==
+                                  QuotationFilterType.salesman,
+                              onTap: () => _openQuotationDetails(q),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
-    ));
+    );
+  }
+}
+
+/// Error state shown when the quotations list fails to load.
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: Responsive.w(40)),
+            SizedBox(height: Responsive.h(12)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.body()),
+            SizedBox(height: Responsive.h(16)),
+            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -364,7 +381,8 @@ class _QuotationCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -381,7 +399,8 @@ class _QuotationCard extends StatelessWidget {
 
             Row(
               children: [
-                const Icon(Icons.assignment_outlined, size: 14, color: AppColors.textSecondary),
+                const Icon(Icons.assignment_outlined,
+                    size: 14, color: AppColors.textSecondary),
                 SizedBox(width: Responsive.w(4)),
                 Text(
                   quotation.quotationNumber,
@@ -389,7 +408,8 @@ class _QuotationCard extends StatelessWidget {
                 ),
                 if (showSalesman) ...[
                   SizedBox(width: Responsive.w(10)),
-                  const Icon(Icons.badge_outlined, size: 14, color: AppColors.textSecondary),
+                  const Icon(Icons.badge_outlined,
+                      size: 14, color: AppColors.textSecondary),
                   SizedBox(width: Responsive.w(4)),
                   Expanded(
                     child: Text(
@@ -408,7 +428,8 @@ class _QuotationCard extends StatelessWidget {
 
             Row(
               children: [
-                const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+                const Icon(Icons.phone_outlined,
+                    size: 14, color: AppColors.textSecondary),
                 SizedBox(width: Responsive.w(4)),
                 Text(
                   quotation.customerPhone,
@@ -433,7 +454,8 @@ class _QuotationCard extends StatelessWidget {
                     ),
                     Text(
                       '${quotation.totalItemsValue} items',
-                      style: AppTextStyles.caption(color: AppColors.textSecondary),
+                      style: AppTextStyles.caption(
+                          color: AppColors.textSecondary),
                     ),
                   ],
                 ),

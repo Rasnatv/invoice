@@ -626,8 +626,8 @@ class _EmptyState extends StatelessWidget {
             SizedBox(height: Responsive.h(10)),
             Text(
               'No estimates yet',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
+                style: AppTextStyles.subtitle()),
+
           ],
         ),
       ),

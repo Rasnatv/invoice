@@ -12,18 +12,6 @@ import '../../bloc/salemanbloc/salemandashboard/salesmandashboard_event.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistbloc.dart';
 import '../../bloc/salemanbloc/estimatelistview/salesmanowner_estimatelistevent.dart';
 
-/// Root shell for the Salesman Dashboard — hosts the bottom navigation
-/// bar (Dashboard / Estimates / Dispatch / Contractors / Profile) exactly
-/// as laid out across every screen in the reference screenshot, and
-/// swaps the body via [NavCubit] without losing each tab's own state.
-///
-/// [DashboardHomeBloc] and [EstimatesBloc] are provided HERE (above the
-/// IndexedStack) rather than inside DashboardHomeScreen/MyEstimatesScreen
-/// themselves, so both tabs share one long-lived bloc instance each.
-/// That lets CreateEstimateScreen's caller (_openCreateEstimate in
-/// DashboardHomeScreen) refresh both blocs after a new estimate is
-/// created, even though IndexedStack keeps both tabs alive/off-screen
-/// and never rebuilds them on tab switch.
 class DashboardShell extends StatelessWidget {
   const DashboardShell({super.key});
 

@@ -236,9 +236,14 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                 }
 
                 if (state.companies.isEmpty) {
-                  return Center(
+                  return
+                    Column(children: [
+                      SizedBox(height: 350,),
+                      Icon(Icons.business, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+                      SizedBox(height: Responsive.h(10)),
+                      Center(
                     child: Text('No companies added yet', style: AppTextStyles.subtitle()),
-                  );
+                    )] );
                 }
 
                 return RefreshIndicator(

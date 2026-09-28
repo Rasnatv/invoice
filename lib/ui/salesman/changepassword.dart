@@ -193,7 +193,7 @@ class _PasswordTipsCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: Responsive.h(8)),
-          const _TipRow(text: 'Use 8 or more characters'),
+          const _TipRow(text: 'Use 8 to 18 characters'),
           SizedBox(height: Responsive.h(4)),
           const _TipRow(text: 'Special characters aren\'t allowed'),
           SizedBox(height: Responsive.h(4)),
@@ -250,6 +250,7 @@ class _PasswordField extends StatelessWidget {
           controller: controller,
           obscureText: obscure,
           validator: validator,
+          inputFormatters: DValidator.passwordLimit, // NEW: max 18 characters
           style: AppTextStyles.body(),
           decoration: InputDecoration(
             isDense: true,
