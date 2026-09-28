@@ -98,7 +98,7 @@ class _QuotationListView extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.request_quote_outlined, size: 48, color: AppColors.textHint),
+                      Icon(Icons.description_rounded, size: 48, color: AppColors.textHint),
                       SizedBox(height: Responsive.h(10)),
                       Text('No quotations yet', style: AppTextStyles.body(color: AppColors.textHint)),
                     ],

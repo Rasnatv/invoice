@@ -12,9 +12,6 @@ import '../../../core/utils/responsive.dart';
 import '../../../models/owner_reportmodel/reportentrymodel.dart';
 import 'ownerreportwidget.dart';
 
-/// Full performance summary for a single salesman.
-/// Matches mockup frame 3. Data now comes from
-/// POST /reports/salesman-performance via OwnerReportsBloc.
 class OwnerSalesmanReportScreen extends StatelessWidget {
   const OwnerSalesmanReportScreen({
     super.key,

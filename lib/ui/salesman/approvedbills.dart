@@ -92,9 +92,13 @@ class _ApprovedBillsView extends StatelessWidget {
 
                   final list = state.filtered;
                   if (list.isEmpty) {
-                    return Center(
+                    return Column(children: [
+                         SizedBox(height: 270,),
+                        Icon(Icons.description_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+                       SizedBox(height: Responsive.h(10)),
+                      Center(
                       child: Text('No estimates found', style: AppTextStyles.subtitle()),
-                    );
+                    )]);
                   }
 
                   return RefreshIndicator(

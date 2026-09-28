@@ -19,13 +19,8 @@ import 'approvedbills.dart';
 import 'create_estimate_screen.dart';
 import 'cubit/nav_cubit.dart';
 import 'dashboardhomeestimatetile.dart';
+import 'my_estimates_screen.dart';
 
-/// NOTE: DashboardHomeBloc is now provided by DashboardShell (above the
-/// IndexedStack) so it's shared/long-lived across tab switches — this
-/// screen no longer creates its own local instance. Do NOT re-add a
-/// BlocProvider<DashboardHomeBloc> here, or you'll end up with two
-/// separate instances (this one shadowing the shared one) and the
-/// refresh-after-create-estimate flow will silently stop working again.
 class DashboardHomeScreen extends StatelessWidget {
   const DashboardHomeScreen({super.key});
 
@@ -46,14 +41,19 @@ class _DashboardHomeView extends StatelessWidget {
     }
   }
 
-  // "My Estimates" is a tab inside this same DashboardShell, not a
-  // standalone screen — EstimatesBloc only lives above the shell's
-  // IndexedStack. Switching tabs via NavCubit keeps MyEstimatesScreen a
-  // descendant of that provider. Pushing a separate '/my-estimates'
-  // GoRoute here would open it with nothing above it and crash with
-  // ProviderNotFoundException<EstimatesBloc>.
-  void _openMyEstimates(BuildContext context) {
-    context.read<NavCubit>().changeTab(1); // 1 = Estimates tab in DashboardShell
+  Future<void> _openMyEstimates(BuildContext context) async {
+    final estimatesBloc = context.read<EstimatesBloc>();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: estimatesBloc,
+          child: const MyEstimatesScreen(),
+        ),
+      ),
+    );
+    if (context.mounted) {
+      context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
+    }
   }
 
   void _openIncentives(BuildContext context, DashboardHomeState state) {
@@ -70,6 +70,12 @@ class _DashboardHomeView extends StatelessWidget {
 
   void _openEstimateDetail(BuildContext context, String id) {
     context.push('/estimate-detail/$id');
+  }
+
+  /// True only when at least one month has a sale greater than 0.
+  bool _hasSalesData(List<dynamic> monthlySales) {
+    if (monthlySales.isEmpty) return false;
+    return monthlySales.any((m) => (m.total as num) > 0);
   }
 
   @override
@@ -152,9 +158,16 @@ class _DashboardHomeView extends StatelessWidget {
                       SizedBox(height: Responsive.h(28)),
                       _SectionTitle(title: 'Sales Overview'),
                       SizedBox(height: Responsive.h(14)),
-                      _CardWrapper(
-                        child: DashboardMonthlySalesChart(data: state.monthlySales),
-                      ),
+                      // Show chart only when at least one month has sales
+                      if (!_hasSalesData(state.monthlySales))
+                        const _EmptyState(
+                          icon: Icons.bar_chart_rounded,
+                          message: 'No sales overview',
+                        )
+                      else
+                        _CardWrapper(
+                          child: DashboardMonthlySalesChart(data: state.monthlySales),
+                        ),
                       SizedBox(height: Responsive.h(28)),
                       _SectionTitle(
                         title: 'Recent Estimates',
@@ -163,7 +176,10 @@ class _DashboardHomeView extends StatelessWidget {
                       ),
                       SizedBox(height: Responsive.h(12)),
                       if (state.recentEstimates.isEmpty)
-                        _EmptyState()
+                        const _EmptyState(
+                          icon: Icons.description_outlined,
+                          message: 'No recent estimates yet',
+                        )
                       else
                         _CardWrapper(
                           padding: EdgeInsets.zero,
@@ -618,6 +634,11 @@ class _CardWrapper extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
   @override
   Widget build(BuildContext context) {
     return _CardWrapper(
@@ -625,10 +646,10 @@ class _EmptyState extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: Responsive.h(24)),
         child: Column(
           children: [
-            Icon(Icons.description_outlined, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.4)),
+            Icon(icon, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.4)),
             SizedBox(height: Responsive.h(10)),
             Text(
-              'No recent estimates yet',
+              message,
               style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
             ),
           ],

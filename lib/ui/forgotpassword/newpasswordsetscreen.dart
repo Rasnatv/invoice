@@ -7,10 +7,6 @@ import '../../bloc/forgotpswd/forgotpassword_bloc.dart';
 import '../../bloc/forgotpswd/forgotpassword_event.dart';
 import '../../bloc/forgotpswd/forgotpassword_state.dart';
 
-/// Screen 3 of the flow — collects the new password and calls
-/// POST /reset-password (email + otp carried forward in the bloc's state
-/// from the earlier two screens). On success, replaces itself with
-/// ResetSuccessScreen below.
 class SetNewPasswordScreen extends StatefulWidget {
   const SetNewPasswordScreen({super.key});
 
@@ -456,47 +452,6 @@ class _SuccessBadge extends StatelessWidget {
   }
 }
 
-// class _BrandButton extends StatelessWidget {
-//   final String label;
-//   final VoidCallback onPressed;
-//
-//   const _BrandButton({required this.label, required this.onPressed});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return SizedBox(
-//       width: double.infinity,
-//       height: 52,
-//       child: DecoratedBox(
-//         decoration: BoxDecoration(
-//           borderRadius: BorderRadius.circular(14),
-//           gradient: AppColors.primaryGradient,
-//           boxShadow: [
-//             BoxShadow(
-//               color: AppColors.primary.withOpacity(0.35),
-//               blurRadius: 18,
-//               offset: const Offset(0, 10),
-//             ),
-//           ],
-//         ),
-//         child: Material(
-//           color: Colors.transparent,
-//           child: InkWell(
-//             borderRadius: BorderRadius.circular(14),
-//             onTap: onPressed,
-//             child: Center(
-//               child: Text(
-//                 label,
-//                 style: AppTextStyles.bodyBold(color: AppColors.white)
-//                     .copyWith(fontSize: 15.5, letterSpacing: 0.2),
-//               ),
-//             ),
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
 class _BrandButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;

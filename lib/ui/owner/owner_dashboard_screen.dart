@@ -27,6 +27,12 @@ class OwnerDashboardScreen extends StatelessWidget {
 class _OwnerDashboardView extends StatelessWidget {
   const _OwnerDashboardView();
 
+  /// True only when at least one month has a sale greater than 0.
+  bool _hasSalesData(List<dynamic> monthlySales) {
+    if (monthlySales.isEmpty) return false;
+    return monthlySales.any((m) => (m.total as num) > 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -184,19 +190,26 @@ class _OwnerDashboardView extends StatelessWidget {
                       SizedBox(height: Responsive.h(28)),
                       const _SectionTitle(title: 'Sales Overview'),
                       SizedBox(height: Responsive.h(14)),
-                      _CardWrapper(
-                        child: MonthlySalesSection(
-                          monthlySales: state.monthlySales
-                              .map(
-                                (m) => MonthlySales(
-                              monthLabel: m.month,
-                              amount: m.total.toDouble(),
-                            ),
-                          )
-                              .toList(),
-                          currency: currency,
+                      // Show chart only when at least one month has sales
+                      if (!_hasSalesData(state.monthlySales))
+                        const _EmptyState(
+                          icon: Icons.bar_chart_rounded,
+                          message: 'No sales overview',
+                        )
+                      else
+                        _CardWrapper(
+                          child: MonthlySalesSection(
+                            monthlySales: state.monthlySales
+                                .map(
+                                  (m) => MonthlySales(
+                                monthLabel: m.month,
+                                amount: m.total.toDouble(),
+                              ),
+                            )
+                                .toList(),
+                            currency: currency,
+                          ),
                         ),
-                      ),
                       SizedBox(height: Responsive.h(28)),
                       _SectionTitle(
                         title: 'Recent Estimates',
@@ -212,7 +225,10 @@ class _OwnerDashboardView extends StatelessWidget {
                               .add(const OwnerDashboardRequested()),
                         )
                       else if (state.recentEstimates.isEmpty)
-                        const _EmptyState()
+                        const _EmptyState(
+                          icon: Icons.description_outlined,
+                          message: 'No estimates yet',
+                        )
                       else
                         Column(
                           children: [
@@ -613,7 +629,10 @@ class _CardWrapper extends StatelessWidget {
 // ---------------- EMPTY / ERROR STATES ----------------
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -622,12 +641,9 @@ class _EmptyState extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: Responsive.h(24)),
         child: Column(
           children: [
-            Icon(Icons.description_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(icon, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(10)),
-            Text(
-              'No estimates yet',
-                style: AppTextStyles.subtitle()),
-
+            Text(message, style: AppTextStyles.subtitle()),
           ],
         ),
       ),

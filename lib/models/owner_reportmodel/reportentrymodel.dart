@@ -1,12 +1,4 @@
-/// A single quotation or estimate row as returned by:
-///   POST /reports/salesman-performance
-///   POST /reports/contractor-performance
-///
-/// The two source lists use different key names for the "number" field
-/// (`quotation_number` vs `estimate_number`) and estimates additionally
-/// carry an `approved_at` timestamp, so use the matching factory:
-///   ReportEntryModel.fromQuotationJson(json)
-///   ReportEntryModel.fromEstimateJson(json)
+
 class ReportEntryModel {
   final String id;
   final String number;

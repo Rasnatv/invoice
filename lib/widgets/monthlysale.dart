@@ -5,11 +5,7 @@ import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
 import 'owner_widgets.dart'; // OwnerSectionTitle, OwnerEmptyState
 
-// ---------------- MONTHLY SALES SECTION ----------------
-//
-// Model: add this (or similar) to your dummymodels, and a
-// `List<MonthlySales> monthlySales` field to OwnerState, populated with
-// the last 6 months (oldest -> newest).
+
 //
 class MonthlySales {
   final String monthLabel; // 'Jan', 'Feb', ...
@@ -17,10 +13,6 @@ class MonthlySales {
   const MonthlySales({required this.monthLabel, required this.amount});
 }
 
-// Usage inside owner_dashboard_screen.dart, right after Quick Actions:
-//
-//   _MonthlySalesSection(monthlySales: state.monthlySales, currency: currency),
-//   SizedBox(height: Responsive.h(28)),
 
 class MonthlySalesSection extends StatelessWidget {
   const MonthlySalesSection({

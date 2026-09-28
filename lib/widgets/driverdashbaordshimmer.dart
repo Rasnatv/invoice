@@ -3,27 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
 
-// ============================================================
-// GENERIC SHIMMER WIDGET
-// Reusable anywhere in the app — not tied to the driver dashboard.
-// ============================================================
 
-/// Generic, reusable shimmer loading effect. Wrap any skeleton built from
-/// plain white [ShimmerBox]es with [ShimmerEffect] to get an animated
-/// left-to-right sheen. No external `shimmer` package needed.
-///
-/// Usage:
-/// ```dart
-/// ShimmerEffect(
-///   child: Column(
-///     children: [
-///       ShimmerBox(width: 120, height: 14),
-///       SizedBox(height: 8),
-///       ShimmerBox(width: 80, height: 10),
-///     ],
-///   ),
-/// )
-/// ```
 class ShimmerEffect extends StatefulWidget {
   const ShimmerEffect({
     super.key,
