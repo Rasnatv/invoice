@@ -11,12 +11,6 @@ import '../../bloc/ownerbloc/allincentiveproductlist/allincentiveproductlist_sta
 import '../../models/salesmanmodels/salesmanowner_incentivemodel.dart';
 import 'billpage.dart';
 
-/// Full paginated product-wise incentive list for a salesman + month.
-/// Opened via the "View All" button on [OwnerSalesmanIncentiveScreen].
-///
-/// Hits POST /salesman-incentives/products — same call for owner and
-/// salesman; [salesmanId] is simply omitted when a salesman is viewing
-/// their own list.
 class AllProductsScreen extends StatelessWidget {
   const AllProductsScreen({
     super.key,
