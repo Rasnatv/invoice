@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -42,11 +43,15 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
     final emailController = TextEditingController(text: existing?.email ?? '');
     final mobileController = TextEditingController(text: existing?.mobile ?? '');
     final addressController = TextEditingController(text: existing?.address ?? '');
+
+    // Empty by default when adding; pre-filled only when editing
     final ValueNotifier<DateTime?> joiningDate = ValueNotifier<DateTime?>(
       existing != null && existing.joiningDate.isNotEmpty
           ? DateTime.tryParse(existing.joiningDate)
-          : DateTime.now(),
+          : null,
     );
+    final ValueNotifier<bool> showDateError = ValueNotifier<bool>(false);
+
     // Only relevant on edit — the create API doesn't accept is_active.
     final ValueNotifier<bool> isActive = ValueNotifier<bool>(existing?.isActive ?? true);
     final formKey = GlobalKey<FormState>();
@@ -145,44 +150,61 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: Responsive.h(14)),
+
+                        // ---- Joining Date (empty until user selects) ----
                         ValueListenableBuilder<DateTime?>(
                           valueListenable: joiningDate,
                           builder: (context, date, _) {
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(14),
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: sheetContext,
-                                  initialDate: date ?? DateTime.now(),
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime(2100),
+                            return ValueListenableBuilder<bool>(
+                              valueListenable: showDateError,
+                              builder: (context, hasError, _) {
+                                return InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: sheetContext,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      joiningDate.value = picked;
+                                      showDateError.value = false;
+                                    }
+                                  },
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText: 'Joining Date',
+                                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                                      prefixIcon: Icon(Icons.calendar_today_outlined,
+                                          color: AppColors.textSecondary, size: 20),
+                                      errorText:
+                                      hasError ? 'Please select joining date' : null,
+                                      filled: true,
+                                      fillColor: AppColors.background,
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: Responsive.w(14),
+                                        vertical: Responsive.h(14),
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      date != null
+                                          ? _formatDate(date)
+                                          : 'Select Joining Date',
+                                      style: TextStyle(
+                                        fontSize: Responsive.sp(14),
+                                        color: date != null
+                                            ? AppColors.black
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
                                 );
-                                if (picked != null) joiningDate.value = picked;
                               },
-                              child: InputDecorator(
-                                decoration: InputDecoration(
-                                  labelText: 'Joining Date',
-                                  prefixIcon: Icon(Icons.calendar_today_outlined,
-                                      color: AppColors.textSecondary, size: 20),
-                                  filled: true,
-                                  fillColor: AppColors.background,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: Responsive.w(14),
-                                    vertical: Responsive.h(14),
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                                child: Text(
-                                  date != null ? _formatDate(date) : 'Select date',
-                                  style: TextStyle(
-                                    fontSize: Responsive.sp(14),
-                                    color: date != null ? AppColors.black : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
                             );
                           },
                         ),
@@ -243,13 +265,17 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                 onPressed: isSaving
                                     ? null
                                     : () {
-                                  if (!formKey.currentState!.validate()) return;
+                                  final formValid =
+                                  formKey.currentState!.validate();
+
                                   if (joiningDate.value == null) {
-                                    AppSnackbar.warning('Please select a joining date');
+                                    showDateError.value = true;
                                     return;
                                   }
+                                  if (!formValid) return;
 
-                                  final joiningDateStr = _formatDate(joiningDate.value!);
+                                  final joiningDateStr =
+                                  _formatDate(joiningDate.value!);
 
                                   if (isEdit) {
                                     bloc.add(UpdateFieldStaffEvent(
@@ -305,7 +331,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
     );
   }
 
-// ---------------- DELETE CONFIRM ----------------
+  // ---------------- DELETE CONFIRM ----------------
 
   Future<void> _confirmDeleteStaff(BuildContext context, FieldStaffModel staff) async {
     final bloc = context.read<FieldStaffBloc>();
@@ -319,6 +345,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
       bloc.add(DeleteFieldStaffEvent(FieldStaffDeleteModel(id: staff.id)));
     }
   }
+
   // ---------------- HELPERS ----------------
 
   String _formatDate(DateTime date) {
@@ -350,47 +377,49 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-        title: Text('Field Staff', style: AppTextStyles.h6()),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: () => _openStaffSheet(context),
-        icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
-        label: Text(
-          'Add Staff',
-          style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          centerTitle: true,
+          title: Text('Field Staff', style: AppTextStyles.h6()),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: AppColors.primary,
+          onPressed: () => _openStaffSheet(context),
+          icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
+          label: Text(
+            'Add Staff',
+            style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
+          ),
+        ),
+        body: ResponsiveCenter(
+          child: BlocConsumer<FieldStaffBloc, FieldStaffState>(
+            listener: (context, state) {
+              if (state.status == FieldStaffStatus.deleteSuccess) {
+                AppSnackbar.success(state.message ?? 'Removed');
+              } else if (state.status == FieldStaffStatus.deleteError) {
+                AppSnackbar.error(state.message ?? 'Failed to remove');
+              }
+            },
+            builder: (context, state) {
+              return RefreshIndicator(
+                // This is the only other place a fetch is triggered — an
+                // explicit pull-to-refresh. The bloc itself never refetches
+                // after add/update/delete; it patches staffList locally.
+                onRefresh: () async {
+                  context.read<FieldStaffBloc>().add(const FetchFieldStaffListEvent());
+                },
+                child: _buildBody(context, state),
+              );
+            },
+          ),
         ),
       ),
-      body: ResponsiveCenter(
-        child: BlocConsumer<FieldStaffBloc, FieldStaffState>(
-          listener: (context, state) {
-            if (state.status == FieldStaffStatus.deleteSuccess) {
-              AppSnackbar.success(state.message ?? 'Removed');
-            } else if (state.status == FieldStaffStatus.deleteError) {
-              AppSnackbar.error(state.message ?? 'Failed to remove');
-            }
-          },
-          builder: (context, state) {
-            return RefreshIndicator(
-              // This is the only other place a fetch is triggered — an
-              // explicit pull-to-refresh. The bloc itself never refetches
-              // after add/update/delete; it patches staffList locally.
-              onRefresh: () async {
-                context.read<FieldStaffBloc>().add(const FetchFieldStaffListEvent());
-              },
-              child: _buildBody(context, state),
-            );
-          },
-        ),
-      ),
-    ));
+    );
   }
 
   Widget _buildBody(BuildContext context, FieldStaffState state) {
@@ -595,10 +624,7 @@ class _EmptyStaffState extends StatelessWidget {
           children: [
             Icon(Icons.badge_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(12)),
-            Text(
-              'No field staff added yet',
-                style: AppTextStyles.subtitle()),
-
+            Text('No field staff added yet', style: AppTextStyles.subtitle()),
           ],
         ),
       ),

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -12,7 +13,6 @@ import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/driver/driver_bloc.dart';
 import '../../bloc/ownerbloc/driver/driver_event.dart';
 import '../../bloc/ownerbloc/driver/driver_state.dart';
-
 
 class OwnerDriverScreen extends StatelessWidget {
   const OwnerDriverScreen({super.key});
@@ -52,10 +52,12 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    DateTime joiningDate = existing?.joiningDate != null &&
-        existing!.joiningDate.isNotEmpty
-        ? DateTime.tryParse(existing.joiningDate) ?? DateTime.now()
-        : DateTime.now();
+    // Empty by default when adding; pre-filled only when editing
+    DateTime? joiningDate;
+    if (existing != null && existing.joiningDate.isNotEmpty) {
+      joiningDate = DateTime.tryParse(existing.joiningDate);
+    }
+    bool showDateError = false;
 
     bool isActive = existing?.isActive ?? true;
 
@@ -159,24 +161,30 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                         ),
                         SizedBox(height: Responsive.h(14)),
 
+                        // ---- Joining Date (empty until user selects) ----
                         InkWell(
                           borderRadius: BorderRadius.circular(14),
                           onTap: () async {
                             final picked = await showDatePicker(
                               context: sheetContext,
-                              initialDate: joiningDate,
+                              initialDate: joiningDate ?? DateTime.now(),
                               firstDate: DateTime(2000),
                               lastDate: DateTime(2100),
                             );
                             if (picked != null) {
-                              setSheetState(() => joiningDate = picked);
+                              setSheetState(() {
+                                joiningDate = picked;
+                                showDateError = false;
+                              });
                             }
                           },
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: 'Joining Date',
-                              floatingLabelBehavior: FloatingLabelBehavior.always, // forces label to top
-                              prefixIcon: Icon(Icons.event_outlined, color: AppColors.textSecondary, size: 20),
+                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              prefixIcon: Icon(Icons.event_outlined,
+                                  color: AppColors.textSecondary, size: 20),
+                              errorText: showDateError ? 'Please select joining date' : null,
                               filled: true,
                               fillColor: AppColors.background,
                               contentPadding: EdgeInsets.symmetric(
@@ -189,15 +197,19 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                               ),
                             ),
                             child: Text(
-                              _formatDate(joiningDate),
+                              joiningDate == null
+                                  ? 'Select Joining Date'
+                                  : _formatDate(joiningDate!),
                               style: TextStyle(
                                 fontSize: Responsive.sp(14),
-                                color: AppColors.black,
+                                color: joiningDate == null
+                                    ? AppColors.textSecondary
+                                    : AppColors.black,
                               ),
                             ),
                           ),
                         ),
-                        SizedBox(height: Responsive.h(10)),
+                        SizedBox(height: Responsive.h(16)),
                         SizedBox(
                           width: double.infinity,
                           height: Responsive.h(48),
@@ -209,7 +221,15 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                               ),
                             ),
                             onPressed: () {
-                              if (!formKey.currentState!.validate()) return;
+                              final formValid = formKey.currentState!.validate();
+
+                              if (joiningDate == null) {
+                                setSheetState(() => showDateError = true);
+                                return;
+                              }
+                              if (!formValid) return;
+
+                              final dateString = _formatDate(joiningDate!);
 
                               if (isEdit) {
                                 bloc.add(UpdateDriver(
@@ -219,7 +239,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                                   mobile: mobileController.text.trim(),
                                   licenseNumber: licenseController.text.trim(),
                                   vehicleNumber: vehicleController.text.trim(),
-                                  joiningDate: _formatDate(joiningDate),
+                                  joiningDate: dateString,
                                   isActive: isActive,
                                   password: passwordController.text.trim().isEmpty
                                       ? null
@@ -232,7 +252,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                                   mobile: mobileController.text.trim(),
                                   licenseNumber: licenseController.text.trim(),
                                   vehicleNumber: vehicleController.text.trim(),
-                                  joiningDate: _formatDate(joiningDate),
+                                  joiningDate: dateString,
                                 ));
                               }
 
@@ -623,12 +643,10 @@ class _EmptyDriverState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.local_shipping_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(Icons.local_shipping_outlined,
+                size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(10)),
-            Text(
-              'No drivers added yet',
-            style: AppTextStyles.subtitle()),
-
+            Text('No drivers added yet', style: AppTextStyles.subtitle()),
           ],
         ),
       ),

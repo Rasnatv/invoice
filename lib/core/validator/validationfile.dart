@@ -122,13 +122,6 @@ class DValidator {
     LengthLimitingTextInputFormatter(defaultPhoneLength),
   ];
 
-  // ── Vehicle number (India) ─────────────────────────────────
-  /// Standard format: SS DD AA NNNN  e.g. KL07AB1234
-  ///   SS   = 2-letter state code
-  ///   DD   = 1-2 digit RTO/district code
-  ///   AA   = 0-3 letter series (some older plates skip this)
-  ///   NNNN = 4-digit number
-  /// Also matches the newer BH-series: 22BH1234AB
   static final RegExp _vehicleNumberRegExp = RegExp(
     r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$|^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$',
   );
@@ -142,7 +135,7 @@ class DValidator {
       return 'Vehicle number is required';
     }
     final v = value.trim().toUpperCase().replaceAll(' ', '').replaceAll('-', '');
-    if (v.length < 9 || v.length > vehicleNumberMaxLength) {
+    if (v.length < 10 || v.length > vehicleNumberMaxLength) {
       return 'Vehicle number must be 9-$vehicleNumberMaxLength characters';
     }
     if (!_vehicleNumberRegExp.hasMatch(v)) {
@@ -159,13 +152,6 @@ class DValidator {
     LengthLimitingTextInputFormatter(vehicleNumberMaxLength),
   ];
 
-  // ── Driving License number (India) ─────────────────────────
-  /// Standard format: SS RR YYYY NNNNNNN  e.g. KL0720230012345
-  ///   SS      = 2-letter state code
-  ///   RR      = 2-digit RTO code
-  ///   YYYY    = 4-digit issue year
-  ///   NNNNNNN = 7-digit serial number
-  /// Total length is always 15 characters.
   static final RegExp _licenseNumberRegExp = RegExp(
     r'^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7}$',
   );

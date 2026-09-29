@@ -355,14 +355,6 @@ class ApiClient {
 
   // =================== QUOTATIONS / ESTIMATES ===================
 
-  /// POST /quotations/create — used by both the salesman and owner Create
-  /// Estimate screens. `data['action']` drives server-side behavior:
-  ///   - 'save_quotation' -> saved as a draft
-  ///   - 'submit'          -> submitted for admin/owner approval
-  ///   - 'approve'         -> owner-only, creates AND finalizes the
-  ///                          estimate in one call. The owner screen sends
-  ///                          `salesman_id` plus optional discount_*/
-  ///                          payment_* fields along with this action.
   Future<Response> createQuotation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.quotationsCreate,
     data: data,
@@ -412,13 +404,6 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /quotations/cancel — body: { id }. Cancels a quotation/estimate
-  /// (any of the API's normal statuses can transition to cancelled). Per
-  /// the API's own message, this also reverts a linked site visit back to
-  /// pending if one exists.
-  ///
-  /// Requires a new entry in ApiConstants (mirroring quotationsApprove
-  /// above):
   ///   static const String quotationsCancel = 'quotations/cancel';
   Future<Response> cancelQuotation(Map<String, dynamic> data) async => dio.post(
     ApiConstants.quotationsCancel,
@@ -462,7 +447,7 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  Future<Response> estimates({int page = 1, int perPage = 100}) async => dio.get(
+  Future<Response> estimates({int page = 1, int perPage = 10}) async => dio.get(
     '${ApiConstants.estimatesAll}?page=$page&per_page=$perPage',
     options: await _authOptions(),
   );
