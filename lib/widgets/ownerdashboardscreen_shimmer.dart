@@ -254,6 +254,45 @@ class ShimmerCardWrapper extends StatelessWidget {
 }
 
 /// Skeleton for the horizontal "Quick Actions" row — mimics N icon+label tiles.
+// class QuickActionsShimmer extends StatelessWidget {
+//   const QuickActionsShimmer({super.key, this.count = 6});
+//   final int count;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return SizedBox(
+//       height: Responsive.h(100),
+//       child: ListView.separated(
+//         scrollDirection: Axis.horizontal,
+//         physics: const NeverScrollableScrollPhysics(),
+//         itemCount: count,
+//         separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
+//         itemBuilder: (context, i) => SizedBox(
+//           width: Responsive.w(84),
+//           child: Container(
+//             padding: EdgeInsets.symmetric(vertical: Responsive.h(10), horizontal: Responsive.w(4)),
+//             decoration: BoxDecoration(
+//               color: Colors.white,
+//               borderRadius: BorderRadius.circular(18),
+//               border: Border.all(color: AppColors.textSecondary.withOpacity(0.10)),
+//             ),
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               mainAxisAlignment: MainAxisAlignment.center,
+//               children: [
+//                 ShimmerWidget.circular(size: 36),
+//                 SizedBox(height: Responsive.h(8)),
+//                 ShimmerWidget.rectangular(width: 52, height: 9, borderRadius: 4),
+//                 SizedBox(height: Responsive.h(4)),
+//                 ShimmerWidget.rectangular(width: 36, height: 9, borderRadius: 4),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
 class QuickActionsShimmer extends StatelessWidget {
   const QuickActionsShimmer({super.key, this.count = 6});
   final int count;
@@ -261,16 +300,16 @@ class QuickActionsShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: Responsive.h(100),
+      height: 100, // fixed height, does not shrink in landscape
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: count,
         separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
         itemBuilder: (context, i) => SizedBox(
-          width: Responsive.w(84),
+          width: 84,
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(10), horizontal: Responsive.w(4)),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -281,9 +320,9 @@ class QuickActionsShimmer extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ShimmerWidget.circular(size: 36),
-                SizedBox(height: Responsive.h(8)),
+                const SizedBox(height: 8),
                 ShimmerWidget.rectangular(width: 52, height: 9, borderRadius: 4),
-                SizedBox(height: Responsive.h(4)),
+                const SizedBox(height: 4),
                 ShimmerWidget.rectangular(width: 36, height: 9, borderRadius: 4),
               ],
             ),
@@ -293,7 +332,6 @@ class QuickActionsShimmer extends StatelessWidget {
     );
   }
 }
-
 /// Skeleton for the Sales Overview card content (bar-chart style).
 class SalesOverviewShimmer extends StatelessWidget {
   const SalesOverviewShimmer({super.key});

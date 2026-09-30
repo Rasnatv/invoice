@@ -208,9 +208,7 @@ class DValidator {
     LengthLimitingTextInputFormatter(10),
   ];
 
-  // ── Optional decimal number (e.g. area sqft, budget) ──────
-  /// For optional numeric fields. Empty is allowed (returns null).
-  /// If something is typed, it must be a valid non-negative number.
+
   static String? validateOptionalNumber(String fieldName, String? value, {double? max}) {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return null; // optional field, nothing typed is fine
@@ -234,8 +232,7 @@ class DValidator {
   ];
 }
 
-/// Forces all typed text to uppercase — used for vehicle/license fields
-/// since Indian registration formats are always uppercase.
+
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {

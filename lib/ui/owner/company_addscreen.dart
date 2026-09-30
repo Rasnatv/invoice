@@ -13,9 +13,6 @@ import '../../bloc/ownerbloc/company/company_bloc.dart';
 import '../../bloc/ownerbloc/company/company_event.dart';
 import '../../bloc/ownerbloc/company/company_state.dart';
 
-/// Lists all companies and lets the owner add / edit / delete them.
-/// Wrapped in its own BlocProvider so it can be pushed from anywhere
-/// without the caller needing to know about CompanyBloc.
 class CompanySetupScreen extends StatelessWidget {
   const CompanySetupScreen({super.key});
 
