@@ -296,8 +296,12 @@ class _ProductIncentiveCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  String _pct(double v) => v.toStringAsFixed(v % 1 == 0 ? 0 : 2);
+
   @override
   Widget build(BuildContext context) {
+    final hasIncentive = product.incentiveType != ProductIncentiveType.none;
+
     return Container(
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
@@ -308,59 +312,24 @@ class _ProductIncentiveCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Name (full, wraps) + menu
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(product.name,
-                    style: AppTextStyles.bodyBold(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                child: Text(
+                  product.name,
+                  style: AppTextStyles.bodyBold(),
+                  softWrap: true,
+                ),
               ),
-              // FIX: badge now only shows when there's an actual active
-              // incentive (incentiveType != none), and picks % vs ₹ based
-              // on incentiveType instead of always reading
-              // incentivePercentage regardless of which type is active.
-              if (product.incentiveType != ProductIncentiveType.none)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    product.incentiveType == ProductIncentiveType.percentage
-                        ? '${product.incentivePercentage.toStringAsFixed(product.incentivePercentage % 1 == 0 ? 0 : 2)}% incentive'
-                        : '${currency.format(product.incentiveAmount)} incentive',
-                    style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              if (!product.isActive) ...[
-                SizedBox(width: Responsive.w(6)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'Inactive',
-                    style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
               SizedBox(width: Responsive.w(4)),
               PopupMenuButton<String>(
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
                 onSelected: (value) {
-                  // IMPORTANT: PopupMenuButton pops its own overlay route
-                  // when an item is selected, and that pop animation is
-                  // still in flight when onSelected fires. Immediately
-                  // pushing a new route (edit) or showing a dialog
-                  // (delete) here overlaps with that closing transition
-                  // and can crash with:
-                  //   Failed assertion: 'manifest.fromHero == newManifest.toHero'
-                  // Deferring to the next frame lets the popup's route
-                  // finish closing first.
+                  // Deferred so the popup's route finishes closing first
+                  // (avoids the 'manifest.fromHero' assertion).
                   Future.delayed(Duration.zero, () {
                     if (value == 'edit') onEdit();
                     if (value == 'delete') onDelete();
@@ -391,90 +360,87 @@ class _ProductIncentiveCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: Responsive.h(3)),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  product.company,
-                  style: AppTextStyles.caption(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (product.size.isNotEmpty) ...[
-                Text('  •  ', style: AppTextStyles.caption()),
-                Flexible(
-                  child: Text(
-                    product.size,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+
+          // Badges (below the name so they never squeeze it)
+          if (hasIncentive || !product.isActive) ...[
+            SizedBox(height: Responsive.h(4)),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (hasIncentive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      product.incentiveType == ProductIncentiveType.percentage
+                          ? '${_pct(product.incentivePercentage)}% incentive'
+                          : '${currency.format(product.incentiveAmount)} incentive',
+                      style: const TextStyle(
+                          color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
+                if (!product.isActive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Inactive',
+                      style: TextStyle(
+                          color: AppColors.error, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
               ],
-              // Packing is entered for every unit (not just box units), so
-              // show it whenever it's actually present — regardless of
-              // hasBoxPacking. Only fall back to the measurement-qty
-              // summary when there's no packing text at all.
-              if (product.packing.isNotEmpty) ...[
-                Text('  •  ', style: AppTextStyles.caption()),
-                Flexible(
-                  child: Text(
-                    product.packing,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ] else if (product.hasBoxPacking && product.piecesPerBox.isNotEmpty) ...[
-                Text('  •  ', style: AppTextStyles.caption()),
-                Flexible(
-                  child: Text(
-                    '${product.piecesPerBox} pcs/box',
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ] else if (product.hasMeasurementQty) ...[
-                Text('  •  ', style: AppTextStyles.caption()),
-                Flexible(
-                  child: Text(
-                    product.measurementQty,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ],
+            ),
+          ],
+
+          SizedBox(height: Responsive.h(4)),
+
+          // Company • size • packing (wraps instead of truncating)
+          Text(
+            [
+              product.company,
+              if (product.size.isNotEmpty) product.size,
+              if (product.packing.isNotEmpty)
+                product.packing
+              else if (product.hasBoxPacking && product.piecesPerBox.isNotEmpty)
+                '${product.piecesPerBox} pcs/box'
+              else if (product.hasMeasurementQty)
+                  product.measurementQty,
+            ].where((s) => s.isNotEmpty).join('  •  '),
+            style: AppTextStyles.caption(),
+            softWrap: true,
           ),
+
           SizedBox(height: Responsive.h(6)),
-          Row(
+
+          // MRP / Rate / Incentive (wraps on narrow screens)
+          Wrap(
+            spacing: Responsive.w(10),
+            runSpacing: 2,
             children: [
               Text('MRP ${currency.format(product.mrp)}', style: AppTextStyles.caption()),
-              SizedBox(width: Responsive.w(10)),
               Text('Rate ${currency.format(product.rate)}', style: AppTextStyles.caption()),
-              // FIX: only show the "Incentive" summary when there's an
-              // active incentiveType, and format it according to which
-              // type is active (₹ amount vs % rate) instead of always
-              // reading incentiveAmount regardless of type.
-              if (product.incentiveType != ProductIncentiveType.none) ...[
-                SizedBox(width: Responsive.w(10)),
+              if (hasIncentive)
                 Text(
                   product.incentiveType == ProductIncentiveType.percentage
-                      ? 'Incentive ${product.incentivePercentage.toStringAsFixed(product.incentivePercentage % 1 == 0 ? 0 : 2)}%'
+                      ? 'Incentive ${_pct(product.incentivePercentage)}%'
                       : 'Incentive ${currency.format(product.incentiveAmount)}',
                   style: AppTextStyles.caption(),
                 ),
-              ],
             ],
           ),
+
           if (product.minQuantity > 0) ...[
             SizedBox(height: Responsive.h(4)),
             Text(
-              'Min. Qty: ${product.minQuantity.toStringAsFixed(product.minQuantity % 1 == 0 ? 0 : 2)}',
+              'Min. Qty: ${_pct(product.minQuantity)}',
               style: AppTextStyles.caption(),
             ),
           ],

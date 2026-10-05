@@ -180,7 +180,12 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
                   );
                 },
                 child: ListView(
-                  padding: EdgeInsets.all(Responsive.w(18)),
+                  padding: EdgeInsets.fromLTRB(
+                    Responsive.w(18),
+                    Responsive.w(18),
+                    Responsive.w(18),
+                    Responsive.w(18) + MediaQuery.of(context).padding.bottom + Responsive.h(16),
+                  ),
                   children: [
                     _StatusBanner(dispatch: dispatch),
                     SizedBox(height: Responsive.h(16)),

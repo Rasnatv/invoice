@@ -35,8 +35,9 @@ class _SalesmanDispatchListView extends StatefulWidget {
 class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   final _searchCtrl = TextEditingController();
 
-  // True only while a manual pull-to-refresh is in flight.
-  bool _isPullRefreshing = false;
+  // True while a manual refresh (pull-to-refresh OR the AppBar refresh icon)
+  // is in flight.
+  bool _isRefreshing = false;
 
   @override
   void dispose() {
@@ -58,19 +59,22 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
     });
   }
 
-  Future<void> _onPullToRefresh(BuildContext context) async {
+  /// Shared by pull-to-refresh and the AppBar refresh icon.
+  Future<void> _doRefresh(BuildContext context) async {
+    if (_isRefreshing) return; // ignore taps while a refresh is running
     // Fire the refresh event, then wait for the bloc to settle into
-    // success/failure so the RefreshIndicator spinner stays visible for the
-    // full round-trip instead of dismissing instantly.
-    setState(() => _isPullRefreshing = true);
+    // success/failure so the spinner stays visible for the full round-trip.
+    setState(() => _isRefreshing = true);
     try {
       final bloc = context.read<DispatchListBloc>();
       bloc.add(const RefreshDispatchList());
-      await bloc.stream.firstWhere(
+      await bloc.stream
+          .firstWhere(
             (s) => s.status == DispatchListStatus.success || s.status == DispatchListStatus.failure,
-      );
+      )
+          .timeout(const Duration(seconds: 20), onTimeout: () => bloc.state);
     } finally {
-      if (mounted) setState(() => _isPullRefreshing = false);
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -85,6 +89,28 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
           title: Text('Dispatch Bills', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
+          actions: [
+            // Refresh icon: turns into a small spinner while refreshing.
+            _isRefreshing
+                ? Padding(
+              padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            )
+                : IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Refresh',
+              onPressed: () => _doRefresh(context),
+            ),
+          ],
         ),
         body: SafeArea(
           child: BlocBuilder<DispatchListBloc, DispatchListState>(
@@ -106,7 +132,7 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
                     ),
                   ),
                   SizedBox(height: Responsive.h(12)),
-                  Expanded(child: _buildBody(context, state, _isPullRefreshing)),
+                  Expanded(child: _buildBody(context, state, _isRefreshing)),
                 ],
               );
             },
@@ -116,39 +142,61 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
     );
   }
 
-  Widget _buildBody(BuildContext context, DispatchListState state, bool isPullRefreshing) {
+  Widget _buildBody(BuildContext context, DispatchListState state, bool isRefreshing) {
     if (state.status == DispatchListStatus.initial ||
-        (state.status == DispatchListStatus.loading && state.allDispatches.isEmpty)) {
+        (state.status == DispatchListStatus.loading &&
+            state.allDispatches.isEmpty &&
+            !isRefreshing)) {
       return const DispatchListShimmer();
     }
 
     if (state.status == DispatchListStatus.failure && state.allDispatches.isEmpty) {
-      return _ErrorView(
-        message: state.errorMessage ?? 'Failed to load dispatch bills.',
-        onRetry: () =>
-            context.read<DispatchListBloc>().add(const FetchDispatchList()),
+      return RefreshIndicator(
+        onRefresh: () => _doRefresh(context),
+        child: LayoutBuilder(
+          builder: (context, c) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: SizedBox(
+              height: c.maxHeight,
+              child: _ErrorView(
+                message: state.errorMessage ?? 'Failed to load dispatch bills.',
+                onRetry: () =>
+                    context.read<DispatchListBloc>().add(const FetchDispatchList()),
+              ),
+            ),
+          ),
+        ),
       );
     }
 
     if (state.filteredDispatches.isEmpty) {
-      return ListView(
-        children: [
-          SizedBox(height: Responsive.h(270),),
-          Icon(Icons.local_shipping_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
-          SizedBox(height: Responsive.h(10)),
-          Center(
-            child: Text(
-              state.searchQuery.isEmpty ? 'No dispatch bills found' : 'No dispatch bills match your search',
-              style: AppTextStyles.subtitle(),
+      // Wrapped in RefreshIndicator + AlwaysScrollableScrollPhysics so the
+      // pull-down refresh circle works even when there is no data.
+      return RefreshIndicator(
+        onRefresh: () => _doRefresh(context),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: Responsive.h(270)),
+            Icon(Icons.local_shipping_rounded,
+                size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
+            Center(
+              child: Text(
+                state.searchQuery.isEmpty
+                    ? 'No dispatch bills found'
+                    : 'No dispatch bills match your search',
+                style: AppTextStyles.subtitle(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: () => _onPullToRefresh(context),
-      child: isPullRefreshing
+      onRefresh: () => _doRefresh(context),
+      child: isRefreshing
           ? DispatchListShimmer(itemCount: state.filteredDispatches.length)
           : ListView.separated(
         padding: EdgeInsets.fromLTRB(

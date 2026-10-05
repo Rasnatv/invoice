@@ -30,11 +30,10 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
+
   late final TextEditingController _emailController;
 
   final FocusNode _nameFocus = FocusNode();
-  final FocusNode _phoneFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -50,17 +49,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     _nameController = TextEditingController(text: widget.initialName);
-    _phoneController = TextEditingController(text: phone);
     _emailController = TextEditingController(text: widget.initialEmail);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
     _emailController.dispose();
     _nameFocus.dispose();
-    _phoneFocus.dispose();
     _emailFocus.dispose();
     super.dispose();
   }
@@ -73,7 +69,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       UpdateProfileRequested(
         ProfileModel(
           name: _nameController.text.trim(),
-          mobile: _phoneController.text.trim(),
           email: _emailController.text.trim(),
         ),
       ),
@@ -141,21 +136,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     const _FieldLabel('PHONE NUMBER'),
                     SizedBox(height: Responsive.h(8)),
-                    _BrandField(
-                      controller: _phoneController,
-                      focusNode: _phoneFocus,
-                      hint: '98765 43210',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: DValidator.phoneNumber, // digits only, max 10
-                      validator: (v) {
-                        // Optional: some roles (e.g. owners) have no phone on file
-                        if (v == null || v.trim().isEmpty) return null;
-                        return DValidator.validatePhoneNumber(v); // exactly 10 digits
-                      },
-                    ),
-                    SizedBox(height: Responsive.h(20)),
-
                     const _FieldLabel('EMAIL ADDRESS'),
                     SizedBox(height: Responsive.h(8)),
                     _BrandField(

@@ -267,13 +267,17 @@ class _PhoneSiteVisitField extends StatelessWidget {
 
         return BlocBuilder<OwnerEstimateBloc, OwnerEstimateState>(
           buildWhen: (prev, curr) =>
-          prev.siteVisits != curr.siteVisits || prev.siteVisitsStatus != curr.siteVisitsStatus,
+          prev.siteVisits != curr.siteVisits ||
+              prev.siteVisitsStatus != curr.siteVisitsStatus ||
+              prev.selectedSiteVisit != curr.selectedSiteVisit,
           builder: (context, state) {
             List<SiteVisitDropdownItem> matches = [];
             if (query.length >= _minDigitsToSearch) {
               matches = state.siteVisits.where((v) => v.customerPhone.contains(query)).toList();
             }
-            final showSuggestions = matches.isNotEmpty;
+            final selected = state.selectedSiteVisit;
+            final alreadySelected = selected != null && selected.customerPhone == query;
+            final showSuggestions = matches.isNotEmpty && !alreadySelected;
             final loading = state.siteVisitsStatus == LoadStatus.loading;
             final failed = state.siteVisitsStatus == LoadStatus.failure;
 
@@ -610,16 +614,39 @@ class AddItemsStep extends StatelessWidget {
                         ),
                       ),
                     ),
-                  LabeledField(
-                    label: 'MRP (auto)',
-                    field: IgnorePointer(
-                      child: CustomTextField(
-                        hint: 'Select a product first',
-                        icon: Icons.currency_rupee,
-                        keyboardType: TextInputType.number,
-                        controller: itemMrpCtrl,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LabeledField(
+                          label: 'MRP (auto)',
+                          field: IgnorePointer(
+                            child: CustomTextField(
+                              hint: 'MRP',
+                              icon: Icons.currency_rupee,
+                              keyboardType: TextInputType.number,
+                              controller: itemMrpCtrl,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      SizedBox(width: Responsive.w(10)),
+                      Expanded(
+                        child: LabeledField(
+                          label: 'Rate',
+                          field: CustomTextField(
+                            hint: 'Rate',
+                            icon: Icons.currency_rupee,
+                            keyboardType: TextInputType.number,
+                            controller: itemRateCtrl,
+                            inputFormatters: DValidator.decimalNumber,
+                            onChanged: (_) {
+                              setLocalState(() {});
+                              onQtyRateChanged?.call();
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   LabeledField(
@@ -671,20 +698,6 @@ class AddItemsStep extends StatelessWidget {
                         ),
                       ],
                     ),
-                  LabeledField(
-                    label: 'Rate',
-                    field: CustomTextField(
-                      hint: 'Enter rate per unit',
-                      icon: Icons.currency_rupee,
-                      keyboardType: TextInputType.number,
-                      controller: itemRateCtrl,
-                      inputFormatters: DValidator.decimalNumber,
-                      onChanged: (_) {
-                        setLocalState(() {});
-                        onQtyRateChanged?.call();
-                      },
-                    ),
-                  ),
 
                   SizedBox(height: Responsive.h(14)),
 

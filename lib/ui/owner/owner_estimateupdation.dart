@@ -14,6 +14,7 @@ import '../../../core/validator/validationfile.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_bloc.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
+import '../../core/utils/delete_helper.dart';
 import '../../models/owner_models/ownerestimate_updatemodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
@@ -221,6 +222,14 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     _addressCtrl = TextEditingController(text: d.customerAddress);
     _emailCtrl = TextEditingController(text: d.customerEmail);
 
+    // When the customer phone number is cleared completely, the other
+    // customer fields (name / address / email) are cleared too — same
+    // behaviour as the Create Estimate screen.
+    _phoneCtrl.addListener(_onPhoneChanged);
+
+    // Product suggestions open when the product field is tapped/focused.
+    _productSearchFocus.addListener(_onProductFocusChanged);
+
     _contractorNameCtrl = TextEditingController(text: d.customer.name);
     _contractorPhoneCtrl = TextEditingController(text: d.customer.phone);
     _contractorEmailCtrl = TextEditingController(text: d.customer.email);
@@ -248,6 +257,31 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     }
 
     _loadProducts();
+  }
+
+  /// Clears name / address / email once the phone number is emptied.
+  void _onPhoneChanged() {
+    if (_phoneCtrl.text.trim().isNotEmpty) return;
+    if (_nameCtrl.text.isEmpty && _addressCtrl.text.isEmpty && _emailCtrl.text.isEmpty) {
+      return;
+    }
+    _nameCtrl.clear();
+    _addressCtrl.clear();
+    _emailCtrl.clear();
+  }
+
+  /// Opens the product suggestion list when the product field gains focus
+  /// (tap) and closes it shortly after focus is lost. The small delay lets
+  /// a tap on a suggestion register before the list disappears.
+  void _onProductFocusChanged() {
+    if (_productSearchFocus.hasFocus) {
+      setState(() => _showProductSuggestions = true);
+    } else {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!mounted || _productSearchFocus.hasFocus) return;
+        setState(() => _showProductSuggestions = false);
+      });
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -312,6 +346,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   @override
   void dispose() {
+    _phoneCtrl.removeListener(_onPhoneChanged);
+    _productSearchFocus.removeListener(_onProductFocusChanged);
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
@@ -422,17 +458,17 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   /// Add/Update Item tapped.
   ///
-  /// NEW behavior: if the row being edited already has a server id (it
-  /// was loaded from the saved estimate, not added in this session),
-  /// this now dispatches OwnerEstimateItemUpdateRequested and returns —
-  /// PUT /estimates/update-item fires immediately, same as the quotation
-  /// edit screen. The row itself is patched once the bloc reports
-  /// itemUpdateStatus == success (see the BlocConsumer listener below).
+  /// If the row being edited already has a server id (it was loaded from
+  /// the saved estimate, not added in this session), this dispatches
+  /// OwnerEstimateItemUpdateRequested and returns — PUT
+  /// /estimates/update-item fires immediately. The row itself is patched
+  /// once the bloc reports itemUpdateStatus == success (see the
+  /// BlocConsumer listener below).
   ///
-  /// Everything below the early-return is unchanged: it's the local-only
-  /// path for brand-new items (and edits of items that aren't saved yet),
-  /// which still goes through product-incentive for a computed `amount`
-  /// and only reaches the server when "Save Changes" is tapped.
+  /// Everything below the early-return is the local-only path for
+  /// brand-new items (and edits of items that aren't saved yet), which
+  /// goes through product-incentive for a computed `amount` and only
+  /// reaches the server when "Save Changes" is tapped.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
@@ -586,26 +622,38 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       _itemPieceQtyCtrl.text = _formatQty(item.pieceQuantity);
     });
 
+    // Make sure the suggestion list isn't left open from a previous tap.
+    _productSearchFocus.unfocus();
+
     AppSnackbar.error('Edit the fields above, then tap "Update Item"');
   }
 
   void _cancelEditItem() => _resetItemForm();
 
-  /// NEW: rows already saved on the server (non-empty id) now go through
-  /// POST /estimates/remove-item immediately instead of only being
-  /// dropped from local state. The row is removed from `_items` once the
-  /// bloc reports itemRemoveStatus == success (see BlocConsumer below).
-  /// Rows added in this session (empty id) are still removed locally only,
-  /// exactly as before.
-  void _removeItem(int index) {
+  /// Rows already saved on the server (non-empty id) show the
+  /// "Are you sure you want to delete this item?" confirmation first.
+  /// Only after the owner confirms is POST /estimates/remove-item
+  /// dispatched; the row is removed from `_items` once the bloc reports
+  /// itemRemoveStatus == success (see BlocConsumer below).
+  /// Rows added in this session (empty id) are removed locally only,
+  /// with no confirmation, since nothing exists on the server for them.
+  Future<void> _removeItem(int index) async {
     final item = _items[index];
+
     if (item.id.isNotEmpty) {
-      debugPrint('OwnerEstimateUpdateScreen: dispatching item remove -> '
-          'estimateId=${widget.detail.id} itemId=${item.id}');
-      context.read<OwnerEstimateDetailBloc>().add(OwnerEstimateItemRemoveRequested(
-        estimateId: widget.detail.id,
-        estimateItemId: item.id,
-      ));
+      await deleteItem(
+        context,
+        itemName: 'item',
+        onConfirmed: () async {
+          if (!mounted) return;
+          debugPrint('OwnerEstimateUpdateScreen: dispatching item remove -> '
+              'estimateId=${widget.detail.id} itemId=${item.id}');
+          context.read<OwnerEstimateDetailBloc>().add(OwnerEstimateItemRemoveRequested(
+            estimateId: widget.detail.id,
+            estimateItemId: item.id,
+          ));
+        },
+      );
       return;
     }
 
@@ -679,8 +727,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
         appBar: AppBar(title: Text('Update Estimate', style: AppTextStyles.h6())),
         body: SafeArea(
           child: BlocConsumer<OwnerEstimateDetailBloc, OwnerEstimateDetailState>(
-            // NEW: also listen for the per-item update/remove statuses so
-            // this screen reacts as soon as PUT /estimates/update-item or
+            // Also listen for the per-item update/remove statuses so this
+            // screen reacts as soon as PUT /estimates/update-item or
             // POST /estimates/remove-item finishes.
             listenWhen: (previous, current) =>
             previous.actionStatus != current.actionStatus ||
@@ -695,7 +743,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                 AppSnackbar.error(state.actionMessage ?? 'Failed to update estimate.');
               }
 
-              // NEW: single-item update finished.
+              // Single-item update finished.
               if (state.itemUpdateStatus == OwnerEstimateActionStatus.success &&
                   state.updatedEstimateItemId != null) {
                 AppSnackbar.success(state.itemUpdateMessage ?? 'Item updated.');
@@ -719,7 +767,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                 AppSnackbar.error(state.itemUpdateMessage ?? 'Failed to update item.');
               }
 
-              // NEW: single-item remove finished.
+              // Single-item remove finished.
               if (state.itemRemoveStatus == OwnerEstimateActionStatus.success &&
                   state.removedEstimateItemId != null) {
                 AppSnackbar.success(state.itemRemoveMessage ?? 'Item removed.');
@@ -734,7 +782,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
             },
             builder: (context, state) {
               final isBusy = state.actionStatus == OwnerEstimateActionStatus.inProgress;
-              // NEW: also disable the Add/Update Item button while a
+              // Also disable the Add/Update Item button while a
               // single-item PUT is in flight.
               final isUpdatingItem =
                   state.itemUpdateStatus == OwnerEstimateActionStatus.inProgress;
@@ -751,15 +799,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                           Text('Customer Details', style: AppTextStyles.h3()),
                           SizedBox(height: Responsive.h(12)),
                           LabeledField(
-                            label: 'Customer Name',
-                            field: CustomTextField(
-                              hint: 'Enter customer name',
-                              icon: Icons.groups_2_outlined,
-                              controller: _nameCtrl,
-                              validator: _validateCustomerName,
-                            ),
-                          ),
-                          LabeledField(
                             label: 'Contact No.',
                             field: CustomTextField(
                               hint: 'Enter phone number',
@@ -770,6 +809,16 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                               validator: _validateCustomerPhone,
                             ),
                           ),
+                          LabeledField(
+                            label: 'Customer Name',
+                            field: CustomTextField(
+                              hint: 'Enter customer name',
+                              icon: Icons.groups_2_outlined,
+                              controller: _nameCtrl,
+                              validator: _validateCustomerName,
+                            ),
+                          ),
+
                           LabeledField(
                             label: 'Address',
                             field: CustomTextField(
@@ -906,11 +955,12 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                     Expanded(
                                       child: LabeledField(
                                         label: 'Size (auto)',
-                                        field: CustomTextField(
-                                          hint: 'e.g. 600x1200',
-                                          icon: Icons.straighten_outlined,
-                                          controller: _itemSizeCtrl,
-                                          inputFormatters: DValidator.textWithLimit,
+                                        field: IgnorePointer(
+                                          child: CustomTextField(
+                                            hint: 'Select a product first',
+                                            icon: Icons.straighten_outlined,
+                                            controller: _itemSizeCtrl,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -918,27 +968,53 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                     Expanded(
                                       child: LabeledField(
                                         label: 'Unit (auto)',
-                                        field: CustomTextField(
-                                          hint: 'e.g. sqft',
-                                          icon: Icons.square_foot_outlined,
-                                          controller: _itemUnitCtrl,
-                                          inputFormatters: DValidator.textWithLimit,
+                                        field: IgnorePointer(
+                                          child: CustomTextField(
+                                            hint: 'Select a product first',
+                                            icon: Icons.square_foot_outlined,
+                                            controller: _itemUnitCtrl,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                LabeledField(
-                                  label: 'MRP (auto)',
-                                  field: CustomTextField(
-                                    hint: '0',
-                                    icon: Icons.currency_rupee,
-                                    keyboardType: TextInputType.number,
-                                    controller: _itemMrpCtrl,
-                                    inputFormatters: DValidator.decimalNumber,
-                                    validator: (v) => DValidator.validateOptionalNumber('MRP', v),
-                                    onChanged: (_) => setState(() {}),
-                                  ),
+                                // MRP and Rate share one row.
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: LabeledField(
+                                        label: 'MRP (auto)',
+                                        field: IgnorePointer(
+                                          child: CustomTextField(
+                                            hint: 'MRP',
+                                            icon: Icons.currency_rupee,
+                                            keyboardType: TextInputType.number,
+                                            controller: _itemMrpCtrl,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: Responsive.w(10)),
+                                    Expanded(
+                                      child: LabeledField(
+                                        label: 'Rate',
+                                        field: CustomTextField(
+                                          hint: 'Rate',
+                                          icon: Icons.currency_rupee,
+                                          keyboardType: TextInputType.number,
+                                          controller: _itemRateCtrl,
+                                          inputFormatters: DValidator.decimalNumber,
+                                          validator: (v) {
+                                            final n = double.tryParse((v ?? '').trim());
+                                            if (n == null || n <= 0) return 'Enter a valid rate';
+                                            return null;
+                                          },
+                                          onChanged: (_) => setState(() {}),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 LabeledField(
                                   label: _isBoxUnitProduct ? 'Quantity (Box)' : 'Quantity',
@@ -994,22 +1070,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                       ),
                                     ],
                                   ),
-                                LabeledField(
-                                  label: 'Rate',
-                                  field: CustomTextField(
-                                    hint: 'Enter rate per unit',
-                                    icon: Icons.currency_rupee,
-                                    keyboardType: TextInputType.number,
-                                    controller: _itemRateCtrl,
-                                    inputFormatters: DValidator.decimalNumber,
-                                    validator: (v) {
-                                      final n = double.tryParse((v ?? '').trim());
-                                      if (n == null || n <= 0) return 'Enter a valid rate';
-                                      return null;
-                                    },
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -1063,7 +1123,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                               ),
                               label: Text(
                                 (_isAddingItem || isUpdatingItem)
-                                    ? 'Calculating…'
+                                    ? (_editingItemIndex != null ? 'Updating…' : 'Calculating…')
                                     : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
                               ),
                               style: ElevatedButton.styleFrom(
@@ -1134,7 +1194,14 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       );
     }
 
-    final query = _productSearchCtrl.text.trim().toLowerCase();
+    // When a product is already chosen the box shows its full
+    // "name — company" text; treat that as "no search" so tapping the
+    // field lists every product instead of "No matching products".
+    final typed = _productSearchCtrl.text.trim();
+    final showingChosenText =
+        _selectedProduct != null && typed == _productDisplayString(_selectedProduct!);
+    final query = showingChosenText ? '' : typed.toLowerCase();
+
     final filtered = query.isEmpty
         ? _products
         : _products.where((p) {
@@ -1152,12 +1219,12 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
             controller: _productSearchCtrl,
             focusNode: _productSearchFocus,
             decoration: InputDecoration(
-              hintText: 'Type a product name…',
-              prefixIcon: const Icon(Icons.inventory_2_outlined),
+              hintText: 'Search product by name',
+              prefixIcon: const Icon(Icons.search),
               suffixIcon: _productSearchCtrl.text.isEmpty
                   ? null
                   : IconButton(
-                icon: const Icon(Icons.clear),
+                icon: const Icon(Icons.clear, size: 18),
                 tooltip: 'Clear',
                 onPressed: _clearProductSelection,
               ),
@@ -1174,14 +1241,15 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
               ),
             ),
             validator: (v) => DValidator.validateDropdown('product', _selectedProduct?.id),
+            // Tapping the field (even if it already has focus) opens the
+            // product list.
+            onTap: () => setState(() => _showProductSuggestions = true),
             onChanged: (text) {
               if (_selectedProduct != null &&
                   text != _productDisplayString(_selectedProduct!)) {
                 _onProductSelected(null);
               }
-              setState(() {
-                _showProductSuggestions = text.trim().isNotEmpty;
-              });
+              setState(() => _showProductSuggestions = true);
             },
           ),
           if (_showProductSuggestions) ...[

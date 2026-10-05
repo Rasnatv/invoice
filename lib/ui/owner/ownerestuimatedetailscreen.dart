@@ -73,6 +73,17 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     return detail.createdByDetails.roleLabel.trim().toLowerCase() == 'owner';
   }
 
+  /// Payment display helpers — prefer the server's pre-formatted labels
+  /// ("Cash", "05 Oct 2026") and fall back to the raw values.
+  String _paymentMethodText(EstimatePayment p) {
+    if (p.methodLabel.isNotEmpty) return p.methodLabel;
+    return p.method.isEmpty ? 'Payment' : p.method;
+  }
+
+  String _paymentDateText(EstimatePayment p) {
+    return p.dateFormatted.isNotEmpty ? p.dateFormatted : p.date;
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -134,6 +145,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
         ),
         body: SafeArea(
           child: BlocConsumer<OwnerEstimateDetailBloc, OwnerEstimateDetailState>(
+            // Only react when the action status actually changes, so the
+            // snackbar doesn't re-fire on every later emit.
+            listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
             listener: (context, state) {
               if (state.actionStatus == OwnerEstimateActionStatus.success) {
                 AppSnackbar.success(state.actionMessage ?? 'Done');
@@ -197,19 +211,16 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             _Row('Address', detail.customerAddress, icon: Icons.location_on_outlined),
                           ],
                         ),
-
-              SizedBox(height: Responsive.h(14)),
-              _DetailSection(
-              title: 'Contractor Details',
-              icon: Icons.person_outline,
-              rows: [
-              _Row('Name', detail.customer.name, icon: Icons.person_outline),
-              _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
-              _Row('Email', detail.customer.email, icon: Icons.email_outlined),
-              ],
-              ),
-
-
+                        SizedBox(height: Responsive.h(14)),
+                        _DetailSection(
+                          title: 'Contractor Details',
+                          icon: Icons.person_outline,
+                          rows: [
+                            _Row('Name', detail.customer.name, icon: Icons.person_outline),
+                            _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
+                            _Row('Email', detail.customer.email, icon: Icons.email_outlined),
+                          ],
+                        ),
                         if (detail.salesman.name.isNotEmpty) ...[
                           SizedBox(height: Responsive.h(14)),
                           _DetailSection(
@@ -255,7 +266,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                         SizedBox(height: Responsive.h(20)),
                         _buildItemsTable(detail, number, isOwner),
                         SizedBox(height: Responsive.h(16)),
-                        _buildSummary(context, detail, number),
+                        _buildSummary(detail, number),
                         if (detail.payments.isNotEmpty) ...[
                           SizedBox(height: Responsive.h(14)),
                           _buildPayments(detail),
@@ -305,7 +316,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Rerference NO.',
+                    Text('Reference NO.',
                         style: AppTextStyles.captionnew().copyWith(letterSpacing: 0.6)),
                     SizedBox(height: Responsive.h(4)),
                     Text(
@@ -355,6 +366,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
   IconData _statusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
+      case 'delivered':
         return Icons.check_circle_rounded;
       case 'rejected':
         return Icons.cancel_rounded;
@@ -448,8 +460,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                   verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
                   bottom: BorderSide(color: AppColors.border),
                 ),
-                // Widened columns so full names like "Wall Tiles" / "Square Feet"
-                // fit on two lines instead of being clipped by the next column.
                 // Column widths are keyed by index, so build the map
                 // dynamically — the index of every column after Unit
                 // shifts depending on which of Box Qty / Piece Qty /
@@ -627,11 +637,13 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
 
   // ---------------------------------------------------------------------
   // Summary card
+  //   Subtotal, Handling Charge
+  //   with discount : Amount Before Discount, Discount, Grand Total (after)
+  //   no discount   : Grand Total
+  //   then Total Paid and the Balance strip.
   // ---------------------------------------------------------------------
 
-  Widget _buildSummary(BuildContext context, EstimateDetailModel detail, NumberFormat number) {
-    final canManagePayment = detail.isPendingApproval;
-
+  Widget _buildSummary(EstimateDetailModel detail, NumberFormat number) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -658,10 +670,8 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                 SizedBox(height: Responsive.h(8)),
                 _summaryRow('Handling Charge', currencyFmt.f(detail.handlingCharge)),
                 SizedBox(height: Responsive.h(8)),
-                _summaryRow('Amount Before Discount', number.format(detail.grandTotal)),
-                SizedBox(height: Responsive.h(8)),
-
                 if (detail.hasDiscount) ...[
+                  _summaryRow('Amount Before Discount', currencyFmt.f(detail.grandTotal)),
                   SizedBox(height: Responsive.h(8)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -677,10 +687,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                     ],
                   ),
                   SizedBox(height: Responsive.h(8)),
-                  _summaryRow(
-                    'Grand Total', currencyFmt.f(detail.amountAfterDiscount,),),
-
-                ],
+                  _summaryRow('Grand Total', currencyFmt.f(detail.amountAfterDiscount)),
+                ] else
+                  _summaryRow('Grand Total', currencyFmt.f(detail.grandTotal)),
                 SizedBox(height: Responsive.h(8)),
                 _summaryRow('Total Paid', currencyFmt.f(detail.totalPaid),
                     valueColor: AppColors.success),
@@ -718,13 +727,14 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     return _DetailSection(
       title: 'Payments',
       icon: Icons.payments_outlined,
-      rows: detail.payments
-          .map((p) => _Row(
-        p.method.isEmpty ? 'Payment' : p.method,
-        '${currencyFmt.f(p.amount)}${p.date.isNotEmpty ? ' · ${p.date}' : ''}',
-        icon: Icons.receipt_long_outlined,
-      ))
-          .toList(),
+      rows: detail.payments.map((p) {
+        final date = _paymentDateText(p);
+        return _Row(
+          _paymentMethodText(p),
+          '${currencyFmt.f(p.amount)}${date.isNotEmpty ? ' · $date' : ''}',
+          icon: Icons.receipt_long_outlined,
+        );
+      }).toList(),
     );
   }
 
@@ -739,38 +749,10 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     );
   }
 
-  String _buildShareText(EstimateDetailModel detail) {
-    final buffer = StringBuffer()
-      ..writeln('Estimate ${detail.estimateNumber}')
-      ..writeln('Customer: ${detail.customerName}')
-      ..writeln('Phone: ${detail.customerPhone}')
-      ..writeln('Date: ${detail.dateRaw}')
-      ..writeln('---');
-    for (final item in detail.items) {
-      final companyPart = item.companyName.isNotEmpty ? ' (${item.companyName})' : '';
-      final unitPart = item.unitName.isNotEmpty ? ' ${item.unitName}' : '';
-      buffer.writeln(
-          '${item.productName}$companyPart x ${item.quantity.toStringAsFixed(0)}$unitPart = ${currencyFmt.f(item.amount)}');
-    }
-    buffer
-      ..writeln('---')
-      ..writeln('Handling Charge: ${currencyFmt.f(detail.handlingCharge)}')
-      ..writeln('Grand Total: ${currencyFmt.f(detail.grandTotal)}');
-    if (detail.hasDiscount) {
-      buffer.writeln(
-          'Discount (${detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel}): - ${currencyFmt.f(detail.discountAmount)}');
-      buffer.writeln('Amount After Discount: ${currencyFmt.f(detail.amountAfterDiscount)}');
-    }
-    buffer
-      ..writeln('Total Paid: ${currencyFmt.f(detail.totalPaid)}')
-      ..writeln('Balance: ${currencyFmt.f(detail.balanceAmount)}')
-      ..writeln('Status: ${detail.status}');
-    return buffer.toString();
-  }
-
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
+      case 'delivered':
         return AppColors.success;
       case 'rejected':
         return Colors.red;
@@ -862,7 +844,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
           children: [
             Row(
               children: [
-
                 if (detail.isPendingApproval) ...[
                   SizedBox(width: Responsive.w(10)),
                   _RoundIconButton(
@@ -939,7 +920,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       );
     }
 
-    // DESPATCHED (or any other status) — read-only status pill.
+    // DESPATCHED / DELIVERED (or any other status) — read-only status pill.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -977,7 +958,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
     }
   }
-
 
   Future<void> _showApproveDialog(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
@@ -1078,7 +1058,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             prefixText: '₹ ',
                             border: OutlineInputBorder(),
                           ),
-                          onChanged: (_) => setLocal(() {})
+                          onChanged: (_) => setLocal(() {}),
                         ),
                         const SizedBox(height: 16),
                         const Text('Discount', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1104,7 +1084,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             decoration: InputDecoration(
                               labelText:
                               discountType == 'percentage' ? 'Discount %' : 'Discount Amount',
-                              // was 'flat' before, but the dropdown value is 'fixed'
                               prefixText: discountType == 'fixed' ? '₹ ' : null,
                               suffixText: discountType == 'percentage' ? '%' : null,
                               border: const OutlineInputBorder(),
@@ -1498,18 +1477,20 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     );
   }
 
+  /// Same order as the on-screen summary card.
   pw.Widget _pdfSummarySection(EstimateDetailModel d) {
     final rows = <List<String>>[
       ['Subtotal', currencyFmt.f(d.subtotal)],
       ['Handling Charge', currencyFmt.f(d.handlingCharge)],
       if (d.hasDiscount) ...[
+        ['Amount Before Discount', currencyFmt.f(d.grandTotal)],
         [
           'Discount (${d.discountTypeLabel.isEmpty ? d.discountType : d.discountTypeLabel})',
           '- ${currencyFmt.f(d.discountAmount)}'
         ],
-        ['Amount After Discount', currencyFmt.f(d.amountAfterDiscount)],
-      ],
-      ['Grand Total', currencyFmt.f(d.grandTotal)],
+        ['Grand Total', currencyFmt.f(d.amountAfterDiscount)],
+      ] else
+        ['Grand Total', currencyFmt.f(d.grandTotal)],
       ['Total Paid', currencyFmt.f(d.totalPaid)],
       ['Balance Amount', currencyFmt.f(d.balanceAmount)],
     ];
@@ -1535,9 +1516,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     final headers = ['Method', 'Amount', 'Date'];
     final data = d.payments
         .map((p) => [
-      p.method.isEmpty ? 'Payment' : p.method,
+      _paymentMethodText(p),
       currencyFmt.f(p.amount),
-      p.date.isEmpty ? '-' : p.date,
+      _paymentDateText(p).isEmpty ? '-' : _paymentDateText(p),
     ])
         .toList();
 
@@ -1582,18 +1563,12 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       addRow(['Status', _statusLabel(d.status)]);
       addRow(['Customer Name', d.customerName]);
       addRow(['Customer Phone', d.customerPhone]);
-      //if (d.customerEmail.isNotEmpty)
-        addRow(['Customer Email', d.customerEmail]);
-     // if (d.customerAddress.isNotEmpty)
-        addRow(['Customer Address', d.customerAddress]);
-     // if (d.customer.name.isNotEmpty)
-        addRow(['Contractor Name', d.customer.name]);
-     // if (d.customer.phone.isNotEmpty)
-        addRow(['Contractor Phone', d.customer.phone]);
-      if (d.salesman.name.isNotEmpty)
-      //  addRow(['Salesman', d.salesman.name]);
-      if (d.notes.isNotEmpty)
-        addRow(['Notes', d.notes]);
+      addRow(['Customer Email', d.customerEmail]);
+      addRow(['Customer Address', d.customerAddress]);
+      addRow(['Contractor Name', d.customer.name]);
+      addRow(['Contractor Phone', d.customer.phone]);
+      if (d.salesman.name.isNotEmpty) addRow(['Salesman', d.salesman.name]);
+      if (d.notes.isNotEmpty) addRow(['Notes', d.notes]);
       addRow([]);
 
       final headers = [
@@ -1630,16 +1605,20 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
         ]);
       }
       addRow([]);
+
+      // Same order as the on-screen summary card.
       addRow(['Subtotal', currencyFmt.f(d.subtotal)]);
       addRow(['Handling Charge', currencyFmt.f(d.handlingCharge)]);
       if (d.hasDiscount) {
+        addRow(['Amount Before Discount', currencyFmt.f(d.grandTotal)]);
         addRow([
           'Discount (${d.discountTypeLabel.isEmpty ? d.discountType : d.discountTypeLabel})',
           '- ${currencyFmt.f(d.discountAmount)}'
         ]);
         addRow(['Grand Total', currencyFmt.f(d.amountAfterDiscount)]);
+      } else {
+        addRow(['Grand Total', currencyFmt.f(d.grandTotal)]);
       }
-      addRow(['Grand Total', currencyFmt.f(d.grandTotal)]);
       addRow(['Total Paid', currencyFmt.f(d.totalPaid)]);
       addRow(['Balance Amount', currencyFmt.f(d.balanceAmount)]);
 
@@ -1649,9 +1628,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
         addRow(['Method', 'Amount', 'Date']);
         for (final p in d.payments) {
           addRow([
-            p.method.isEmpty ? 'Payment' : p.method,
+            _paymentMethodText(p),
             currencyFmt.f(p.amount),
-            p.date.isEmpty ? '-' : p.date,
+            _paymentDateText(p).isEmpty ? '-' : _paymentDateText(p),
           ]);
         }
       }
@@ -1793,152 +1772,4 @@ class _CurrencyFmt {
   const _CurrencyFmt();
   String f(double v) =>
       NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2).format(v);
-}
-
-/// Records a payment against this bill (pending or approved). Reuses the
-/// same POST /estimates/approve endpoint as discount/approve — only
-/// estimateId + payment fields are set, so every other field (handling
-/// charge, discount, approval notes) is left untouched server-side,
-/// PROVIDED your backend doesn't treat any call to this endpoint as an
-/// implicit approval. Verify that before relying on this for pending bills.
-Future<void> _showAddPaymentDialog(BuildContext context, EstimateDetailModel detail) async {
-  const currencyFmt = _CurrencyFmt();
-  final bloc = context.read<OwnerEstimateDetailBloc>();
-  final formKey = GlobalKey<FormState>();
-
-  final amountCtrl = TextEditingController();
-  String paymentMethod = 'cash'; // cash | online | cheque | bank_transfer
-  final refCtrl = TextEditingController();
-  DateTime? paymentDate;
-  final notesCtrl = TextEditingController();
-
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (dialogContext, setLocal) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Add Payment'),
-            content: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Balance Due: ${currencyFmt.f(detail.balanceAmount)}',
-                      style: AppTextStyles.bodyBold(color: Colors.red),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: amountCtrl,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Amount Received',
-                        prefixText: '₹ ',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Required';
-                        final parsed = double.tryParse(v.trim());
-                        if (parsed == null || parsed <= 0) return 'Enter a valid amount';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: paymentMethod,
-                      decoration: const InputDecoration(
-                        labelText: 'Payment Method',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                        DropdownMenuItem(value: 'online', child: Text('Online')),
-                        DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
-                        DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
-                      ],
-                      onChanged: (v) => setLocal(() => paymentMethod = v ?? 'cash'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: refCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Payment Reference (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: dialogContext,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) setLocal(() => paymentDate = picked);
-                      },
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Date (optional)',
-                          border: OutlineInputBorder(),
-                        ),
-                        child: Text(paymentDate == null
-                            ? 'Select date'
-                            : DateFormat('yyyy-MM-dd').format(paymentDate!)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: notesCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) return;
-                  // Only estimateId + payment fields are set — handling
-                  // charge, discount, and approval notes stay untouched.
-                  final request = OwnerApproveEstimateRequest(
-                    estimateId: detail.id,
-                    paymentAmount: double.parse(amountCtrl.text.trim()),
-                    paymentMethod: paymentMethod,
-                    paymentReference: refCtrl.text.trim().isEmpty ? null : refCtrl.text.trim(),
-                    paymentDate: paymentDate == null
-                        ? null
-                        : DateFormat('yyyy-MM-dd').format(paymentDate!),
-                    paymentNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                  );
-                  Navigator.of(dialogContext).pop();
-                  bloc.add(OwnerEstimateApproveRequested(request));
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
 }

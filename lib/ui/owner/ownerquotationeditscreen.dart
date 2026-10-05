@@ -12,11 +12,13 @@ import '../../bloc/quotationitemremove/quotationitemremove_event.dart';
 import '../../bloc/quotationitemremove/quotationitemremove_state.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/utils/delete_helper.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/validator/validationfile.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
+// TODO: change this path to wherever your deleteItem() helper file liveser.dart';
 import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../models/salesmanmodels/quotationupdatemodel.dart';
@@ -255,6 +257,14 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     _customerEmail = TextEditingController(text: e.customer.email);
     _customerAddress = TextEditingController(text: e.customer.address);
 
+    // When the customer phone number is cleared completely, the other
+    // customer fields (name / address / email) are cleared too — same
+    // behaviour as the Create Estimate screen.
+    _customerPhone.addListener(_onCustomerPhoneChanged);
+
+    // Product suggestions open when the product field is tapped/focused.
+    _productSearchFocus.addListener(_onProductFocusChanged);
+
     _contractorName = TextEditingController(text: e.contractor.name);
     _contractorPhone = TextEditingController(text: e.contractor.mobile);
     _contractorEmail = TextEditingController(text: e.contractor.email);
@@ -294,6 +304,33 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         .toList();
   }
 
+  /// Clears name / address / email once the phone number is emptied.
+  void _onCustomerPhoneChanged() {
+    if (_customerPhone.text.trim().isNotEmpty) return;
+    if (_customerName.text.isEmpty &&
+        _customerAddress.text.isEmpty &&
+        _customerEmail.text.isEmpty) {
+      return;
+    }
+    _customerName.clear();
+    _customerAddress.clear();
+    _customerEmail.clear();
+  }
+
+  /// Opens the product suggestion list when the product field gains focus
+  /// (tap) and closes it shortly after focus is lost. The small delay lets
+  /// a tap on a suggestion register before the list disappears.
+  void _onProductFocusChanged() {
+    if (_productSearchFocus.hasFocus) {
+      setState(() => _showProductSuggestions = true);
+    } else {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (!mounted || _productSearchFocus.hasFocus) return;
+        setState(() => _showProductSuggestions = false);
+      });
+    }
+  }
+
   /// Re-runs the contractor name/phone Form's validators on every
   /// keystroke in either field — mirrors why _scheduleIncentiveFetch
   /// listens on quantity/rate changes.
@@ -304,6 +341,8 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   @override
   void dispose() {
     _incentiveDebounce?.cancel();
+    _customerPhone.removeListener(_onCustomerPhoneChanged);
+    _productSearchFocus.removeListener(_onProductFocusChanged);
     _contractorName.removeListener(_revalidateContractorFields);
     _contractorPhone.removeListener(_revalidateContractorFields);
     _customerName.dispose();
@@ -335,8 +374,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   double get _handling => double.tryParse(_handlingCharge.text.trim()) ?? 0;
   double get _grandTotal => _itemsTotal + _handling;
   double get _incentiveTotal => _items.fold(0.0, (s, i) => s + i.incentiveAmount);
-  int get _totalItemsCount => _items.length;
-  double get _totalQty => _items.fold(0.0, (s, i) => s + i.quantity);
   double get _mrpTotal => _items.fold(0.0, (s, i) => s + (i.mrp * i.quantity));
 
   double get _totalSqft => _items.fold(0.0, (s, i) {
@@ -352,14 +389,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         u.contains('squarefeet');
     return s + (isSqft ? i.quantity : 0);
   });
-
-  // REMOVED: _currentItemAmount getter and the pre-add "Amount" preview
-  // box. It used to show a local quantity*rate approximation, which could
-  // disagree with what the server actually calculates (square feet,
-  // box/piece breakdown, incentive rules). The server's own `amount` is
-  // now only ever read after Add/Update Item succeeds — see the Items
-  // list below, and _saveItemFromForm. Same change QuotationEditScreen /
-  // CreateEstimateScreen already made.
 
   static String _formatPrice(double value) =>
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
@@ -544,18 +573,14 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   /// For an item that's already saved on the server (a real backend id,
   /// not one of this screen's own 'new_' ids), the resulting
   /// quantity/rate/box/piece are ALSO persisted right away via PUT
-  /// /quotations/update-item (see OwnerQuotationItemUpdateSubmitted below)
-  /// — the item is only applied to [_items] once that call succeeds, so
-  /// the on-screen list never shows a change the server rejected. A
-  /// brand-new (never-saved) item has nothing to persist yet and is
-  /// simply added to local state, same as before — it's saved for the
+  /// /quotations/update-item — the item is only applied to [_items] once
+  /// that call succeeds, so the on-screen list never shows a change the
+  /// server rejected. A brand-new (never-saved) item has nothing to
+  /// persist yet and is simply added to local state; it's saved for the
   /// first time only when "Save Changes" submits the whole quotation.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
-    // Validate quantity/rate formatting via the item form before doing
-    // anything else. Product-selection and >0 checks stay as explicit
-    // checks below since they aren't plain text-field concerns.
     if (!(_itemFormKey.currentState?.validate() ?? true)) {
       return;
     }
@@ -652,8 +677,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
       // Existing, already-saved item — persist the change immediately via
       // PUT /quotations/update-item. _isAddingItem stays true (button keeps
       // its spinner) until the itemUpdateStatus BlocListener below reports
-      // success or failure; only on success is [newItem] applied to
-      // [_items] and the form reset.
+      // success or failure.
       _pendingItemUpdate = newItem;
       context.read<OwnerQuotationEditBloc>().add(OwnerQuotationItemUpdateSubmitted(
         quotationId: widget.estimate.id,
@@ -667,7 +691,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     }
 
     // Brand-new item (or one added earlier on this screen and not yet
-    // saved) — nothing to persist yet, keep it purely local as before.
+    // saved) — nothing to persist yet, keep it purely local.
     setState(() {
       _isAddingItem = false;
       if (editingIndex != null) {
@@ -699,11 +723,12 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
       // Show the item's own saved box quantity here — do NOT derive it
       // from the Quantity field (that's only for live-sync while the
       // user is actively typing, see the Quantity field's onChanged).
-      // Quantity and Box Quantity are separate stored values and must
-      // each be populated from their own field on the item.
       _itemBoxQtyCtrl.text = _formatPrice(item.boxQuantity);
       _itemPieceQtyCtrl.text = _formatPrice(item.pieceQuantity);
     });
+
+    // Make sure the suggestion list isn't left open from a previous tap.
+    _productSearchFocus.unfocus();
 
     context.read<OwnerQuotationEditBloc>().add(const OwnerEditProductIncentiveCleared());
     if (match != null) _scheduleIncentiveFetch();
@@ -712,11 +737,14 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   void _cancelEditItem() => _resetItemForm();
 
   /// For an unsaved (locally-added) item, removes it from the list
-  /// immediately — there's nothing on the server to delete. For an
-  /// existing item, dispatches the remove-item API call instead; the
-  /// item is only dropped from [_items] once that call succeeds (handled
-  /// in the BlocListener in build()).
-  void _removeItem(int index) {
+  /// immediately — there's nothing on the server to delete.
+  ///
+  /// For an existing (database) item, shows the "Are you sure you want to
+  /// delete this item?" confirmation first. Only after the owner confirms
+  /// is the remove-item API call dispatched; the item is then dropped from
+  /// [_items] once that call succeeds (handled in the BlocListener in
+  /// build()).
+  Future<void> _removeItem(int index) async {
     final item = _items[index];
 
     if (_isUnsavedItem(item)) {
@@ -734,15 +762,22 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
       return;
     }
 
-    context.read<QuotationItemRemoveBloc>().add(QuotationItemRemoveRequested(
-      quotationId: widget.estimate.id,
-      quotationItemId: item.id,
-    ));
+    await deleteItem(
+      context,
+      itemName: 'item',
+      onConfirmed: () async {
+        if (!mounted) return;
+        context.read<QuotationItemRemoveBloc>().add(QuotationItemRemoveRequested(
+          quotationId: widget.estimate.id,
+          quotationItemId: item.id,
+        ));
+      },
+    );
   }
 
   /// Called once the remove-item API call for [itemId] has succeeded —
   /// actually drops the item from the local list and fixes up the
-  /// editing index the same way the old synchronous _removeItem did.
+  /// editing index.
   void _dropItemById(String itemId) {
     final index = _items.indexWhere((i) => i.id == itemId);
     if (index == -1) return;
@@ -763,8 +798,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   /// Called once the PUT /quotations/update-item call for the item
   /// currently being edited has succeeded — applies the item built from
   /// the /quotations/product-incentive response (see _saveItemFromForm)
-  /// to [_items] and resets the add/edit-item form, mirroring what the
-  /// brand-new-item branch of _saveItemFromForm does synchronously.
+  /// to [_items] and resets the add/edit-item form.
   void _applyPendingItemUpdate() {
     final pending = _pendingItemUpdate;
     final editingIndex = _editingItemIndex;
@@ -785,7 +819,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     // Runs every validator attached to the customer/other-details Form
     // (customer name, phone, address, optional email, handling charge).
     final formValid = _formKey.currentState?.validate() ?? true;
-    // Contractor name/phone now live in their own Form so they can be
+    // Contractor name/phone live in their own Form so they can be
     // cross-validated live — checked separately here.
     final contractorValid = _contractorFormKey.currentState?.validate() ?? true;
 
@@ -868,8 +902,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
             // _saveItemFromForm whenever "Update Item" is tapped on an
             // item that's already saved on the server. Only on success is
             // the locally-built item (held in _pendingItemUpdate) actually
-            // applied to _items — a failure leaves the list untouched and
-            // the form open so the owner can retry or cancel.
+            // applied to _items.
             BlocListener<OwnerQuotationEditBloc, OwnerQuotationEditState>(
               listenWhen: (prev, curr) => prev.itemUpdateStatus != curr.itemUpdateStatus,
               listener: (context, state) {
@@ -919,15 +952,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                       Text('Customer Details', style: AppTextStyles.h3()),
                       SizedBox(height: Responsive.h(12)),
                       LabeledField(
-                        label: 'Customer Name',
-                        field: CustomTextField(
-                          hint: 'Enter customer name',
-                          icon: Icons.groups_2_outlined,
-                          controller: _customerName,
-                          validator: _validatePartyName,
-                        ),
-                      ),
-                      LabeledField(
                         label: 'Contact No.',
                         field: CustomTextField(
                           hint: 'Enter phone number',
@@ -938,6 +962,16 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                           validator: _validateCustomerPhone,
                         ),
                       ),
+                      LabeledField(
+                        label: 'Customer Name',
+                        field: CustomTextField(
+                          hint: 'Enter customer name',
+                          icon: Icons.groups_2_outlined,
+                          controller: _customerName,
+                          validator: _validatePartyName,
+                        ),
+                      ),
+
                       LabeledField(
                         label: 'Address',
                         field: CustomTextField(
@@ -1025,11 +1059,12 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                                 Expanded(
                                   child: LabeledField(
                                     label: 'Size (auto)',
-                                    field: CustomTextField(
-                                      hint: 'e.g. 600x1200',
-                                      icon: Icons.straighten_outlined,
-                                      controller: _itemSizeCtrl,
-                                      inputFormatters: DValidator.textWithLimit,
+                                    field: IgnorePointer(
+                                      child: CustomTextField(
+                                        hint: 'Select a product first',
+                                        icon: Icons.straighten_outlined,
+                                        controller: _itemSizeCtrl,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1037,27 +1072,56 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                                 Expanded(
                                   child: LabeledField(
                                     label: 'Unit (auto)',
-                                    field: CustomTextField(
-                                      hint: 'e.g. sqft',
-                                      icon: Icons.square_foot_outlined,
-                                      controller: _itemUnitCtrl,
-                                      inputFormatters: DValidator.textWithLimit,
+                                    field: IgnorePointer(
+                                      child: CustomTextField(
+                                        hint: 'Select a product first',
+                                        icon: Icons.square_foot_outlined,
+                                        controller: _itemUnitCtrl,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            LabeledField(
-                              label: 'MRP (auto)',
-                              field: CustomTextField(
-                                hint: '0',
-                                icon: Icons.currency_rupee,
-                                keyboardType: TextInputType.number,
-                                controller: _itemMrpCtrl,
-                                inputFormatters: DValidator.decimalNumber,
-                                validator: (v) => DValidator.validateOptionalNumber('MRP', v),
-                                onChanged: (_) => setState(() {}),
-                              ),
+                            // MRP and Rate share one row.
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: LabeledField(
+                                    label: 'MRP (auto)',
+                                    field: IgnorePointer(
+                                      child: CustomTextField(
+                                        hint: 'MRP',
+                                        icon: Icons.currency_rupee,
+                                        keyboardType: TextInputType.number,
+                                        controller: _itemMrpCtrl,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: Responsive.w(10)),
+                                Expanded(
+                                  child: LabeledField(
+                                    label: 'Rate',
+                                    field: CustomTextField(
+                                      hint: 'Rate',
+                                      icon: Icons.currency_rupee,
+                                      keyboardType: TextInputType.number,
+                                      controller: _itemRateCtrl,
+                                      inputFormatters: DValidator.decimalNumber,
+                                      validator: (v) {
+                                        final n = double.tryParse((v ?? '').trim());
+                                        if (n == null || n <= 0) return 'Enter a valid rate';
+                                        return null;
+                                      },
+                                      onChanged: (_) {
+                                        setState(() {});
+                                        _scheduleIncentiveFetch();
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             LabeledField(
                               label: 'Quantity',
@@ -1117,36 +1181,10 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                                   ),
                                 ],
                               ),
-                            LabeledField(
-                              label: 'Rate',
-                              field: CustomTextField(
-                                hint: 'Enter rate per unit',
-                                icon: Icons.currency_rupee,
-                                keyboardType: TextInputType.number,
-                                controller: _itemRateCtrl,
-                                inputFormatters: DValidator.decimalNumber,
-                                validator: (v) {
-                                  final n = double.tryParse((v ?? '').trim());
-                                  if (n == null || n <= 0) return 'Enter a valid rate';
-                                  return null;
-                                },
-                                onChanged: (_) {
-                                  setState(() {});
-                                  _scheduleIncentiveFetch();
-                                },
-                              ),
-                            ),
                           ],
                         ),
                       ),
                       SizedBox(height: Responsive.h(6)),
-                      // REMOVED: pre-add "Amount" preview box. It used to
-                      // show a local quantity*rate approximation, which
-                      // could disagree with what the server actually
-                      // calculates (square feet, box/piece breakdown,
-                      // incentive rules). The server's own `amount` is now
-                      // only ever read after Add/Update Item succeeds —
-                      // see the Items list below, and _saveItemFromForm.
 
                       // Incentive preview hidden for owner-created quotations.
                       if (!_isOwner && (_selectedProduct != null || _editingItemIndex != null)) ...[
@@ -1287,9 +1325,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                         ),
                         child: Column(
                           children: [
-                            // _totalRow('Total Items', '$_totalItemsCount'),
-                            // SizedBox(height: Responsive.h(6)),
-                            // _totalRow('Total Qty', number.format(_totalQty)),
                             SizedBox(height: Responsive.h(6)),
                             _totalRow('Total Sq.Ft', number.format(_totalSqft)),
                             if (_mrpTotal > 0) ...[
@@ -1407,7 +1442,15 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         }
 
         final products = state.products;
-        final query = _productSearchCtrl.text.trim().toLowerCase();
+
+        // When a product is already chosen the box shows its full
+        // "name — company" text; treat that as "no search" so tapping the
+        // field lists every product instead of "No matching products".
+        final typed = _productSearchCtrl.text.trim();
+        final showingChosenText = _selectedProduct != null &&
+            typed == _productDisplayString(_selectedProduct!);
+        final query = showingChosenText ? '' : typed.toLowerCase();
+
         final filtered = query.isEmpty
             ? products
             : products.where((p) {
@@ -1425,12 +1468,12 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                 controller: _productSearchCtrl,
                 focusNode: _productSearchFocus,
                 decoration: InputDecoration(
-                  hintText: 'Type a product name…',
-                  prefixIcon: const Icon(Icons.inventory_2_outlined),
+                  hintText: 'Search product by name',
+                  prefixIcon: const Icon(Icons.search),
                   suffixIcon: _productSearchCtrl.text.isEmpty
                       ? null
                       : IconButton(
-                    icon: const Icon(Icons.clear),
+                    icon: const Icon(Icons.clear, size: 18),
                     tooltip: 'Clear',
                     onPressed: _clearProductSelection,
                   ),
@@ -1447,14 +1490,15 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                   ),
                 ),
                 validator: (v) => DValidator.validateDropdown('product', _selectedProduct?.id),
+                // Tapping the field (even if it already has focus) opens
+                // the product list.
+                onTap: () => setState(() => _showProductSuggestions = true),
                 onChanged: (text) {
                   if (_selectedProduct != null &&
                       text != _productDisplayString(_selectedProduct!)) {
                     _onProductSelected(null);
                   }
-                  setState(() {
-                    _showProductSuggestions = text.trim().isNotEmpty;
-                  });
+                  setState(() => _showProductSuggestions = true);
                 },
               ),
               if (_showProductSuggestions) ...[
