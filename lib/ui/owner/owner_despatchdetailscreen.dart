@@ -258,10 +258,6 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
     );
   }
 
-  /// Items table — includes a "Unit" column (from `packing`) between
-  /// Size and Box so quantity/unit context is visible on screen, in
-  /// addition to Qty. Falls back to "-" when packing is empty (older
-  /// records / items created without a packing unit set).
   Widget _itemsTable(DispatchDetail d) {
     return Container(
       decoration: BoxDecoration(
@@ -273,18 +269,19 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Table(
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: TableBorder(
             horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
             verticalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
           ),
-          // Fixed widths (not Flex) — needed so the table can be wider
-          // than the screen and scroll, instead of squeezing text.
+          // Fixed widths (not Flex) — the table can be wider than the
+          // screen and scroll horizontally.
           columnWidths: const {
             0: FixedColumnWidth(32),   // #
             1: FixedColumnWidth(160),  // Item
             2: FixedColumnWidth(140),  // Company
             3: FixedColumnWidth(110),  // Size
-            4: FixedColumnWidth(70),   // Unit
+            4: FixedColumnWidth(95),   // Unit
             5: FixedColumnWidth(50),   // Box
             6: FixedColumnWidth(50),   // Pcs
             7: FixedColumnWidth(60),   // Qty
@@ -310,13 +307,14 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
                 ),
                 children: [
                   _dataCell('${i + 1}'),
-                  _dataCell(d.items[i].productName),
+                  _dataCell(d.items[i].productName.isEmpty ? '-' : d.items[i].productName),
                   _dataCell(d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName),
-                  _dataCell(d.items[i].productSize),
+                  _dataCell(d.items[i].productSize.isEmpty ? '-' : d.items[i].productSize),
                   _dataCell(d.items[i].packing.isEmpty ? '-' : d.items[i].packing),
                   _dataCell(d.items[i].boxes.toStringAsFixed(0), align: TextAlign.right),
                   _dataCell(d.items[i].pieces.toStringAsFixed(0), align: TextAlign.right),
-                  _dataCell(d.items[i].quantity.toStringAsFixed(0), align: TextAlign.right, bold: true),
+                  _dataCell(d.items[i].quantity.toStringAsFixed(0),
+                      align: TextAlign.right, bold: true),
                 ],
               ),
           ],
@@ -331,8 +329,9 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       child: Text(
         text,
         textAlign: align,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis, // header labels are short, fine as-is
+        maxLines: 3,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
         style: AppTextStyles.captionnew().copyWith(fontWeight: FontWeight.w700),
       ),
     );
@@ -344,9 +343,9 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       child: Text(
         text,
         textAlign: align,
-        maxLines: 1,                 // single line, fixed row height
-        softWrap: false,
-        overflow: TextOverflow.visible, // don't cut it — table scrolls instead
+        maxLines: 3,            // wraps up to 3 lines instead of overflowing
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
         style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
       ),
     );

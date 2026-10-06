@@ -52,6 +52,8 @@ Future<void> _openUpdateScreen(BuildContext context, EstimateDetailModel detail)
       ),
     ),
   );
+  // Reload after coming back so the page always shows the latest data.
+  bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
 }
 
 class _OwnerEstimateDetailView extends StatefulWidget {
@@ -71,6 +73,22 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
 
   bool _isOwner(EstimateDetailModel detail) {
     return detail.createdByDetails.roleLabel.trim().toLowerCase() == 'owner';
+  }
+
+  /// Manual refresh (pull-to-refresh + app bar button).
+  /// Fires a reload and waits until the bloc finishes loading so the
+  /// RefreshIndicator spinner stays visible for the right duration.
+  Future<void> _refresh(BuildContext context) async {
+    final bloc = context.read<OwnerEstimateDetailBloc>();
+    bloc.add(OwnerEstimateDetailLoadRequested(widget.estimateId));
+
+    await bloc.stream
+        .firstWhere(
+          (s) =>
+      s.status != OwnerEstimateDetailStatus.loading &&
+          s.status != OwnerEstimateDetailStatus.initial,
+    )
+        .timeout(const Duration(seconds: 20), onTimeout: () => bloc.state);
   }
 
   /// Payment display helpers — prefer the server's pre-formatted labels
@@ -95,7 +113,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
         appBar: AppBar(
           title: Text('Owner Estimate Details', style: AppTextStyles.h6()),
           actions: [
-            // Share as PDF -> native share sheet -> WhatsApp/etc.
             Builder(builder: (context) {
               return IconButton(
                 tooltip: 'Share as PDF',
@@ -156,23 +173,36 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
               }
             },
             builder: (context, state) {
-              if (state.status == OwnerEstimateDetailStatus.loading ||
-                  state.status == OwnerEstimateDetailStatus.initial) {
+              // Full-screen loader only when there is nothing to show yet.
+              // During a refresh the old data stays on screen (as long as the
+              // bloc keeps `detail` while emitting `loading`).
+              if ((state.status == OwnerEstimateDetailStatus.loading ||
+                  state.status == OwnerEstimateDetailStatus.initial) &&
+                  state.detail == null) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (state.status == OwnerEstimateDetailStatus.failure ||
                   state.detail == null) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                return RefreshIndicator(
+                  onRefresh: () => _refresh(context),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      Text(state.errorMessage ?? 'Failed to load estimate.'),
-                      SizedBox(height: Responsive.h(10)),
-                      ElevatedButton(
-                        onPressed: () => context
-                            .read<OwnerEstimateDetailBloc>()
-                            .add(OwnerEstimateDetailLoadRequested(widget.estimateId)),
-                        child: const Text('Retry'),
+                      SizedBox(height: Responsive.h(200)),
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(state.errorMessage ?? 'Failed to load estimate.'),
+                            SizedBox(height: Responsive.h(10)),
+                            ElevatedButton(
+                              onPressed: () => context
+                                  .read<OwnerEstimateDetailBloc>()
+                                  .add(OwnerEstimateDetailLoadRequested(widget.estimateId)),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -186,93 +216,98 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
               return Column(
                 children: [
                   Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.all(Responsive.w(18)),
-                      children: [
-                        _buildHeader(detail),
-                        SizedBox(height: Responsive.h(16)),
-                        if (detail.notes.isNotEmpty) ...[
-                          _DetailSection(
-                            title: 'Notes',
-                            icon: Icons.sticky_note_2_outlined,
-                            rows: [
-                              _Row('Notes', detail.notes, icon: Icons.sticky_note_2_outlined),
-                            ],
-                          ),
-                          SizedBox(height: Responsive.h(14)),
-                        ],
-                        _DetailSection(
-                          title: 'Customer Details',
-                          icon: Icons.groups_2_outlined,
-                          rows: [
-                            _Row('Name', detail.customerName, icon: Icons.groups_2_outlined),
-                            _Row('Phone', detail.customerPhone, icon: Icons.phone_outlined),
-                            _Row('Email', detail.customerEmail, icon: Icons.email_outlined),
-                            _Row('Address', detail.customerAddress, icon: Icons.location_on_outlined),
+                    child: RefreshIndicator(
+                      onRefresh: () => _refresh(context),
+                      child: ListView(
+                        // Needed so pull-to-refresh works even when content is short
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.all(Responsive.w(18)),
+                        children: [
+                          _buildHeader(detail),
+                          SizedBox(height: Responsive.h(16)),
+                          if (detail.notes.isNotEmpty) ...[
+                            _DetailSection(
+                              title: 'Notes',
+                              icon: Icons.sticky_note_2_outlined,
+                              rows: [
+                                _Row('Notes', detail.notes, icon: Icons.sticky_note_2_outlined),
+                              ],
+                            ),
+                            SizedBox(height: Responsive.h(14)),
                           ],
-                        ),
-                        SizedBox(height: Responsive.h(14)),
-                        _DetailSection(
-                          title: 'Contractor Details',
-                          icon: Icons.person_outline,
-                          rows: [
-                            _Row('Name', detail.customer.name, icon: Icons.person_outline),
-                            _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
-                            _Row('Email', detail.customer.email, icon: Icons.email_outlined),
+                          _DetailSection(
+                            title: 'Customer Details',
+                            icon: Icons.groups_2_outlined,
+                            rows: [
+                              _Row('Name', detail.customerName, icon: Icons.groups_2_outlined),
+                              _Row('Phone', detail.customerPhone, icon: Icons.phone_outlined),
+                              _Row('Email', detail.customerEmail, icon: Icons.email_outlined),
+                              _Row('Address', detail.customerAddress, icon: Icons.location_on_outlined),
+                            ],
+                          ),
+                          SizedBox(height: Responsive.h(14)),
+                          _DetailSection(
+                            title: 'Contractor Details',
+                            icon: Icons.person_outline,
+                            rows: [
+                              _Row('Name', detail.customer.name, icon: Icons.person_outline),
+                              _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
+                              _Row('Email', detail.customer.email, icon: Icons.email_outlined),
+                            ],
+                          ),
+                          if (detail.salesman.name.isNotEmpty) ...[
+                            SizedBox(height: Responsive.h(14)),
+                            _DetailSection(
+                              title: 'Salesman',
+                              icon: Icons.badge_outlined,
+                              rows: [
+                                _Row('Name', detail.salesman.name, icon: Icons.badge_outlined),
+                              ],
+                            ),
                           ],
-                        ),
-                        if (detail.salesman.name.isNotEmpty) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _DetailSection(
-                            title: 'Salesman',
-                            icon: Icons.badge_outlined,
-                            rows: [
-                              _Row('Name', detail.salesman.name, icon: Icons.badge_outlined),
-                            ],
-                          ),
+                          if (detail.isApproved) ...[
+                            SizedBox(height: Responsive.h(14)),
+                            _DetailSection(
+                              title: 'Approval',
+                              icon: Icons.check_circle_outline,
+                              rows: [
+                                _Row(
+                                  'Approved By',
+                                  detail.approvedByDetails.name.isNotEmpty
+                                      ? detail.approvedByDetails.name
+                                      : detail.approvedBy,
+                                  icon: Icons.check_circle_outline,
+                                ),
+                                if (detail.approvedAt.isNotEmpty)
+                                  _Row('Approved At', detail.approvedAt, icon: Icons.event_outlined),
+                                if (detail.approvalNotes.isNotEmpty)
+                                  _Row('Notes', detail.approvalNotes, icon: Icons.info_outline),
+                              ],
+                            ),
+                          ],
+                          if (detail.quotation.exists) ...[
+                            SizedBox(height: Responsive.h(14)),
+                            _DetailSection(
+                              title: 'Linked Quotation',
+                              icon: Icons.description_outlined,
+                              rows: [
+                                _Row('Quotation No.', detail.quotation.quotationNumber,
+                                    icon: Icons.description_outlined),
+                                _Row('Status', detail.quotation.status, icon: Icons.flag_outlined),
+                              ],
+                            ),
+                          ],
+                          SizedBox(height: Responsive.h(20)),
+                          _buildItemsTable(detail, number, isOwner),
+                          SizedBox(height: Responsive.h(16)),
+                          _buildSummary(detail, number),
+                          if (detail.payments.isNotEmpty) ...[
+                            SizedBox(height: Responsive.h(14)),
+                            _buildPayments(detail),
+                          ],
+                          SizedBox(height: Responsive.h(8)),
                         ],
-                        if (detail.isApproved) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _DetailSection(
-                            title: 'Approval',
-                            icon: Icons.check_circle_outline,
-                            rows: [
-                              _Row(
-                                'Approved By',
-                                detail.approvedByDetails.name.isNotEmpty
-                                    ? detail.approvedByDetails.name
-                                    : detail.approvedBy,
-                                icon: Icons.check_circle_outline,
-                              ),
-                              if (detail.approvedAt.isNotEmpty)
-                                _Row('Approved At', detail.approvedAt, icon: Icons.event_outlined),
-                              if (detail.approvalNotes.isNotEmpty)
-                                _Row('Notes', detail.approvalNotes, icon: Icons.info_outline),
-                            ],
-                          ),
-                        ],
-                        if (detail.quotation.exists) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _DetailSection(
-                            title: 'Linked Quotation',
-                            icon: Icons.description_outlined,
-                            rows: [
-                              _Row('Quotation No.', detail.quotation.quotationNumber,
-                                  icon: Icons.description_outlined),
-                              _Row('Status', detail.quotation.status, icon: Icons.flag_outlined),
-                            ],
-                          ),
-                        ],
-                        SizedBox(height: Responsive.h(20)),
-                        _buildItemsTable(detail, number, isOwner),
-                        SizedBox(height: Responsive.h(16)),
-                        _buildSummary(detail, number),
-                        if (detail.payments.isNotEmpty) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _buildPayments(detail),
-                        ],
-                        SizedBox(height: Responsive.h(8)),
-                      ],
+                      ),
                     ),
                   ),
                   _buildBottomBar(context, detail, isBusy),

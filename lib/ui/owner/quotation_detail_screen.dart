@@ -53,8 +53,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
   // element may already be deactivated.
   late final OwnerQuotationDetailBloc _detailBloc;
 
-  /// Set to true whenever an edit / approve / cancel actually succeeded,
-  /// so the list screen knows it must refresh when this screen pops.
+
   bool _didChange = false;
 
   /// Prevents double taps while a PDF / Excel file is being generated.
@@ -70,6 +69,21 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
   void dispose() {
     _detailBloc.add(const OwnerQuotationDetailCleared());
     super.dispose();
+  }
+
+  /// Manual refresh (pull-to-refresh + app bar button).
+  /// Fires a reload and waits until the bloc finishes loading so the
+  /// RefreshIndicator spinner stays visible for the right duration.
+  Future<void> _refresh() async {
+    _detailBloc.add(OwnerQuotationDetailRequested(widget.quotationId));
+
+    await _detailBloc.stream
+        .firstWhere(
+          (s) =>
+      s.detailStatus != OwnerQuotationDetailStatus.loading &&
+          s.detailStatus != OwnerQuotationDetailStatus.initial,
+    )
+        .timeout(const Duration(seconds: 20), onTimeout: () => _detailBloc.state);
   }
 
   bool _isOwner(QuotationDetailModel q) {
@@ -575,6 +589,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
           appBar: AppBar(
             title: Text('Owner Quotation Details', style: AppTextStyles.h6()),
             actions: [
+              // Manual refresh — always visible, even while loading / on error.
               BlocBuilder<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
                 buildWhen: (prev, curr) => prev.detail != curr.detail,
                 builder: (context, state) {
@@ -679,42 +694,64 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                   }
                 },
                 builder: (context, state) {
-                  if (state.detailStatus == OwnerQuotationDetailStatus.loading ||
-                      state.detailStatus == OwnerQuotationDetailStatus.initial) {
+                  // Full-screen loader only when there is nothing to show yet.
+                  // During a refresh the old data stays on screen (as long as
+                  // the bloc keeps `detail` while emitting `loading`).
+                  if ((state.detailStatus == OwnerQuotationDetailStatus.loading ||
+                      state.detailStatus == OwnerQuotationDetailStatus.initial) &&
+                      state.detail == null) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   if (state.detailStatus == OwnerQuotationDetailStatus.failure) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.error_outline, size: 40, color: AppColors.textHint),
-                            const SizedBox(height: 12),
-                            Text(
-                              state.detailError ?? 'Failed to load quotation.',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.body(),
+                    return RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(height: Responsive.h(160)),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.error_outline, size: 40, color: AppColors.textHint),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    state.detailError ?? 'Failed to load quotation.',
+                                    textAlign: TextAlign.center,
+                                    style: AppTextStyles.body(),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  PrimaryButton(
+                                    label: 'Retry',
+                                    height: 44,
+                                    onPressed: () => context
+                                        .read<OwnerQuotationDetailBloc>()
+                                        .add(OwnerQuotationDetailRequested(widget.quotationId)),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            PrimaryButton(
-                              label: 'Retry',
-                              height: 44,
-                              onPressed: () => context
-                                  .read<OwnerQuotationDetailBloc>()
-                                  .add(OwnerQuotationDetailRequested(widget.quotationId)),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   }
 
                   final q = state.detail;
                   if (q == null) {
-                    return const Center(child: Text('No data found.'));
+                    return RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(height: Responsive.h(200)),
+                          const Center(child: Text('No data found.')),
+                        ],
+                      ),
+                    );
                   }
 
                   final status = q.status.toLowerCase();
@@ -736,175 +773,180 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                   return Column(
                     children: [
                       Expanded(
-                        child: ListView(
-                          padding: EdgeInsets.all(Responsive.w(18)),
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(Responsive.w(16)),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.primary.withOpacity(0.07),
-                                    AppColors.primary.withOpacity(0.02),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppColors.primary.withOpacity(0.14)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Quotation No.', style: AppTextStyles.caption()),
-                                      Text(q.quotationNumber, style: AppTextStyles.h3()),
-                                    ],
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text('Date', style: AppTextStyles.caption()),
-                                      Text(
-                                        q.date != null
-                                            ? DateFormat('dd-MM-yyyy').format(q.date!)
-                                            : q.dateRaw,
-                                        style: AppTextStyles.h3(),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: Responsive.h(10)),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(q.status).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  q.status.isEmpty ? '-' : q.status,
-                                  style: AppTextStyles.bodyBold(color: _statusColor(q.status)),
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: Responsive.h(16)),
-
-                            _DetailSection(
-                              title: 'Customer Details',
-                              rows: [
-                                _Row('Name', q.customer.name, icon: Icons.groups_2_outlined),
-                                _Row('Address', q.customer.address, icon: Icons.location_on_outlined),
-                                _Row('Phone', q.customer.phone, icon: Icons.phone_outlined),
-                                _Row('Email', q.customer.email, icon: Icons.email_outlined),
-                              ],
-                            ),
-                            SizedBox(height: Responsive.h(14)),
-                            _DetailSection(
-                              title: 'Contractor Details',
-                              rows: [
-                                _Row('Name', q.contractor.name, icon: Icons.engineering_outlined),
-                                _Row('Mobile', q.contractor.mobile, icon: Icons.phone_outlined),
-                                _Row('Email', q.contractor.email, icon: Icons.email),
-                              ],
-                            ),
-                            if (q.salesman.employeeCode.isNotEmpty) ...[
-                              SizedBox(height: Responsive.h(14)),
-                              _DetailSection(
-                                title: 'Salesman',
-                                rows: [
-                                  _Row('Created By', q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
-                                      icon: Icons.person_outline),
-                                ],
-                              ),
-                            ],
-                            if (q.notes.isNotEmpty) ...[
-                              SizedBox(height: Responsive.h(14)),
-                              _DetailSection(
-                                title: 'Notes',
-                                rows: [_Row('Notes', q.notes, icon: Icons.notes_outlined)],
-                              ),
-                            ],
-                            SizedBox(height: Responsive.h(20)),
-
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Items', style: AppTextStyles.h3()),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceAlt,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    'Total Items: ${q.itemsCount}',
-                                    style: AppTextStyles.bodyBold(color: AppColors.primary),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: Responsive.h(10)),
-
-                            // ---- Excel-style bordered items table ----
-                            _InvoiceTable(
-                              items: q.items,
-                              showCompany: hasAnyCompany,
-                              showMrp: hasAnyMrp,
-                              showBox: hasBoxQty,
-                              showPiece: hasPieceQty,
-                              showIncentive: !isOwner,
-                              currency: currency,
-                              number: number,
-                            ),
-                            SizedBox(height: Responsive.h(16)),
-
-                            // Totals card
-                            _buildTotalsCard(q, money, number),
-
-                            // Payments received (only when the API returns them).
-                            if (q.payments.isNotEmpty) ...[
-                              SizedBox(height: Responsive.h(14)),
-                              _buildPaymentsCard(q, money),
-                            ],
-                            SizedBox(height: Responsive.h(12)),
-
-                            // Total incentive — hidden when the Owner created it.
-                            if (!isOwner)
+                        child: RefreshIndicator(
+                          onRefresh: _refresh,
+                          child: ListView(
+                            // Needed so pull-to-refresh works even when content is short
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.all(Responsive.w(18)),
+                            children: [
                               Container(
-                                padding: EdgeInsets.all(Responsive.w(14)),
+                                padding: EdgeInsets.all(Responsive.w(16)),
                                 decoration: BoxDecoration(
-                                  color: AppColors.success.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      AppColors.primary.withOpacity(0.07),
+                                      AppColors.primary.withOpacity(0.02),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.primary.withOpacity(0.14)),
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Icon(Icons.percent, size: 18, color: AppColors.success),
-                                        SizedBox(width: Responsive.w(8)),
-                                        Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                                        Text('Quotation No.', style: AppTextStyles.caption()),
+                                        Text(q.quotationNumber, style: AppTextStyles.h3()),
                                       ],
                                     ),
-                                    Text(
-                                      currency.format(
-                                        q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
-                                      ),
-                                      style: AppTextStyles.h3(color: AppColors.success),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('Date', style: AppTextStyles.caption()),
+                                        Text(
+                                          q.date != null
+                                              ? DateFormat('dd-MM-yyyy').format(q.date!)
+                                              : q.dateRaw,
+                                          style: AppTextStyles.h3(),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-                            if (!isOwner) SizedBox(height: Responsive.h(12)),
-                          ],
+                              SizedBox(height: Responsive.h(10)),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(q.status).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    q.status.isEmpty ? '-' : q.status,
+                                    style: AppTextStyles.bodyBold(color: _statusColor(q.status)),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: Responsive.h(16)),
+
+                              _DetailSection(
+                                title: 'Customer Details',
+                                rows: [
+                                  _Row('Name', q.customer.name, icon: Icons.groups_2_outlined),
+                                  _Row('Address', q.customer.address, icon: Icons.location_on_outlined),
+                                  _Row('Phone', q.customer.phone, icon: Icons.phone_outlined),
+                                  _Row('Email', q.customer.email, icon: Icons.email_outlined),
+                                ],
+                              ),
+                              SizedBox(height: Responsive.h(14)),
+                              _DetailSection(
+                                title: 'Contractor Details',
+                                rows: [
+                                  _Row('Name', q.contractor.name, icon: Icons.engineering_outlined),
+                                  _Row('Mobile', q.contractor.mobile, icon: Icons.phone_outlined),
+                                  _Row('Email', q.contractor.email, icon: Icons.email),
+                                ],
+                              ),
+                              if (q.salesman.employeeCode.isNotEmpty) ...[
+                                SizedBox(height: Responsive.h(14)),
+                                _DetailSection(
+                                  title: 'Salesman',
+                                  rows: [
+                                    _Row('Created By', q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
+                                        icon: Icons.person_outline),
+                                  ],
+                                ),
+                              ],
+                              if (q.notes.isNotEmpty) ...[
+                                SizedBox(height: Responsive.h(14)),
+                                _DetailSection(
+                                  title: 'Notes',
+                                  rows: [_Row('Notes', q.notes, icon: Icons.notes_outlined)],
+                                ),
+                              ],
+                              SizedBox(height: Responsive.h(20)),
+
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Items', style: AppTextStyles.h3()),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceAlt,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      'Total Items: ${q.itemsCount}',
+                                      style: AppTextStyles.bodyBold(color: AppColors.primary),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: Responsive.h(10)),
+
+                              // ---- Excel-style bordered items table ----
+                              _InvoiceTable(
+                                items: q.items,
+                                showCompany: hasAnyCompany,
+                                showMrp: hasAnyMrp,
+                                showBox: hasBoxQty,
+                                showPiece: hasPieceQty,
+                                showIncentive: !isOwner,
+                                currency: currency,
+                                number: number,
+                              ),
+                              SizedBox(height: Responsive.h(16)),
+
+                              // Totals card
+                              _buildTotalsCard(q, money, number),
+
+                              // Payments received (only when the API returns them).
+                              if (q.payments.isNotEmpty) ...[
+                                SizedBox(height: Responsive.h(14)),
+                                _buildPaymentsCard(q, money),
+                              ],
+                              SizedBox(height: Responsive.h(12)),
+
+                              // Total incentive — hidden when the Owner created it.
+                              if (!isOwner)
+                                Container(
+                                  padding: EdgeInsets.all(Responsive.w(14)),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.percent, size: 18, color: AppColors.success),
+                                          SizedBox(width: Responsive.w(8)),
+                                          Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
+                                        ],
+                                      ),
+                                      Text(
+                                        currency.format(
+                                          q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
+                                        ),
+                                        style: AppTextStyles.h3(color: AppColors.success),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (!isOwner) SizedBox(height: Responsive.h(12)),
+                            ],
+                          ),
                         ),
                       ),
 

@@ -375,7 +375,7 @@ class _QuotationCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     quotation.customerName,
-                    style: AppTextStyles.bodyBold(),
+                    style: AppTextStyles.caption(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -404,7 +404,7 @@ class _QuotationCard extends StatelessWidget {
                 SizedBox(width: Responsive.w(4)),
                 Text(
                   quotation.quotationNumber,
-                  style: AppTextStyles.caption(),
+                  style: AppTextStyles.bodyBold(),
                 ),
                 if (showSalesman) ...[
                   SizedBox(width: Responsive.w(10)),

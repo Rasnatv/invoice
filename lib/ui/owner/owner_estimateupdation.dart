@@ -874,40 +874,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                               onChanged: (_) => _formKey.currentState?.validate(),
                             ),
                           ),
-                          LabeledField(
-                            label: 'Estimate Date',
-                            field: InkWell(
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _date ?? DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2100),
-                                );
-                                if (picked != null) setState(() => _date = picked);
-                              },
-                              child: InputDecorator(
-                                decoration: InputDecoration(
-                                  prefixIcon: const Icon(Icons.calendar_today_outlined),
-                                  filled: true,
-                                  fillColor: AppColors.surface,
-                                  contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.border),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.border),
-                                  ),
-                                ),
-                                child: Text(_date == null
-                                    ? 'Select date'
-                                    : DateFormat('yyyy-MM-dd').format(_date!)),
-                              ),
-                            ),
-                          ),
+
                           LabeledField(
                             label: 'Handling Charge (optional)',
                             field: CustomTextField(

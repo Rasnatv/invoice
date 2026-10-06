@@ -31,10 +31,50 @@ class _EstimateDetailsScreenState extends State<SalesmanEstimateDetailsScreen> {
   }
 }
 
-class _EstimateDetailsView extends StatelessWidget {
+class _EstimateDetailsView extends StatefulWidget {
   const _EstimateDetailsView({required this.id});
 
   final String id;
+
+  @override
+  State<_EstimateDetailsView> createState() => _EstimateDetailsViewState();
+}
+
+class _EstimateDetailsViewState extends State<_EstimateDetailsView>
+    with WidgetsBindingObserver {
+  late final EstimateDetailBloc _bloc;
+
+  @override
+  void initState() {
+    super.initState();
+    _bloc = context.read<EstimateDetailBloc>();
+    // Auto refresh: reload whenever the app comes back to the foreground.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _bloc.add(EstimateDetailRequested(widget.id));
+    }
+  }
+
+  /// Manual refresh (pull-to-refresh + app bar button).
+  /// Waits until the bloc finishes loading so the RefreshIndicator spinner
+  /// stays visible for the right duration.
+  Future<void> _refresh() async {
+    _bloc.add(EstimateDetailRequested(widget.id));
+
+    await _bloc.stream
+        .firstWhere((s) => s.status != EstimateDetailStatus.loading)
+        .timeout(const Duration(seconds: 20), onTimeout: () => _bloc.state);
+  }
 
   /// Derived straight from the API response's `created_by_details.role_label`
   /// (e.g. "Owner" vs "Salesman") — no manual flag needed. When the estimate
@@ -100,7 +140,6 @@ class _EstimateDetailsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
 
     return NetworkAwareWrapper(
@@ -112,30 +151,41 @@ class _EstimateDetailsView extends StatelessWidget {
         body: SafeArea(
           child: BlocBuilder<EstimateDetailBloc, EstimateDetailState>(
             builder: (context, state) {
+              // Full-screen loader only when there is nothing to show yet.
+              // During a refresh the old data stays on screen.
               if (state.status == EstimateDetailStatus.loading && state.detail == null) {
                 return const Center(child: CircularProgressIndicator());
               }
 
               if (state.status == EstimateDetailStatus.failure && state.detail == null) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                return RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      Icon(Icons.error_outline, size: 40, color: AppColors.error),
-                      SizedBox(height: Responsive.h(10)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(24)),
-                        child: Text(
-                          state.error ?? 'Failed to load estimate.',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.body(color: AppColors.error),
+                      SizedBox(height: Responsive.h(180)),
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline, size: 40, color: AppColors.error),
+                            SizedBox(height: Responsive.h(10)),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: Responsive.w(24)),
+                              child: Text(
+                                state.error ?? 'Failed to load estimate.',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.body(color: AppColors.error),
+                              ),
+                            ),
+                            SizedBox(height: Responsive.h(10)),
+                            TextButton(
+                              onPressed: () =>
+                                  context.read<EstimateDetailBloc>().add(EstimateDetailRequested(widget.id)),
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(height: Responsive.h(10)),
-                      TextButton(
-                        onPressed: () =>
-                            context.read<EstimateDetailBloc>().add(EstimateDetailRequested(id)),
-                        child: const Text('Retry'),
                       ),
                     ],
                   ),
@@ -143,7 +193,15 @@ class _EstimateDetailsView extends StatelessWidget {
               }
 
               final estimate = state.detail;
-              if (estimate == null) return const SizedBox.shrink();
+              if (estimate == null) {
+                return RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [SizedBox(height: 300)],
+                  ),
+                );
+              }
 
               final statusColor = _statusColor(estimate.status);
               final isOwner = _isOwner(estimate);
@@ -151,194 +209,199 @@ class _EstimateDetailsView extends StatelessWidget {
               return Column(
                 children: [
                   Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.all(Responsive.w(18)),
-                      children: [
-                        // ---- Header card ----
-                        Container(
-                          padding: EdgeInsets.all(Responsive.w(16)),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.primary.withOpacity(0.07),
-                                AppColors.primary.withOpacity(0.02),
-                              ],
+                    child: RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView(
+                        // Needed so pull-to-refresh works even when content is short
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.all(Responsive.w(18)),
+                        children: [
+                          // ---- Header card ----
+                          Container(
+                            padding: EdgeInsets.all(Responsive.w(16)),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.primary.withOpacity(0.07),
+                                  AppColors.primary.withOpacity(0.02),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.primary.withOpacity(0.14)),
                             ),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.primary.withOpacity(0.14)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Reference NO.',
+                                              style: AppTextStyles.captionnew()
+                                                  .copyWith(letterSpacing: 0.6)),
+                                          SizedBox(height: Responsive.h(4)),
+                                          Text(
+                                            estimate.estimateNumber.isEmpty
+                                                ? '#${estimate.id}'
+                                                : estimate.estimateNumber,
+                                            style: AppTextStyles.bodyBold(),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(width: Responsive.w(12)),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text('Reference NO.',
-                                            style: AppTextStyles.captionnew()
+                                        Text('DATE',
+                                            style: AppTextStyles.caption()
                                                 .copyWith(letterSpacing: 0.6)),
                                         SizedBox(height: Responsive.h(4)),
                                         Text(
-                                          estimate.estimateNumber.isEmpty
-                                              ? '#${estimate.id}'
-                                              : estimate.estimateNumber,
+                                          estimate.date != null
+                                              ? DateFormat('dd-MM-yyyy').format(estimate.date!)
+                                              : estimate.dateRaw,
                                           style: AppTextStyles.bodyBold(),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
+                                  ],
+                                ),
+                                SizedBox(height: Responsive.h(14)),
+                                Container(
+                                  padding:
+                                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.14),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                  SizedBox(width: Responsive.w(12)),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('DATE',
-                                          style: AppTextStyles.caption()
-                                              .copyWith(letterSpacing: 0.6)),
-                                      SizedBox(height: Responsive.h(4)),
+                                      Icon(_statusIcon(estimate.status),
+                                          size: 14, color: statusColor),
+                                      SizedBox(width: Responsive.w(6)),
                                       Text(
-                                        estimate.date != null
-                                            ? DateFormat('dd-MM-yyyy').format(estimate.date!)
-                                            : estimate.dateRaw,
-                                        style: AppTextStyles.bodyBold(),
+                                        _statusLabel(estimate.status),
+                                        style: AppTextStyles.bodyBold(color: statusColor)
+                                            .copyWith(fontSize: Responsive.sp(12)),
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                              SizedBox(height: Responsive.h(14)),
-                              Container(
-                                padding:
-                                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.14),
-                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(_statusIcon(estimate.status),
-                                        size: 14, color: statusColor),
-                                    SizedBox(width: Responsive.w(6)),
-                                    Text(
-                                      _statusLabel(estimate.status),
-                                      style: AppTextStyles.bodyBold(color: statusColor)
-                                          .copyWith(fontSize: Responsive.sp(12)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: Responsive.h(16)),
-
-                        _DetailSection(
-                          title: 'Customer Details',
-                          icon: Icons.groups_2_outlined,
-                          rows: [
-                            _Row(' Name', estimate.customerName, icon: Icons.groups_2_outlined),
-                            _Row('Address', estimate.customerAddress,
-                                icon: Icons.location_on_outlined),
-                            _Row('Contact No.', estimate.customerPhone,
-                                icon: Icons.phone_outlined),
-                            _Row('Email', estimate.customerEmail, icon: Icons.alternate_email),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(14)),
-                        _DetailSection(
-                          title: 'Contractor Details',
-                          icon: Icons.person_outline,
-                          rows: [
-                            _Row(' Name', estimate.customer.name, icon: Icons.groups_2_outlined),
-                            _Row('Contact No.', estimate.customer.phone,
-                                icon: Icons.phone_outlined),
-                            _Row('Email', estimate.customer.email, icon: Icons.alternate_email),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(14)),
-                        // Salesman section — always shown, including for owners.
-                        _DetailSection(
-                          title: 'Salesman',
-                          icon: Icons.badge_outlined,
-                          rows: [
-                            _Row('Name', estimate.salesman.name, icon: Icons.badge_outlined),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(14)),
-
-                        if (estimate.siteVisit.id.isNotEmpty)
-                          _DetailSection(
-                            title: 'Site Visit',
-                            icon: Icons.location_history_outlined,
-                            rows: [
-                              _Row('Visit Date', estimate.siteVisit.visitDate,
-                                  icon: Icons.event_outlined),
-                              _Row('Status', estimate.siteVisit.statusLabel,
-                                  icon: Icons.flag_outlined),
-                              _Row('Field Staff', estimate.siteVisit.fieldStaffName,
-                                  icon: Icons.engineering_outlined),
-                            ],
-                          ),
-                        SizedBox(height: Responsive.h(20)),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(Icons.list_alt_rounded,
-                                      size: 15, color: AppColors.primary),
-                                ),
-                                SizedBox(width: Responsive.w(8)),
-                                Text('Items', style: AppTextStyles.h3()),
                               ],
                             ),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceAlt,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                'Total Items: ${estimate.itemsCount}',
-                                style: AppTextStyles.bodyBold(color: AppColors.primary),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(12)),
+                          ),
+                          SizedBox(height: Responsive.h(16)),
 
-                        _buildItemsTable(estimate, number, isOwner),
-                        SizedBox(height: Responsive.h(16)),
-
-                        if (estimate.notes.isNotEmpty) ...[
                           _DetailSection(
-                            title: 'Notes',
-                            icon: Icons.sticky_note_2_outlined,
-                            rows: [_Row('', estimate.notes)],
+                            title: 'Customer Details',
+                            icon: Icons.groups_2_outlined,
+                            rows: [
+                              _Row(' Name', estimate.customerName, icon: Icons.groups_2_outlined),
+                              _Row('Address', estimate.customerAddress,
+                                  icon: Icons.location_on_outlined),
+                              _Row('Contact No.', estimate.customerPhone,
+                                  icon: Icons.phone_outlined),
+                              _Row('Email', estimate.customerEmail, icon: Icons.alternate_email),
+                            ],
                           ),
                           SizedBox(height: Responsive.h(14)),
+                          _DetailSection(
+                            title: 'Contractor Details',
+                            icon: Icons.person_outline,
+                            rows: [
+                              _Row(' Name', estimate.customer.name, icon: Icons.groups_2_outlined),
+                              _Row('Contact No.', estimate.customer.phone,
+                                  icon: Icons.phone_outlined),
+                              _Row('Email', estimate.customer.email, icon: Icons.alternate_email),
+                            ],
+                          ),
+                          SizedBox(height: Responsive.h(14)),
+                          // Salesman section — always shown, including for owners.
+                          _DetailSection(
+                            title: 'Salesman',
+                            icon: Icons.badge_outlined,
+                            rows: [
+                              _Row('Name', estimate.salesman.name, icon: Icons.badge_outlined),
+                            ],
+                          ),
+                          SizedBox(height: Responsive.h(14)),
+
+                          if (estimate.siteVisit.id.isNotEmpty)
+                            _DetailSection(
+                              title: 'Site Visit',
+                              icon: Icons.location_history_outlined,
+                              rows: [
+                                _Row('Visit Date', estimate.siteVisit.visitDate,
+                                    icon: Icons.event_outlined),
+                                _Row('Status', estimate.siteVisit.statusLabel,
+                                    icon: Icons.flag_outlined),
+                                _Row('Field Staff', estimate.siteVisit.fieldStaffName,
+                                    icon: Icons.engineering_outlined),
+                              ],
+                            ),
+                          SizedBox(height: Responsive.h(20)),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(Icons.list_alt_rounded,
+                                        size: 15, color: AppColors.primary),
+                                  ),
+                                  SizedBox(width: Responsive.w(8)),
+                                  Text('Items', style: AppTextStyles.h3()),
+                                ],
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceAlt,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'Total Items: ${estimate.itemsCount}',
+                                  style: AppTextStyles.bodyBold(color: AppColors.primary),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: Responsive.h(12)),
+
+                          _buildItemsTable(estimate, number, isOwner),
+                          SizedBox(height: Responsive.h(16)),
+
+                          if (estimate.notes.isNotEmpty) ...[
+                            _DetailSection(
+                              title: 'Notes',
+                              icon: Icons.sticky_note_2_outlined,
+                              rows: [_Row('', estimate.notes)],
+                            ),
+                            SizedBox(height: Responsive.h(14)),
+                          ],
+
+                          _buildSummaryCard(estimate, number),
+                          SizedBox(height: Responsive.h(12)),
+
+                          if (estimate.isApproved) _buildPaymentStatus(estimate),
                         ],
-
-                        _buildSummaryCard(estimate, number),
-                        SizedBox(height: Responsive.h(12)),
-
-                        if (estimate.isApproved) _buildPaymentStatus(estimate),
-                      ],
+                      ),
                     ),
                   ),
                   if (estimate.isApproved) _buildBottomBar(context, estimate),
@@ -352,7 +415,9 @@ class _EstimateDetailsView extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------
-  // Items table — Excel-style bordered grid with Total row
+  // Items table — same style as the Owner estimate screen:
+  // wrapping text (Item / Company break into multiple lines instead of
+  // overflowing), dynamic column widths, totals footer row.
   // ---------------------------------------------------------------------
 
   Widget _buildItemsTable(EstimateDetailModel estimate, NumberFormat number, bool isOwner) {
@@ -380,127 +445,23 @@ class _EstimateDetailsView extends StatelessWidget {
     final hasPieceQty = items.any((i) => i.pieceQuantity > 0);
     final showIncentive = !isOwner;
 
-    // label, width, alignment
-    final cols = <(String, double, TextAlign)>[
-      ('Sl.No', 50, TextAlign.center),
-      ('Item', 170, TextAlign.left),
-      ('Company', 110, TextAlign.left,),
-      ('Size', 90, TextAlign.center),
-      ('Qty', 70, TextAlign.right),
-      ('Unit', 60, TextAlign.center),
-      if (hasBoxQty) ('Box Qty', 70, TextAlign.right),
-      if (hasPieceQty) ('Piece Qty', 80, TextAlign.right),
-      ('MRP', 80, TextAlign.right),
-      ('Rate', 80, TextAlign.right),
-      ('Amount', 100, TextAlign.right),
-      if (showIncentive) ('Incentive', 90, TextAlign.right),
-    ];
-
-    final amountCol = cols.indexWhere((c) => c.$1 == 'Amount');
-    final qtyCol = cols.indexWhere((c) => c.$1 == 'Qty');
-    final incentiveCol = cols.indexWhere((c) => c.$1 == 'Incentive');
-
-    Alignment alignOf(int c) => switch (cols[c].$3) {
-      TextAlign.right => Alignment.centerRight,
-      TextAlign.center => Alignment.center,
-      _ => Alignment.centerLeft,
-    };
-
-    Widget headerCell(int c) => Container(
-      alignment: alignOf(c),
-      padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(8), vertical: Responsive.h(11)),
-      child: Text(
-        cols[c].$1,
-        textAlign: cols[c].$3,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.captionnew().copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-
-    Widget dataCell(String text, int c, {bool bold = false, Color? color}) =>
-        Container(
-          alignment: alignOf(c),
-          padding: EdgeInsets.symmetric(
-              horizontal: Responsive.w(8), vertical: Responsive.h(9)),
-          child: Text(
-            text,
-            textAlign: cols[c].$3,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.visible,
-            style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
-                .copyWith(color: color),
-          ),
-        );
-
-    TableRow itemRow(int i, EstimateDetailItem it) {
-      final values = <String>[
-        '${i + 1}',
-        it.productName,
-        it.companyName.isEmpty ? '-' : it.companyName,
-        it.productSize.isEmpty ? '-' : it.productSize,
-        number.format(it.quantity),
-        it.unitName.isEmpty ? '-' : it.unitName,
-        if (hasBoxQty) it.boxQuantity > 0 ? number.format(it.boxQuantity) : '-',
-        if (hasPieceQty) it.pieceQuantity > 0 ? number.format(it.pieceQuantity) : '-',
-        it.mrp > 0 ? currency.format(it.mrp) : '-',
-        number.format(it.rate),
-        currency.format(it.amount),
-        if (showIncentive)
-          it.incentiveAmount > 0 ? currency.format(it.incentiveAmount) : '-',
-      ];
-      return TableRow(
-        decoration: BoxDecoration(
-          color: i.isEven
-              ? AppColors.surface
-              : AppColors.surfaceAlt.withOpacity(0.4),
-        ),
-        children: [
-          for (var c = 0; c < values.length; c++)
-            dataCell(
-              values[c],
-              c,
-              bold: c == amountCol || (showIncentive && c == incentiveCol),
-              color: (showIncentive && c == incentiveCol) ? AppColors.success : null,
-            ),
-        ],
-      );
-    }
-
-    TableRow totalRow() {
-      final values = List<String>.filled(cols.length, '');
-      values[1] = 'Total';
-      values[qtyCol] = number.format(totalQty);
-      values[amountCol] = currency.format(totalAmount);
-      if (showIncentive) values[incentiveCol] = currency.format(totalIncentive);
-      return TableRow(
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.06),
-          border: Border(
-            top: BorderSide(color: AppColors.primary.withOpacity(0.3), width: 1.2),
-          ),
-        ),
-        children: [
-          for (var c = 0; c < values.length; c++)
-            dataCell(
-              values[c],
-              c,
-              bold: true,
-              color: c == amountCol
-                  ? AppColors.primary
-                  : (showIncentive && c == incentiveCol)
-                  ? AppColors.success
-                  : null,
-            ),
-        ],
-      );
-    }
+    // Column widths are keyed by index, so build the map dynamically —
+    // the index of every column after Unit shifts depending on which
+    // optional columns are shown.
+    final widths = <int, TableColumnWidth>{};
+    var col = 0;
+    widths[col++] = const FixedColumnWidth(44); // Sl.No
+    widths[col++] = const FixedColumnWidth(150); // Item
+    widths[col++] = const FixedColumnWidth(120); // Company
+    widths[col++] = const FixedColumnWidth(90); // Size
+    widths[col++] = const FixedColumnWidth(60); // Qty
+    widths[col++] = const FixedColumnWidth(75); // Unit
+    if (hasBoxQty) widths[col++] = const FixedColumnWidth(70); // Box Qty
+    if (hasPieceQty) widths[col++] = const FixedColumnWidth(75); // Piece Qty
+    widths[col++] = const FixedColumnWidth(80); // MRP
+    widths[col++] = const FixedColumnWidth(75); // Rate
+    widths[col++] = const FixedColumnWidth(100); // Amount
+    if (showIncentive) widths[col++] = const FixedColumnWidth(95); // Incentive
 
     return Container(
       decoration: BoxDecoration(
@@ -519,13 +480,15 @@ class _EstimateDetailsView extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Table(
-          // Full grid lines (Excel style) in your theme border color.
-          border: TableBorder.all(color: AppColors.border, width: 0.8),
+          border: TableBorder(
+            horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
+            verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
+            bottom: BorderSide(color: AppColors.border),
+          ),
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          columnWidths: {
-            for (var c = 0; c < cols.length; c++) c: FixedColumnWidth(cols[c].$2),
-          },
+          columnWidths: widths,
           children: [
+            // ---- Header row ----
             TableRow(
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.08),
@@ -534,15 +497,141 @@ class _EstimateDetailsView extends StatelessWidget {
                       color: AppColors.primary.withOpacity(0.3), width: 1.4),
                 ),
               ),
-              children: [for (var c = 0; c < cols.length; c++) headerCell(c)],
+              children: [
+                _headerCell('Sl.No', align: TextAlign.center),
+                _headerCell('Item'),
+                _headerCell('Company'),
+                _headerCell('Size'),
+                _headerCell('Qty', align: TextAlign.right),
+                _headerCell('Unit'),
+                if (hasBoxQty) _headerCell('Box Qty', align: TextAlign.right),
+                if (hasPieceQty) _headerCell('Piece Qty', align: TextAlign.right),
+                _headerCell('MRP', align: TextAlign.right),
+                _headerCell('Rate', align: TextAlign.right),
+                _headerCell('Amount', align: TextAlign.right),
+                if (showIncentive) _headerCell('Incentive', align: TextAlign.right),
+              ],
             ),
-            for (var i = 0; i < items.length; i++) itemRow(i, items[i]),
-            totalRow(),
+
+            // ---- Data rows ----
+            for (var i = 0; i < items.length; i++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: i.isEven
+                      ? AppColors.surface
+                      : AppColors.surfaceAlt.withOpacity(0.4),
+                ),
+                children: [
+                  _dataCell('${i + 1}', align: TextAlign.center),
+                  _dataCell(items[i].productName.isEmpty ? '-' : items[i].productName),
+                  _dataCell(items[i].companyName.isEmpty ? '-' : items[i].companyName),
+                  _dataCell(items[i].productSize.isEmpty ? '-' : items[i].productSize),
+                  _dataCell(number.format(items[i].quantity), align: TextAlign.right),
+                  _dataCell(items[i].unitName.isEmpty ? '-' : items[i].unitName),
+                  if (hasBoxQty)
+                    _dataCell(
+                      items[i].boxQuantity > 0 ? number.format(items[i].boxQuantity) : '-',
+                      align: TextAlign.right,
+                    ),
+                  if (hasPieceQty)
+                    _dataCell(
+                      items[i].pieceQuantity > 0
+                          ? number.format(items[i].pieceQuantity)
+                          : '-',
+                      align: TextAlign.right,
+                    ),
+                  _dataCell(
+                    items[i].mrp > 0 ? currency.format(items[i].mrp) : '-',
+                    align: TextAlign.right,
+                  ),
+                  _dataCell(number.format(items[i].rate), align: TextAlign.right),
+                  _dataCell(currency.format(items[i].amount),
+                      align: TextAlign.right, bold: true),
+                  if (showIncentive)
+                    _dataCell(
+                      items[i].incentiveAmount > 0
+                          ? currency.format(items[i].incentiveAmount)
+                          : '-',
+                      align: TextAlign.right,
+                      bold: true,
+                      color: AppColors.success,
+                    ),
+                ],
+              ),
+
+            // ---- Totals footer row ----
+            TableRow(
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.06),
+                border: Border(
+                  top: BorderSide(
+                      color: AppColors.primary.withOpacity(0.3), width: 1.2),
+                ),
+              ),
+              children: [
+                _dataCell(''),
+                _dataCell('Total', bold: true),
+                _dataCell(''),
+                _dataCell(''),
+                _dataCell(number.format(totalQty), align: TextAlign.right, bold: true),
+                _dataCell(''),
+                if (hasBoxQty) _dataCell(''),
+                if (hasPieceQty) _dataCell(''),
+                _dataCell(''),
+                _dataCell(''),
+                _dataCell(currency.format(totalAmount),
+                    align: TextAlign.right, bold: true, color: AppColors.primary),
+                if (showIncentive)
+                  _dataCell(currency.format(totalIncentive),
+                      align: TextAlign.right, bold: true, color: AppColors.success),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(8), vertical: Responsive.h(10)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 2,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.captionnew().copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _dataCell(
+      String text, {
+        TextAlign align = TextAlign.left,
+        bool bold = false,
+        Color? color,
+      }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 3,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
+            .copyWith(color: color),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------
   // Summary card
   // ---------------------------------------------------------------------
@@ -612,7 +701,6 @@ class _EstimateDetailsView extends StatelessWidget {
               ],
             ),
           ),
-          // Grand Total strip
           // Balance strip — only meaningful once approved.
           if (estimate.isApproved)
             Container(
