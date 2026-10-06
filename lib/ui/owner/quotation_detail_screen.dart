@@ -1293,11 +1293,6 @@ class _DetailSection extends StatelessWidget {
     );
   }
 }
-
-// =======================================================================
-// Excel-style bordered items table with a Total row
-// =======================================================================
-
 class _InvoiceTable extends StatelessWidget {
   const _InvoiceTable({
     required this.items,
@@ -1325,141 +1320,31 @@ class _InvoiceTable extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.border),
         ),
-        child: Text('No items on this quotation.',
-            style: AppTextStyles.caption()),
+        child: Text('No items on this quotation.', style: AppTextStyles.caption()),
       );
     }
-
-    // label, width, alignment
-    final cols = <(String, double, TextAlign)>[
-      ('Sl.No', 50, TextAlign.center),
-      ('Item', 170, TextAlign.left),
-      if (showCompany) ('Company', 110, TextAlign.left),
-      ('Size', 90, TextAlign.center),
-      ('Qty', 70, TextAlign.right),
-      ('Unit', 60, TextAlign.center),
-      if (showBox) ('Box Qty', 70, TextAlign.right),
-      if (showPiece) ('Piece Qty', 80, TextAlign.right),
-      if (showMrp) ('MRP', 80, TextAlign.right),
-      ('Rate', 80, TextAlign.right),
-      ('Amount', 100, TextAlign.right),
-      if (showIncentive) ('Incentive', 90, TextAlign.right),
-    ];
-
-    final amountCol = cols.indexWhere((c) => c.$1 == 'Amount');
-    final qtyCol = cols.indexWhere((c) => c.$1 == 'Qty');
-    final incentiveCol = cols.indexWhere((c) => c.$1 == 'Incentive');
 
     final totalQty = items.fold<double>(0, (s, i) => s + i.quantity);
     final totalAmount = items.fold<double>(0, (s, i) => s + i.amount);
-    final totalIncentive =
-    items.fold<double>(0, (s, i) => s + i.incentiveAmount);
+    final totalIncentive = items.fold<double>(0, (s, i) => s + i.incentiveAmount);
 
-    Alignment alignOf(int c) => switch (cols[c].$3) {
-      TextAlign.right => Alignment.centerRight,
-      TextAlign.center => Alignment.center,
-      _ => Alignment.centerLeft,
-    };
-
-    Widget headerCell(int c) => Container(
-      alignment: alignOf(c),
-      padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(8), vertical: Responsive.h(11)),
-      child: Text(
-        cols[c].$1,
-        textAlign: cols[c].$3,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.captionnew().copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-
-    Widget dataCell(String text, int c, {bool bold = false, Color? color}) =>
-        Container(
-          alignment: alignOf(c),
-          padding: EdgeInsets.symmetric(
-              horizontal: Responsive.w(8), vertical: Responsive.h(9)),
-          child: Text(
-            text,
-            textAlign: cols[c].$3,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.visible,
-            style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
-                .copyWith(color: color),
-          ),
-        );
-
-    TableRow itemRow(int i, QuotationDetailItem it) {
-      final values = <String>[
-        '${i + 1}',
-        it.productName.isEmpty ? '-' : it.productName,
-        if (showCompany) it.companyName.isEmpty ? '-' : it.companyName,
-        it.productSize.isEmpty ? '-' : it.productSize,
-        number.format(it.quantity),
-        it.productUnit,
-        if (showBox) it.boxQuantity > 0 ? number.format(it.boxQuantity) : '-',
-        if (showPiece)
-          it.pieceQuantity > 0 ? number.format(it.pieceQuantity) : '-',
-        if (showMrp) it.mrp > 0 ? number.format(it.mrp) : '-',
-        number.format(it.rate),
-        currency.format(it.amount),
-        if (showIncentive)
-          it.isIncentiveEligible ? currency.format(it.incentiveAmount) : '-',
-      ];
-      return TableRow(
-        decoration: BoxDecoration(
-          color: i.isEven
-              ? AppColors.surface
-              : AppColors.surfaceAlt.withOpacity(0.4),
-        ),
-        children: [
-          for (var c = 0; c < values.length; c++)
-            dataCell(
-              values[c],
-              c,
-              bold: c == amountCol || (showIncentive && c == incentiveCol),
-              color: (showIncentive && c == incentiveCol)
-                  ? AppColors.success
-                  : null,
-            ),
-        ],
-      );
-    }
-
-    TableRow totalRow() {
-      final values = List<String>.filled(cols.length, '');
-      values[1] = 'Total';
-      values[qtyCol] = number.format(totalQty);
-      values[amountCol] = currency.format(totalAmount);
-      if (showIncentive) values[incentiveCol] = currency.format(totalIncentive);
-      return TableRow(
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.06),
-          border: Border(
-            top: BorderSide(
-                color: AppColors.primary.withOpacity(0.3), width: 1.2),
-          ),
-        ),
-        children: [
-          for (var c = 0; c < values.length; c++)
-            dataCell(
-              values[c],
-              c,
-              bold: true,
-              color: c == amountCol
-                  ? AppColors.primary
-                  : (showIncentive && c == incentiveCol)
-                  ? AppColors.success
-                  : null,
-            ),
-        ],
-      );
-    }
+    // Column widths are keyed by index, so build the map dynamically —
+    // the index of every column after Size shifts depending on which
+    // optional columns are shown.
+    final widths = <int, TableColumnWidth>{};
+    var col = 0;
+    widths[col++] = const FixedColumnWidth(50); // Sl.No
+    widths[col++] = const FixedColumnWidth(150); // Item
+    if (showCompany) widths[col++] = const FixedColumnWidth(120); // Company
+    widths[col++] = const FixedColumnWidth(90); // Size
+    widths[col++] = const FixedColumnWidth(70); // Qty
+    widths[col++] = const FixedColumnWidth(95); // Unit
+    if (showBox) widths[col++] = const FixedColumnWidth(70); // Box Qty
+    if (showPiece) widths[col++] = const FixedColumnWidth(80); // Piece Qty
+    if (showMrp) widths[col++] = const FixedColumnWidth(75); // MRP
+    widths[col++] = const FixedColumnWidth(75); // Rate
+    widths[col++] = const FixedColumnWidth(110); // Amount
+    if (showIncentive) widths[col++] = const FixedColumnWidth(100); // Incentive
 
     return Container(
       decoration: BoxDecoration(
@@ -1478,13 +1363,15 @@ class _InvoiceTable extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Table(
-          border: TableBorder.all(color: AppColors.border, width: 0.8),
+          border: TableBorder(
+            horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
+            verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
+            bottom: BorderSide(color: AppColors.border),
+          ),
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          columnWidths: {
-            for (var c = 0; c < cols.length; c++)
-              c: FixedColumnWidth(cols[c].$2),
-          },
+          columnWidths: widths,
           children: [
+            // ---- Header row ----
             TableRow(
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.08),
@@ -1493,12 +1380,139 @@ class _InvoiceTable extends StatelessWidget {
                       color: AppColors.primary.withOpacity(0.3), width: 1.4),
                 ),
               ),
-              children: [for (var c = 0; c < cols.length; c++) headerCell(c)],
+              children: [
+                _headerCell('Sl.No', align: TextAlign.center),
+                _headerCell('Item'),
+                if (showCompany) _headerCell('Company'),
+                _headerCell('Size'),
+                _headerCell('Qty', align: TextAlign.right),
+                _headerCell('Unit'),
+                if (showBox) _headerCell('Box Qty', align: TextAlign.right),
+                if (showPiece) _headerCell('Piece Qty', align: TextAlign.right),
+                if (showMrp) _headerCell('MRP', align: TextAlign.right),
+                _headerCell('Rate', align: TextAlign.right),
+                _headerCell('Amount', align: TextAlign.right),
+                if (showIncentive) _headerCell('Incentive', align: TextAlign.right),
+              ],
             ),
-            for (var i = 0; i < items.length; i++) itemRow(i, items[i]),
-            totalRow(),
+
+            // ---- Data rows ----
+            for (var i = 0; i < items.length; i++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: i.isEven
+                      ? AppColors.surface
+                      : AppColors.surfaceAlt.withOpacity(0.4),
+                ),
+                children: [
+                  _dataCell('${i + 1}', align: TextAlign.center),
+                  _dataCell(items[i].productName.isEmpty ? '-' : items[i].productName),
+                  if (showCompany)
+                    _dataCell(items[i].companyName.isEmpty ? '-' : items[i].companyName),
+                  _dataCell(items[i].productSize.isEmpty ? '-' : items[i].productSize),
+                  _dataCell(number.format(items[i].quantity), align: TextAlign.right),
+                  _dataCell(items[i].productUnit.isEmpty ? '-' : items[i].productUnit),
+                  if (showBox)
+                    _dataCell(
+                      items[i].boxQuantity > 0 ? number.format(items[i].boxQuantity) : '-',
+                      align: TextAlign.right,
+                    ),
+                  if (showPiece)
+                    _dataCell(
+                      items[i].pieceQuantity > 0
+                          ? number.format(items[i].pieceQuantity)
+                          : '-',
+                      align: TextAlign.right,
+                    ),
+                  if (showMrp)
+                    _dataCell(
+                      items[i].mrp > 0 ? number.format(items[i].mrp) : '-',
+                      align: TextAlign.right,
+                    ),
+                  _dataCell(number.format(items[i].rate), align: TextAlign.right),
+                  _dataCell(currency.format(items[i].amount),
+                      align: TextAlign.right, bold: true),
+                  if (showIncentive)
+                    _dataCell(
+                      items[i].isIncentiveEligible
+                          ? currency.format(items[i].incentiveAmount)
+                          : '-',
+                      align: TextAlign.right,
+                      bold: true,
+                      color: AppColors.success,
+                    ),
+                ],
+              ),
+
+            // ---- Totals footer row ----
+            TableRow(
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.06),
+                border: Border(
+                  top: BorderSide(
+                      color: AppColors.primary.withOpacity(0.3), width: 1.2),
+                ),
+              ),
+              children: [
+                _dataCell(''),
+                _dataCell('Total', bold: true),
+                if (showCompany) _dataCell(''),
+                _dataCell(''),
+                _dataCell(number.format(totalQty), align: TextAlign.right, bold: true),
+                _dataCell(''),
+                if (showBox) _dataCell(''),
+                if (showPiece) _dataCell(''),
+                if (showMrp) _dataCell(''),
+                _dataCell(''),
+                _dataCell(currency.format(totalAmount),
+                    align: TextAlign.right, bold: true, color: AppColors.primary),
+                if (showIncentive)
+                  _dataCell(currency.format(totalIncentive),
+                      align: TextAlign.right, bold: true, color: AppColors.success),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(8), vertical: Responsive.h(10)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 2,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.captionnew().copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _dataCell(
+      String text, {
+        TextAlign align = TextAlign.left,
+        bool bold = false,
+        Color? color,
+      }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 3,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
+            .copyWith(color: color),
       ),
     );
   }

@@ -163,24 +163,24 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(title, style: AppTextStyles.h6()),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.tune),
-              tooltip: 'Edit filter',
-              onPressed: () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => OwnerQuotationReportFilterScreen(
-                    initialType: widget.type,
-                    // '' = All, which the filter screen opens on the All chip.
-                    initialPersonId: widget.personId,
-                    initialPerson: widget.personName,
-                    initialStart: widget.startDate,
-                    initialEnd: widget.endDate,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          // actions: [
+          //   IconButton(
+          //     icon: const Icon(Icons.tune),
+          //     tooltip: 'Edit filter',
+          //     onPressed: () => Navigator.of(context).pushReplacement(
+          //       MaterialPageRoute(
+          //         builder: (_) => OwnerQuotationReportFilterScreen(
+          //           initialType: widget.type,
+          //           // '' = All, which the filter screen opens on the All chip.
+          //           initialPersonId: widget.personId,
+          //           initialPerson: widget.personName,
+          //           initialStart: widget.startDate,
+          //           initialEnd: widget.endDate,
+          //         ),
+          //       ),
+          //     ),
+          //   ),
+          // ],
         ),
         body: BlocConsumer<QuotationReportBloc, QuotationReportState>(
           listener: (context, state) {
