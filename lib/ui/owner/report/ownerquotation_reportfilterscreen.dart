@@ -33,13 +33,24 @@ class OwnerQuotationReportFilterScreen extends StatefulWidget {
 }
 
 class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportFilterScreen> {
+  // Type chips: All | Salesman | Contractor.
+  static const String _chipAll = 'All';
+  static const String _chipSalesman = 'Salesman';
+  static const String _chipContractor = 'Contractor';
+  static const List<String> _typeChips = [_chipAll, _chipSalesman, _chipContractor];
+
   final OwnerReportsProvider _reportsProvider = OwnerReportsProvider();
 
+  /// True when the "All" chip is selected: no person dropdown, and the report
+  /// is requested with type = "" and person_id = "".
+  late bool _isAll;
+
+  /// Salesman / Contractor — only used when [_isAll] is false.
   late ReportEntityType _type;
   late DateTime _startDate;
   late DateTime _endDate;
 
-  bool _loadingPeople = true;
+  bool _loadingPeople = false;
   String? _peopleError;
   List<ActiveSalesmanModel> _salesmen = [];
   List<ActiveContractorModel> _contractors = [];
@@ -56,7 +67,10 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
     _endDate = widget.initialEnd ?? DateTime(now.year, now.month + 1, 0);
     _selectedPersonId = widget.initialPersonId;
     _selectedPersonName = widget.initialPerson;
-    _loadPeople();
+
+    // Opens on "All" unless a specific person was passed in.
+    _isAll = widget.initialPersonId == null || widget.initialPersonId!.isEmpty;
+    if (!_isAll) _loadPeople();
   }
 
   // ---------------------------------------------------------------------------
@@ -164,9 +178,28 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
   // Handlers
   // ---------------------------------------------------------------------------
 
-  void _onTypeChanged(bool isSalesman) {
+  String get _selectedChip {
+    if (_isAll) return _chipAll;
+    return _type == ReportEntityType.salesman ? _chipSalesman : _chipContractor;
+  }
+
+  void _onTypeChipChanged(String chip) {
+    if (chip == _selectedChip) return;
+
+    if (chip == _chipAll) {
+      setState(() {
+        _isAll = true;
+        _selectedPersonId = null;
+        _selectedPersonName = null;
+        _peopleError = null;
+        _loadingPeople = false;
+      });
+      return;
+    }
+
     setState(() {
-      _type = isSalesman ? ReportEntityType.salesman : ReportEntityType.contractor;
+      _isAll = false;
+      _type = chip == _chipSalesman ? ReportEntityType.salesman : ReportEntityType.contractor;
       _selectedPersonId = null;
       _selectedPersonName = null;
     });
@@ -201,7 +234,9 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
     });
   }
 
-  bool get _canGenerate => _selectedPersonId != null && _selectedPersonName != null;
+  // "All" needs no person; Salesman / Contractor need one picked.
+  bool get _canGenerate =>
+      _isAll || (_selectedPersonId != null && _selectedPersonName != null);
 
   void _generate() {
     if (!_canGenerate) return;
@@ -209,8 +244,9 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
       MaterialPageRoute(
         builder: (_) => OwnerQuotationReportScreen(
           type: _type,
-          personId: _selectedPersonId!,
-          personName: _selectedPersonName!,
+          // '' for "All" — the API then gets type "" and person_id "".
+          personId: _isAll ? '' : _selectedPersonId!,
+          personName: _isAll ? 'All' : _selectedPersonName!,
           startDate: _startDate,
           endDate: _endDate,
         ),
@@ -238,43 +274,47 @@ class _OwnerQuotationReportFilterScreenState extends State<OwnerQuotationReportF
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const ReportFieldLabel('SELECT TYPE'),
-              SizedBox(height: Responsive.h(8)),
-              ReportTypeToggle(
-                leftLabel: 'Salesman',
-                rightLabel: 'Contractor',
-                isLeftSelected: _type == ReportEntityType.salesman,
-                onChanged: _onTypeChanged,
+              SizedBox(height: Responsive.h(10)),
+              ReportStatusChips(
+                options: _typeChips,
+                selected: _selectedChip,
+                onChanged: _onTypeChipChanged,
               ),
-              SizedBox(height: Responsive.h(20)),
-              ReportFieldLabel(
-                _type == ReportEntityType.salesman ? 'SELECT SALESMAN' : 'SELECT CONTRACTOR',
-              ),
-              SizedBox(height: Responsive.h(8)),
-              if (_loadingPeople)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: LinearProgressIndicator(),
-                )
-              else if (_peopleError != null)
-                Text(_peopleError!, style: AppTextStyles.caption())
-              else if (names.isEmpty)
-                  Text(
-                    _type == ReportEntityType.salesman
-                        ? 'No active salesmen found.'
-                        : 'No active contractors found.',
-                    style: AppTextStyles.caption(),
+
+              // Person dropdown only for Salesman / Contractor.
+              if (!_isAll) ...[
+                SizedBox(height: Responsive.h(20)),
+                ReportFieldLabel(
+                  _type == ReportEntityType.salesman ? 'SELECT SALESMAN' : 'SELECT CONTRACTOR',
+                ),
+                SizedBox(height: Responsive.h(8)),
+                if (_loadingPeople)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: LinearProgressIndicator(),
                   )
-                else
-                  ReportDropdownField(
-                    options: names,
-                    // null until the user actually picks someone — shows
-                    // the "Select Salesman" / "Select Contractor" hint.
-                    value: _selectedLabel,
-                    hint: _type == ReportEntityType.salesman
-                        ? 'Select Salesman'
-                        : 'Select Contractor',
-                    onChanged: _onPersonChanged,
-                  ),
+                else if (_peopleError != null)
+                  Text(_peopleError!, style: AppTextStyles.caption(color: AppColors.error))
+                else if (names.isEmpty)
+                    Text(
+                      _type == ReportEntityType.salesman
+                          ? 'No active salesmen found.'
+                          : 'No active contractors found.',
+                      style: AppTextStyles.caption(),
+                    )
+                  else
+                    ReportDropdownField(
+                      options: names,
+                      // null until the user actually picks someone — shows
+                      // the "Select Salesman" / "Select Contractor" hint.
+                      value: _selectedLabel,
+                      hint: _type == ReportEntityType.salesman
+                          ? 'Select Salesman'
+                          : 'Select Contractor',
+                      onChanged: _onPersonChanged,
+                    ),
+              ],
+
               SizedBox(height: Responsive.h(20)),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

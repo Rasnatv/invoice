@@ -13,6 +13,12 @@ import '../../../models/owner_reportmodel/estimatereportmodel.dart';
 import 'ownerquotation_reportfilterscreen.dart'; // ReportEntityType
 import 'ownerreportwidget.dart';
 
+/// Value for the API `type` field. Blank when no person is chosen ("All"),
+/// otherwise 'salesman' / 'contractor'.
+String _apiTypeFor(ReportEntityType type, String personId) {
+  if (personId.trim().isEmpty) return '';
+  return type == ReportEntityType.salesman ? 'salesman' : 'contractor';
+}
 
 class OwnerEstimateReportScreen extends StatelessWidget {
   const OwnerEstimateReportScreen({
@@ -25,19 +31,19 @@ class OwnerEstimateReportScreen extends StatelessWidget {
   });
 
   final ReportEntityType type;
+
+  /// Empty string = "All" report (type + person_id are sent blank).
   final String personId;
   final String personName;
   final DateTime startDate;
   final DateTime endDate;
-
-  String get _apiType => type == ReportEntityType.salesman ? 'salesman' : 'contractor';
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => EstimateReportBloc()
         ..add(FetchEstimateReport(
-          type: _apiType,
+          type: _apiTypeFor(type, personId),
           personId: personId,
           personName: personName,
           fromDate: startDate,
@@ -89,14 +95,25 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
   // unfiltered list on first load — it never becomes a chip.
   String _selectedApiValue = 'all';
 
+  bool get _isAll => widget.personId.trim().isEmpty;
+
   /// Runs once, on the first ('all') response — pulls every distinct
   /// status straight out of the rows the server actually returned.
   /// The chip list is exactly this set — no extra "All" entry added.
   void _discoverStatusesIfNeeded(List<EstimateListItemModel> rows) {
     if (_statusOptions.isNotEmpty) return; // already discovered, don't overwrite
-    final seen = <String, String>{}; // status -> status_label, first-seen order
+    // filter value -> status_label, first-seen order.
+    //
+    // The backend's status FILTER does not accept the raw row status
+    // (e.g. "pending_approval" -> "The selected status is invalid.").
+    // It accepts the lowercased label instead ("Pending" -> "pending",
+    // "Approved" -> "approved", "Despatched" -> "despatched", ...).
+    final seen = <String, String>{};
     for (final row in rows) {
-      seen.putIfAbsent(row.status, () => row.statusLabel);
+      final label = row.statusLabel.trim();
+      final filterValue = (label.isNotEmpty ? label : row.status).trim().toLowerCase();
+      if (filterValue.isEmpty) continue;
+      seen.putIfAbsent(filterValue, () => label.isNotEmpty ? label : row.status);
     }
     if (seen.isEmpty) return;
     setState(() {
@@ -107,28 +124,60 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
   }
 
   void _onChipTap(String apiValue) {
-    setState(() => _selectedApiValue = apiValue);
+    // Tapping the selected chip again clears the filter (back to everything),
+    // since there is no manual "All" chip to go back with.
+    final next = apiValue == _selectedApiValue ? 'all' : apiValue;
+    setState(() => _selectedApiValue = next);
     context.read<EstimateReportBloc>().add(FetchEstimateReport(
-      type: widget.type == ReportEntityType.salesman ? 'salesman' : 'contractor',
+      type: _apiTypeFor(widget.type, widget.personId),
       personId: widget.personId,
       personName: widget.personName,
       fromDate: widget.startDate,
       toDate: widget.endDate,
-      status: apiValue,
+      status: next,
     ));
+  }
+
+  /// Builds the labelled lines shown under each estimate number.
+  ///
+  /// An estimate can have BOTH a salesman and a contractor, so each gets its
+  /// own line. In a salesman-specific report the salesman line is skipped
+  /// (redundant); in a contractor-specific report the contractor line is
+  /// skipped. In the "All" report both are shown when present.
+  String _buildSubtitle(EstimateListItemModel row) {
+    final lines = <String>[
+      'Customer: ${row.customerName.isNotEmpty ? row.customerName : '-'}',
+      'Phone: ${row.customerPhone.isNotEmpty ? row.customerPhone : '-'}',
+    ];
+
+    final showSalesman = _isAll || widget.type == ReportEntityType.contractor;
+    final showContractor = _isAll || widget.type == ReportEntityType.salesman;
+
+    if (showSalesman && row.salesmanName.trim().isNotEmpty) {
+      lines.add('Salesman: ${row.salesmanName.trim()}');
+    }
+    if (showContractor && row.contractorName.trim().isNotEmpty) {
+      lines.add('Contractor: ${row.contractorName.trim()}');
+    }
+
+    return lines.join('\n');
   }
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final title = widget.type == ReportEntityType.salesman ? 'Salesman Report' : 'Contractor Report';
+    final title = _isAll
+        ? 'Estimate Report'
+        : widget.type == ReportEntityType.salesman
+        ? 'Estimate Salesman Report'
+        : 'Estimate Contractor Report';
     final subtitle =
         '${widget.personName} · ${DateFormat('dd').format(widget.startDate)}\u2013${DateFormat('dd MMM yyyy').format(widget.endDate)}';
 
     return NetworkAwareWrapper(child:Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Estimate $title', style: AppTextStyles.h6()),
+        title: Text(title, style: AppTextStyles.h6()),
       ),
       body: BlocConsumer<EstimateReportBloc, EstimateReportState>(
         listener: (context, state) {
@@ -143,19 +192,64 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
           }
 
           if (state is EstimateReportError) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(Responsive.w(20)),
-                child: Text(state.message ?? '', style: AppTextStyles.caption(), textAlign: TextAlign.center),
-              ),
+            // Keep the chips on screen (when statuses are already known) so a
+            // failed filter never leaves the user stuck on a blank error page.
+            final errorSelectedLabel = _statusOptions
+                .firstWhere(
+                  (s) => s.apiValue == _selectedApiValue,
+              orElse: () => const _StatusOption(apiValue: '', label: ''),
+            )
+                .label;
+
+            return ListView(
+              padding: EdgeInsets.all(Responsive.w(20)),
+              children: [
+                if (_statusOptions.isNotEmpty) ...[
+                  ReportStatusChips(
+                    options: _statusOptions.map((s) => s.label).toList(),
+                    selected: errorSelectedLabel,
+                    onChanged: (label) {
+                      final match = _statusOptions.firstWhere((s) => s.label == label);
+                      _onChipTap(match.apiValue);
+                    },
+                  ),
+                  SizedBox(height: Responsive.h(40)),
+                ] else
+                  SizedBox(height: Responsive.h(80)),
+                Center(
+                  child: Text(
+                    state.message ?? '',
+                    style: AppTextStyles.caption(),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             );
           }
 
           final loaded = state as EstimateReportLoaded;
           final summary = loaded.data.summary;
           final rows = loaded.data.list;
-          // Empty string = nothing selected yet (initial unfiltered view,
-          // before the user has tapped any status chip).
+
+          // True once at least one estimate exists for this period.
+          final hasEstimates =
+              rows.isNotEmpty || _statusOptions.isNotEmpty || _selectedApiValue != 'all';
+
+          // No estimates at all -> only the header text and an empty message.
+          if (!hasEstimates) {
+            return ListView(
+              padding: EdgeInsets.all(Responsive.w(20)),
+              children: [
+                Text(subtitle, style: AppTextStyles.caption()),
+                SizedBox(height: Responsive.h(60)),
+                Center(
+                  child: Text('No estimates in this period', style: AppTextStyles.caption()),
+                ),
+              ],
+            );
+          }
+
+          // Empty string = nothing selected yet (initial unfiltered view).
           final selectedLabel = _statusOptions
               .firstWhere(
                 (s) => s.apiValue == _selectedApiValue,
@@ -189,22 +283,24 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
                 ],
               ),
               SizedBox(height: Responsive.h(16)),
-              // Chip set + count come entirely from _statusOptions,
-              // which is built from API rows — nothing hardcoded here.
-              ReportStatusChips(
-                options: _statusOptions.map((s) => s.label).toList(),
-                selected: selectedLabel,
-                onChanged: (label) {
-                  final match = _statusOptions.firstWhere((s) => s.label == label);
-                  _onChipTap(match.apiValue);
-                },
-              ),
-              SizedBox(height: Responsive.h(16)),
+              // Chip set comes entirely from _statusOptions (built from API rows).
+              if (_statusOptions.isNotEmpty) ...[
+                ReportStatusChips(
+                  options: _statusOptions.map((s) => s.label).toList(),
+                  selected: selectedLabel,
+                  onChanged: (label) {
+                    final match = _statusOptions.firstWhere((s) => s.label == label);
+                    _onChipTap(match.apiValue);
+                  },
+                ),
+                SizedBox(height: Responsive.h(16)),
+              ],
               for (int i = 0; i < rows.length; i++) ...[
                 ReportListItemCard(
                   code: rows[i].estimateNumber,
                   status: rows[i].statusLabel,
-                  subtitle: '${rows[i].customerName} · ${rows[i].customerPhone}',
+                  // Labelled lines: Customer / Phone / Salesman / Contractor
+                  subtitle: _buildSubtitle(rows[i]),
                   amountFormatted: currency.format(rows[i].grandTotal),
                   dateFormatted:
                   rows[i].date != null ? DateFormat('dd MMM yyyy').format(rows[i].date!) : '-',

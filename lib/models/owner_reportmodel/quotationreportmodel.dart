@@ -1,19 +1,18 @@
-// POST /reports/quotations?page=&per_page=
-// Body:  { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
-// Response shape matches the sample you shared: { status, status_code, data: { summary, list }, message }
 
 /// Request body for the quotation report endpoint.
 class QuotationReportRequest {
   const QuotationReportRequest({
-    required this.type,
-    required this.personId,
+    this.type = '',
+    this.personId = '',
     required this.fromDate,
     required this.toDate,
     this.status = 'all',
   });
 
-  /// 'salesman' or 'contractor'
+  /// 'salesman' or 'contractor'. Empty = all.
   final String type;
+
+  /// Empty = all people.
   final String personId;
 
   /// yyyy-MM-dd
@@ -25,14 +24,23 @@ class QuotationReportRequest {
   /// 'all' or a specific status key understood by the backend.
   final String status;
 
+  /// True when no specific person is chosen (the "All" report).
+  bool get isAll => personId.trim().isEmpty;
+
   Map<String, dynamic> toJson() => {
-    'type': type,
-    'person_id': personId,
+    // For the "All" report both type and person_id must be blank.
+    'type': isAll ? '' : type,
+    'person_id': isAll ? '' : personId,
     'from_date': fromDate,
     'to_date': toDate,
     'status': status,
   };
 }
+
+/// Safe parsers — the backend sends numbers as strings ("4", "102295.00"),
+/// but this also copes with real numbers, null and blank values.
+int _toInt(dynamic v) => int.tryParse('${v ?? 0}'.trim()) ?? 0;
+double _toDouble(dynamic v) => double.tryParse('${v ?? 0}'.trim()) ?? 0;
 
 class QuotationReportSummaryModel {
   const QuotationReportSummaryModel({
@@ -53,16 +61,19 @@ class QuotationReportSummaryModel {
 
   factory QuotationReportSummaryModel.fromJson(Map<String, dynamic> json) {
     return QuotationReportSummaryModel(
-      totalQuotations: int.tryParse('${json['total_quotations'] ?? 0}') ?? 0,
-      totalValue: double.tryParse('${json['total_value'] ?? 0}') ?? 0,
-      pendingCount: int.tryParse('${json['pending_count'] ?? 0}') ?? 0,
+      totalQuotations: _toInt(json['total_quotations']),
+      totalValue: _toDouble(json['total_value']),
+      pendingCount: _toInt(json['pending_count']),
     );
   }
 }
 
-/// One row of the report list. `status` is the raw backend key (e.g. "sent"),
-/// `statusLabel` is what the backend wants shown to the user (e.g. "Pending").
+/// One row of the report list. `status` is the raw backend key (e.g. "draft"),
+/// `statusLabel` is what the backend wants shown to the user (e.g. "Draft").
 /// The UI should always render `statusLabel` and never re-derive it locally.
+///
+/// In the "All" report a row can belong to a salesman, a contractor, or
+/// neither (both names empty) — use [ownerName] for display.
 class QuotationListItemModel {
   const QuotationListItemModel({
     required this.id,
@@ -88,16 +99,32 @@ class QuotationListItemModel {
   final String salesmanName;
   final String contractorName;
 
+  /// Who raised the quotation: salesman, else contractor, else empty.
+  String get ownerName {
+    if (salesmanName.trim().isNotEmpty) return salesmanName.trim();
+    if (contractorName.trim().isNotEmpty) return contractorName.trim();
+    return '';
+  }
+
+  /// 'Salesman' / 'Contractor' / '' — handy for a small tag in the "All" list.
+  String get ownerType {
+    if (salesmanName.trim().isNotEmpty) return 'Salesman';
+    if (contractorName.trim().isNotEmpty) return 'Contractor';
+    return '';
+  }
+
   factory QuotationListItemModel.fromJson(Map<String, dynamic> json) {
+    final status = '${json['status'] ?? ''}';
+    final label = '${json['status_label'] ?? ''}'.trim();
     return QuotationListItemModel(
       id: '${json['id'] ?? ''}',
       quotationNumber: '${json['quotation_number'] ?? ''}',
       customerName: '${json['customer_name'] ?? ''}',
       customerPhone: '${json['customer_phone'] ?? ''}',
       date: DateTime.tryParse('${json['date'] ?? ''}'),
-      grandTotal: double.tryParse('${json['grand_total'] ?? 0}') ?? 0,
-      status: '${json['status'] ?? ''}',
-      statusLabel: '${json['status_label'] ?? json['status'] ?? ''}',
+      grandTotal: _toDouble(json['grand_total']),
+      status: status,
+      statusLabel: label.isNotEmpty ? label : status,
       salesmanName: '${json['salesman_name'] ?? ''}',
       contractorName: '${json['contractor_name'] ?? ''}',
     );

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -58,8 +59,10 @@ class _OwnerIncentiveReportFilterScreenState
   /// The id actually sent to the API.
   String? _personId;
 
-  DateTime? _startDate;
-  DateTime? _endDate;
+  /// Dates always have a value (default: current month), so the fields
+  /// show a real date instead of the "Select date" hint.
+  late DateTime _startDate;
+  late DateTime _endDate;
   late String _status;
 
   @override
@@ -71,8 +74,12 @@ class _OwnerIncentiveReportFilterScreenState
     _type = widget.initialType ?? IncentiveEntityType.salesman;
     _person = widget.initialPerson;
     _personId = widget.initialPersonId;
-    _startDate = widget.initialStart;
-    _endDate = widget.initialEnd;
+
+    // Default to the current month (1st → last day), like the Estimate report.
+    final now = DateTime.now();
+    _startDate = widget.initialStart ?? DateTime(now.year, now.month, 1);
+    _endDate = widget.initialEnd ?? DateTime(now.year, now.month + 1, 0);
+
     _status = widget.initialStatus ?? _statusOptions.first;
   }
 
@@ -96,7 +103,7 @@ class _OwnerIncentiveReportFilterScreenState
   Future<void> _pickDate({required bool isStart}) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: (isStart ? _startDate : _endDate) ?? DateTime.now(),
+      initialDate: isStart ? _startDate : _endDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2035),
     );
@@ -110,11 +117,8 @@ class _OwnerIncentiveReportFilterScreenState
     });
   }
 
-  bool get _canGenerate =>
-      _person != null &&
-          _personId != null &&
-          _startDate != null &&
-          _endDate != null;
+  // Dates always have a value now, so only the person needs checking.
+  bool get _canGenerate => _person != null && _personId != null;
 
   void _generate() {
     if (!_canGenerate) return;
@@ -124,8 +128,8 @@ class _OwnerIncentiveReportFilterScreenState
           type: _type,
           personId: _personId!,
           personName: _person!,
-          startDate: _startDate!,
-          endDate: _endDate!,
+          startDate: _startDate,
+          endDate: _endDate,
           status: _status,
         ),
       ),
@@ -136,85 +140,88 @@ class _OwnerIncentiveReportFilterScreenState
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      appBar: AppBar(title: Text('Incentive Report', style: AppTextStyles.h6())),
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(Responsive.w(20)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const ReportFieldLabel('SELECT TYPE'),
-                  SizedBox(height: Responsive.h(8)),
-                  ReportTypeToggle(
-                    leftLabel: 'Salesman',
-                    rightLabel: 'Field Staff',
-                    isLeftSelected: _type == IncentiveEntityType.salesman,
-                    onChanged: _onTypeChanged,
-                  ),
-                  SizedBox(height: Responsive.h(20)),
-                  ReportFieldLabel(_type == IncentiveEntityType.salesman
-                      ? 'SELECT SALESMAN'
-                      : 'SELECT FIELD STAFF'),
-                  SizedBox(height: Responsive.h(8)),
-                  _buildPersonDropdown(),
-                  SizedBox(height: Responsive.h(20)),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const ReportFieldLabel('START DATE'),
-                            SizedBox(height: Responsive.h(8)),
-                            ReportDateField(
-                              date: _startDate,
-                              hint: 'Select date',
-                              onTap: () => _pickDate(isStart: true),
-                            ),
-                          ],
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        appBar:
+        AppBar(title: Text('Incentive Report', style: AppTextStyles.h6())),
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(Responsive.w(20)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const ReportFieldLabel('SELECT TYPE'),
+                    SizedBox(height: Responsive.h(8)),
+                    ReportTypeToggle(
+                      leftLabel: 'Salesman',
+                      rightLabel: 'Field Staff',
+                      isLeftSelected: _type == IncentiveEntityType.salesman,
+                      onChanged: _onTypeChanged,
+                    ),
+                    SizedBox(height: Responsive.h(20)),
+                    ReportFieldLabel(_type == IncentiveEntityType.salesman
+                        ? 'SELECT SALESMAN'
+                        : 'SELECT FIELD STAFF'),
+                    SizedBox(height: Responsive.h(8)),
+                    _buildPersonDropdown(),
+                    SizedBox(height: Responsive.h(20)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const ReportFieldLabel('START DATE'),
+                              SizedBox(height: Responsive.h(8)),
+                              ReportDateField(
+                                date: _startDate,
+                                hint: 'Select date',
+                                onTap: () => _pickDate(isStart: true),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      SizedBox(width: Responsive.w(12)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const ReportFieldLabel('END DATE'),
-                            SizedBox(height: Responsive.h(8)),
-                            ReportDateField(
-                              date: _endDate,
-                              hint: 'Select date',
-                              onTap: () => _pickDate(isStart: false),
-                            ),
-                          ],
+                        SizedBox(width: Responsive.w(12)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const ReportFieldLabel('END DATE'),
+                              SizedBox(height: Responsive.h(8)),
+                              ReportDateField(
+                                date: _endDate,
+                                hint: 'Select date',
+                                onTap: () => _pickDate(isStart: false),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: Responsive.h(20)),
-                  const ReportFieldLabel('STATUS'),
-                  SizedBox(height: Responsive.h(10)),
-                  ReportStatusChips(
-                    options: _statusOptions,
-                    selected: _status,
-                    onChanged: (v) => setState(() => _status = v),
-                  ),
-                  SizedBox(height: Responsive.h(28)),
-                  GenerateReportButton(
-                      onPressed: _canGenerate ? _generate : null),
-                  SizedBox(height: Responsive.h(20)),
-                ],
+                      ],
+                    ),
+                    SizedBox(height: Responsive.h(20)),
+                    const ReportFieldLabel('STATUS'),
+                    SizedBox(height: Responsive.h(10)),
+                    ReportStatusChips(
+                      options: _statusOptions,
+                      selected: _status,
+                      onChanged: (v) => setState(() => _status = v),
+                    ),
+                    SizedBox(height: Responsive.h(28)),
+                    GenerateReportButton(
+                        onPressed: _canGenerate ? _generate : null),
+                    SizedBox(height: Responsive.h(20)),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   /// Salesman pulls live data from [_ownerReportsBloc] via GET

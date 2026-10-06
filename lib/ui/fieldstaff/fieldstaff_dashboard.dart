@@ -33,28 +33,42 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _searchCtrl = TextEditingController();
-  // Only the "All" tab is paginated (the "today" list is short and comes
-  // back in full on every /site-visits/my call), so only that list needs
-  // a scroll listener.
-  final _allListScrollCtrl = ScrollController();
+
+  // The whole dashboard is ONE CustomScrollView (header + search + tabs +
+  // list), so this single controller drives the page scroll AND the
+  // pagination of the "All" tab. No nested scrollables → the header can
+  // never get stuck off-screen.
+  final _scrollCtrl = ScrollController();
   String _query = '';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // The list is now a sliver (not a TabBarView), so rebuild whenever the
+    // selected tab changes.
+    _tabController.addListener(_onTabChanged);
+
     context.read<SiteVisitBloc>().add(const FetchMySiteVisits());
     context.read<ProfileBloc>().add(const LoadProfile());
 
-    _allListScrollCtrl.addListener(_onAllListScroll);
+    _scrollCtrl.addListener(_onScroll);
   }
 
-  void _onAllListScroll() {
-    if (!_allListScrollCtrl.hasClients) return;
+  void _onTabChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    // Only the "All" tab (index 1) is paginated.
+    if (_tabController.index != 1) return;
+
     // Fire the next page a bit before hitting the true bottom so the
     // next page is ready before the user runs out of items.
-    final nearBottom = _allListScrollCtrl.position.pixels >=
-        _allListScrollCtrl.position.maxScrollExtent - 200;
+    final nearBottom =
+        _scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200;
     if (!nearBottom) return;
 
     final state = context.read<SiteVisitBloc>().state;
@@ -67,10 +81,11 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _searchCtrl.dispose();
-    _allListScrollCtrl.removeListener(_onAllListScroll);
-    _allListScrollCtrl.dispose();
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -194,10 +209,13 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
               return const FieldStaffFullShimmer();
             }
 
+            final isTodayTab = _tabController.index == 0;
+
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
               child: CustomScrollView(
+                controller: _scrollCtrl,
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(
@@ -223,7 +241,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                     padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        SizedBox(height: Responsive.h(55)),
+                        SizedBox(height: Responsive.h(16)),
                         _SearchField(
                           controller: _searchCtrl,
                           onChanged: (v) => setState(() => _query = v),
@@ -246,38 +264,33 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                       ]),
                     ),
                   ),
-                  SliverFillRemaining(
-                    hasScrollBody: true,
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _VisitList(
-                          visits: _filtered(todayVisits),
-                          emptyIcon: Icons.today_rounded,
-                          emptyLabel: 'No visits logged today',
-                          emptySubLabel: 'Tap "Add Visit" once you reach a party.',
-                          onTapVisit: _openDetail,
-                          onCallTap: _callNumber,
-                        ),
-                        _VisitList(
-                          visits: _filtered(allVisits),
-                          emptyIcon: Icons.map_outlined,
-                          emptyLabel: 'No visits logged yet',
-                          emptySubLabel: 'Every party you visit will be listed here.',
-                          onTapVisit: _openDetail,
-                          onCallTap: _callNumber,
-                          scrollController: _allListScrollCtrl,
-                          isLoadingMore: state.isLoadingMore,
-                          // Only show the "no more" footer once there's
-                          // something loaded and the search box isn't
-                          // filtering the list down.
-                          showEndReached: !state.hasMoreAll &&
-                              allVisits.isNotEmpty &&
-                              _query.trim().isEmpty,
-                        ),
-                      ],
+                  // The list lives in the SAME scroll view as the header,
+                  // so scrolling up always brings the header back.
+                  if (isTodayTab)
+                    _VisitSliver(
+                      visits: _filtered(todayVisits),
+                      emptyIcon: Icons.today_rounded,
+                      emptyLabel: 'No visits logged today',
+                      emptySubLabel: 'Tap "Add Visit" once you reach a party.',
+                      onTapVisit: _openDetail,
+                      onCallTap: _callNumber,
+                    )
+                  else
+                    _VisitSliver(
+                      visits: _filtered(allVisits),
+                      emptyIcon: Icons.map_outlined,
+                      emptyLabel: 'No visits logged yet',
+                      emptySubLabel: 'Every party you visit will be listed here.',
+                      onTapVisit: _openDetail,
+                      onCallTap: _callNumber,
+                      isLoadingMore: state.isLoadingMore,
+                      // Only show the "no more" footer once there's
+                      // something loaded and the search box isn't
+                      // filtering the list down.
+                      showEndReached: !state.hasMoreAll &&
+                          allVisits.isNotEmpty &&
+                          _query.trim().isEmpty,
                     ),
-                  ),
                 ],
               ),
             );
@@ -357,141 +370,148 @@ class _FieldStaffHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    // The floating stats card used to hang 50px BELOW the Stack's bounds
+    // (bottom: -50). Flutter ignores touches outside a widget's bounds, so
+    // that part of the card (incl. the Incentive button) was not tappable.
+    // The extra bottom padding below makes the card sit INSIDE the Stack.
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          padding: EdgeInsets.fromLTRB(
-            Responsive.w(20),
-            Responsive.h(20),
-            Responsive.w(20),
-            Responsive.h(52),
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.primary.withOpacity(0.86)],
+        Padding(
+          padding: EdgeInsets.only(bottom: Responsive.h(50)),
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+              Responsive.w(20),
+              Responsive.h(20),
+              Responsive.w(20),
+              Responsive.h(52),
             ),
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(28),
-              bottomRight: Radius.circular(28),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.22),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.primary.withOpacity(0.86)],
               ),
-            ],
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Material(
-                      color: Colors.transparent,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: onAccountTap,
-                        child: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.4),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            _initials,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: Responsive.sp(16),
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: Responsive.w(12)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            greeting,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.78),
-                              fontSize: Responsive.sp(11.5),
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          SizedBox(height: Responsive.h(2)),
-                          Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold(color: Colors.white)
-                                .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
-                          ),
-                          SizedBox(height: Responsive.h(4)),
-                        ],
-                      ),
-                    ),
-                    Material(
-                      color: Colors.white.withOpacity(0.16),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: onAccountTap,
-                        child: const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 19),
-                        ),
-                      ),
-                    ),
-                  ],
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.22),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
-                SizedBox(height: Responsive.h(16)),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(6)),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 12.5, color: Colors.white.withOpacity(0.9)),
-                      SizedBox(width: Responsive.w(6)),
-                      Text(
-                        dateLabel,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: Responsive.sp(11.5),
-                          fontWeight: FontWeight.w500,
+                      Material(
+                        color: Colors.transparent,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: onAccountTap,
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.4),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _initials,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: Responsive.sp(16),
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: Responsive.w(12)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              greeting,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.78),
+                                fontSize: Responsive.sp(11.5),
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            SizedBox(height: Responsive.h(2)),
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.bodyBold(color: Colors.white)
+                                  .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
+                            ),
+                            SizedBox(height: Responsive.h(4)),
+                          ],
+                        ),
+                      ),
+                      Material(
+                        color: Colors.white.withOpacity(0.16),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: onAccountTap,
+                          child: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 19),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                // Extra breathing room below the date pill.
-                SizedBox(height: Responsive.h(10)),
-              ],
+                  SizedBox(height: Responsive.h(16)),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(6)),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 12.5, color: Colors.white.withOpacity(0.9)),
+                        SizedBox(width: Responsive.w(6)),
+                        Text(
+                          dateLabel,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: Responsive.sp(11.5),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Extra breathing room below the date pill.
+                  SizedBox(height: Responsive.h(10)),
+                ],
+              ),
             ),
           ),
         ),
         Positioned(
           left: Responsive.w(20),
           right: Responsive.w(20),
-          bottom: -Responsive.h(50),
+          bottom: 0,
           child: Container(
             padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(8)),
             decoration: BoxDecoration(
@@ -896,17 +916,19 @@ class _FieldStaffTabBar extends StatelessWidget {
   }
 }
 
-// ---------------- VISIT LIST ----------------
+// ---------------- VISIT LIST (sliver) ----------------
 
-class _VisitList extends StatelessWidget {
-  const _VisitList({
+/// Sliver version of the visit list. It scrolls together with the header,
+/// search and tabs inside one CustomScrollView, so there is no inner
+/// scrollable that can swallow drags and leave the header unreachable.
+class _VisitSliver extends StatelessWidget {
+  const _VisitSliver({
     required this.visits,
     required this.emptyIcon,
     required this.emptyLabel,
     required this.emptySubLabel,
     required this.onTapVisit,
     required this.onCallTap,
-    this.scrollController,
     this.isLoadingMore = false,
     this.showEndReached = false,
   });
@@ -917,12 +939,11 @@ class _VisitList extends StatelessWidget {
   final String emptySubLabel;
   final ValueChanged<SiteVisitListItemModel> onTapVisit;
   final ValueChanged<String> onCallTap;
-  /// Only passed for the paginated "All" tab so it can detect
-  /// scroll-to-bottom and request the next page.
-  final ScrollController? scrollController;
+
   /// Shows a small spinner row below the last item while the next page
   /// is being fetched.
   final bool isLoadingMore;
+
   /// Shows a "You're all caught up" footer once every page has been
   /// loaded — only meaningful on the paginated "All" tab.
   final bool showEndReached;
@@ -930,34 +951,37 @@ class _VisitList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (visits.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 74,
-                height: 74,
-                decoration: BoxDecoration(
-                  color: AppColors.textSecondary.withOpacity(0.08),
-                  shape: BoxShape.circle,
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(emptyIcon, size: 32, color: AppColors.textSecondary.withOpacity(0.5)),
                 ),
-                alignment: Alignment.center,
-                child: Icon(emptyIcon, size: 32, color: AppColors.textSecondary.withOpacity(0.5)),
-              ),
-              SizedBox(height: Responsive.h(14)),
-              Text(
-                emptyLabel,
-                style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
-              ),
-              SizedBox(height: Responsive.h(4)),
-              Text(
-                emptySubLabel,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
-              ),
-            ],
+                SizedBox(height: Responsive.h(14)),
+                Text(
+                  emptyLabel,
+                  style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
+                ),
+                SizedBox(height: Responsive.h(4)),
+                Text(
+                  emptySubLabel,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -968,49 +992,56 @@ class _VisitList extends StatelessWidget {
     final showFooter = isLoadingMore || showEndReached;
     final itemCount = visits.length + (showFooter ? 1 : 0);
 
-    return ListView.separated(
-      controller: scrollController,
+    return SliverPadding(
       padding: EdgeInsets.fromLTRB(
         Responsive.w(20),
         Responsive.h(4),
         Responsive.w(20),
         Responsive.h(90),
       ),
-      itemCount: itemCount,
-      separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
-      itemBuilder: (context, i) {
-        if (i >= visits.length) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
-            child: Center(
-              child: isLoadingMore
-                  ? SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: AppColors.primary,
-                ),
-              )
-                  : Text(
-                "You're all caught up",
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: Responsive.sp(11.5),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          );
-        }
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+              (context, index) {
+            // Odd indexes are the gaps between items.
+            if (index.isOdd) return SizedBox(height: Responsive.h(12));
 
-        final visit = visits[i];
-        return _VisitTile(
-          visit: visit,
-          onTap: () => onTapVisit(visit),
-          onCallTap: () => onCallTap(visit.customerPhone),
-        );
-      },
+            final i = index ~/ 2;
+
+            if (i >= visits.length) {
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                child: Center(
+                  child: isLoadingMore
+                      ? SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: AppColors.primary,
+                    ),
+                  )
+                      : Text(
+                    "You're all caught up",
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.sp(11.5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            final visit = visits[i];
+            return _VisitTile(
+              visit: visit,
+              onTap: () => onTapVisit(visit),
+              onCallTap: () => onCallTap(visit.customerPhone),
+            );
+          },
+          childCount: itemCount * 2 - 1,
+        ),
+      ),
     );
   }
 }
