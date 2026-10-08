@@ -241,12 +241,29 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
           : 'Please enter a valid quantity');
       return false;
     }
+    if (_computedQuantity > DValidator.maxQuantity) {
+      _showError('Quantity can have at most ${DValidator.maxQuantityDigits} digits');
+      return false;
+    }
 
     final rateError = DValidator.validateOptionalNumber('Rate', _itemRateCtrl.text);
     final rateValue = double.tryParse(_itemRateCtrl.text) ?? 0;
     if (rateError != null || rateValue <= 0) {
       _showError('Please enter a valid rate');
       return false;
+    }
+    if (rateValue > DValidator.maxPrice) {
+      _showError('Rate can have at most ${DValidator.maxPriceDigits} digits');
+      return false;
+    }
+
+    // Piece qty (box-unit products only)
+    if (_isBoxUnitProduct) {
+      final piece = double.tryParse(_itemPieceQtyCtrl.text) ?? 0;
+      if (piece > DValidator.maxQuantity) {
+        _showError('Piece quantity can have at most ${DValidator.maxQuantityDigits} digits');
+        return false;
+      }
     }
 
     return true;
@@ -720,9 +737,12 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                       controller: valueCtrl,
                       autofocus: true,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
+                      // Percentage: max 3 digits (100). Fixed: max 8 digits.
+                      inputFormatters: DValidator.decimalWithLimit(
+                        maxIntDigits: type == QuotationDiscountType.percentage
+                            ? 3
+                            : DValidator.maxPriceDigits,
+                      ),
                       decoration: InputDecoration(
                         labelText: type == QuotationDiscountType.percentage
                             ? 'Discount %'
@@ -737,6 +757,10 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                         if (parsed == null || parsed < 0) return 'Enter a valid value';
                         if (type == QuotationDiscountType.percentage && parsed > 100) {
                           return 'Percentage can\'t exceed 100';
+                        }
+                        if (type != QuotationDiscountType.percentage &&
+                            parsed > DValidator.maxPrice) {
+                          return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
                         }
                         return null;
                       },
@@ -809,9 +833,8 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                         controller: amountCtrl,
                         autofocus: true,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                        ],
+                        // Payment amount: max 8 digits (+ up to 2 decimals)
+                        inputFormatters: DValidator.priceNumber,
                         decoration: const InputDecoration(
                           labelText: 'Amount Received',
                           prefixText: '₹ ',
@@ -821,6 +844,9 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                           if (value == null || value.trim().isEmpty) return 'Amount is required';
                           final parsed = double.tryParse(value.trim());
                           if (parsed == null || parsed < 0) return 'Enter a valid amount';
+                          if (parsed > DValidator.maxPrice) {
+                            return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                          }
                           return null;
                         },
                       ),

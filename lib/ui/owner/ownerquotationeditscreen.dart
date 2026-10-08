@@ -51,13 +51,7 @@ class OwnerQuotationEditScreen extends StatelessWidget {
   }
 }
 
-/// Mirrors QuotationEditScreen's _EditItem and the reasoning behind it:
-/// `amount` is always the server's own figure — from
-/// POST /quotations/product-incentive when adding/editing an item here, or
-/// straight from QuotationDetailItem.amount for items already saved on the
-/// quotation — never recomputed locally as quantity * rate, since the
-/// server may derive it from square feet or a box/piece breakdown instead
-/// of a flat multiplication.
+
 class _OwnerEditItem {
   const _OwnerEditItem({
     required this.id,
@@ -161,11 +155,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   final _itemMrpCtrl = TextEditingController();
   final _itemQtyCtrl = TextEditingController();
   final _itemRateCtrl = TextEditingController();
-
-  // Box-unit products show Box Quantity as its own visible field that
-  // auto-updates whenever Quantity changes (kept in sync, read-only) —
-  // same convention as the Owner Create Estimate screen. Piece Quantity
-  // is also its own visible field but is entered independently.
   final _itemBoxQtyCtrl = TextEditingController();
   final _itemPieceQtyCtrl = TextEditingController();
 
@@ -174,34 +163,11 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
   bool _backfilledFromCatalog = false;
 
-  // Used ONLY for the Add/Update Item call — a fresh, one-shot request
-  // fired straight from QuotationProvider (bypassing the bloc's cached
-  // state entirely), so the item that gets added/updated always matches
-  // exactly what's on screen at the moment the button is tapped. Same
-  // approach as QuotationEditScreen / CreateEstimateScreen.
   final QuotationProvider _quotationProvider = QuotationProvider();
   bool _isAddingItem = false;
 
-  // Holds the item built from the /quotations/product-incentive response
-  // while a PUT /quotations/update-item call for that same item is in
-  // flight (existing, already-saved items only — see _saveItemFromForm).
-  // Applied to _items only once the bloc reports itemUpdateStatus success;
-  // discarded on failure so the on-screen list never shows a change the
-  // server didn't actually accept.
   _OwnerEditItem? _pendingItemUpdate;
 
-  /// Whether the current add/edit-item form should be treated as a
-  /// box-unit product (and therefore show the Box Quantity / Piece
-  /// Quantity fields).
-  ///
-  /// Order matters here — mirrors QuotationEditScreen._isBoxUnitProduct:
-  /// 1. When editing an EXISTING item, its own saved quantities are the
-  ///    source of truth, so a saved box_quantity/piece_quantity keeps the
-  ///    row visible even if the catalog's current `is_box_unit` flag for
-  ///    that product has since changed.
-  /// 2. Only when there's no saved item to check (adding a brand-new
-  ///    item, or editing an item that genuinely has no box/piece data) do
-  ///    we fall back to the catalog-matched product's own flag.
   bool get _isBoxUnitProduct {
     if (_editingItemIndex != null) {
       final item = _items[_editingItemIndex!];
@@ -213,38 +179,17 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text) ?? 0;
 
-  /// Keeps the visible Box Quantity field in sync with Quantity for
-  /// box-unit products — mirrors the Owner Create Estimate screen's
-  /// _recomputeBoxQtyIfNeeded.
-  ///
-  /// NOTE: this is the "live sync while typing" behavior only. It should
-  /// only run in response to the user editing the Quantity field (see the
-  /// Quantity field's onChanged below). It must NOT be used to populate
-  /// the Box Quantity field when an existing item is first loaded into
-  /// the form for editing — that must come from the item's own saved
-  /// `boxQuantity`, not from whatever happens to be in the Quantity field
-  /// at that moment. See _editItem.
   void _recomputeBoxQtyIfNeeded() {
     if (!_isBoxUnitProduct) return;
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
   }
 
-  /// Mirrors OwnerQuotationDetailsScreen._isOwner — incentive figures are
-  /// salesman-facing, so this edit screen hides the incentive preview,
-  /// incentive total, and per-item incentive amounts whenever the
-  /// quotation was created by the Owner. Salesman-created quotations
-  /// still show incentive normally, same as the details screen.
   bool get _isOwner {
     final label = widget.estimate.createdBy.roleLabel.trim().toLowerCase();
     if (label.isNotEmpty) return label == 'owner';
     return widget.estimate.createdBy.role.trim().toLowerCase() == 'owner';
   }
 
-  /// Items added on this screen and not yet saved to the server carry an
-  /// id prefixed 'new_' (see _saveItemFromForm). Anything else is a real
-  /// backend item id — deleting it goes through POST /quotations/remove-item
-  /// and editing it goes through PUT /quotations/update-item, both of which
-  /// hit the server immediately rather than only updating local state.
   bool _isUnsavedItem(_OwnerEditItem item) => item.id.startsWith('new_');
 
   @override
@@ -269,10 +214,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     _contractorPhone = TextEditingController(text: e.contractor.mobile);
     _contractorEmail = TextEditingController(text: e.contractor.email);
     _contractorAddress = TextEditingController(text: e.contractor.address);
-
-    // Re-run the contractor Form's validators on every keystroke in
-    // either field, so "name requires phone" / "phone requires name"
-    // errors show up immediately instead of waiting for Save.
     _contractorName.addListener(_revalidateContractorFields);
     _contractorPhone.addListener(_revalidateContractorFields);
 
@@ -283,11 +224,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
         .asMap()
         .entries
         .map((entry) => _OwnerEditItem(
-      // Real backend item id — needed to call POST /quotations/remove-item
-      // and PUT /quotations/update-item. Newly-added items (added on this
-      // screen, never saved) instead get an id prefixed 'new_' — see
-      // _saveItemFromForm — which is how _removeItem / _saveItemFromForm
-      // tell the two cases apart.
       id: entry.value.id,
       productId: entry.value.productId,
       name: entry.value.productName,
@@ -317,9 +253,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     _customerEmail.clear();
   }
 
-  /// Opens the product suggestion list when the product field gains focus
-  /// (tap) and closes it shortly after focus is lost. The small delay lets
-  /// a tap on a suggestion register before the list disappears.
   void _onProductFocusChanged() {
     if (_productSearchFocus.hasFocus) {
       setState(() => _showProductSuggestions = true);
@@ -331,9 +264,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     }
   }
 
-  /// Re-runs the contractor name/phone Form's validators on every
-  /// keystroke in either field — mirrors why _scheduleIncentiveFetch
-  /// listens on quantity/rate changes.
+
   void _revalidateContractorFields() {
     _contractorFormKey.currentState?.validate();
   }
@@ -561,23 +492,6 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
     _itemFormKey.currentState?.reset();
   }
 
-  /// Fires a FRESH, one-shot POST /quotations/product-incentive with
-  /// exactly what's on the form right now (product_id, quantity, rate,
-  /// box_quantity, piece_quantity), waits for the real response, and
-  /// builds/updates the item using ONLY that response's amount/incentive
-  /// fields. No cached bloc state, no local qty*rate math — identical
-  /// approach to QuotationEditScreen / CreateEstimateScreen's
-  /// _addItemToList, so an item added or edited here always reflects
-  /// exactly what the server computed.
-  ///
-  /// For an item that's already saved on the server (a real backend id,
-  /// not one of this screen's own 'new_' ids), the resulting
-  /// quantity/rate/box/piece are ALSO persisted right away via PUT
-  /// /quotations/update-item — the item is only applied to [_items] once
-  /// that call succeeds, so the on-screen list never shows a change the
-  /// server rejected. A brand-new (never-saved) item has nothing to
-  /// persist yet and is simply added to local state; it's saved for the
-  /// first time only when "Save Changes" submits the whole quotation.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
@@ -736,14 +650,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
 
   void _cancelEditItem() => _resetItemForm();
 
-  /// For an unsaved (locally-added) item, removes it from the list
-  /// immediately — there's nothing on the server to delete.
-  ///
-  /// For an existing (database) item, shows the "Are you sure you want to
-  /// delete this item?" confirmation first. Only after the owner confirms
-  /// is the remove-item API call dispatched; the item is then dropped from
-  /// [_items] once that call succeeds (handled in the BlocListener in
-  /// build()).
+
   Future<void> _removeItem(int index) async {
     final item = _items[index];
 
@@ -898,11 +805,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                 }
               },
             ),
-            // Reacts to PUT /quotations/update-item, fired from
-            // _saveItemFromForm whenever "Update Item" is tapped on an
-            // item that's already saved on the server. Only on success is
-            // the locally-built item (held in _pendingItemUpdate) actually
-            // applied to _items.
+
             BlocListener<OwnerQuotationEditBloc, OwnerQuotationEditState>(
               listenWhen: (prev, curr) => prev.itemUpdateStatus != curr.itemUpdateStatus,
               listener: (context, state) {
@@ -1106,31 +1009,34 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                                     field: CustomTextField(
                                       hint: 'Rate',
                                       icon: Icons.currency_rupee,
-                                      keyboardType: TextInputType.number,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                       controller: _itemRateCtrl,
-                                      inputFormatters: DValidator.decimalNumber,
+                                      inputFormatters: DValidator.priceNumber,
                                       validator: (v) {
                                         final n = double.tryParse((v ?? '').trim());
                                         if (n == null || n <= 0) return 'Enter a valid rate';
+                                        if (n > DValidator.maxPrice) {
+                                          return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
+                                        }
                                         return null;
                                       },
                                       onChanged: (_) {
                                         setState(() {});
                                         _scheduleIncentiveFetch();
                                       },
-                                    ),
-                                  ),
+                                    ),)
                                 ),
                               ],
                             ),
                             LabeledField(
                               label: 'Quantity',
-                              field: CustomTextField(
+                              field:
+                              CustomTextField(
                                 hint: 'Enter quantity',
                                 icon: Icons.numbers_outlined,
-                                keyboardType: TextInputType.number,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 controller: _itemQtyCtrl,
-                                inputFormatters: DValidator.decimalNumber,
+                                inputFormatters: DValidator.quantityNumber,
                                 validator: (v) {
                                   final n = double.tryParse((v ?? '').trim());
                                   if (n == null || n <= 0) {
@@ -1138,12 +1044,12 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                                         ? 'Enter a valid box/piece quantity'
                                         : 'Enter a valid quantity';
                                   }
+                                  if (n > DValidator.maxQuantity) {
+                                    return 'Quantity can have at most ${DValidator.maxQuantityDigits} digits';
+                                  }
                                   return null;
                                 },
                                 onChanged: (_) {
-                                  // Live-sync only: this is the one place Box
-                                  // Quantity should be derived from Quantity —
-                                  // while the user is actively editing it.
                                   setState(_recomputeBoxQtyIfNeeded);
                                   _scheduleIncentiveFetch();
                                 },
@@ -1169,12 +1075,20 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                                   Expanded(
                                     child: LabeledField(
                                       label: 'Piece Quantity',
-                                      field: CustomTextField(
+                                      field:
+                                      CustomTextField(
                                         hint: 'Enter piece qty',
                                         icon: Icons.widgets_outlined,
-                                        keyboardType: TextInputType.number,
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                         controller: _itemPieceQtyCtrl,
-                                        inputFormatters: DValidator.decimalNumber,
+                                        inputFormatters: DValidator.quantityNumber,
+                                        validator: (v) {
+                                          final n = double.tryParse((v ?? '').trim());
+                                          if (n != null && n > DValidator.maxQuantity) {
+                                            return 'Piece quantity can have at most ${DValidator.maxQuantityDigits} digits';
+                                          }
+                                          return null;
+                                        },
                                         onChanged: (_) => setState(() {}),
                                       ),
                                     ),
@@ -1299,9 +1213,9 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
                         field: CustomTextField(
                           hint: 'Enter handling charge',
                           icon: Icons.currency_rupee,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           controller: _handlingCharge,
-                          inputFormatters: DValidator.decimalNumber,
+                          inputFormatters: DValidator.priceNumber,
                           validator: _validateHandlingCharge,
                           onChanged: (_) => setState(() {}),
                         ),
@@ -1558,8 +1472,7 @@ class _OwnerQuotationEditViewState extends State<_OwnerQuotationEditView> {
   }
 }
 
-/// Shows the live /quotations/product-incentive result for whatever is
-/// currently in the product/quantity/rate fields on the add-item form.
+
 class _OwnerIncentivePreviewCard extends StatelessWidget {
   const _OwnerIncentivePreviewCard();
 

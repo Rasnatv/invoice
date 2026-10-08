@@ -1406,6 +1406,230 @@ class _DetailSection extends StatelessWidget {
     );
   }
 }
+// class _InvoiceTable extends StatelessWidget {
+//   const _InvoiceTable({
+//     required this.items,
+//     required this.showCompany,
+//     required this.showMrp,
+//     required this.showBox,
+//     required this.showPiece,
+//     required this.showIncentive,
+//     required this.currency,
+//     required this.number,
+//   });
+//
+//   final List<QuotationDetailItem> items;
+//   final bool showCompany, showMrp, showBox, showPiece, showIncentive;
+//   final NumberFormat currency;
+//   final NumberFormat number;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     if (items.isEmpty) {
+//       return Container(
+//         padding: EdgeInsets.all(Responsive.w(14)),
+//         decoration: BoxDecoration(
+//           color: AppColors.surface,
+//           borderRadius: BorderRadius.circular(14),
+//           border: Border.all(color: AppColors.border),
+//         ),
+//         child: Text('No items on this quotation.', style: AppTextStyles.caption()),
+//       );
+//     }
+//
+//     final totalQty = items.fold<double>(0, (s, i) => s + i.quantity);
+//     final totalAmount = items.fold<double>(0, (s, i) => s + i.amount);
+//     final totalIncentive = items.fold<double>(0, (s, i) => s + i.incentiveAmount);
+//
+//     // Column widths are keyed by index, so build the map dynamically —
+//     // the index of every column after Size shifts depending on which
+//     // optional columns are shown.
+//     final widths = <int, TableColumnWidth>{};
+//     var col = 0;
+//     widths[col++] = const FixedColumnWidth(50); // Sl.No
+//     widths[col++] = const FixedColumnWidth(150); // Item
+//     if (showCompany) widths[col++] = const FixedColumnWidth(120); // Company
+//     widths[col++] = const FixedColumnWidth(90); // Size
+//     widths[col++] = const FixedColumnWidth(70); // Qty
+//     widths[col++] = const FixedColumnWidth(95); // Unit
+//     if (showBox) widths[col++] = const FixedColumnWidth(70); // Box Qty
+//     if (showPiece) widths[col++] = const FixedColumnWidth(80); // Piece Qty
+//     if (showMrp) widths[col++] = const FixedColumnWidth(75); // MRP
+//     widths[col++] = const FixedColumnWidth(75); // Rate
+//     widths[col++] = const FixedColumnWidth(110); // Amount
+//     if (showIncentive) widths[col++] = const FixedColumnWidth(100); // Incentive
+//
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: AppColors.surface,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: AppColors.border),
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.black.withOpacity(0.04),
+//             blurRadius: 6,
+//             offset: const Offset(0, 2),
+//           ),
+//         ],
+//       ),
+//       clipBehavior: Clip.antiAlias,
+//       child: SingleChildScrollView(
+//         scrollDirection: Axis.horizontal,
+//         child: Table(
+//           border: TableBorder(
+//             horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
+//             verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
+//             bottom: BorderSide(color: AppColors.border),
+//           ),
+//           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+//           columnWidths: widths,
+//           children: [
+//             // ---- Header row ----
+//             TableRow(
+//               decoration: BoxDecoration(
+//                 color: AppColors.primary.withOpacity(0.08),
+//                 border: Border(
+//                   bottom: BorderSide(
+//                       color: AppColors.primary.withOpacity(0.3), width: 1.4),
+//                 ),
+//               ),
+//               children: [
+//                 _headerCell('Sl.No', align: TextAlign.center),
+//                 _headerCell('Item'),
+//                 if (showCompany) _headerCell('Company'),
+//                 _headerCell('Size'),
+//                 _headerCell('Qty', align: TextAlign.right),
+//                 _headerCell('Unit'),
+//                 if (showBox) _headerCell('Box Qty', align: TextAlign.right),
+//                 if (showPiece) _headerCell('Piece Qty', align: TextAlign.right),
+//                 if (showMrp) _headerCell('MRP', align: TextAlign.right),
+//                 _headerCell('Rate', align: TextAlign.right),
+//                 _headerCell('Amount', align: TextAlign.right),
+//                 if (showIncentive) _headerCell('Incentive', align: TextAlign.right),
+//               ],
+//             ),
+//
+//             // ---- Data rows ----
+//             for (var i = 0; i < items.length; i++)
+//               TableRow(
+//                 decoration: BoxDecoration(
+//                   color: i.isEven
+//                       ? AppColors.surface
+//                       : AppColors.surfaceAlt.withOpacity(0.4),
+//                 ),
+//                 children: [
+//                   _dataCell('${i + 1}', align: TextAlign.center),
+//                   _dataCell(items[i].productName.isEmpty ? '-' : items[i].productName),
+//                   if (showCompany)
+//                     _dataCell(items[i].companyName.isEmpty ? '-' : items[i].companyName),
+//                   _dataCell(items[i].productSize.isEmpty ? '-' : items[i].productSize),
+//                   _dataCell(number.format(items[i].quantity), align: TextAlign.right),
+//                   _dataCell(items[i].productUnit.isEmpty ? '-' : items[i].productUnit),
+//                   if (showBox)
+//                     _dataCell(
+//                       items[i].boxQuantity > 0 ? number.format(items[i].boxQuantity) : '-',
+//                       align: TextAlign.right,
+//                     ),
+//                   if (showPiece)
+//                     _dataCell(
+//                       items[i].pieceQuantity > 0
+//                           ? number.format(items[i].pieceQuantity)
+//                           : '-',
+//                       align: TextAlign.right,
+//                     ),
+//                   if (showMrp)
+//                     _dataCell(
+//                       items[i].mrp > 0 ? number.format(items[i].mrp) : '-',
+//                       align: TextAlign.right,
+//                     ),
+//                   _dataCell(number.format(items[i].rate), align: TextAlign.right),
+//                   _dataCell(currency.format(items[i].amount),
+//                       align: TextAlign.right, bold: true),
+//                   if (showIncentive)
+//                     _dataCell(
+//                       items[i].isIncentiveEligible
+//                           ? currency.format(items[i].incentiveAmount)
+//                           : '-',
+//                       align: TextAlign.right,
+//                       bold: true,
+//                       color: AppColors.success,
+//                     ),
+//                 ],
+//               ),
+//
+//             // ---- Totals footer row ----
+//             TableRow(
+//               decoration: BoxDecoration(
+//                 color: AppColors.primary.withOpacity(0.06),
+//                 border: Border(
+//                   top: BorderSide(
+//                       color: AppColors.primary.withOpacity(0.3), width: 1.2),
+//                 ),
+//               ),
+//               children: [
+//                 _dataCell(''),
+//                 _dataCell('Total', bold: true),
+//                 if (showCompany) _dataCell(''),
+//                 _dataCell(''),
+//                 _dataCell(number.format(totalQty), align: TextAlign.right, bold: true),
+//                 _dataCell(''),
+//                 if (showBox) _dataCell(''),
+//                 if (showPiece) _dataCell(''),
+//                 if (showMrp) _dataCell(''),
+//                 _dataCell(''),
+//                 _dataCell(currency.format(totalAmount),
+//                     align: TextAlign.right, bold: true, color: AppColors.primary),
+//                 if (showIncentive)
+//                   _dataCell(currency.format(totalIncentive),
+//                       align: TextAlign.right, bold: true, color: AppColors.success),
+//               ],
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+//     return Padding(
+//       padding: EdgeInsets.symmetric(
+//           horizontal: Responsive.w(8), vertical: Responsive.h(10)),
+//       child: Text(
+//         text,
+//         textAlign: align,
+//         maxLines: 2,
+//         softWrap: true,
+//         overflow: TextOverflow.ellipsis,
+//         style: AppTextStyles.captionnew().copyWith(
+//           fontWeight: FontWeight.w700,
+//           color: AppColors.primary,
+//           letterSpacing: 0.3,
+//         ),
+//       ),
+//     );
+//   }
+//
+//   Widget _dataCell(
+//       String text, {
+//         TextAlign align = TextAlign.left,
+//         bool bold = false,
+//         Color? color,
+//       }) {
+//     return Padding(
+//       padding: EdgeInsets.symmetric(
+//           horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+//       child: Text(
+//         text,
+//         textAlign: align,
+//         maxLines: 3,
+//         softWrap: true,
+//         overflow: TextOverflow.ellipsis,
+//         style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
+//             .copyWith(color: color),
+//       ),
+//     );
+//   }
+// }
 class _InvoiceTable extends StatelessWidget {
   const _InvoiceTable({
     required this.items,
@@ -1441,23 +1665,23 @@ class _InvoiceTable extends StatelessWidget {
     final totalAmount = items.fold<double>(0, (s, i) => s + i.amount);
     final totalIncentive = items.fold<double>(0, (s, i) => s + i.incentiveAmount);
 
-    // Column widths are keyed by index, so build the map dynamically —
-    // the index of every column after Size shifts depending on which
-    // optional columns are shown.
+    // Text columns: fixed width (can wrap).
+    // Numeric columns: IntrinsicColumnWidth -> grow to fit the value, one line.
+    const numCol = IntrinsicColumnWidth();
     final widths = <int, TableColumnWidth>{};
     var col = 0;
     widths[col++] = const FixedColumnWidth(50); // Sl.No
     widths[col++] = const FixedColumnWidth(150); // Item
     if (showCompany) widths[col++] = const FixedColumnWidth(120); // Company
     widths[col++] = const FixedColumnWidth(90); // Size
-    widths[col++] = const FixedColumnWidth(70); // Qty
+    widths[col++] = numCol; // Qty
     widths[col++] = const FixedColumnWidth(95); // Unit
-    if (showBox) widths[col++] = const FixedColumnWidth(70); // Box Qty
-    if (showPiece) widths[col++] = const FixedColumnWidth(80); // Piece Qty
-    if (showMrp) widths[col++] = const FixedColumnWidth(75); // MRP
-    widths[col++] = const FixedColumnWidth(75); // Rate
-    widths[col++] = const FixedColumnWidth(110); // Amount
-    if (showIncentive) widths[col++] = const FixedColumnWidth(100); // Incentive
+    if (showBox) widths[col++] = numCol; // Box Qty
+    if (showPiece) widths[col++] = numCol; // Piece Qty
+    if (showMrp) widths[col++] = numCol; // MRP
+    widths[col++] = numCol; // Rate
+    widths[col++] = numCol; // Amount
+    if (showIncentive) widths[col++] = numCol; // Incentive
 
     return Container(
       decoration: BoxDecoration(
@@ -1591,15 +1815,16 @@ class _InvoiceTable extends StatelessWidget {
   }
 
   Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+    final isNumeric = align == TextAlign.right;
     return Padding(
       padding: EdgeInsets.symmetric(
           horizontal: Responsive.w(8), vertical: Responsive.h(10)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 2,
-        softWrap: true,
-        overflow: TextOverflow.ellipsis,
+        maxLines: isNumeric ? 1 : 2,
+        softWrap: !isNumeric,
+        overflow: isNumeric ? TextOverflow.visible : TextOverflow.ellipsis,
         style: AppTextStyles.captionnew().copyWith(
           fontWeight: FontWeight.w700,
           color: AppColors.primary,
@@ -1615,15 +1840,16 @@ class _InvoiceTable extends StatelessWidget {
         bool bold = false,
         Color? color,
       }) {
+    final isNumeric = align == TextAlign.right;
     return Padding(
       padding: EdgeInsets.symmetric(
           horizontal: Responsive.w(8), vertical: Responsive.h(9)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 3,
-        softWrap: true,
-        overflow: TextOverflow.ellipsis,
+        maxLines: isNumeric ? 1 : 3,
+        softWrap: !isNumeric, // numbers always stay on one line
+        overflow: isNumeric ? TextOverflow.visible : TextOverflow.ellipsis,
         style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
             .copyWith(color: color),
       ),

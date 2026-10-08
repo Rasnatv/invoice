@@ -425,7 +425,11 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   }
 
   String? _validateHandlingCharge(String? v) =>
-      DValidator.validateOptionalNumber('Handling charge', v);
+      DValidator.validateOptionalNumber(
+        'Handling charge',
+        v,
+        max: DValidator.maxPrice,
+      );
 
   // ---------------- Add-item form wiring ----------------
 
@@ -514,20 +518,6 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     _itemFormKey.currentState?.reset();
   }
 
-  /// Fires a FRESH, one-shot POST /quotations/product-incentive with
-  /// exactly what's on the form right now, waits for the real response,
-  /// and builds/updates the item using ONLY that response's amount/
-  /// incentive fields.
-  ///
-  /// For an item that's already saved on the server (a real backend id,
-  /// not one of this screen's own 'new_' ids), the resulting
-  /// quantity/rate/box/piece are ALSO persisted right away via PUT
-  /// /quotations/update-item (see QuotationItemUpdateSubmitted below) —
-  /// the item is only applied to [_items] once that call succeeds, so the
-  /// on-screen list never shows a change the server rejected. A brand-new
-  /// (never-saved) item has nothing to persist yet and is simply added to
-  /// local state, same as before — it's saved for the first time only
-  /// when "Save Changes" submits the whole quotation.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
@@ -829,12 +819,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                   }
                 },
               ),
-              // Reacts to PUT /quotations/update-item, fired from
-              // _saveItemFromForm whenever "Update Item" is tapped on an
-              // item that's already saved on the server. Only on success is
-              // the locally-built item (held in _pendingItemUpdate) actually
-              // applied to _items — a failure leaves the list untouched and
-              // the form open so the salesman can retry or cancel.
+
               BlocListener<SalesmanEstimateBloc, SalesmanEstimateState>(
                 listenWhen: (prev, curr) => prev.itemUpdateStatus != curr.itemUpdateStatus,
                 listener: (context, state) {
@@ -1009,30 +994,39 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                               ),
                               LabeledField(
                                 label: 'MRP (auto)',
-                                field: CustomTextField(
+                                field:
+                                CustomTextField(
                                   hint: '0',
                                   icon: Icons.currency_rupee,
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   controller: _itemMrpCtrl,
-                                  inputFormatters: DValidator.decimalNumber,
-                                  validator: (v) => DValidator.validateOptionalNumber('MRP', v),
+                                  inputFormatters: DValidator.priceNumber,
+                                  validator: (v) => DValidator.validateOptionalNumber(
+                                    'MRP',
+                                    v,
+                                    max: DValidator.maxPrice,
+                                  ),
                                   onChanged: (_) => setState(() {}),
                                 ),
                               ),
                               LabeledField(
                                 label: 'Quantity',
-                                field: CustomTextField(
+                                 field:
+                                CustomTextField(
                                   hint: 'Enter quantity',
                                   icon: Icons.numbers_outlined,
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   controller: _itemQtyCtrl,
-                                  inputFormatters: DValidator.decimalNumber,
+                                  inputFormatters: DValidator.quantityNumber,
                                   validator: (v) {
                                     final n = double.tryParse((v ?? '').trim());
                                     if (n == null || n <= 0) {
                                       return _isBoxUnitProduct
                                           ? 'Enter a valid box/piece quantity'
                                           : 'Enter a valid quantity';
+                                    }
+                                    if (n > DValidator.maxQuantity) {
+                                      return 'Quantity can have at most ${DValidator.maxQuantityDigits} digits';
                                     }
                                     return null;
                                   },
@@ -1062,12 +1056,20 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                                     Expanded(
                                       child: LabeledField(
                                         label: 'Piece Quantity',
-                                        field: CustomTextField(
+                                        field:
+                                        CustomTextField(
                                           hint: 'Enter piece qty',
                                           icon: Icons.widgets_outlined,
-                                          keyboardType: TextInputType.number,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                           controller: _itemPieceQtyCtrl,
-                                          inputFormatters: DValidator.decimalNumber,
+                                          inputFormatters: DValidator.quantityNumber,
+                                          validator: (v) {
+                                            final n = double.tryParse((v ?? '').trim());
+                                            if (n != null && n > DValidator.maxQuantity) {
+                                              return 'Piece quantity can have at most ${DValidator.maxQuantityDigits} digits';
+                                            }
+                                            return null;
+                                          },
                                           onChanged: (_) => setState(() {}),
                                         ),
                                       ),
@@ -1076,15 +1078,19 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                                 ),
                               LabeledField(
                                 label: 'Rate',
-                                field: CustomTextField(
+                                field:
+                                CustomTextField(
                                   hint: 'Enter rate per unit',
                                   icon: Icons.currency_rupee,
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   controller: _itemRateCtrl,
-                                  inputFormatters: DValidator.decimalNumber,
+                                  inputFormatters: DValidator.priceNumber,
                                   validator: (v) {
                                     final n = double.tryParse((v ?? '').trim());
                                     if (n == null || n <= 0) return 'Enter a valid rate';
+                                    if (n > DValidator.maxPrice) {
+                                      return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
+                                    }
                                     return null;
                                   },
                                   onChanged: (_) {
@@ -1210,9 +1216,9 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           field: CustomTextField(
                             hint: 'Enter handling charge',
                             icon: Icons.currency_rupee,
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             controller: _handlingCharge,
-                            inputFormatters: DValidator.decimalNumber,
+                            inputFormatters: DValidator.priceNumber,
                             validator: _validateHandlingCharge,
                             onChanged: (_) => setState(() {}),
                           ),

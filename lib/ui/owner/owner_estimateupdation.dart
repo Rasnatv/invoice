@@ -456,19 +456,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     _itemFormKey.currentState?.reset();
   }
 
-  /// Add/Update Item tapped.
-  ///
-  /// If the row being edited already has a server id (it was loaded from
-  /// the saved estimate, not added in this session), this dispatches
-  /// OwnerEstimateItemUpdateRequested and returns — PUT
-  /// /estimates/update-item fires immediately. The row itself is patched
-  /// once the bloc reports itemUpdateStatus == success (see the
-  /// BlocConsumer listener below).
-  ///
-  /// Everything below the early-return is the local-only path for
-  /// brand-new items (and edits of items that aren't saved yet), which
-  /// goes through product-incentive for a computed `amount` and only
-  /// reaches the server when "Save Changes" is tapped.
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
@@ -875,18 +862,18 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                             ),
                           ),
 
-                          LabeledField(
-                            label: 'Handling Charge (optional)',
-                            field: CustomTextField(
-                              hint: '0',
-                              icon: Icons.currency_rupee,
-                              keyboardType: TextInputType.number,
-                              controller: _handlingChargeCtrl,
-                              inputFormatters: DValidator.decimalNumber,
-                              validator: (v) =>
-                                  DValidator.validateOptionalNumber('Handling charge', v),
-                            ),
-                          ),
+                      CustomTextField(
+                        hint: '0',
+                        icon: Icons.currency_rupee,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        controller: _handlingChargeCtrl,
+                        inputFormatters: DValidator.priceNumber,
+                        validator: (v) => DValidator.validateOptionalNumber(
+                          'Handling charge',
+                          v,
+                          max: DValidator.maxPrice,
+                        ),
+                      ),
                           LabeledField(
                             label: 'Notes (optional)',
                             field: CustomTextField(
@@ -966,15 +953,19 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                     Expanded(
                                       child: LabeledField(
                                         label: 'Rate',
-                                        field: CustomTextField(
+                                        field:
+                                        CustomTextField(
                                           hint: 'Rate',
                                           icon: Icons.currency_rupee,
-                                          keyboardType: TextInputType.number,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                           controller: _itemRateCtrl,
-                                          inputFormatters: DValidator.decimalNumber,
+                                          inputFormatters: DValidator.priceNumber,
                                           validator: (v) {
                                             final n = double.tryParse((v ?? '').trim());
                                             if (n == null || n <= 0) return 'Enter a valid rate';
+                                            if (n > DValidator.maxPrice) {
+                                              return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
+                                            }
                                             return null;
                                           },
                                           onChanged: (_) => setState(() {}),
@@ -985,18 +976,22 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                 ),
                                 LabeledField(
                                   label: _isBoxUnitProduct ? 'Quantity (Box)' : 'Quantity',
-                                  field: CustomTextField(
+                                  field:
+                                  CustomTextField(
                                     hint: 'Enter quantity',
                                     icon: Icons.numbers_outlined,
-                                    keyboardType: TextInputType.number,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                     controller: _itemQtyCtrl,
-                                    inputFormatters: DValidator.decimalNumber,
+                                    inputFormatters: DValidator.quantityNumber,
                                     validator: (v) {
                                       final n = double.tryParse((v ?? '').trim());
                                       if (n == null || n <= 0) {
                                         return _isBoxUnitProduct
                                             ? 'Enter a valid box/piece quantity'
                                             : 'Enter a valid quantity';
+                                      }
+                                      if (n > DValidator.maxQuantity) {
+                                        return 'Quantity can have at most ${DValidator.maxQuantityDigits} digits';
                                       }
                                       return null;
                                     },
@@ -1025,12 +1020,20 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                       Expanded(
                                         child: LabeledField(
                                           label: 'Piece Quantity',
-                                          field: CustomTextField(
+                                          field:
+                                          CustomTextField(
                                             hint: 'Enter piece qty',
                                             icon: Icons.widgets_outlined,
-                                            keyboardType: TextInputType.number,
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                             controller: _itemPieceQtyCtrl,
-                                            inputFormatters: DValidator.decimalNumber,
+                                            inputFormatters: DValidator.quantityNumber,
+                                            validator: (v) {
+                                              final n = double.tryParse((v ?? '').trim());
+                                              if (n != null && n > DValidator.maxQuantity) {
+                                                return 'Piece quantity can have at most ${DValidator.maxQuantityDigits} digits';
+                                              }
+                                              return null;
+                                            },
                                             onChanged: (_) => setState(() {}),
                                           ),
                                         ),

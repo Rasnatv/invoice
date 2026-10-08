@@ -83,10 +83,15 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
   bool _isOwner(EstimateDetailModel estimate) {
     return estimate.createdByDetails.roleLabel.trim().toLowerCase() == 'owner';
   }
+  bool _isDelivered(EstimateDetailModel estimate) {
+    final s = estimate.status.trim().toLowerCase();
+    return s == 'delivered' || s == 'despatched' || s == 'dispatched';
+  }
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
+      case 'delivered':
         return AppColors.success;
       case 'pending_approval':
         return Colors.orange;
@@ -116,6 +121,8 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
         return 'Pending Approval';
       case 'approved':
         return 'Approved';
+      case 'delivered':
+        return 'Delivered';
       case 'rejected':
         return 'Rejected';
       default:
@@ -404,7 +411,8 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                       ),
                     ),
                   ),
-                  if (estimate.isApproved) _buildBottomBar(context, estimate),
+                  if (estimate.isApproved && !_isDelivered(estimate))
+                    _buildBottomBar(context, estimate),
                 ],
               );
             },

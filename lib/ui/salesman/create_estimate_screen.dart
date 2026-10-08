@@ -147,9 +147,6 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
   }
 
-  // REMOVED: _currentItemAmount getter — the pre-add "Amount" preview box
-  // is gone, so nothing reads a cached/mismatched bloc amount anymore.
-
   void _showError(String msg) {
     AppSnackbar.error(msg);
   }
@@ -216,30 +213,75 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     return true;
   }
 
+  /// Validates the item currently on the form:
+  ///  - Quantity / Piece qty: max 99999 (5 digits)
+  ///  - Rate: max 99999999 (8 digits)
   bool _validateCurrentItemFields() {
     if (_selectedProduct == null) {
       _showError('Please select a product');
       return false;
     }
 
-    final qtyShapeError = DValidator.validateOptionalNumber(
-      _isBoxUnitProduct ? 'Box/piece quantity' : 'Quantity',
+    // Quantity (max 99999)
+    final qtyError = DValidator.validateOptionalNumber(
+      _isBoxUnitProduct ? 'Box quantity' : 'Quantity',
       _itemQtyCtrl.text,
+      max: DValidator.maxQuantity,
     );
-    if (qtyShapeError != null || _computedQuantity <= 0) {
+    if (qtyError != null) {
+      _showError(qtyError);
+      return false;
+    }
+    if (_computedQuantity <= 0) {
       _showError(_isBoxUnitProduct
           ? 'Please enter a valid box quantity or piece quantity'
           : 'Please enter a valid quantity');
       return false;
     }
 
-    final rateShapeError = DValidator.validateOptionalNumber('Rate', _itemRateCtrl.text);
+    // Piece quantity (box-unit products only, max 99999)
+    if (_isBoxUnitProduct) {
+      final pieceError = DValidator.validateOptionalNumber(
+        'Piece quantity',
+        _itemPieceQtyCtrl.text,
+        max: DValidator.maxQuantity,
+      );
+      if (pieceError != null) {
+        _showError(pieceError);
+        return false;
+      }
+    }
+
+    // Rate (max 99999999)
+    final rateError = DValidator.validateOptionalNumber(
+      'Rate',
+      _itemRateCtrl.text,
+      max: DValidator.maxPrice,
+    );
+    if (rateError != null) {
+      _showError(rateError);
+      return false;
+    }
     final rateValue = double.tryParse(_itemRateCtrl.text) ?? 0;
-    if (rateShapeError != null || rateValue <= 0) {
+    if (rateValue <= 0) {
       _showError('Please enter a valid rate');
       return false;
     }
 
+    return true;
+  }
+
+  /// Handling charge (max 99999999).
+  bool _validateHandlingCharge() {
+    final error = DValidator.validateOptionalNumber(
+      'Handling charge',
+      _handlingChargeCtrl.text,
+      max: DValidator.maxPrice,
+    );
+    if (error != null) {
+      _showError(error);
+      return false;
+    }
     return true;
   }
 
@@ -577,11 +619,13 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
 
   void _saveDraft() {
     if (!_validateDetails()) return;
+    if (!_validateHandlingCharge()) return;
     final request = _buildRequest(action: 'save_quotation');
     context.read<SalesmanEstimateBloc>().add(QuotationSubmitRequested(request));
   }
 
   void _submitForApproval() {
+    if (!_validateHandlingCharge()) return;
     final request = _buildRequest(action: 'submit');
     context.read<SalesmanEstimateBloc>().add(QuotationSubmitRequested(request));
   }
@@ -631,87 +675,88 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
           if (didPop) return;
           _onWillPop();
         },
-        child: NetworkAwareWrapper(child: Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            title: Text(_appBarTitle),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (_step == EstimateStep.details) {
-                  Navigator.of(context).pop();
-                } else {
-                  _onWillPop();
-                }
-              },
+        child: NetworkAwareWrapper(
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: Text(_appBarTitle),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (_step == EstimateStep.details) {
+                    Navigator.of(context).pop();
+                  } else {
+                    _onWillPop();
+                  }
+                },
+              ),
+            ),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  _StepIndicator(step: _step),
+                  Expanded(
+                    child: switch (_step) {
+                      EstimateStep.details => _DetailsStep(
+                        date: _date,
+                        onDateChanged: (d) => setState(() => _date = d),
+                        partyNameCtrl: _partyNameCtrl,
+                        addressCtrl: _addressCtrl,
+                        phoneCtrl: _phoneCtrl,
+                        customerEmailCtrl: _customerEmailCtrl,
+                        contractorNameCtrl: _contractorNameCtrl,
+                        contractorPhoneCtrl: _contractorPhoneCtrl,
+                        contractorEmailCtrl: _contractorEmailCtrl,
+                        contractorAddressCtrl: _contractorAddressCtrl,
+                        onSelectSiteVisit: _selectSiteVisit,
+                        onNext: _goToAddItems,
+                      ),
+                      EstimateStep.addItems => AddItemsSteps(
+                        selectedProduct: _selectedProduct,
+                        onProductSelected: _onProductSelected,
+                        itemCompanyCtrl: _itemCompanyCtrl,
+                        itemSizeCtrl: _itemSizeCtrl,
+                        itemUnitCtrl: _itemUnitCtrl,
+                        itemPackingCtrl: _itemPackingCtrl,
+                        itemMrpCtrl: _itemMrpCtrl,
+                        itemQtyCtrl: _itemQtyCtrl,
+                        itemBoxQtyCtrl: _itemBoxQtyCtrl,
+                        itemPieceQtyCtrl: _itemPieceQtyCtrl,
+                        itemRateCtrl: _itemRateCtrl,
+                        isAdding: _isAddingItem,
+                        onQuantityChanged: _onQuantityChanged,
+                        onQtyRateChanged: _scheduleIncentiveFetch,
+                        items: _items,
+                        editingIndex: _editingItemIndex,
+                        onAddItem: _addItemToList,
+                        onEditItem: _editItem,
+                        onCancelEdit: _cancelEditItem,
+                        onRemoveItem: _removeItem,
+                        onCancel: () => setState(() => _step = EstimateStep.details),
+                        onSaveItems: _goToPreview,
+                      ),
+                      EstimateStep.preview => PreviewStep(
+                        date: _date,
+                        partyName: _partyNameCtrl.text,
+                        address: _addressCtrl.text,
+                        phone: _phoneCtrl.text,
+                        customerEmail: _customerEmailCtrl.text,
+                        contractorName: _contractorNameCtrl.text,
+                        contractorPhone: _contractorPhoneCtrl.text,
+                        contractorEmail: _contractorEmailCtrl.text,
+                        handlingChargeCtrl: _handlingChargeCtrl,
+                        notesCtrl: _notesCtrl,
+                        onHandlingChargeChanged: _onHandlingChargeChanged,
+                        onRetryPreview: _requestPreview,
+                        onSaveDraft: _saveDraft,
+                        onSubmit: _submitForApproval,
+                      ),
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-          body: SafeArea(
-            child: Column(
-              children: [
-                _StepIndicator(step: _step),
-                Expanded(
-                  child: switch (_step) {
-                    EstimateStep.details => _DetailsStep(
-                      date: _date,
-                      onDateChanged: (d) => setState(() => _date = d),
-                      partyNameCtrl: _partyNameCtrl,
-                      addressCtrl: _addressCtrl,
-                      phoneCtrl: _phoneCtrl,
-                      customerEmailCtrl: _customerEmailCtrl,
-                      contractorNameCtrl: _contractorNameCtrl,
-                      contractorPhoneCtrl: _contractorPhoneCtrl,
-                      contractorEmailCtrl: _contractorEmailCtrl,
-                      contractorAddressCtrl: _contractorAddressCtrl,
-                      onSelectSiteVisit: _selectSiteVisit,
-                      onNext: _goToAddItems,
-                    ),
-                    EstimateStep.addItems => AddItemsSteps(
-                      selectedProduct: _selectedProduct,
-                      onProductSelected: _onProductSelected,
-                      itemCompanyCtrl: _itemCompanyCtrl,
-                      itemSizeCtrl: _itemSizeCtrl,
-                      itemUnitCtrl: _itemUnitCtrl,
-                      itemPackingCtrl: _itemPackingCtrl,
-                      itemMrpCtrl: _itemMrpCtrl,
-                      itemQtyCtrl: _itemQtyCtrl,
-                      itemBoxQtyCtrl: _itemBoxQtyCtrl,
-                      itemPieceQtyCtrl: _itemPieceQtyCtrl,
-                      itemRateCtrl: _itemRateCtrl,
-                      isAdding: _isAddingItem, // NEW
-                      onQuantityChanged: _onQuantityChanged,
-                      onQtyRateChanged: _scheduleIncentiveFetch,
-                      items: _items,
-                      editingIndex: _editingItemIndex,
-                      onAddItem: _addItemToList,
-                      onEditItem: _editItem,
-                      onCancelEdit: _cancelEditItem,
-                      onRemoveItem: _removeItem,
-                      onCancel: () => setState(() => _step = EstimateStep.details),
-                      onSaveItems: _goToPreview,
-                    ),
-                    EstimateStep.preview => PreviewStep(
-                      date: _date,
-                      partyName: _partyNameCtrl.text,
-                      address: _addressCtrl.text,
-                      phone: _phoneCtrl.text,
-                      customerEmail: _customerEmailCtrl.text,
-                      contractorName: _contractorNameCtrl.text,
-                      contractorPhone: _contractorPhoneCtrl.text,
-                      contractorEmail: _contractorEmailCtrl.text,
-                      handlingChargeCtrl: _handlingChargeCtrl,
-                      notesCtrl: _notesCtrl,
-                      onHandlingChargeChanged: _onHandlingChargeChanged,
-                      onRetryPreview: _requestPreview,
-                      onSaveDraft: _saveDraft,
-                      onSubmit: _submitForApproval,
-                    ),
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
         ),
       ),
     );

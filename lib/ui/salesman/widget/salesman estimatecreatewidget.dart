@@ -308,9 +308,10 @@ class AddItemsSteps extends StatelessWidget {
                           field: CustomTextField(
                             hint: 'Rate',
                             icon: Icons.currency_rupee,
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             controller: itemRateCtrl,
-                            inputFormatters: DValidator.decimalNumber,
+                            // Rate: max 8 digits + 2 decimals
+                            inputFormatters: DValidator.priceNumber,
                             onChanged: (_) {
                               setLocalState(() {});
                               onQtyRateChanged();
@@ -326,9 +327,10 @@ class AddItemsSteps extends StatelessWidget {
                     field: CustomTextField(
                       hint: 'Enter quantity',
                       icon: Icons.numbers_outlined,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       controller: itemQtyCtrl,
-                      inputFormatters: DValidator.decimalNumber,
+                      // Quantity: max 5 digits + 2 decimals
+                      inputFormatters: DValidator.quantityNumber,
                       onChanged: (_) {
                         setLocalState(() {});
                         onQuantityChanged();
@@ -358,9 +360,10 @@ class AddItemsSteps extends StatelessWidget {
                             field: CustomTextField(
                               hint: '0',
                               icon: Icons.view_module_outlined,
-                              keyboardType: TextInputType.number,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               controller: itemPieceQtyCtrl,
-                              inputFormatters: DValidator.decimalNumber,
+                              // Piece qty: max 5 digits + 2 decimals
+                              inputFormatters: DValidator.quantityNumber,
                               onChanged: (_) {
                                 setLocalState(() {});
                                 onQtyRateChanged();
@@ -924,9 +927,10 @@ class PreviewStep extends StatelessWidget {
                     field: CustomTextField(
                       hint: 'Enter handling charge',
                       icon: Icons.currency_rupee,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       controller: handlingChargeCtrl,
-                      inputFormatters: DValidator.decimalNumber,
+                      // Handling charge: max 8 digits + 2 decimals
+                      inputFormatters: DValidator.priceNumber,
                       onChanged: (_) => onHandlingChargeChanged(),
                     ),
                   ),
@@ -951,10 +955,6 @@ class PreviewStep extends StatelessWidget {
                     child: Column(
                       children: [
                         _totalRow('Total Sq.Ft', number.format(preview.totals.totalSquareFeet)),
-                        // if (preview.totals.mrpTotal > 0) ...[
-                        //   SizedBox(height: Responsive.h(6)),
-                        //   _totalRow('Total MRP', currency.format(preview.totals.mrpTotal)),
-                        // ],
                         SizedBox(height: Responsive.h(6)),
                         _totalRow('Subtotal', currency.format(preview.totals.subtotal)),
                         SizedBox(height: Responsive.h(6)),
