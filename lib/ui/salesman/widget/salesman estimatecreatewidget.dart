@@ -951,10 +951,10 @@ class PreviewStep extends StatelessWidget {
                     child: Column(
                       children: [
                         _totalRow('Total Sq.Ft', number.format(preview.totals.totalSquareFeet)),
-                        if (preview.totals.mrpTotal > 0) ...[
-                          SizedBox(height: Responsive.h(6)),
-                          _totalRow('Total MRP', currency.format(preview.totals.mrpTotal)),
-                        ],
+                        // if (preview.totals.mrpTotal > 0) ...[
+                        //   SizedBox(height: Responsive.h(6)),
+                        //   _totalRow('Total MRP', currency.format(preview.totals.mrpTotal)),
+                        // ],
                         SizedBox(height: Responsive.h(6)),
                         _totalRow('Subtotal', currency.format(preview.totals.subtotal)),
                         SizedBox(height: Responsive.h(6)),

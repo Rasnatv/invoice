@@ -1,17 +1,21 @@
+
 import 'package:equatable/equatable.dart';
 import 'package:tileshop/models/salesmanmodels/salesmanownerestimatemodel.dart';
 
 enum EstimatesStatus { initial, loading, success, failure }
 
-/// One tab in the status tab bar. Built dynamically from whatever statuses
-/// actually come back in the API response - however many distinct statuses
-/// exist in the data, that many tabs show up (plus "All").
+/// One chip in the status filter bar. Built dynamically from the statuses
+/// present in the loaded data (plus "All").
 class StatusFilterOption extends Equatable {
   final String key; // 'all' or a statusKey
   final String label; // 'All', 'Draft', 'Sent', 'New' ...
   final int count;
 
-  const StatusFilterOption({required this.key, required this.label, required this.count});
+  const StatusFilterOption({
+    required this.key,
+    required this.label,
+    required this.count,
+  });
 
   @override
   List<Object?> get props => [key, label, count];
@@ -26,6 +30,12 @@ class SalesmanownerEstimatesState extends Equatable {
   final String query;
   final String? errorMessage;
 
+  // Pagination
+  final int page;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final bool loadMoreFailed;
+
   const SalesmanownerEstimatesState({
     this.status = EstimatesStatus.initial,
     this.allEstimates = const [],
@@ -34,6 +44,10 @@ class SalesmanownerEstimatesState extends Equatable {
     this.activeFilter = 'all',
     this.query = '',
     this.errorMessage,
+    this.page = 1,
+    this.hasMore = true,
+    this.isLoadingMore = false,
+    this.loadMoreFailed = false,
   });
 
   SalesmanownerEstimatesState copyWith({
@@ -44,6 +58,10 @@ class SalesmanownerEstimatesState extends Equatable {
     String? activeFilter,
     String? query,
     String? errorMessage,
+    int? page,
+    bool? hasMore,
+    bool? isLoadingMore,
+    bool? loadMoreFailed,
   }) {
     return SalesmanownerEstimatesState(
       status: status ?? this.status,
@@ -52,11 +70,26 @@ class SalesmanownerEstimatesState extends Equatable {
       filters: filters ?? this.filters,
       activeFilter: activeFilter ?? this.activeFilter,
       query: query ?? this.query,
-      errorMessage: errorMessage,
+      errorMessage: errorMessage, // intentionally not carried over
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [status, allEstimates, filteredEstimates, filters, activeFilter, query, errorMessage];
+  List<Object?> get props => [
+    status,
+    allEstimates,
+    filteredEstimates,
+    filters,
+    activeFilter,
+    query,
+    errorMessage,
+    page,
+    hasMore,
+    isLoadingMore,
+    loadMoreFailed,
+  ];
 }

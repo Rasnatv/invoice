@@ -27,10 +27,18 @@ class ApprovedBills extends StatelessWidget {
 class _ApprovedBillsView extends StatelessWidget {
   const _ApprovedBillsView();
 
-  void _openEstimateDetail(BuildContext context, String id) {
-    Navigator.of(context).push(
+  Future<void> _openEstimateDetail(BuildContext context, String id) async {
+    // Grab the bloc before the await so we don't touch context afterwards.
+    final bloc = context.read<ApprovedEstimatesBloc>();
+
+    final despatched = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => SalesmanEstimateDetailsScreen(id: id)),
     );
+
+    // Despatch sheet was created -> reload so the bill disappears from this list.
+    if (despatched == true) {
+      bloc.add(const ApprovedEstimatesRefreshed());
+    }
   }
 
   @override

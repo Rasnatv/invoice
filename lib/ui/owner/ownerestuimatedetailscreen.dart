@@ -1136,13 +1136,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                             },
                           ),
                           const SizedBox(height: 12),
-                          TextFormField(
-                            controller: discountNotesCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Discount Notes (optional)',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
+
                         ],
 
                         // ---- PAYABLE AMOUNT: shown right before Amount Received ----

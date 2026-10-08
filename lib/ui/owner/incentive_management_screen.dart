@@ -427,13 +427,6 @@ class _ProductIncentiveCard extends StatelessWidget {
             children: [
               Text('MRP ${currency.format(product.mrp)}', style: AppTextStyles.caption()),
               Text('Rate ${currency.format(product.rate)}', style: AppTextStyles.caption()),
-              if (hasIncentive)
-                Text(
-                  product.incentiveType == ProductIncentiveType.percentage
-                      ? 'Incentive ${_pct(product.incentivePercentage)}%'
-                      : 'Incentive ${currency.format(product.incentiveAmount)}',
-                  style: AppTextStyles.caption(),
-                ),
             ],
           ),
 

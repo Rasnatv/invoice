@@ -89,28 +89,7 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
           title: Text('Dispatch Bills', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          actions: [
-            // Refresh icon: turns into a small spinner while refreshing.
-            _isRefreshing
-                ? Padding(
-              padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
-              child: const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            )
-                : IconButton(
-              icon: const Icon(Icons.refresh_rounded),
-              tooltip: 'Refresh',
-              onPressed: () => _doRefresh(context),
-            ),
-          ],
+
         ),
         body: SafeArea(
           child: BlocBuilder<DispatchListBloc, DispatchListState>(
@@ -306,7 +285,7 @@ class _DispatchCard extends StatelessWidget {
               ],
             ),
             SizedBox(height: Responsive.h(4)),
-            Text('Estimate No: ${dispatch.estimateNumber}', style: AppTextStyles.caption()),
+            Text('Ref: ${dispatch.estimateNumber}', style: AppTextStyles.caption()),
             SizedBox(height: Responsive.h(8)),
             // Visible status badge so a refresh actually shows a change.
             Container(

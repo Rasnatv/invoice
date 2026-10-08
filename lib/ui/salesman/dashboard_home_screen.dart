@@ -8,6 +8,7 @@ import 'package:tileshop/ui/salesman/widget/salesman_dashboardshimmer.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../bloc/salemanbloc/estimatelistview/salesmanownerestimatestate.dart';
 import '../../bloc/salemanbloc/salemandashboard/salesman_dashboardbloc.dart';
 import '../../bloc/salemanbloc/salemandashboard/salesman_dashboardstate.dart';
 import '../../bloc/salemanbloc/salemandashboard/salesmandashboard_event.dart';
@@ -41,8 +42,15 @@ class _DashboardHomeView extends StatelessWidget {
     }
   }
 
+
   Future<void> _openMyEstimates(BuildContext context) async {
     final estimatesBloc = context.read<EstimatesBloc>();
+
+    // Load fresh data every time the screen is opened.
+    if (estimatesBloc.state.status != EstimatesStatus.loading) {
+      estimatesBloc.add(const EstimatesRefreshRequested());
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
@@ -55,15 +63,19 @@ class _DashboardHomeView extends StatelessWidget {
       context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
     }
   }
-
   void _openIncentives(BuildContext context, DashboardHomeState state) {
     context.push('/incentives');
   }
-
-  void _openApprovedBills(BuildContext context) {
-    context.push('/approved-bills');
+  //
+  // void _openApprovedBills(BuildContext context) {
+  //   context.push('/approved-bills');
+  // }
+  Future<void> _openApprovedBills(BuildContext context) async {
+    await context.push('/approved-bills');
+    if (context.mounted) {
+      context.read<DashboardHomeBloc>().add(const DashboardHomeRefreshed());
+    }
   }
-
   void _openQuotationBills(BuildContext context) {
     context.push('/quotation-bills');
   }

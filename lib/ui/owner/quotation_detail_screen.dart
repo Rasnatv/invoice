@@ -16,6 +16,7 @@ import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/owner_models/owner_quotationapprovemodel.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
+import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/primary_button.dart';
 import 'ownerquotationeditscreen.dart';
 
@@ -272,27 +273,28 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
 
   Future<void> _showApproveDialog(QuotationDetailModel q) async {
     final formKey = GlobalKey<FormState>();
-    final handlingCtrl = TextEditingController(
-      text: q.handlingCharge > 0 ? q.handlingCharge.toStringAsFixed(2) : '',
-    );
 
-    String? discountType; // null | 'percentage' | 'fixed'
+    final handlingCtrl = TextEditingController(
+      text: q.handlingCharge > 0 ? q.handlingCharge.toStringAsFixed(0) : '',
+    );
+    String discountType = 'none'; // none | percentage | fixed
     final discountValueCtrl = TextEditingController();
     final discountNotesCtrl = TextEditingController();
 
     final paymentAmountCtrl = TextEditingController();
-    String? paymentMethod; // 'cash' | 'online' | 'cheque' | 'credit' | 'bank_transfer'
+    String paymentMethod = 'cash'; // cash | online | cheque | credit | bank_transfer
     final paymentReferenceCtrl = TextEditingController();
     DateTime? paymentDate;
     final paymentNotesCtrl = TextEditingController();
 
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-    // Pure calculation — no API call. Runs on every keystroke via setDialogState.
-    // subtotal + handling - discount = grand total; grand total - payment = balance.
-    ({double handling, double discount, double grandTotal, double payment, double balance})
-    _calcPreview() {
-      final handling = double.tryParse(handlingCtrl.text.trim()) ?? 0;
+    // Pure frontend calculation — no API call. Re-run on every keystroke.
+    // subtotal + handling - discount = payable; payable - received = balance.
+    ({double handling, double discount, double payable, double received, double balance})
+    calcPreview() {
+      // Empty handling field falls back to the quotation's current charge.
+      final handling = double.tryParse(handlingCtrl.text.trim()) ?? q.handlingCharge;
       final discountValue = double.tryParse(discountValueCtrl.text.trim()) ?? 0;
       final beforeDiscount = q.subtotal + handling;
 
@@ -302,183 +304,236 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
       } else if (discountType == 'fixed') {
         discount = discountValue;
       }
-      // Never let discount exceed the payable amount.
       if (discount > beforeDiscount) discount = beforeDiscount;
 
-      final grandTotal = beforeDiscount - discount;
-      final payment = double.tryParse(paymentAmountCtrl.text.trim()) ?? 0;
-      final balance = (grandTotal - payment).clamp(0, double.infinity).toDouble();
+      final payable = beforeDiscount - discount;
+      final received = double.tryParse(paymentAmountCtrl.text.trim()) ?? 0;
+      final balance = (payable - received).clamp(0, double.infinity).toDouble();
 
-      return (handling: handling, discount: discount, grandTotal: grandTotal, payment: payment, balance: balance);
+      return (
+      handling: handling,
+      discount: discount,
+      payable: payable,
+      received: received,
+      balance: balance,
+      );
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final preview = _calcPreview();
+          builder: (dialogContext, setDialogState) {
+            final preview = calcPreview();
 
             return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Text('Approve Quotation'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        controller: handlingCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Handling Charge (optional)',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-
-                      // ---- Discount ----
-                      const Divider(height: 28),
-                      Text('Discount (optional)', style: AppTextStyles.bodyBold()),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: discountType,
-                        decoration: const InputDecoration(
-                          labelText: 'Discount Type',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: null, child: Text('None')),
-                          DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
-                          DropdownMenuItem(value: 'fixed', child: Text('Flat Amount')),
-                        ],
-                        onChanged: (v) => setDialogState(() => discountType = v),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: discountValueCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        enabled: discountType != null,
-                        decoration: const InputDecoration(
-                          labelText: 'Discount Value',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-
-                      // ---- LIVE PREVIEW (above Initial Payment) ----
-                      const Divider(height: 28),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceAlt,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Preview', style: AppTextStyles.bodyBold(color: AppColors.primary)),
-                            const SizedBox(height: 8),
-                            _previewRow('Subtotal', currency.format(q.subtotal)),
-                            _previewRow('Handling Charge', currency.format(preview.handling)),
-                            if (discountType != null)
-                              _previewRow('Discount', '- ${currency.format(preview.discount)}',
-                                  color: Colors.red),
-                            const Divider(height: 16),
-                            _previewRow('Grand Total', currency.format(preview.grandTotal), bold: true),
-                            _previewRow('Amount Received', currency.format(preview.payment)),
-                            _previewRow(
-                              'Balance Due',
-                              currency.format(preview.balance),
-                              bold: true,
-                              color: preview.balance > 0 ? Colors.red : AppColors.success,
-                            ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ---- Handling charge ----
+                        TextFormField(
+                          controller: handlingCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                           ],
-                        ),
-                      ),
-
-                      // ---- Initial Payment ----
-                      const Divider(height: 28),
-                      Text('Initial Payment (optional)', style: AppTextStyles.bodyBold()),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: paymentAmountCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Amount',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: paymentMethod,
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Method',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: null, child: Text('Select')),
-                          DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                          DropdownMenuItem(value: 'online', child: Text('Online')),
-                          DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
-                          DropdownMenuItem(value: 'credit', child: Text('Credit')),
-                          DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
-                        ],
-                        onChanged: paymentAmountCtrl.text.trim().isEmpty
-                            ? null
-                            : (v) => setDialogState(() => paymentMethod = v),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: paymentReferenceCtrl,
-                        enabled: paymentAmountCtrl.text.trim().isNotEmpty,
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Reference (e.g. TXN No.)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: paymentAmountCtrl.text.trim().isEmpty
-                            ? null
-                            : () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: paymentDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            setDialogState(() => paymentDate = picked);
-                          }
-                        },
-                        child: InputDecorator(
                           decoration: const InputDecoration(
-                            labelText: 'Payment Date',
+                            labelText: 'Handling Charge (optional)',
+                            prefixText: '₹ ',
                             border: OutlineInputBorder(),
                           ),
-                          child: Text(
-                            paymentDate == null
-                                ? 'Select date'
-                                : DateFormat('dd-MM-yyyy').format(paymentDate!),
+                          onChanged: (_) => setDialogState(() {}),
+                        ),
+
+                        // ---- Discount ----
+                        const SizedBox(height: 16),
+                        const Text('Discount', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: discountType,
+                          decoration: const InputDecoration(border: OutlineInputBorder()),
+                          items: const [
+                            DropdownMenuItem(value: 'none', child: Text('No discount')),
+                            DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
+                            DropdownMenuItem(value: 'fixed', child: Text('Fixed')),
+                          ],
+                          onChanged: (v) => setDialogState(() => discountType = v ?? 'none'),
+                        ),
+                        if (discountType != 'none') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: discountValueCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
+                            decoration: InputDecoration(
+                              labelText:
+                              discountType == 'percentage' ? 'Discount %' : 'Discount Amount',
+                              prefixText: discountType == 'fixed' ? '₹ ' : null,
+                              suffixText: discountType == 'percentage' ? '%' : null,
+                              border: const OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => setDialogState(() {}),
+                            validator: (v) {
+                              if (discountType == 'none') return null;
+                              if (v == null || v.trim().isEmpty) return 'Required';
+                              final parsed = double.tryParse(v.trim());
+                              if (parsed == null || parsed < 0) return 'Enter a valid value';
+                              if (discountType == 'percentage' && parsed > 100) {
+                                return 'Cannot exceed 100%';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+
+                        // ---- PAYABLE AMOUNT PREVIEW (right before Initial Payment) ----
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceAlt,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _previewRow('Subtotal', currency.format(q.subtotal)),
+                              _previewRow('Handling Charge',
+                                  '+ ${currency.format(preview.handling)}'),
+                              if (discountType != 'none')
+                                _previewRow(
+                                  discountType == 'percentage'
+                                      ? 'Discount (${discountValueCtrl.text.trim().isEmpty ? '0' : discountValueCtrl.text.trim()}%)'
+                                      : 'Discount',
+                                  '- ${currency.format(preview.discount)}',
+                                  color: Colors.red,
+                                ),
+                              const Divider(height: 14),
+                              _previewRow(
+                                'Payable Amount',
+                                currency.format(preview.payable),
+                                bold: true,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: paymentNotesCtrl,
-                        enabled: paymentAmountCtrl.text.trim().isNotEmpty,
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Notes',
-                          border: OutlineInputBorder(),
+
+                        // ---- Initial Payment ----
+                        const SizedBox(height: 16),
+                        const Text('Initial Payment (optional)',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: paymentAmountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Amount Received',
+                            prefixText: '₹ ',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => setDialogState(() {}),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null; // optional
+                            final parsed = double.tryParse(v.trim());
+                            if (parsed == null || parsed <= 0) return 'Enter a valid amount';
+                            final payable = calcPreview().payable;
+                            if (parsed > payable + 0.009) {
+                              return 'Cannot exceed payable amount (${currency.format(payable)})';
+                            }
+                            return null;
+                          },
                         ),
-                        maxLines: 2,
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+
+                        // Live balance after the amount received.
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Balance Due', style: AppTextStyles.bodyBold()),
+                              Text(
+                                currency.format(preview.balance),
+                                style: AppTextStyles.bodyBold(
+                                  color: preview.balance > 0 ? Colors.red : AppColors.success,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: paymentMethod,
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Method',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                            DropdownMenuItem(value: 'online', child: Text('Online')),
+                            DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+                            DropdownMenuItem(value: 'credit', child: Text('Credit')),
+                            DropdownMenuItem(
+                                value: 'bank_transfer', child: Text('Bank Transfer')),
+                          ],
+                          onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash'),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: paymentReferenceCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Reference (optional)',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: dialogContext,
+                              initialDate: paymentDate ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setDialogState(() => paymentDate = picked);
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Payment Date (optional)',
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(paymentDate == null
+                                ? 'Select date'
+                                : DateFormat('yyyy-MM-dd').format(paymentDate!)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: paymentNotesCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Notes (optional)',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -488,7 +543,13 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    Navigator.of(dialogContext).pop(true);
+                  },
                   child: const Text('Approve'),
                 ),
               ],
@@ -503,26 +564,35 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
     final handlingCharge = double.tryParse(handlingCtrl.text.trim());
     final discountValue = double.tryParse(discountValueCtrl.text.trim());
     final paymentAmount = double.tryParse(paymentAmountCtrl.text.trim());
+    final hasDiscount = discountType != 'none';
 
     final request = QuotationApproveRequest(
       id: widget.quotationId,
       handlingCharge: handlingCharge,
-      discountType: discountType,
-      discountValue: discountType != null ? discountValue : null,
-      discountNotes: discountType != null ? discountNotesCtrl.text : null,
+      discountType: hasDiscount ? discountType : null,
+      discountValue: hasDiscount ? discountValue : null,
+      discountNotes: hasDiscount && discountNotesCtrl.text.trim().isNotEmpty
+          ? discountNotesCtrl.text.trim()
+          : null,
       paymentAmount: paymentAmount,
       paymentMethod: paymentAmount != null ? paymentMethod : null,
-      paymentReference: paymentAmount != null ? paymentReferenceCtrl.text : null,
+      paymentReference: paymentAmount != null && paymentReferenceCtrl.text.trim().isNotEmpty
+          ? paymentReferenceCtrl.text.trim()
+          : null,
       paymentDate: paymentAmount != null && paymentDate != null
           ? DateFormat('yyyy-MM-dd').format(paymentDate!)
           : null,
-      paymentNotes: paymentAmount != null ? paymentNotesCtrl.text : null,
+      paymentNotes: paymentAmount != null && paymentNotesCtrl.text.trim().isNotEmpty
+          ? paymentNotesCtrl.text.trim()
+          : null,
     );
 
     context.read<OwnerQuotationDetailBloc>().add(OwnerQuotationApproveRequested(request));
   }
 
-  Widget _previewRow(String label, String value, {bool bold = false, Color? color}) {
+  Widget _previewRow(String label, String value,
+      {bool bold = false, Color? color, double size = 0}) {
+    final base = bold ? AppTextStyles.bodyBold() : AppTextStyles.body();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -531,7 +601,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
           Text(label, style: AppTextStyles.body()),
           Text(
             value,
-            style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(color: color),
+            style: base.copyWith(color: color, fontSize: size > 0 ? size : null),
           ),
         ],
       ),
@@ -678,6 +748,7 @@ class _OwnerQuotationDetailsViewState extends State<_OwnerQuotationDetailsView> 
                 listener: (context, state) async {
                   if (state.approveStatus == OwnerQuotationApproveStatus.success) {
                     _didChange = true;
+                    ownerDataRefresh.value++;   // <-- ADD THIS LINE
                     await _showBackendMessage(state.approveMessage);
                     if (mounted) {
                       context

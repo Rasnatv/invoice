@@ -22,7 +22,8 @@ class OwnerEstimatesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => OwnerEstimatesBloc()..add(const OwnerEstimatesLoadRequested()),
+      create: (_) =>
+      OwnerEstimatesBloc()..add(const OwnerEstimatesLoadRequested()),
       child: _OwnerEstimatesView(initialFilter: initialFilter),
     );
   }
@@ -38,12 +39,15 @@ class _OwnerEstimatesView extends StatefulWidget {
 
 class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController(); // pagination
 
   @override
   void initState() {
     super.initState();
 
-    // NEW: refresh this list whenever an estimate is created/approved.
+    _scrollCtrl.addListener(_onScroll);
+
+    // Refresh this list whenever an estimate is created/approved.
     ownerDataRefresh.addListener(_onExternalRefresh);
 
     if (widget.initialFilter != 'all') {
@@ -56,7 +60,35 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     }
   }
 
-  /// NEW: same event the pull-to-refresh sends.
+  /// Load the next page when the user is near the bottom.
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      context
+          .read<OwnerEstimatesBloc>()
+          .add(const OwnerEstimatesLoadMoreRequested());
+    }
+  }
+
+  /// Filters/search are client-side, so a filtered list can be too short
+  /// to scroll. In that case keep loading pages until it fills or the
+  /// server runs out.
+  void _maybeLoadMore(OwnerEstimatesState state) {
+    if (!state.hasMore || state.isLoadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final short =
+          !_scrollCtrl.hasClients || _scrollCtrl.position.maxScrollExtent <= 0;
+      if (short) {
+        context
+            .read<OwnerEstimatesBloc>()
+            .add(const OwnerEstimatesLoadMoreRequested());
+      }
+    });
+  }
+
+  /// Same event the pull-to-refresh sends.
   void _onExternalRefresh() {
     if (!mounted) return;
     final bloc = context.read<OwnerEstimatesBloc>();
@@ -71,7 +103,9 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
 
   @override
   void dispose() {
-    ownerDataRefresh.removeListener(_onExternalRefresh); // NEW
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
+    ownerDataRefresh.removeListener(_onExternalRefresh);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -83,7 +117,9 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
       ),
     );
     if (mounted) {
-      context.read<OwnerEstimatesBloc>().add(const OwnerEstimatesRefreshRequested());
+      context
+          .read<OwnerEstimatesBloc>()
+          .add(const OwnerEstimatesRefreshRequested());
     }
   }
 
@@ -103,7 +139,9 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     );
 
     if (result == true && mounted) {
-      context.read<OwnerEstimatesBloc>().add(const OwnerEstimatesRefreshRequested());
+      context
+          .read<OwnerEstimatesBloc>()
+          .add(const OwnerEstimatesRefreshRequested());
     }
   }
 
@@ -123,7 +161,9 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     // A payment could have been recorded from inside the history screen
     // (via its own "record payment" FAB), so refresh the list balances too.
     if (result == true && mounted) {
-      context.read<OwnerEstimatesBloc>().add(const OwnerEstimatesRefreshRequested());
+      context
+          .read<OwnerEstimatesBloc>()
+          .add(const OwnerEstimatesRefreshRequested());
     }
   }
 
@@ -142,16 +182,14 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
         body: SafeArea(
           child: BlocBuilder<OwnerEstimatesBloc, OwnerEstimatesState>(
             builder: (context, state) {
-              // True on the very first load AND on every subsequent
-              // pull-to-refresh, so the chip row shimmers alongside the list.
               final bool isLoadingChips =
                   state.status == OwnerEstimatesStatus.loading;
 
               return Column(
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(
-                        Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
+                    padding: EdgeInsets.fromLTRB(Responsive.w(16),
+                        Responsive.h(14), Responsive.w(16), 0),
                     child: TextField(
                       controller: _searchCtrl,
                       onChanged: (v) => context
@@ -166,7 +204,8 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
                   SizedBox(height: Responsive.h(12)),
                   if (isLoadingChips)
                     _buildFilterChipsSkeleton(
-                      chipCount: state.filters.isNotEmpty ? state.filters.length : 4,
+                      chipCount:
+                      state.filters.isNotEmpty ? state.filters.length : 4,
                     )
                   else if (state.allEstimates.isNotEmpty &&
                       state.filters.isNotEmpty)
@@ -182,8 +221,6 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     );
   }
 
-  /// Filter chip row. Only built when at least one estimate exists
-  /// (the caller hides it entirely for an empty list).
   Widget _buildFilterChips(BuildContext context, OwnerEstimatesState state) {
     return SizedBox(
       height: 42,
@@ -238,15 +275,9 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   }
 
   Widget _buildBody(BuildContext context, OwnerEstimatesState state) {
-    // Covers both the very first load (allEstimates empty) AND a
-    // pull-to-refresh / manual refresh triggered later (allEstimates
-    // already has data, but the bloc goes back to `loading` while it
-    // re-fetches). In the refresh case we size the skeleton to match
-    // however many cards were already on screen, so the list doesn't
-    // visibly jump; on first load we fall back to a sensible default.
     if (state.status == OwnerEstimatesStatus.loading) {
       final int skeletonCount = state.filteredEstimates.isNotEmpty
-          ? state.filteredEstimates.length
+          ? state.filteredEstimates.length.clamp(1, 8)
           : 6;
 
       return ShimmerListPlaceholder(
@@ -267,9 +298,15 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
       );
     }
 
-    // Empty state: centered in the available space, and still supports
-    // pull-to-refresh.
+    // Keep fetching while the (filtered) list is too short to scroll.
+    _maybeLoadMore(state);
+
     if (state.filteredEstimates.isEmpty) {
+      // Still fetching more pages for this filter/search: show a loader.
+      if (state.hasMore || state.isLoadingMore) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
       return RefreshIndicator(
         onRefresh: () async => context
             .read<OwnerEstimatesBloc>()
@@ -304,11 +341,22 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
           .read<OwnerEstimatesBloc>()
           .add(const OwnerEstimatesRefreshRequested()),
       child: ListView.separated(
+        controller: _scrollCtrl,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
             Responsive.w(16), 0, Responsive.w(16), Responsive.h(20)),
-        itemCount: state.filteredEstimates.length,
+        itemCount:
+        state.filteredEstimates.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
         itemBuilder: (context, i) {
+          // Bottom loader while the next page is being fetched.
+          if (i >= state.filteredEstimates.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
           final e = state.filteredEstimates[i];
           return _OwnerEstimateCard(
             key: ValueKey(e.id),
@@ -351,8 +399,6 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-/// Skeleton placeholder shaped like [_OwnerEstimateCard], shown (inside a
-/// [ShimmerLoading] ancestor) while the estimates list is first loading.
 class _OwnerEstimateCardSkeleton extends StatelessWidget {
   const _OwnerEstimateCardSkeleton();
 
@@ -368,7 +414,6 @@ class _OwnerEstimateCardSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Estimate number + history icon + status chip row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -383,15 +428,12 @@ class _OwnerEstimateCardSkeleton extends StatelessWidget {
             ],
           ),
           SizedBox(height: Responsive.h(10)),
-          // Customer name
           const ShimmerBox(width: 180, height: 14),
           SizedBox(height: Responsive.h(8)),
-          // Contractor name
           const ShimmerBox(width: 130, height: 12),
           SizedBox(height: Responsive.h(12)),
           const Divider(height: 1, color: AppColors.border),
           SizedBox(height: Responsive.h(10)),
-          // Date + grand total row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
@@ -457,25 +499,24 @@ class _OwnerEstimateCard extends StatelessWidget {
                   tooltip: 'Payment History',
                 ),
                 SizedBox(width: Responsive.w(6)),
-                _StatusChip(label: estimate.statusLabel, statusKey: estimate.statusKey),
+                _StatusChip(
+                    label: estimate.statusLabel, statusKey: estimate.statusKey),
               ],
             ),
             SizedBox(height: Responsive.h(4)),
-            // Party / Customer name
             Row(
               children: [
                 SizedBox(width: Responsive.w(4)),
                 Expanded(
                   child: Text(
                     estimate.customerName,
-                    style: AppTextStyles.bodyBold(),
+                    style: AppTextStyles.caption(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            // Contractor name (only if present)
             if (estimate.contractorName.isNotEmpty) ...[
               SizedBox(height: Responsive.h(4)),
               Row(
@@ -494,7 +535,6 @@ class _OwnerEstimateCard extends StatelessWidget {
                 ],
               ),
             ],
-
             if (estimate.isApproved) ...[
               SizedBox(height: Responsive.h(4)),
               Row(
@@ -545,7 +585,8 @@ class _OwnerEstimateCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.w(12)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

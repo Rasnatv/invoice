@@ -28,6 +28,11 @@ class OwnerEstimatesState extends Equatable {
   final String query;
   final String? errorMessage;
 
+  // Pagination
+  final int page;
+  final bool hasMore;
+  final bool isLoadingMore;
+
   const OwnerEstimatesState({
     this.status = OwnerEstimatesStatus.initial,
     this.allEstimates = const [],
@@ -36,6 +41,9 @@ class OwnerEstimatesState extends Equatable {
     this.activeFilter = 'all',
     this.query = '',
     this.errorMessage,
+    this.page = 1,
+    this.hasMore = false,
+    this.isLoadingMore = false,
   });
 
   OwnerEstimatesState copyWith({
@@ -47,6 +55,9 @@ class OwnerEstimatesState extends Equatable {
     String? query,
     String? errorMessage,
     bool clearErrorMessage = false,
+    int? page,
+    bool? hasMore,
+    bool? isLoadingMore,
   }) {
     return OwnerEstimatesState(
       status: status ?? this.status,
@@ -55,7 +66,11 @@ class OwnerEstimatesState extends Equatable {
       filters: filters ?? this.filters,
       activeFilter: activeFilter ?? this.activeFilter,
       query: query ?? this.query,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage:
+      clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
@@ -68,5 +83,8 @@ class OwnerEstimatesState extends Equatable {
     activeFilter,
     query,
     errorMessage,
+    page,
+    hasMore,
+    isLoadingMore,
   ];
 }

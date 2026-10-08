@@ -373,16 +373,24 @@ class _QuotationCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    quotation.customerName,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.assignment_outlined,
+                          size: 14, color: AppColors.textSecondary),
+                      SizedBox(width: Responsive.w(4)),
+                      Expanded(
+                        child: Text(
+                          quotation.quotationNumber,
+                          style: AppTextStyles.bodyBold(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -397,14 +405,19 @@ class _QuotationCard extends StatelessWidget {
 
             SizedBox(height: Responsive.h(4)),
 
+// Row 2: Customer name (+ salesman when shown)
             Row(
               children: [
-                const Icon(Icons.assignment_outlined,
+                const Icon(Icons.person_outline_rounded,
                     size: 14, color: AppColors.textSecondary),
                 SizedBox(width: Responsive.w(4)),
-                Text(
-                  quotation.quotationNumber,
-                  style: AppTextStyles.bodyBold(),
+                Expanded(
+                  child: Text(
+                    quotation.customerName,
+                    style: AppTextStyles.caption(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (showSalesman) ...[
                   SizedBox(width: Responsive.w(10)),
@@ -419,8 +432,7 @@ class _QuotationCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ] else
-                  const Spacer(),
+                ],
               ],
             ),
 

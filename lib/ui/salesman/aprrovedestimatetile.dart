@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -29,6 +30,7 @@ class ApprovedEstimateTile extends StatelessWidget {
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 20,
@@ -49,14 +51,9 @@ class ApprovedEstimateTile extends StatelessWidget {
                     SizedBox(height: Responsive.h(4)),
                     Text(
                       estimate.customerName.isEmpty ? 'No party name' : estimate.customerName,
-                      style: AppTextStyles.body(),
+                      style: AppTextStyles.caption(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: Responsive.h(2)),
-                    Text(
-                      '${estimate.date != null ? DateFormat('dd-MM-yyyy').format(estimate.date!) : '-'}  •  ${estimate.totalItems} items',
-                      style: AppTextStyles.caption(color: AppColors.textHint),
                     ),
                   ],
                 ),
@@ -65,8 +62,10 @@ class ApprovedEstimateTile extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(currency.format(estimate.grandTotal),
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                  Text(
+                    currency.format(estimate.grandTotal),
+                    style: AppTextStyles.bodyBold(color: AppColors.primary),
+                  ),
                   SizedBox(height: Responsive.h(4)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

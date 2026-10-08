@@ -29,6 +29,55 @@ class _MyEstimatesView extends StatefulWidget {
 }
 
 class _MyEstimatesViewState extends State<_MyEstimatesView> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      context.read<EstimatesBloc>().add(const EstimatesLoadMoreRequested());
+    }
+  }
+
+  /// If the visible (filtered) list is too short to scroll, the scroll
+  /// listener never fires - so fetch the next page ourselves until the
+  /// list fills the screen or there is nothing more to load.
+  void _scheduleAutoLoadMore(SalesmanownerEstimatesState state) {
+    if (!state.hasMore || state.isLoadingMore || state.loadMoreFailed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollController.position.maxScrollExtent <= 0) {
+        context.read<EstimatesBloc>().add(const EstimatesLoadMoreRequested());
+      }
+    });
+  }
+
+  void _openDetails(BuildContext context, String id) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SalesmanEstimateDetailsScreen(id: id),
+      ),
+    );
+    // Refresh when returning from the detail screen,
+    // in case its status changed there.
+    if (context.mounted) {
+      context.read<EstimatesBloc>().add(const EstimatesRefreshRequested());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -100,7 +149,8 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> {
                               final filter = state.filters[i];
                               final selected = state.activeFilter == filter.key;
                               return ChoiceChip(
-                                label: Text('${filter.label} (${filter.count})'),
+                                label:
+                                Text('${filter.label} (${filter.count})'),
                                 selected: selected,
                                 selectedColor: AppColors.primary,
                                 backgroundColor: AppColors.surface,
@@ -130,7 +180,8 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> {
                 ),
 
                 Expanded(
-                  child: BlocBuilder<EstimatesBloc, SalesmanownerEstimatesState>(
+                  child:
+                  BlocBuilder<EstimatesBloc, SalesmanownerEstimatesState>(
                     builder: (context, state) {
                       // Shimmer skeleton on first load AND on manual refresh.
                       if (state.status == EstimatesStatus.loading) {
@@ -140,8 +191,8 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> {
                       if (state.status == EstimatesStatus.failure &&
                           state.allEstimates.isEmpty) {
                         return _ErrorView(
-                          message:
-                          state.errorMessage ?? 'Failed to load estimates.',
+                          message: state.errorMessage ??
+                              'Failed to load estimates.',
                           onRetry: () => context
                               .read<EstimatesBloc>()
                               .add(const EstimatesLoadRequested()),
@@ -149,10 +200,15 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> {
                       }
 
                       final list = state.filteredEstimates;
+
                       if (list.isEmpty) {
+                        // The filter/search may match items on later pages.
+                        _scheduleAutoLoadMore(state);
+
                         // Scrollable so pull-to-refresh still works.
                         return LayoutBuilder(
                           builder: (context, constraints) => ListView(
+                            controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: [
                               SizedBox(
@@ -160,15 +216,36 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons.description_rounded,
-                                      size: 40,
-                                      color: AppColors.textSecondary
-                                          .withOpacity(0.4),
-                                    ),
+                                    if (state.isLoadingMore)
+                                      const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    else
+                                      Icon(
+                                        Icons.description_rounded,
+                                        size: 40,
+                                        color: AppColors.textSecondary
+                                            .withOpacity(0.4),
+                                      ),
                                     SizedBox(height: Responsive.h(10)),
-                                    Text('No estimates found',
-                                        style: AppTextStyles.subtitle()),
+                                    Text(
+                                      state.isLoadingMore
+                                          ? 'Searching more estimates...'
+                                          : 'No estimates found',
+                                      style: AppTextStyles.subtitle(),
+                                    ),
+                                    if (state.loadMoreFailed)
+                                      TextButton(
+                                        onPressed: () => context
+                                            .read<EstimatesBloc>()
+                                            .add(const
+                                        EstimatesLoadMoreRequested()),
+                                        child: const Text(
+                                            'Failed to load more. Tap to retry'),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -177,29 +254,51 @@ class _MyEstimatesViewState extends State<_MyEstimatesView> {
                         );
                       }
 
+                      _scheduleAutoLoadMore(state);
+
+                      final showFooter = state.hasMore ||
+                          state.isLoadingMore ||
+                          state.loadMoreFailed;
+
                       return ListView.builder(
+                        controller: _scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(Responsive.w(16), 0,
                             Responsive.w(16), Responsive.h(20)),
-                        itemCount: list.length,
-                        itemBuilder: (context, i) => EstimateCard(
-                          estimate: list[i],
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    SalesmanEstimateDetailsScreen(id: list[i].id),
+                        itemCount: list.length + (showFooter ? 1 : 0),
+                        itemBuilder: (context, i) {
+                          // Footer: spinner or retry button.
+                          if (i >= list.length) {
+                            if (state.loadMoreFailed) {
+                              return Center(
+                                child: TextButton(
+                                  onPressed: () => context
+                                      .read<EstimatesBloc>()
+                                      .add(const EstimatesLoadMoreRequested()),
+                                  child: const Text(
+                                      'Failed to load more. Tap to retry'),
+                                ),
+                              );
+                            }
+                            return Padding(
+                              padding: EdgeInsets.symmetric(
+                                  vertical: Responsive.h(16)),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                ),
                               ),
                             );
-                            // Refresh when returning from the detail screen,
-                            // in case its status changed there.
-                            if (context.mounted) {
-                              context
-                                  .read<EstimatesBloc>()
-                                  .add(const EstimatesRefreshRequested());
-                            }
-                          },
-                        ),
+                          }
+
+                          return EstimateCard(
+                            estimate: list[i],
+                            onTap: () => _openDetails(context, list[i].id),
+                          );
+                        },
                       );
                     },
                   ),

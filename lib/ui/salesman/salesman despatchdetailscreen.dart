@@ -102,7 +102,12 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
               );
             },
             child: ListView(
-              padding: EdgeInsets.all(Responsive.w(18)),
+              padding: EdgeInsets.fromLTRB(
+                Responsive.w(18),
+                Responsive.w(18),
+                Responsive.w(18),
+                Responsive.h(24) + MediaQuery.of(context).viewPadding.bottom,
+              ),
               children: [
                 _StatusBanner(dispatch: dispatch),
                 SizedBox(height: Responsive.h(16)),
@@ -152,7 +157,6 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
           _infoRow('Contact Number', d.contactNumber),
           _infoRow('Delivery Address', d.deliveryAddress),
           _infoRow('Driver Name', d.driverName),
-          _infoRow('Vehicle Number', d.vehicleNumber),
           if (d.despatchedAt != null) _infoRow('Despatched At', dateFmt.format(d.despatchedAt!)),
           if (d.deliveryNotes.isNotEmpty) _infoRow('Delivery Notes', d.deliveryNotes),
         ],

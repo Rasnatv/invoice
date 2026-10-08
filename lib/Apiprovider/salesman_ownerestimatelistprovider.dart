@@ -19,25 +19,25 @@ class EstimateListResult {
         estimates = const [];
 }
 
-// Renamed 'salesmanowrEstimateProvider' -> 'SalesmanOwnerEstimateProvider'
-// to fix the UpperCamelCase lint. Update every place you instantiate this
-// provider (bloc, DI setup, etc.) to use the new name.
 class SalesmanOwnerEstimateProvider {
   final ApiClient _apiClient;
 
-  SalesmanOwnerEstimateProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+  SalesmanOwnerEstimateProvider({ApiClient? apiClient})
+      : _apiClient = apiClient ?? ApiClient();
 
   /// GET /estimates/all?page=&per_page=
-  Future<EstimateListResult> getEstimates({int page = 1, int perPage = 100}) async {
+  Future<EstimateListResult> getEstimates({
+    int page = 1,
+    int perPage = 10,
+  }) async {
     try {
       final response = await _apiClient.estimates(page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // IMPORTANT: parse with the WRAPPER model (has status/list/message),
-        // never with SalesmanowrEstimateModel (that's a single row and has
-        // neither .list nor .message - that mismatch is what caused all
-        // three analyzer errors).
-        final parsed = SalesmanownrEstimateListResponseModel.fromJson(response.data);
+        // Parse with the WRAPPER model (status/list/message),
+        // never with the single-row SalesmanowrEstimateModel.
+        final parsed =
+        SalesmanownrEstimateListResponseModel.fromJson(response.data);
         return EstimateListResult.success(parsed.list);
       }
       return EstimateListResult.failure(response.statusCode.toString());

@@ -4,14 +4,20 @@ import 'package:tileshop/bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
 import 'package:tileshop/bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../../Apiprovider/salesman_quotationprovider.dart';
 
-
 class SalesmanQuotationBloc extends Bloc<SalesmanQuotationEvent, SalesmanQuotationState> {
   final QuotationProvider _provider;
+
+  static const int _perPage = 15;
+
+  /// Incremented on every fresh list load so a slow in-flight load-more
+  /// can't append stale data after a refresh.
+  int _listGeneration = 0;
 
   SalesmanQuotationBloc({QuotationProvider? provider})
       : _provider = provider ?? QuotationProvider(),
         super(const SalesmanQuotationState()) {
     on<QuotationListRequested>(_onListRequested);
+    on<QuotationLoadMoreRequested>(_onLoadMore);
     on<QuotationDetailRequested>(_onDetailRequested);
     on<QuotationDetailCleared>(_onDetailCleared);
     on<QuotationDeleteRequested>(_onDeleteRequested);
@@ -22,16 +28,64 @@ class SalesmanQuotationBloc extends Bloc<SalesmanQuotationEvent, SalesmanQuotati
 
   Future<void> _onListRequested(
       QuotationListRequested event, Emitter<SalesmanQuotationState> emit) async {
-    emit(state.copyWith(listStatus: QuotationLoadStatus.loading, listError: null));
-    final result = await _provider.getMyQuotations();
+    final gen = ++_listGeneration;
+
+    emit(state.copyWith(
+      listStatus: QuotationLoadStatus.loading,
+      listError: null,
+      isLoadingMore: false,
+      loadMoreFailed: false,
+    ));
+
+    final result = await _provider.getMyQuotations(page: 1, perPage: _perPage);
+    if (gen != _listGeneration) return;
+
     if (result.success) {
-      emit(state.copyWith(listStatus: QuotationLoadStatus.success, list: result.list));
+      emit(state.copyWith(
+        listStatus: QuotationLoadStatus.success,
+        list: result.list,
+        listPage: 1,
+        listHasMore: result.list.length >= _perPage,
+      ));
     } else {
       emit(state.copyWith(
         listStatus: QuotationLoadStatus.failure,
         listError: result.errorMessage,
       ));
     }
+  }
+
+  Future<void> _onLoadMore(
+      QuotationLoadMoreRequested event, Emitter<SalesmanQuotationState> emit) async {
+    if (state.listStatus != QuotationLoadStatus.success ||
+        !state.listHasMore ||
+        state.isLoadingMore) {
+      return;
+    }
+
+    final gen = _listGeneration;
+    final nextPage = state.listPage + 1;
+
+    emit(state.copyWith(isLoadingMore: true, loadMoreFailed: false));
+
+    final result = await _provider.getMyQuotations(page: nextPage, perPage: _perPage);
+    if (gen != _listGeneration) return; // a refresh happened meanwhile
+
+    if (!result.success) {
+      emit(state.copyWith(isLoadingMore: false, loadMoreFailed: true));
+      return;
+    }
+
+    // De-duplicate in case the server list shifted between pages.
+    final existingIds = state.list.map((q) => q.id).toSet();
+    final fresh = result.list.where((q) => !existingIds.contains(q.id)).toList();
+
+    emit(state.copyWith(
+      list: [...state.list, ...fresh],
+      listPage: nextPage,
+      listHasMore: result.list.length >= _perPage,
+      isLoadingMore: false,
+    ));
   }
 
   Future<void> _onDetailRequested(

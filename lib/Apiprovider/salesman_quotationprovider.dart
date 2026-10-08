@@ -13,7 +13,6 @@ import '../models/salesmanmodels/quotationlistmodel.dart';
 import '../models/salesmanmodels/quotationupdatemodel.dart';
 import '../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 
-
 class SiteVisitDropdownResult {
   final bool success;
   final List<SiteVisitDropdownItem> list;
@@ -129,9 +128,7 @@ class SalesmanListResult {
 
 /// Request body for PUT /quotations/update-item — updates a single existing
 /// line item on a quotation (quantity/rate/box_quantity/piece_quantity)
-/// without touching the rest of the quotation or its other items. Mirrors
-/// the shape of the /estimates/update-item request already used elsewhere
-/// in the app.
+/// without touching the rest of the quotation or its other items.
 class QuotationItemUpdateRequest {
   final String quotationId;
   final String quotationItemId;
@@ -159,9 +156,7 @@ class QuotationItemUpdateRequest {
   };
 }
 
-/// Provider for the salesman/owner estimate ("quotation") flow. Mirrors
-/// DriverProvider's shape 1:1 (result classes + try/catch) so it drops
-/// straight into the same Bloc/Cubit wiring style already used elsewhere.
+/// Provider for the salesman/owner estimate ("quotation") flow.
 class QuotationProvider {
   final ApiClient _apiClient;
 
@@ -217,8 +212,7 @@ class QuotationProvider {
   }
 
   /// POST /quotations/product-incentive — live incentive preview for the
-  /// item currently being entered on the Add Items step (not yet added to
-  /// the estimate).
+  /// item currently being entered on the Add Items step.
   Future<ProductIncentiveResult> getProductIncentive(ProductIncentiveRequest request) async {
     try {
       final response = await _apiClient.productIncentive(request.toJson());
@@ -237,9 +231,7 @@ class QuotationProvider {
     }
   }
 
-  /// POST /quotations/preview — server-calculated preview (line incentives,
-  /// subtotal, handling charge, discount, grand total, balance due) for
-  /// whatever has been entered so far on the estimate.
+  /// POST /quotations/preview — server-calculated preview.
   Future<QuotationPreviewResult> previewQuotation(QuotationPreviewRequest request) async {
     try {
       final response = await _apiClient.previewQuotation(request.toJson());
@@ -260,8 +252,7 @@ class QuotationProvider {
 
   /// POST /quotations/create
   /// `request.action` must be 'save_quotation' or 'submit' from the
-  /// salesman screen, or 'approve' from the owner screen (in which case
-  /// `salesmanId` plus any discount_*/payment_* fields are sent along).
+  /// salesman screen, or 'approve' from the owner screen.
   Future<QuotationActionResult> createQuotation(QuotationCreateRequest request) => _actionCall(
         () => _apiClient.createQuotation(request.toJson()),
         (data) {
@@ -270,11 +261,14 @@ class QuotationProvider {
     },
   );
 
-  /// GET /quotations/my — the logged-in salesman/owner's own quotations,
-  /// newest first (server-ordered).
-  Future<QuotationListResult> getMyQuotations() async {
+  /// GET /quotations/my?page=&per_page= — the logged-in salesman/owner's own
+  /// quotations, newest first (server-ordered), one page at a time.
+  Future<QuotationListResult> getMyQuotations({
+    int page = 1,
+    int perPage = 15,
+  }) async {
     try {
-      final response = await _apiClient.myQuotations();
+      final response = await _apiClient.myQuotations(page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = QuotationListResponseModel.fromJson(response.data);
@@ -313,15 +307,12 @@ class QuotationProvider {
   );
 
   /// PUT /quotations/update-item — updates a single existing line item on a
-  /// quotation (quantity/rate/box_quantity/piece_quantity) without touching
-  /// the rest of the quotation or its other items. Used by the Owner Edit
-  /// Quotation screen's "Update Item" action for items already saved on the
-  /// server, so the change is persisted immediately rather than only living
-  /// in local state until the whole-quotation "Save Changes" is submitted.
-  Future<QuotationActionResult> updateQuotationItem(QuotationItemUpdateRequest request) => _actionCall(
-        () => _apiClient.updateQuotationItem(request.toJson()),
-        (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
-  );
+  /// quotation without touching the rest of the quotation or its other items.
+  Future<QuotationActionResult> updateQuotationItem(QuotationItemUpdateRequest request) =>
+      _actionCall(
+            () => _apiClient.updateQuotationItem(request.toJson()),
+            (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
+      );
 
   /// POST /quotations/delete
   Future<QuotationActionResult> deleteQuotation(String id) => _actionCall(
@@ -336,9 +327,7 @@ class QuotationProvider {
         (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
   );
 
-  /// POST /quotations/approve — owner-only. Approves an already-submitted
-  /// quotation/estimate (separate flow from creating one directly as
-  /// approved via /quotations/create with action=approve).
+  /// POST /quotations/approve — owner-only.
   Future<QuotationActionResult> approveQuotation(QuotationApproveRequest request) => _actionCall(
         () => _apiClient.approveQuotation(request.toJson()),
         (data) {

@@ -53,9 +53,12 @@ class OwnerIncentiveBloc extends Bloc<OwnerIncentiveEvent, OwnerIncentiveState> 
       SelectSalesman event,
       Emitter<OwnerIncentiveState> emit,
       ) async {
+    // Clear the previous salesman's data so stale paid/unpaid status
+    // is never shown while the new summary is loading.
     emit(state.copyWith(
       selectedSalesmanId: event.salesmanId,
       selectedSalesmanName: event.salesmanName,
+      clearSummary: true,
     ));
     add(const LoadIncentiveSummary());
   }
@@ -64,7 +67,7 @@ class OwnerIncentiveBloc extends Bloc<OwnerIncentiveEvent, OwnerIncentiveState> 
       SelectMonth event,
       Emitter<OwnerIncentiveState> emit,
       ) async {
-    emit(state.copyWith(selectedMonth: event.month));
+    emit(state.copyWith(selectedMonth: event.month, clearSummary: true));
     add(const LoadIncentiveSummary());
   }
 

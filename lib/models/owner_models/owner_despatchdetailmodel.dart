@@ -1,4 +1,6 @@
 
+import 'package:intl/intl.dart';
+
 class DispatchItemDetail {
   final String id;
   final String estimateItemId;
@@ -149,9 +151,19 @@ class DispatchDetail {
     );
   }
 
+  static final DateFormat _apiDateFmt = DateFormat('dd-MM-yyyy HH:mm:ss');
+
   static DateTime? _parseDateTime(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
-    return DateTime.tryParse(raw);
+    final value = raw.trim();
+
+    // API format: "07-10-2026 10:40:31"
+    try {
+      return _apiDateFmt.parseStrict(value);
+    } catch (_) {}
+
+    // Fallback for ISO strings like "2026-10-07T10:40:31Z"
+    return DateTime.tryParse(value);
   }
 
   bool get isPending => status == 'pending';

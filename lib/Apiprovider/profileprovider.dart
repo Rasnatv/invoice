@@ -53,13 +53,6 @@ class ProfileProvider {
     }
   }
 
-  /// POST/PUT /profile update.
-  ///
-  /// The confirmed real response returns an empty `data: {}` on success —
-  /// no updated profile object comes back. Callers should merge the
-  /// submitted [profile] fields into local state themselves (the bloc
-  /// below does this) rather than trying to build a ProfileModel out of
-  /// this result.
   Future<ProfileActionResult> updateProfile(ProfileModel profile) async {
     try {
       final response = await _apiClient.updateProfile(profile.toUpdateJson());

@@ -502,7 +502,7 @@ class _FieldStaffHeader extends StatelessWidget {
                     ),
                   ),
                   // Extra breathing room below the date pill.
-                  SizedBox(height: Responsive.h(10)),
+                  SizedBox(height: Responsive.h(15)),
                 ],
               ),
             ),

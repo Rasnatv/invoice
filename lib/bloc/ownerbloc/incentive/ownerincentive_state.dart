@@ -1,3 +1,4 @@
+
 import 'package:equatable/equatable.dart';
 import '../../../models/salesmanmodels/activeslaesman_model.dart';
 import '../../../models/salesmanmodels/salesmanowner_incentivemodel.dart';
@@ -70,12 +71,8 @@ class OwnerIncentiveState extends Equatable {
   /// a salesman is only required up-front for the owner flow.
   bool get canLoadSummary => !isOwner || selectedSalesmanId != null;
 
-  bool get isPaid => summary != null &&
-      // The summary endpoint itself doesn't return a paid/unpaid flag in the
-      // payload you shared, so this flips true right after a successful
-      // mark-paid call for the same period. Wire this up to a real field
-      // (e.g. summary.status) if/when the summary API starts returning one.
-      false;
+  /// Paid flag now comes straight from summary.bonus_status.
+  bool get isPaid => summary?.bonusStatus.isPaid ?? false;
 
   OwnerIncentiveState copyWith({
     bool? isOwner,
@@ -91,6 +88,7 @@ class OwnerIncentiveState extends Equatable {
     String? selectedSalesmanName,
     DateTime? selectedMonth,
     SalesmanIncentiveSummaryModel? summary,
+    bool clearSummary = false,
     List<IncentiveProductModel>? productList,
     MarkPaidStatus? markPaidStatus,
     String? markPaidMessage,
@@ -108,8 +106,8 @@ class OwnerIncentiveState extends Equatable {
       selectedSalesmanId: selectedSalesmanId ?? this.selectedSalesmanId,
       selectedSalesmanName: selectedSalesmanName ?? this.selectedSalesmanName,
       selectedMonth: selectedMonth ?? this.selectedMonth,
-      summary: summary ?? this.summary,
-      productList: productList ?? this.productList,
+      summary: clearSummary ? null : (summary ?? this.summary),
+      productList: clearSummary ? const [] : (productList ?? this.productList),
       markPaidStatus: markPaidStatus ?? this.markPaidStatus,
       markPaidMessage: clearMarkPaidMessage ? null : (markPaidMessage ?? this.markPaidMessage),
     );

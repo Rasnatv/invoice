@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -52,10 +52,12 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    // Empty by default when adding; pre-filled only when editing
+    // Empty by default when adding; pre-filled only when editing.
+    // The API returns joining_date as dd-MM-yyyy (e.g. "01-10-2026"),
+    // which DateTime.tryParse can't read — so parse it explicitly.
     DateTime? joiningDate;
-    if (existing != null && existing.joiningDate.isNotEmpty) {
-      joiningDate = DateTime.tryParse(existing.joiningDate);
+    if (existing != null) {
+      joiningDate = _parseApiDate(existing.joiningDate);
     }
     bool showDateError = false;
 
@@ -161,7 +163,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                         ),
                         SizedBox(height: Responsive.h(14)),
 
-                        // ---- Joining Date (empty until user selects) ----
+                        // ---- Joining Date (pre-filled when editing) ----
                         InkWell(
                           borderRadius: BorderRadius.circular(14),
                           onTap: () async {
@@ -199,7 +201,7 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                             child: Text(
                               joiningDate == null
                                   ? 'Select Joining Date'
-                                  : _formatDate(joiningDate!),
+                                  : _pickerDate(joiningDate!),
                               style: TextStyle(
                                 fontSize: Responsive.sp(14),
                                 color: joiningDate == null
@@ -229,8 +231,6 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                               }
                               if (!formValid) return;
 
-                              final dateString = _formatDate(joiningDate!);
-
                               if (isEdit) {
                                 bloc.add(UpdateDriver(
                                   id: existing.id,
@@ -239,7 +239,9 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                                   mobile: mobileController.text.trim(),
                                   licenseNumber: licenseController.text.trim(),
                                   vehicleNumber: vehicleController.text.trim(),
-                                  joiningDate: dateString,
+                                  // Update API body uses dd-MM-yyyy
+                                  // (e.g. "25-01-2025").
+                                  joiningDate: _pickerDate(joiningDate!),
                                   isActive: isActive,
                                   password: passwordController.text.trim().isEmpty
                                       ? null
@@ -252,7 +254,8 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                                   mobile: mobileController.text.trim(),
                                   licenseNumber: licenseController.text.trim(),
                                   vehicleNumber: vehicleController.text.trim(),
-                                  joiningDate: dateString,
+                                  // Add flow unchanged: yyyy-MM-dd
+                                  joiningDate: _formatDate(joiningDate!),
                                 ));
                               }
 
@@ -291,10 +294,26 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
     }
   }
 
+  /// yyyy-MM-dd — used when adding a driver.
   static String _formatDate(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// dd-MM-yyyy — shown in the date field and sent on update.
+  static String _pickerDate(DateTime date) => DateFormat('dd-MM-yyyy').format(date);
+
+  /// API returns dd-MM-yyyy (e.g. "01-10-2026"); also accepts yyyy-MM-dd.
+  /// Returns null if empty or unparseable.
+  static DateTime? _parseApiDate(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    try {
+      return DateFormat('dd-MM-yyyy').parseStrict(s);
+    } catch (_) {
+      return DateTime.tryParse(s);
+    }
   }
 
   static String _displayDate(String raw) {

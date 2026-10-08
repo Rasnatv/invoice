@@ -1,5 +1,4 @@
 
-
 class IncentiveTarget {
   final String targetAmount;
   final String achieved;
@@ -35,6 +34,45 @@ class IncentiveTarget {
   double get progressFraction => (progressValue / 100).clamp(0.0, 1.0);
 
   bool get isAchieved => achieved.toLowerCase() == 'achieved';
+}
+
+/// Paid / unpaid status of the monthly bonus (summary.bonus_status).
+class IncentiveBonusStatus {
+  final String status;
+  final String isPaidFlag;
+  final String? paidAt;
+  final String paymentReference;
+  final String monthBonusAmount;
+  final String productBonusAmount;
+  final String totalPaidIncentive;
+  final String notes;
+
+  const IncentiveBonusStatus({
+    required this.status,
+    required this.isPaidFlag,
+    this.paidAt,
+    required this.paymentReference,
+    required this.monthBonusAmount,
+    required this.productBonusAmount,
+    required this.totalPaidIncentive,
+    required this.notes,
+  });
+
+  factory IncentiveBonusStatus.fromJson(Map<String, dynamic> json) => IncentiveBonusStatus(
+    status: json['status']?.toString() ?? '',
+    isPaidFlag: json['is_paid']?.toString() ?? '0',
+    paidAt: json['paid_at']?.toString(),
+    paymentReference: json['payment_reference']?.toString() ?? '',
+    monthBonusAmount: json['month_bonus_amount']?.toString() ?? '0',
+    productBonusAmount: json['product_bonus_amount']?.toString() ?? '0',
+    totalPaidIncentive: json['total_paid_incentive']?.toString() ?? '0',
+    notes: json['notes']?.toString() ?? '',
+  );
+
+  bool get isPaid => isPaidFlag == '1' || status.toLowerCase() == 'paid';
+  double get monthBonusValue => double.tryParse(monthBonusAmount) ?? 0;
+  double get productBonusValue => double.tryParse(productBonusAmount) ?? 0;
+  double get totalPaidValue => double.tryParse(totalPaidIncentive) ?? 0;
 }
 
 class IncentivePeriod {
@@ -98,6 +136,7 @@ class SalesmanIncentiveSummaryModel {
   final String totalSales;
   final String totalIncentive;
   final IncentiveTarget target;
+  final IncentiveBonusStatus bonusStatus;
   final IncentivePeriod period;
 
   const SalesmanIncentiveSummaryModel({
@@ -106,6 +145,15 @@ class SalesmanIncentiveSummaryModel {
     required this.totalSales,
     required this.totalIncentive,
     required this.target,
+    this.bonusStatus = const IncentiveBonusStatus(
+      status: '',
+      isPaidFlag: '0',
+      paymentReference: '',
+      monthBonusAmount: '0',
+      productBonusAmount: '0',
+      totalPaidIncentive: '0',
+      notes: '',
+    ),
     required this.period,
   });
 
@@ -115,6 +163,7 @@ class SalesmanIncentiveSummaryModel {
     totalSales: json['total_sales']?.toString() ?? '0',
     totalIncentive: json['total_incentive']?.toString() ?? '0',
     target: IncentiveTarget.fromJson(json['target'] as Map<String, dynamic>? ?? const {}),
+    bonusStatus: IncentiveBonusStatus.fromJson(json['bonus_status'] as Map<String, dynamic>? ?? const {}),
     period: IncentivePeriod.fromJson(json['period'] as Map<String, dynamic>? ?? const {}),
   );
 

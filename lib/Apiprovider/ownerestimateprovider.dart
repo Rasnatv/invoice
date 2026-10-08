@@ -10,18 +10,21 @@ import '../models/salesmanmodels/salesmanownerestimatemodel.dart';
 import '../models/salesmanmodels/salesmanownerresponseestimatemodel.dart';
 import '../models/salesmanmodels/estimatedetail.model.dart';
 
-
 class OwnerEstimateListResult {
   final bool success;
   final List<SalesmanowrEstimateModel> estimates;
   final String? errorMessage;
 
-  const OwnerEstimateListResult.success(this.estimates)
+  /// True when the server has more pages after the one just fetched.
+  final bool hasMore;
+
+  const OwnerEstimateListResult.success(this.estimates, {this.hasMore = false})
       : success = true,
         errorMessage = null;
 
   const OwnerEstimateListResult.failure(this.errorMessage)
       : success = false,
+        hasMore = false,
         estimates = const [];
 }
 
@@ -60,20 +63,66 @@ class OwnerEstimateProvider {
 
   /// GET /estimates/all?page=&per_page=
   Future<OwnerEstimateListResult> getEstimates(
-      {int page = 1, int perPage = 100}) async {
+      {int page = 1, int perPage = 10}) async {
     try {
       final response = await _apiClient.estimates(page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final parsed = SalesmanownrEstimateListResponseModel.fromJson(
-            response.data);
-        return OwnerEstimateListResult.success(parsed.list);
+        final parsed =
+        SalesmanownrEstimateListResponseModel.fromJson(response.data);
+        final hasMore =
+        _hasMore(response.data, page, perPage, parsed.list.length);
+
+        debugPrint(
+            'OwnerEstimateProvider.getEstimates: page=$page perPage=$perPage '
+                'count=${parsed.list.length} hasMore=$hasMore');
+
+        return OwnerEstimateListResult.success(parsed.list, hasMore: hasMore);
       }
       return OwnerEstimateListResult.failure(response.statusCode.toString());
     } on DioException catch (e) {
       final message = await ApiErrorHandler.handleDioError(e);
       return OwnerEstimateListResult.failure(message);
     }
+  }
+
+  /// Reads whichever pagination keys the API returns (last_page,
+  /// total_pages, next_page_url, has_more...). Falls back to
+  /// "got a full page => probably more".
+  bool _hasMore(dynamic body, int page, int perPage, int count) {
+    try {
+      if (body is Map) {
+        final data = body['data'];
+        final candidates = <dynamic>[
+          body,
+          body['pagination'],
+          body['meta'],
+          data,
+          if (data is Map) data['pagination'],
+          if (data is Map) data['meta'],
+        ];
+        for (final c in candidates) {
+          if (c is! Map) continue;
+
+          final last =
+          int.tryParse('${c['last_page'] ?? c['total_pages'] ?? ''}');
+          if (last != null) {
+            final cur = int.tryParse('${c['current_page'] ?? ''}') ?? page;
+            return cur < last;
+          }
+
+          if (c.containsKey('next_page_url')) {
+            return c['next_page_url'] != null;
+          }
+
+          final hm = c['has_more'] ?? c['has_more_pages'];
+          if (hm != null) {
+            return hm == true || hm == 1 || '$hm' == 'true';
+          }
+        }
+      }
+    } catch (_) {}
+    return count >= perPage;
   }
 
   /// POST /estimates/show — body: { "id": "..." }
@@ -123,7 +172,6 @@ class OwnerEstimateProvider {
     }
   }
 
-
   /// POST /estimates/approve
   Future<OwnerActionResult> approveEstimate(
       OwnerApproveEstimateRequest request) =>
@@ -141,7 +189,8 @@ class OwnerEstimateProvider {
   /// Shared response handling for /estimates/approve and /quotations/reject
   /// — both return `{ status, message }`.
   Future<OwnerActionResult> _actionCall(
-      Future<Response> Function() request,) async {
+      Future<Response> Function() request,
+      ) async {
     try {
       final response = await request();
 
@@ -183,16 +232,14 @@ class OwnerEstimateProvider {
       );
 
       debugPrint(
-          'OwnerEstimateProvider.updateItem: PUT estimates/update-item -> ${request
-              .toJson()}');
+          'OwnerEstimateProvider.updateItem: PUT estimates/update-item -> ${request.toJson()}');
 
       final response = await _apiClient.updateEstimateItem(request.toJson());
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = UpdateEstimateItemResponse.fromJson(response.data);
         debugPrint(
-            'OwnerEstimateProvider.updateItem: response -> status=${parsed
-                .status} message=${parsed.message}');
+            'OwnerEstimateProvider.updateItem: response -> status=${parsed.status} message=${parsed.message}');
         return OwnerActionResult(
             success: parsed.isSuccess, message: parsed.message);
       }
@@ -203,4 +250,5 @@ class OwnerEstimateProvider {
       debugPrint('OwnerEstimateProvider.updateItem: DioException -> $message');
       return OwnerActionResult(success: false, message: message);
     }
-  }}
+  }
+}

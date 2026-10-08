@@ -1,3 +1,4 @@
+
 import 'package:equatable/equatable.dart';
 import '../../../models/salesmanmodels/quotationupdatemodel.dart';
 
@@ -8,10 +9,15 @@ abstract class SalesmanQuotationEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Fetches (or refreshes) the logged-in salesman's quotation list from
-/// GET /quotations/my.
+/// Fetches (or refreshes) page 1 of the logged-in salesman's quotation list
+/// from GET /quotations/my?page=1&per_page=15. Resets pagination.
 class QuotationListRequested extends SalesmanQuotationEvent {
   const QuotationListRequested();
+}
+
+/// Fetches the next page of GET /quotations/my and appends it to the list.
+class QuotationLoadMoreRequested extends SalesmanQuotationEvent {
+  const QuotationLoadMoreRequested();
 }
 
 /// Fetches full detail for a single quotation from POST /quotations/show.

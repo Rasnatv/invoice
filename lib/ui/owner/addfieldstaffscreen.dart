@@ -17,7 +17,6 @@ import '../../bloc/ownerbloc/fieldstaff/fieldstaff_bloc.dart';
 import '../../bloc/ownerbloc/fieldstaff/fieldstaff_event.dart';
 import '../../bloc/ownerbloc/fieldstaff/fieldstaffstate.dart';
 
-
 class OwnerAddFieldStaffScreen extends StatelessWidget {
   const OwnerAddFieldStaffScreen({super.key});
 
@@ -44,11 +43,10 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
     final mobileController = TextEditingController(text: existing?.mobile ?? '');
     final addressController = TextEditingController(text: existing?.address ?? '');
 
-    // Empty by default when adding; pre-filled only when editing
+    // Empty by default when adding; pre-filled only when editing.
+    // API sends "dd-MM-yyyy" so it must be parsed manually.
     final ValueNotifier<DateTime?> joiningDate = ValueNotifier<DateTime?>(
-      existing != null && existing.joiningDate.isNotEmpty
-          ? DateTime.tryParse(existing.joiningDate)
-          : null,
+      existing != null ? _parseApiDate(existing.joiningDate) : null,
     );
     final ValueNotifier<bool> showDateError = ValueNotifier<bool>(false);
 
@@ -274,8 +272,12 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                   }
                                   if (!formValid) return;
 
+                                  // dd-MM-yyyy -> update API
                                   final joiningDateStr =
                                   _formatDate(joiningDate.value!);
+                                  // yyyy-MM-dd -> create API
+                                  final joiningDateForCreate =
+                                  _formatDateForCreate(joiningDate.value!);
 
                                   if (isEdit) {
                                     bloc.add(UpdateFieldStaffEvent(
@@ -296,7 +298,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                         email: emailController.text.trim(),
                                         mobile: mobileController.text.trim(),
                                         address: addressController.text.trim(),
-                                        joiningDate: joiningDateStr,
+                                        joiningDate: joiningDateForCreate,
                                       ),
                                     ));
                                   }
@@ -307,7 +309,8 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                                   ),
                                 )
                                     : Text(
@@ -348,10 +351,45 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
 
   // ---------------- HELPERS ----------------
 
+  /// DateTime -> "dd-MM-yyyy" (display + update API)
   String _formatDate(DateTime date) {
+    final dd = date.day.toString().padLeft(2, '0');
+    final mm = date.month.toString().padLeft(2, '0');
+    return '$dd-$mm-${date.year}';
+  }
+
+  /// DateTime -> "yyyy-MM-dd" (create API, which was working before).
+  /// If your create API also expects dd-MM-yyyy, use _formatDate instead.
+  String _formatDateForCreate(DateTime date) {
     final mm = date.month.toString().padLeft(2, '0');
     final dd = date.day.toString().padLeft(2, '0');
     return '${date.year}-$mm-$dd';
+  }
+
+  /// "dd-MM-yyyy" (API) -> DateTime. Also accepts "yyyy-MM-dd".
+  DateTime? _parseApiDate(String value) {
+    final s = value.trim();
+    if (s.isEmpty) return null;
+    final parts = s.split('-');
+    if (parts.length != 3) return null;
+    try {
+      if (parts[0].length == 4) {
+        // yyyy-MM-dd
+        return DateTime(
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+          int.parse(parts[2]),
+        );
+      }
+      // dd-MM-yyyy
+      return DateTime(
+        int.parse(parts[2]),
+        int.parse(parts[1]),
+        int.parse(parts[0]),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   InputDecoration _inputDecoration(String hint, IconData icon) {
@@ -393,7 +431,8 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
           icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
           label: Text(
             'Add Staff',
-            style: AppTextStyles.bodyBold(color: Colors.white).copyWith(fontSize: Responsive.sp(13)),
+            style: AppTextStyles.bodyBold(color: Colors.white)
+                .copyWith(fontSize: Responsive.sp(13)),
           ),
         ),
         body: ResponsiveCenter(
@@ -552,21 +591,24 @@ class _FieldStaffTile extends StatelessWidget {
                 SizedBox(height: Responsive.h(4)),
                 Text(
                   staff.email,
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: Responsive.h(4)),
                 Text(
                   staff.address,
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: Responsive.h(4)),
                 Text(
                   'Joined: ${staff.joiningDate}',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(11.5)),
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: Responsive.sp(11.5)),
                 ),
               ],
             ),
@@ -622,7 +664,8 @@ class _EmptyStaffState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.badge_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(Icons.badge_outlined,
+                size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(12)),
             Text('No field staff added yet', style: AppTextStyles.subtitle()),
           ],
@@ -645,7 +688,8 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, color: AppColors.error, size: Responsive.w(40)),
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: Responsive.w(40)),
             SizedBox(height: Responsive.h(12)),
             Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
             SizedBox(height: Responsive.h(16)),

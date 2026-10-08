@@ -378,9 +378,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                 _PreviewRow(
                                     'Email', estimate.contractor.email,
                                     icon: Icons.alternate_email),
-                                _PreviewRow(
-                                    'Address', estimate.contractor.address,
-                                    icon: Icons.location_on_outlined),
+
                               ],
                             ),
                             SizedBox(height: Responsive.h(14)),

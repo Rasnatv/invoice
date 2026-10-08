@@ -367,8 +367,10 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  Future<Response> myQuotations() async => dio.get(
+  /// GET /quotations/my?page=&per_page=
+  Future<Response> myQuotations({int page = 1, int perPage = 15}) async => dio.get(
     ApiConstants.quotationsMy,
+    queryParameters: {'page': page, 'per_page': perPage},
     options: await _authOptions(),
   );
 
@@ -610,22 +612,29 @@ class ApiClient {
 
   // =================== REPORTS ===================
 
-  /// POST /reports/salesman-performance
+  /// POST /reports/salesman-performance?page=&per_page=
   /// Body: { salesman_id, from_date, to_date }
-  Future<Response> salesmanPerformanceReport(Map<String, dynamic> data) async => dio.post(
-    ApiConstants.salesmanPerformanceReport,
+  Future<Response> salesmanPerformanceReport(
+      Map<String, dynamic> data, {
+        int page = 1,
+        int perPage = 15,
+      }) async => dio.post(
+    '${ApiConstants.salesmanPerformanceReport}?page=$page&per_page=$perPage',
     data: data,
     options: await _authOptions(),
   );
 
-  /// POST /reports/contractor-performance
+  /// POST /reports/contractor-performance?page=&per_page=
   /// Body: { contractor_id, from_date, to_date }
-  Future<Response> contractorPerformanceReport(Map<String, dynamic> data) async => dio.post(
-    ApiConstants.contractorPerformanceReport,
+  Future<Response> contractorPerformanceReport(
+      Map<String, dynamic> data, {
+        int page = 1,
+        int perPage = 15,
+      }) async => dio.post(
+    '${ApiConstants.contractorPerformanceReport}?page=$page&per_page=$perPage',
     data: data,
     options: await _authOptions(),
   );
-
   /// POST /reports/quotations?page=&per_page=
   /// Body: { type: 'salesman' | 'contractor', person_id, from_date, to_date, status }
   /// Requires ApiConstants.quotationsReport = 'reports/quotations'.

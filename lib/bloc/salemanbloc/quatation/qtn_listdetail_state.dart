@@ -1,3 +1,4 @@
+
 import 'package:equatable/equatable.dart';
 import '../../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../../models/salesmanmodels/quotationlistmodel.dart';
@@ -21,6 +22,12 @@ class SalesmanQuotationState extends Equatable {
   final List<QuotationListItem> list;
   final String? listError;
 
+  // ---- list pagination ----
+  final int listPage;
+  final bool listHasMore;
+  final bool isLoadingMore;
+  final bool loadMoreFailed;
+
   // ---- detail (POST /quotations/show) ----
   final QuotationLoadStatus detailStatus;
   final QuotationDetailModel? detail;
@@ -41,6 +48,10 @@ class SalesmanQuotationState extends Equatable {
     this.listStatus = QuotationLoadStatus.initial,
     this.list = const [],
     this.listError,
+    this.listPage = 1,
+    this.listHasMore = true,
+    this.isLoadingMore = false,
+    this.loadMoreFailed = false,
     this.detailStatus = QuotationLoadStatus.initial,
     this.detail,
     this.detailError,
@@ -57,6 +68,10 @@ class SalesmanQuotationState extends Equatable {
     QuotationLoadStatus? listStatus,
     List<QuotationListItem>? list,
     Object? listError = _noUpdate,
+    int? listPage,
+    bool? listHasMore,
+    bool? isLoadingMore,
+    bool? loadMoreFailed,
     QuotationLoadStatus? detailStatus,
     Object? detail = _noUpdate,
     Object? detailError = _noUpdate,
@@ -72,6 +87,10 @@ class SalesmanQuotationState extends Equatable {
       listStatus: listStatus ?? this.listStatus,
       list: list ?? this.list,
       listError: identical(listError, _noUpdate) ? this.listError : listError as String?,
+      listPage: listPage ?? this.listPage,
+      listHasMore: listHasMore ?? this.listHasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
       detailStatus: detailStatus ?? this.detailStatus,
       detail: identical(detail, _noUpdate) ? this.detail : detail as QuotationDetailModel?,
       detailError: identical(detailError, _noUpdate) ? this.detailError : detailError as String?,
@@ -90,6 +109,10 @@ class SalesmanQuotationState extends Equatable {
     listStatus,
     list,
     listError,
+    listPage,
+    listHasMore,
+    isLoadingMore,
+    loadMoreFailed,
     detailStatus,
     detail,
     detailError,
