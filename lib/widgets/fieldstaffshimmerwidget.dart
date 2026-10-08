@@ -3,13 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
 
-/// Shimmer loading state for [FieldStaffDashboardScreen].
-///
-/// Drop this in place of the visit list while data is being fetched:
-///
-/// ```dart
-/// isInitialLoading ? const FieldStaffShimmerDashboard() : TabBarView(...)
-/// ```
 class FieldStaffShimmerDashboard extends StatelessWidget {
   const FieldStaffShimmerDashboard({super.key, this.itemCount = 6});
 

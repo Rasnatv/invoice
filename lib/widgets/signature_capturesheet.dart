@@ -7,13 +7,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 
-/// Bottom sheet used on the dispatch detail screen to capture both the
-/// customer's and the driver's signatures before marking a dispatch as
-/// delivered.
-///
-/// Pops with a `{'customer': ..., 'driver': ...}` map of base64 PNG data
-/// URIs (matching the shape POST /despatches/mark-delivered expects), or
-/// `null` if the user cancels.
 class SignatureCaptureSheet extends StatefulWidget {
   const SignatureCaptureSheet({super.key, required this.dsNumber});
   final String dsNumber;
