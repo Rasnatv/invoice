@@ -1,10 +1,5 @@
 
 enum ProductIncentiveType { none, percentage, fixed }
-
-/// bonus_type: 'none', 'bulk', or 'single'.
-/// 'none' is first in the list (and the default) — when picked, bonus_type
-/// and min_quantity are left out of the request entirely rather than sent
-/// as null/0.
 enum ProductBonusType { none, bulk, single }
 
 extension ProductIncentiveTypeX on ProductIncentiveType {

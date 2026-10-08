@@ -8,12 +8,6 @@ enum ProductStatus { initial, loading, loaded, actionInProgress, actionSuccess, 
 
 enum DropdownStatus { initial, loading, loaded, error }
 
-/// Single state class rather than a state-per-subclass hierarchy. Products,
-/// companies, and units are loaded somewhat independently (dropdowns load
-/// once on screen open, the list can reload separately, an action can run
-/// on top of an already-loaded list) — copyWith lets each of those update
-/// without wiping the others out, which a sealed-class-per-status shape
-/// would make awkward.
 class ProductState extends Equatable {
   const ProductState({
     this.status = ProductStatus.initial,

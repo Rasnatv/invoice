@@ -5,16 +5,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-/// Controller for a [SignaturePad]. Holds the drawn strokes, and exposes
-/// [clear], [isEmpty], and [exportBase64] so the parent screen can pull the
-/// signature out as a base64 PNG data URI once the driver is done drawing.
-///
-/// Extends [ChangeNotifier] so [SignaturePad] can listen for stroke updates
-/// and repaint. ChangeNotifier already provides `dispose()` — that's what
-/// was missing before (the class this replaces didn't extend anything, so
-/// calling `.dispose()` on it in the screen's State.dispose() didn't
-/// resolve to anything). We override it here just to also clear stroke
-/// data before calling super.dispose().
 class SignaturePadController extends ChangeNotifier {
   /// Each inner list is one continuous stroke (pointer down -> pointer up).
   final List<List<Offset>> _strokes = [];

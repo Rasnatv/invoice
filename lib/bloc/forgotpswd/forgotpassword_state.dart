@@ -2,12 +2,6 @@ import 'package:equatable/equatable.dart';
 
 enum RequestStatus { initial, loading, success, failure }
 
-/// One state class covers all three screens in the flow. Each step
-/// (send OTP / resend OTP / verify OTP / reset password) has its own
-/// status + error so each screen can react only to the step it cares
-/// about, while [email] and [otp] are carried forward for the later
-/// steps that need them (verify-otp and reset-password both need the
-/// email; reset-password also needs the otp that was verified).
 class ForgotPasswordState extends Equatable {
   final String email;
   final String otp;

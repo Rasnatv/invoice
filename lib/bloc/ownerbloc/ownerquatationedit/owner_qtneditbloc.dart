@@ -5,15 +5,6 @@ import '../../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import 'owner_qtneditestate.dart';
 import 'owner_qtneditevent.dart';
 
-/// Bloc for the Owner Edit Quotation screen.
-///
-/// Deliberately self-contained (doesn't reuse SalesmanEstimateBloc /
-/// SalesmanQuotationBloc) so the owner edit screen has its own
-/// independent lifecycle, per your "owner want to separate create owner
-/// quotation editscreen" — but it talks to the exact same QuotationProvider
-/// and the exact same POST /quotations/update endpoint / request models
-/// (QuotationUpdateRequest / QuotationUpdateItemRequest) already shared
-/// with the salesman flow, so nothing on the API side changes.
 class OwnerQuotationEditBloc
     extends Bloc<OwnerQuotationEditEvent, OwnerQuotationEditState> {
   final QuotationProvider _provider;

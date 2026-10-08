@@ -1,10 +1,5 @@
 String _asString(dynamic v) => v?.toString() ?? '';
 
-/// Body for POST /quotations/approve.
-///
-/// Only [id] is required. Everything else — handling charge override,
-/// discount, and an initial payment — is optional and only included in
-/// the outgoing JSON when the owner actually filled it in on screen.
 class QuotationApproveRequest {
   final String id;
 

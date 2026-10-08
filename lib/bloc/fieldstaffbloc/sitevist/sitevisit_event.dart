@@ -13,15 +13,6 @@ abstract class SiteVisitEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// GET /site-visits/my — feeds both the "Today" and "All" tabs on the
-/// dashboard.
-///
-/// - [page]: which page of the "all" list to fetch. Defaults to 1 (first
-///   load / pull-to-refresh).
-/// - [loadMore]: true when this fetch was triggered by scrolling to the
-///   bottom of the "All" tab — the bloc appends the results onto the
-///   existing list instead of replacing it, and uses the
-///   isLoadingMore/hasMoreAll state instead of the full-screen shimmer.
 class FetchMySiteVisits extends SiteVisitEvent {
   const FetchMySiteVisits({this.page = 1, this.loadMore = false});
 

@@ -7,10 +7,6 @@ import '../core/errors/apierrorhandler.dart';
 import '../models/owner_models/owner_viewquotationmodel.dart';
 import '../models/salesmanmodels/quotationupdatemodel.dart';
 
-// =====================================================================
-// OWNER QUOTATION LIST RESULT
-// =====================================================================
-
 class OwnerviewQuotationListResult {
   final bool success;
 

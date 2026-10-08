@@ -128,6 +128,14 @@ class IncentiveProductModel {
   double get incentiveEarnedValue => double.tryParse(incentiveEarned) ?? 0;
   double get unitPriceValue => double.tryParse(unitPrice) ?? 0;
   int get totalUnitsInt => totalUnitsValue.round();
+
+  /// "36.36" -> "36.36", "10.00" -> "10", "12.50" -> "12.5"
+  String get incentiveRateDisplay {
+    final v = incentiveRateValue;
+    if (v % 1 == 0) return v.toStringAsFixed(0);
+    final s = v.toStringAsFixed(2);
+    return s.endsWith('0') ? s.substring(0, s.length - 1) : s;
+  }
 }
 
 class SalesmanIncentiveSummaryModel {
@@ -169,6 +177,22 @@ class SalesmanIncentiveSummaryModel {
 
   double get totalSalesValue => double.tryParse(totalSales) ?? 0;
   double get totalIncentiveValue => double.tryParse(totalIncentive) ?? 0;
+
+  /// Month target bonus (e.g. 2000).
+  double get bonusAmountValue => bonusStatus.monthBonusValue;
+
+  /// Product-wise incentive only (e.g. 40).
+  /// Uses product_bonus_amount; falls back to total - bonus.
+  double get productIncentiveValue {
+    final p = bonusStatus.productBonusValue;
+    if (p > 0) return p;
+    final diff = totalIncentiveValue - bonusAmountValue;
+    return diff > 0 ? diff : 0;
+  }
+
+  /// total_incentive from the API already includes the bonus
+  /// (product incentive + month bonus), so it is the total payable.
+  double get totalPayableValue => totalIncentiveValue;
 }
 
 class SalesmanIncentiveSummaryData {
@@ -489,6 +513,8 @@ class ProductBillsRequest {
     'product_id': productId,
     'year': year,
     'month': month,
+    'page': page,
+    'per_page': perPage,
   };
 }
 

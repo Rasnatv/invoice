@@ -10,13 +10,7 @@ import '../../core/utils/currency_utils.dart';
 import '../../models/owner_models/paymentmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
-/// "Record Payment" screen.
-///
-/// Pass the estimate's id plus the display fields already on hand
-/// (contractor/customer name, estimate number, total amount, amount
-/// already paid) so this screen doesn't have to re-fetch anything just to
-/// render its header card. On successful save it pops with `true` so the
-/// caller (Payment History screen) can refresh.
+
 class RecordPaymentScreen extends StatefulWidget {
   const RecordPaymentScreen({
     super.key,
