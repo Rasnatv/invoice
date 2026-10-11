@@ -1,24 +1,19 @@
-
-
-
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../bloc/salemanbloc/estimate/salesman_estimate_bloc.dart';
+import '../../../bloc/salemanbloc/estimate/salesmanestimate_event.dart';
 import '../../../bloc/salemanbloc/estimate/salesmanestimate_state.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/validator/validationfile.dart';
+import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
+import '../../../widgets/custom_text_field.dart'; // CustomTextField (+ LabeledField if defined there)
 
-/// Mirrors CreateEstimateScreen's AddedItem model and the reasoning behind
-/// it: `amount` is always the server's own figure — from
-/// POST /quotations/product-incentive when adding/editing an item here, or
-/// straight from QuotationDetailItem.amount for items already saved on the
-/// quotation — never recomputed locally as quantity * rate, since the
-/// server may derive it from square feet or a box/piece breakdown instead
-/// of a flat multiplication.
+String qeProductDisplayString(ActiveProductModel p) => '${p.name} — ${p.company}';
+
 class EditItem {
   const EditItem({
     required this.id,
@@ -54,10 +49,7 @@ class EditItem {
   final bool incentiveEligible;
   final String? incentiveReason;
 
-  EditItem copyWith({
-    String? company,
-    double? mrp,
-  }) {
+  EditItem copyWith({String? company, double? mrp}) {
     return EditItem(
       id: id,
       productId: productId,
@@ -78,10 +70,686 @@ class EditItem {
   }
 }
 
-/// Shows the live /quotations/product-incentive result for whatever is
-/// currently in the product/quantity/rate fields on the add-item form.
+class QeTotalRow extends StatelessWidget {
+  const QeTotalRow(this.label, this.value, {super.key});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTextStyles.body()),
+        Text(value, style: AppTextStyles.body()),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Customer section
+// ---------------------------------------------------------------------------
+class QeCustomerSection extends StatelessWidget {
+  const QeCustomerSection({
+    super.key,
+    required this.phone,
+    required this.name,
+    required this.address,
+    required this.email,
+    required this.phoneValidator,
+    required this.nameValidator,
+    required this.addressValidator,
+    required this.emailValidator,
+  });
+
+  final TextEditingController phone;
+  final TextEditingController name;
+  final TextEditingController address;
+  final TextEditingController email;
+  final String? Function(String?) phoneValidator;
+  final String? Function(String?) nameValidator;
+  final String? Function(String?) addressValidator;
+  final String? Function(String?) emailValidator;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        LabeledField(
+          label: 'Contact No.',
+          field: CustomTextField(
+            hint: 'Enter phone number',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            controller: phone,
+            inputFormatters: DValidator.phoneNumber,
+            validator: phoneValidator,
+          ),
+        ),
+        LabeledField(
+          label: 'Party Name',
+          field: CustomTextField(
+            hint: 'Enter party name',
+            icon: Icons.groups_2_outlined,
+            controller: name,
+            validator: nameValidator,
+          ),
+        ),
+        LabeledField(
+          label: 'Address',
+          field: CustomTextField(
+            hint: 'Enter site address',
+            icon: Icons.location_on_outlined,
+            controller: address,
+            validator: addressValidator,
+          ),
+        ),
+        LabeledField(
+          label: 'Email',
+          field: CustomTextField(
+            hint: 'Enter customer email',
+            icon: Icons.alternate_email,
+            keyboardType: TextInputType.emailAddress,
+            controller: email,
+            validator: emailValidator,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Contractor section
+// ---------------------------------------------------------------------------
+class QeContractorSection extends StatelessWidget {
+  const QeContractorSection({
+    super.key,
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.nameValidator,
+    required this.phoneValidator,
+    required this.emailValidator,
+    required this.onNamePhoneChanged,
+  });
+
+  final TextEditingController name;
+  final TextEditingController phone;
+  final TextEditingController email;
+  final String? Function(String?) nameValidator;
+  final String? Function(String?) phoneValidator;
+  final String? Function(String?) emailValidator;
+  final ValueChanged<String> onNamePhoneChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        LabeledField(
+          label: 'Contractor Name',
+          field: CustomTextField(
+            hint: 'Enter contractor name',
+            icon: Icons.engineering_outlined,
+            controller: name,
+            inputFormatters: DValidator.lettersOnly,
+            validator: nameValidator,
+            onChanged: onNamePhoneChanged,
+          ),
+        ),
+        LabeledField(
+          label: 'Contact No.',
+          field: CustomTextField(
+            hint: 'Enter contractor phone number',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            controller: phone,
+            inputFormatters: DValidator.phoneNumber,
+            validator: phoneValidator,
+            onChanged: onNamePhoneChanged,
+          ),
+        ),
+        LabeledField(
+          label: 'Email (optional)',
+          field: CustomTextField(
+            hint: 'Enter contractor email',
+            icon: Icons.alternate_email,
+            keyboardType: TextInputType.emailAddress,
+            controller: email,
+            validator: emailValidator,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Add / Edit item form fields
+// ---------------------------------------------------------------------------
+class QeItemFormFields extends StatelessWidget {
+  const QeItemFormFields({
+    super.key,
+    required this.formKey,
+    required this.productField,
+    required this.companyCtrl,
+    required this.sizeCtrl,
+    required this.unitCtrl,
+    required this.mrpCtrl,
+    required this.rateCtrl,
+    required this.qtyCtrl,
+    required this.boxQtyCtrl,
+    required this.pieceQtyCtrl,
+    required this.isBoxUnit,
+    required this.onMrpChanged,
+    required this.onRateChanged,
+    required this.onQtyChanged,
+    required this.onPieceChanged,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final Widget productField;
+  final TextEditingController companyCtrl;
+  final TextEditingController sizeCtrl;
+  final TextEditingController unitCtrl;
+  final TextEditingController mrpCtrl;
+  final TextEditingController rateCtrl;
+  final TextEditingController qtyCtrl;
+  final TextEditingController boxQtyCtrl;
+  final TextEditingController pieceQtyCtrl;
+  final bool isBoxUnit;
+  final ValueChanged<String> onMrpChanged;
+  final ValueChanged<String> onRateChanged;
+  final ValueChanged<String> onQtyChanged;
+  final ValueChanged<String> onPieceChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const decimal = TextInputType.numberWithOptions(decimal: true);
+
+    return Form(
+      key: formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        children: [
+          productField,
+          SizedBox(height: Responsive.h(10)),
+          LabeledField(
+            label: 'Company (auto)',
+            field: IgnorePointer(
+              child: CustomTextField(
+                hint: 'Select a product first',
+                icon: Icons.factory_outlined,
+                controller: companyCtrl,
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: LabeledField(
+                  label: 'Size (auto)',
+                  field: CustomTextField(
+                    hint: 'e.g. 600x1200',
+                    icon: Icons.straighten_outlined,
+                    controller: sizeCtrl,
+                    inputFormatters: DValidator.textWithLimit,
+                  ),
+                ),
+              ),
+              SizedBox(width: Responsive.w(10)),
+              Expanded(
+                child: LabeledField(
+                  label: 'Unit (auto)',
+                  field: CustomTextField(
+                    hint: 'e.g. sqft',
+                    icon: Icons.square_foot_outlined,
+                    controller: unitCtrl,
+                    inputFormatters: DValidator.textWithLimit,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          LabeledField(
+            label: 'MRP (auto)',
+            field: CustomTextField(
+              hint: '0',
+              icon: Icons.currency_rupee,
+              keyboardType: decimal,
+              controller: mrpCtrl,
+              inputFormatters: DValidator.priceNumber,
+              validator: (v) =>
+                  DValidator.validateOptionalNumber('MRP', v, max: DValidator.maxPrice),
+              onChanged: onMrpChanged,
+            ),
+          ),
+          LabeledField(
+            label: 'Quantity',
+            field: CustomTextField(
+              hint: 'Enter quantity',
+              icon: Icons.numbers_outlined,
+              keyboardType: decimal,
+              controller: qtyCtrl,
+              inputFormatters: DValidator.quantityNumber,
+              validator: (v) {
+                final n = double.tryParse((v ?? '').trim());
+                if (n == null || n <= 0) {
+                  return isBoxUnit
+                      ? 'Enter a valid box/piece quantity'
+                      : 'Enter a valid quantity';
+                }
+                if (n > DValidator.maxQuantity) {
+                  return 'Quantity can have at most ${DValidator.maxQuantityDigits} digits';
+                }
+                return null;
+              },
+              onChanged: onQtyChanged,
+            ),
+          ),
+          if (isBoxUnit)
+            Row(
+              children: [
+                Expanded(
+                  child: LabeledField(
+                    label: 'Box Quantity (auto)',
+                    field: IgnorePointer(
+                      child: CustomTextField(
+                        hint: '0',
+                        icon: Icons.inventory_2_outlined,
+                        keyboardType: TextInputType.number,
+                        controller: boxQtyCtrl,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: Responsive.w(10)),
+                Expanded(
+                  child: LabeledField(
+                    label: 'Piece Quantity',
+                    field: CustomTextField(
+                      hint: 'Enter piece qty',
+                      icon: Icons.widgets_outlined,
+                      keyboardType: decimal,
+                      controller: pieceQtyCtrl,
+                      inputFormatters: DValidator.quantityNumber,
+                      validator: (v) {
+                        final n = double.tryParse((v ?? '').trim());
+                        if (n != null && n > DValidator.maxQuantity) {
+                          return 'Piece quantity can have at most ${DValidator.maxQuantityDigits} digits';
+                        }
+                        return null;
+                      },
+                      onChanged: onPieceChanged,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          LabeledField(
+            label: 'Rate',
+            field: CustomTextField(
+              hint: 'Enter rate per unit',
+              icon: Icons.currency_rupee,
+              keyboardType: decimal,
+              controller: rateCtrl,
+              inputFormatters: DValidator.priceNumber,
+              validator: (v) {
+                final n = double.tryParse((v ?? '').trim());
+                if (n == null || n <= 0) return 'Enter a valid rate';
+                if (n > DValidator.maxPrice) {
+                  return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
+                }
+                return null;
+              },
+              onChanged: onRateChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Product search dropdown
+// ---------------------------------------------------------------------------
+class QeProductDropdown extends StatelessWidget {
+  const QeProductDropdown({
+    super.key,
+    required this.searchCtrl,
+    required this.focusNode,
+    required this.selectedProduct,
+    required this.editingProductId,
+    required this.showSuggestions,
+    required this.onFieldTap,
+    required this.onTextChanged,
+    required this.onClear,
+    required this.onSelected,
+  });
+
+  final TextEditingController searchCtrl;
+  final FocusNode focusNode;
+  final ActiveProductModel? selectedProduct;
+
+  /// Product id of the item being edited (used so validation doesn't block
+  /// items that have no catalog match).
+  final String? editingProductId;
+  final bool showSuggestions;
+  final VoidCallback onFieldTap;
+  final ValueChanged<String> onTextChanged;
+  final VoidCallback onClear;
+  final ValueChanged<ActiveProductModel> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SalesmanEstimateBloc, SalesmanEstimateState>(
+      buildWhen: (prev, curr) =>
+      prev.products != curr.products || prev.productsStatus != curr.productsStatus,
+      builder: (context, state) {
+        if (state.productsStatus == LoadStatus.loading && state.products.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (state.productsStatus == LoadStatus.failure && state.products.isEmpty) {
+          return Container(
+            padding: EdgeInsets.all(Responsive.w(12)),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    state.productsError ?? 'Failed to load products.',
+                    style: AppTextStyles.caption(color: AppColors.error),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      context.read<SalesmanEstimateBloc>().add(const ActiveProductsRequested()),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final products = state.products;
+        final typed = searchCtrl.text.trim();
+        final showingChosenText =
+            selectedProduct != null && typed == qeProductDisplayString(selectedProduct!);
+        final query = showingChosenText ? '' : typed.toLowerCase();
+
+        final filtered = query.isEmpty
+            ? products
+            : products.where((p) {
+          return p.name.toLowerCase().contains(query) ||
+              p.company.toLowerCase().contains(query) ||
+              p.size.toLowerCase().contains(query);
+        }).toList();
+
+        return LabeledField(
+          label: 'Select Product',
+          field: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: searchCtrl,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  hintText: 'Search product by name',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchCtrl.text.isEmpty
+                      ? null
+                      : IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: 'Clear',
+                    onPressed: onClear,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                ),
+                validator: (v) => DValidator.validateDropdown(
+                  'product',
+                  selectedProduct?.id ?? editingProductId,
+                ),
+                onTap: onFieldTap,
+                onChanged: onTextChanged,
+              ),
+              if (showSuggestions) ...[
+                SizedBox(height: Responsive.h(6)),
+                Container(
+                  constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: filtered.isEmpty
+                      ? Padding(
+                    padding: EdgeInsets.all(Responsive.w(14)),
+                    child: Text('No matching products', style: AppTextStyles.caption()),
+                  )
+                      : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final p = filtered[index];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.inventory_2_outlined, size: 18),
+                        title: Text(p.name, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(
+                          '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => onSelected(p),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "Editing item #n" banner
+// ---------------------------------------------------------------------------
+class QeEditingBanner extends StatelessWidget {
+  const QeEditingBanner({super.key, required this.itemNumber, required this.onCancel});
+
+  final int itemNumber;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+      margin: EdgeInsets.only(bottom: Responsive.h(10)),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+          SizedBox(width: Responsive.w(6)),
+          Expanded(child: Text('Editing item #$itemNumber', style: AppTextStyles.caption())),
+          InkWell(
+            onTap: onCancel,
+            child: Text('Cancel', style: AppTextStyles.bodyBold(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Other details (handling charge + notes)
+// ---------------------------------------------------------------------------
+class QeOtherDetailsSection extends StatelessWidget {
+  const QeOtherDetailsSection({
+    super.key,
+    required this.handlingCharge,
+    required this.notes,
+    required this.handlingValidator,
+    required this.onHandlingChanged,
+  });
+
+  final TextEditingController handlingCharge;
+  final TextEditingController notes;
+  final String? Function(String?) handlingValidator;
+  final ValueChanged<String> onHandlingChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        LabeledField(
+          label: 'Handling Charge',
+          field: CustomTextField(
+            hint: 'Enter handling charge',
+            icon: Icons.currency_rupee,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            controller: handlingCharge,
+            inputFormatters: DValidator.priceNumber,
+            validator: handlingValidator,
+            onChanged: onHandlingChanged,
+          ),
+        ),
+        LabeledField(
+          label: 'Notes (optional)',
+          field: CustomTextField(
+            hint: 'e.g. Customer enquiry for new project',
+            icon: Icons.notes_outlined,
+            controller: notes,
+            inputFormatters: DValidator.textWithLimit,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Totals card
+// ---------------------------------------------------------------------------
+class QeTotalsCard extends StatelessWidget {
+  const QeTotalsCard({
+    super.key,
+    required this.totalSqft,
+    required this.mrpTotal,
+    required this.itemsTotal,
+    required this.handling,
+    required this.grandTotal,
+    required this.currency,
+    required this.number,
+  });
+
+  final double totalSqft;
+  final double mrpTotal;
+  final double itemsTotal;
+  final double handling;
+  final double grandTotal;
+  final NumberFormat currency;
+  final NumberFormat number;
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = SizedBox(height: Responsive.h(6));
+    return Container(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          gap,
+          QeTotalRow('Total Sq.Ft', number.format(totalSqft)),
+          if (mrpTotal > 0) ...[gap, QeTotalRow('Total MRP', currency.format(mrpTotal))],
+          gap,
+          QeTotalRow('Items Total', currency.format(itemsTotal)),
+          gap,
+          QeTotalRow('Handling Charge', currency.format(handling)),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Grand Total', style: AppTextStyles.h3()),
+              Text(currency.format(grandTotal),
+                  style: AppTextStyles.h2(color: AppColors.primary)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Incentive total card
+// ---------------------------------------------------------------------------
+class QeIncentiveTotalCard extends StatelessWidget {
+  const QeIncentiveTotalCard({super.key, required this.total, required this.currency});
+
+  final double total;
+  final NumberFormat currency;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: AppColors.success.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.percent, size: 18, color: AppColors.success),
+              SizedBox(width: Responsive.w(8)),
+              Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
+            ],
+          ),
+          Text(currency.format(total), style: AppTextStyles.h3(color: AppColors.success)),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Incentive preview (live /quotations/product-incentive result)
+// ---------------------------------------------------------------------------
 class IncentivePreviewCard extends StatelessWidget {
-  const IncentivePreviewCard();
+  const IncentivePreviewCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -196,8 +864,12 @@ class IncentivePreviewCard extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Item tile
+// ---------------------------------------------------------------------------
 class EditItemTile extends StatelessWidget {
   const EditItemTile({
+    super.key,
     required this.serialNo,
     required this.item,
     required this.currency,
@@ -277,9 +949,6 @@ class EditItemTile extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Edit tap goes through onEdit — reopens an already-saved
-                  // item into the add/edit form, where "Update Item" persists
-                  // it immediately via PUT /quotations/update-item.
                   InkWell(
                     onTap: isRemoving ? null : onEdit,
                     child: Icon(

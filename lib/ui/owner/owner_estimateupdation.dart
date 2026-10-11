@@ -1,11 +1,9 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
+import 'package:tileshop/ui/owner/widget/ownerestimateupdationwidget.dart';
 import '../../../core/apiclient/api_client.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -17,133 +15,10 @@ import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
 import '../../core/utils/delete_helper.dart';
 import '../../models/owner_models/ownerestimate_updatemodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
 import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../Apiprovider/salesman_quotationprovider.dart';
-
-String _formatQty(double value) =>
-    value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
-
-bool _parseBool(dynamic v) {
-  if (v is bool) return v;
-  final s = v?.toString().toLowerCase() ?? '';
-  return s == '1' || s == 'true';
-}
-
-class _ActiveProduct {
-  final String id;
-  final String name;
-  final String company;
-  final String size;
-  final String unit;
-  final double rate;
-  final double mrp;
-  final bool isBoxUnit;
-
-  const _ActiveProduct({
-    required this.id,
-    required this.name,
-    this.company = '',
-    this.size = '',
-    this.unit = '',
-    required this.rate,
-    this.mrp = 0,
-    this.isBoxUnit = false,
-  });
-
-  factory _ActiveProduct.fromJson(Map<String, dynamic> json) {
-    double parseNum(dynamic v) {
-      if (v == null) return 0;
-      if (v is num) return v.toDouble();
-      return double.tryParse(v.toString()) ?? 0;
-    }
-
-    return _ActiveProduct(
-      id: (json['id'] ?? '').toString(),
-      name: (json['name'] ?? json['product_name'] ?? '').toString(),
-      company: (json['company'] ?? json['company_name'] ?? '').toString(),
-      size: (json['size'] ?? json['product_size'] ?? '').toString(),
-      unit: (json['unit'] ?? json['product_unit'] ?? '').toString(),
-      rate: parseNum(json['rate'] ?? json['default_rate'] ?? json['selling_rate']),
-      mrp: parseNum(json['mrp']),
-      isBoxUnit: _parseBool(
-        json['is_box_unit'] ?? json['isBoxUnit'] ?? json['box_unit'],
-      ),
-    );
-  }
-}
-
-class _EstimateEditItem {
-  const _EstimateEditItem({
-    required this.id,
-    required this.productId,
-    required this.name,
-    required this.amount,
-    this.company = '',
-    this.size = '',
-    this.unit = '',
-    required this.quantity,
-    required this.rate,
-    this.mrp = 0,
-    this.boxQuantity = 0,
-    this.pieceQuantity = 0,
-    this.isBoxUnit = false,
-    this.incentiveAmount = 0,
-    this.incentiveEligible = false,
-    this.incentiveReason,
-  });
-
-  final String id;
-  final String productId;
-  final String name;
-  final String company;
-  final String size;
-  final String unit;
-  final double quantity;
-  final double rate;
-  final double amount;
-  final double mrp;
-  final double boxQuantity;
-  final double pieceQuantity;
-  final bool isBoxUnit;
-  final double incentiveAmount;
-  final bool incentiveEligible;
-  final String? incentiveReason;
-
-  _EstimateEditItem copyWith({
-    String? company,
-    String? size,
-    String? unit,
-    double? mrp,
-    bool? isBoxUnit,
-    double? quantity,
-    double? rate,
-    double? boxQuantity,
-    double? pieceQuantity,
-    double? amount,
-  }) {
-    return _EstimateEditItem(
-      id: id,
-      productId: productId,
-      name: name,
-      amount: amount ?? this.amount,
-      company: company ?? this.company,
-      size: size ?? this.size,
-      unit: unit ?? this.unit,
-      quantity: quantity ?? this.quantity,
-      rate: rate ?? this.rate,
-      mrp: mrp ?? this.mrp,
-      boxQuantity: boxQuantity ?? this.boxQuantity,
-      pieceQuantity: pieceQuantity ?? this.pieceQuantity,
-      isBoxUnit: isBoxUnit ?? this.isBoxUnit,
-      incentiveAmount: incentiveAmount,
-      incentiveEligible: incentiveEligible,
-      incentiveReason: incentiveReason,
-    );
-  }
-}
 
 class OwnerEstimateUpdateScreen extends StatefulWidget {
   const OwnerEstimateUpdateScreen({super.key, required this.detail});
@@ -171,10 +46,10 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
   late final TextEditingController _handlingChargeCtrl;
   DateTime? _date;
 
-  final List<_EstimateEditItem> _items = [];
+  final List<EstimateEditItem> _items = [];
 
   final _itemFormKey = GlobalKey<FormState>();
-  _ActiveProduct? _selectedProduct;
+  EstimateActiveProduct? _selectedProduct;
   int? _editingItemIndex;
   final _productSearchCtrl = TextEditingController();
   final _productSearchFocus = FocusNode();
@@ -188,7 +63,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
   final _itemPieceQtyCtrl = TextEditingController();
   final _itemRateCtrl = TextEditingController();
 
-  List<_ActiveProduct> _products = [];
+  List<EstimateActiveProduct> _products = [];
   bool _loadingProducts = true;
 
   bool _backfilledFromCatalog = false;
@@ -222,9 +97,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     _addressCtrl = TextEditingController(text: d.customerAddress);
     _emailCtrl = TextEditingController(text: d.customerEmail);
 
-    // When the customer phone number is cleared completely, the other
-    // customer fields (name / address / email) are cleared too — same
-    // behaviour as the Create Estimate screen.
+    // Clearing the customer phone also clears name / address / email.
     _phoneCtrl.addListener(_onPhoneChanged);
 
     // Product suggestions open when the product field is tapped/focused.
@@ -236,15 +109,14 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
     _notesCtrl = TextEditingController(text: d.notes);
     _termsCtrl = TextEditingController(text: d.termsConditions);
-    _handlingChargeCtrl =
-        TextEditingController(text: d.handlingCharge > 0 ? _formatQty(d.handlingCharge) : '');
+    _handlingChargeCtrl = TextEditingController(
+        text: d.handlingCharge > 0 ? estimateFormatQty(d.handlingCharge) : '');
     _date = d.date;
 
     for (final item in d.items) {
-      _items.add(_EstimateEditItem(
+      _items.add(EstimateEditItem(
         // ASSUMPTION: EstimateDetailItem exposes the saved row's own id
-        // as `.id`. If your model names it differently (e.g. `itemId`,
-        // `estimateItemId`), change this one line to match.
+        // as `.id`. If your model names it differently, change this line.
         id: item.id.toString(),
         productId: item.productId,
         name: item.productName,
@@ -259,7 +131,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     _loadProducts();
   }
 
-  /// Clears name / address / email once the phone number is emptied.
   void _onPhoneChanged() {
     if (_phoneCtrl.text.trim().isNotEmpty) return;
     if (_nameCtrl.text.isEmpty && _addressCtrl.text.isEmpty && _emailCtrl.text.isEmpty) {
@@ -270,9 +141,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     _emailCtrl.clear();
   }
 
-  /// Opens the product suggestion list when the product field gains focus
-  /// (tap) and closes it shortly after focus is lost. The small delay lets
-  /// a tap on a suggestion register before the list disappears.
+  /// Opens the suggestion list on focus; closes it shortly after focus is
+  /// lost so a tap on a suggestion can register first.
   void _onProductFocusChanged() {
     if (_productSearchFocus.hasFocus) {
       setState(() => _showProductSuggestions = true);
@@ -301,7 +171,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       }
       final parsed = rawList
           .whereType<Map>()
-          .map((e) => _ActiveProduct.fromJson(e.cast<String, dynamic>()))
+          .map((e) => EstimateActiveProduct.fromJson(e.cast<String, dynamic>()))
           .toList();
       if (mounted) {
         setState(() {
@@ -316,7 +186,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     }
   }
 
-  _ActiveProduct? _findProduct(String productId) {
+  EstimateActiveProduct? _findProduct(String productId) {
     for (final p in _products) {
       if (p.id == productId) return p;
     }
@@ -371,6 +241,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     super.dispose();
   }
 
+  // ---------------- Validators ----------------
+
   String? _validateCustomerName(String? v) => DValidator.validateName('Customer name', v);
 
   String? _validateCustomerPhone(String? v) => DValidator.validatePhoneNumber(v);
@@ -396,40 +268,37 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     final hasName = _contractorNameCtrl.text.trim().isNotEmpty;
 
     if (phone.isEmpty) {
-      if (hasName) {
-        return 'Contractor phone is required when a name is provided';
-      }
+      if (hasName) return 'Contractor phone is required when a name is provided';
       return null;
     }
     return DValidator.validatePhoneNumber(phone);
   }
 
-  static String _productDisplayString(_ActiveProduct p) =>
-      p.company.isEmpty ? p.name : '${p.name} — ${p.company}';
+  String? _validateHandlingCharge(String? v) =>
+      DValidator.validateOptionalNumber('Handling charge', v, max: DValidator.maxPrice);
 
-  void _onProductSelected(_ActiveProduct? product) {
+  // ---------------- Add-item form wiring ----------------
+
+  void _onProductSelected(EstimateActiveProduct? product) {
     setState(() {
       _selectedProduct = product;
       if (product != null) {
-        _productSearchCtrl.text = _productDisplayString(product);
+        _productSearchCtrl.text = estimateProductDisplayString(product);
         _itemCompanyCtrl.text = product.company;
         _itemSizeCtrl.text = product.size;
         _itemUnitCtrl.text = product.unit;
-        _itemMrpCtrl.text = _formatQty(product.mrp);
-        _itemRateCtrl.text = product.rate > 0 ? _formatQty(product.rate) : '';
-        _itemQtyCtrl.clear();
-        _itemBoxQtyCtrl.clear();
-        _itemPieceQtyCtrl.clear();
+        _itemMrpCtrl.text = estimateFormatQty(product.mrp);
+        _itemRateCtrl.text = product.rate > 0 ? estimateFormatQty(product.rate) : '';
       } else {
         _itemCompanyCtrl.clear();
         _itemSizeCtrl.clear();
         _itemUnitCtrl.clear();
         _itemMrpCtrl.clear();
         _itemRateCtrl.clear();
-        _itemQtyCtrl.clear();
-        _itemBoxQtyCtrl.clear();
-        _itemPieceQtyCtrl.clear();
       }
+      _itemQtyCtrl.clear();
+      _itemBoxQtyCtrl.clear();
+      _itemPieceQtyCtrl.clear();
     });
   }
 
@@ -489,7 +358,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
     if (editingSavedItem) {
       debugPrint('OwnerEstimateUpdateScreen: dispatching item update -> '
-          'estimateId=${widget.detail.id} itemId=${_items[editingIndex!].id} '
+          'estimateId=${widget.detail.id} itemId=${_items[editingIndex].id} '
           'qty=$qty rate=$rate box=$boxQuantity piece=$pieceQuantity');
       context.read<OwnerEstimateDetailBloc>().add(OwnerEstimateItemUpdateRequested(
         estimateId: widget.detail.id,
@@ -559,7 +428,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     final previous = editingIndex != null ? _items[editingIndex] : null;
     final isBoxUnit = _selectedProduct?.isBoxUnit ?? previous?.isBoxUnit ?? false;
 
-    final newItem = _EstimateEditItem(
+    final newItem = EstimateEditItem(
       id: previous?.id ?? '',
       productId: productIdStr,
       name: name,
@@ -598,18 +467,17 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       _editingItemIndex = index;
       _selectedProduct = match;
       _showProductSuggestions = false;
-      _productSearchCtrl.text = match != null ? _productDisplayString(match) : item.name;
+      _productSearchCtrl.text = match != null ? estimateProductDisplayString(match) : item.name;
       _itemCompanyCtrl.text = match?.company ?? item.company;
       _itemSizeCtrl.text = item.size;
       _itemUnitCtrl.text = item.unit;
-      _itemMrpCtrl.text = _formatQty(match?.mrp ?? item.mrp);
-      _itemQtyCtrl.text = _formatQty(item.quantity);
-      _itemRateCtrl.text = _formatQty(item.rate);
-      _itemBoxQtyCtrl.text = _formatQty(item.boxQuantity);
-      _itemPieceQtyCtrl.text = _formatQty(item.pieceQuantity);
+      _itemMrpCtrl.text = estimateFormatQty(match?.mrp ?? item.mrp);
+      _itemQtyCtrl.text = estimateFormatQty(item.quantity);
+      _itemRateCtrl.text = estimateFormatQty(item.rate);
+      _itemBoxQtyCtrl.text = estimateFormatQty(item.boxQuantity);
+      _itemPieceQtyCtrl.text = estimateFormatQty(item.pieceQuantity);
     });
 
-    // Make sure the suggestion list isn't left open from a previous tap.
     _productSearchFocus.unfocus();
 
     AppSnackbar.error('Edit the fields above, then tap "Update Item"');
@@ -617,13 +485,10 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   void _cancelEditItem() => _resetItemForm();
 
-  /// Rows already saved on the server (non-empty id) show the
-  /// "Are you sure you want to delete this item?" confirmation first.
-  /// Only after the owner confirms is POST /estimates/remove-item
-  /// dispatched; the row is removed from `_items` once the bloc reports
-  /// itemRemoveStatus == success (see BlocConsumer below).
-  /// Rows added in this session (empty id) are removed locally only,
-  /// with no confirmation, since nothing exists on the server for them.
+  /// Saved rows (non-empty id) ask for confirmation, then dispatch
+  /// POST /estimates/remove-item; the row is dropped once the bloc reports
+  /// success (see the listener in build()). Rows added in this session are
+  /// removed locally with no confirmation.
   Future<void> _removeItem(int index) async {
     final item = _items[index];
 
@@ -656,6 +521,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       }
     });
   }
+
+  // ---------------- Submit ----------------
 
   void _submit(BuildContext context) {
     final formValid = _formKey.currentState?.validate() ?? true;
@@ -714,9 +581,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
         appBar: AppBar(title: Text('Update Estimate', style: AppTextStyles.h6())),
         body: SafeArea(
           child: BlocConsumer<OwnerEstimateDetailBloc, OwnerEstimateDetailState>(
-            // Also listen for the per-item update/remove statuses so this
-            // screen reacts as soon as PUT /estimates/update-item or
-            // POST /estimates/remove-item finishes.
             listenWhen: (previous, current) =>
             previous.actionStatus != current.actionStatus ||
                 previous.itemUpdateStatus != current.itemUpdateStatus ||
@@ -734,14 +598,14 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
               if (state.itemUpdateStatus == OwnerEstimateActionStatus.success &&
                   state.updatedEstimateItemId != null) {
                 AppSnackbar.success(state.itemUpdateMessage ?? 'Item updated.');
-                final idx =
-                _items.indexWhere((i) => i.id == state.updatedEstimateItemId);
+                final idx = _items.indexWhere((i) => i.id == state.updatedEstimateItemId);
                 if (idx != -1) {
                   setState(() {
                     _items[idx] = _items[idx].copyWith(
                       quantity: double.tryParse(_itemQtyCtrl.text) ?? _items[idx].quantity,
                       rate: double.tryParse(_itemRateCtrl.text) ?? _items[idx].rate,
-                      boxQuantity: double.tryParse(_itemBoxQtyCtrl.text) ?? _items[idx].boxQuantity,
+                      boxQuantity:
+                      double.tryParse(_itemBoxQtyCtrl.text) ?? _items[idx].boxQuantity,
                       pieceQuantity:
                       double.tryParse(_itemPieceQtyCtrl.text) ?? _items[idx].pieceQuantity,
                     );
@@ -769,8 +633,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
             },
             builder: (context, state) {
               final isBusy = state.actionStatus == OwnerEstimateActionStatus.inProgress;
-              // Also disable the Add/Update Item button while a
-              // single-item PUT is in flight.
               final isUpdatingItem =
                   state.itemUpdateStatus == OwnerEstimateActionStatus.inProgress;
 
@@ -785,294 +647,82 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                         children: [
                           Text('Customer Details', style: AppTextStyles.h3()),
                           SizedBox(height: Responsive.h(12)),
-                          LabeledField(
-                            label: 'Contact No.',
-                            field: CustomTextField(
-                              hint: 'Enter phone number',
-                              icon: Icons.phone_outlined,
-                              keyboardType: TextInputType.phone,
-                              controller: _phoneCtrl,
-                              inputFormatters: DValidator.phoneNumber,
-                              validator: _validateCustomerPhone,
-                            ),
-                          ),
-                          LabeledField(
-                            label: 'Customer Name',
-                            field: CustomTextField(
-                              hint: 'Enter customer name',
-                              icon: Icons.groups_2_outlined,
-                              controller: _nameCtrl,
-                              validator: _validateCustomerName,
-                            ),
-                          ),
-
-                          LabeledField(
-                            label: 'Address',
-                            field: CustomTextField(
-                              hint: 'Enter site address',
-                              icon: Icons.location_on_outlined,
-                              controller: _addressCtrl,
-                            ),
-                          ),
-                          LabeledField(
-                            label: 'Email',
-                            field: CustomTextField(
-                              hint: 'Enter customer email',
-                              icon: Icons.alternate_email,
-                              keyboardType: TextInputType.emailAddress,
-                              controller: _emailCtrl,
-                              validator: _validateOptionalEmail,
-                            ),
+                          EstimateCustomerSection(
+                            phone: _phoneCtrl,
+                            name: _nameCtrl,
+                            address: _addressCtrl,
+                            email: _emailCtrl,
+                            phoneValidator: _validateCustomerPhone,
+                            nameValidator: _validateCustomerName,
+                            emailValidator: _validateOptionalEmail,
                           ),
                           SizedBox(height: Responsive.h(20)),
 
                           Text('Contractor Details', style: AppTextStyles.h3()),
                           SizedBox(height: Responsive.h(12)),
-                          LabeledField(
-                            label: 'Contractor Name',
-                            field: CustomTextField(
-                              hint: 'Enter contractor name',
-                              icon: Icons.person_outline,
-                              controller: _contractorNameCtrl,
-                              validator: _validateContractorName,
-                              onChanged: (_) => _formKey.currentState?.validate(),
-                            ),
-                          ),
-                          LabeledField(
-                            label: 'Contractor Phone',
-                            field: CustomTextField(
-                              hint: 'Enter contractor phone',
-                              icon: Icons.phone_outlined,
-                              keyboardType: TextInputType.phone,
-                              controller: _contractorPhoneCtrl,
-                              inputFormatters: DValidator.phoneNumber,
-                              validator: _validateContractorPhone,
-                              onChanged: (_) => _formKey.currentState?.validate(),
-                            ),
-                          ),
-                          LabeledField(
-                            label: 'Contractor Email',
-                            field: CustomTextField(
-                              hint: 'Enter contractor email',
-                              icon: Icons.alternate_email,
-                              keyboardType: TextInputType.emailAddress,
-                              controller: _contractorEmailCtrl,
-                              validator: _validateOptionalEmail,
-                              onChanged: (_) => _formKey.currentState?.validate(),
-                            ),
+                          EstimateContractorSection(
+                            name: _contractorNameCtrl,
+                            phone: _contractorPhoneCtrl,
+                            email: _contractorEmailCtrl,
+                            nameValidator: _validateContractorName,
+                            phoneValidator: _validateContractorPhone,
+                            emailValidator: _validateOptionalEmail,
+                            // Re-validate so the name/phone cross-check updates live.
+                            onChanged: (_) => _formKey.currentState?.validate(),
                           ),
 
-                      CustomTextField(
-                        hint: '0',
-                        icon: Icons.currency_rupee,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        controller: _handlingChargeCtrl,
-                        inputFormatters: DValidator.priceNumber,
-                        validator: (v) => DValidator.validateOptionalNumber(
-                          'Handling charge',
-                          v,
-                          max: DValidator.maxPrice,
-                        ),
-                      ),
-                          LabeledField(
-                            label: 'Notes (optional)',
-                            field: CustomTextField(
-                              hint: 'e.g. Customer enquiry for new project',
-                              icon: Icons.notes_outlined,
-                              controller: _notesCtrl,
-                              inputFormatters: DValidator.textWithLimit,
-                            ),
+                          EstimateOtherDetailsSection(
+                            handlingCharge: _handlingChargeCtrl,
+                            notes: _notesCtrl,
+                            handlingValidator: _validateHandlingCharge,
                           ),
                           SizedBox(height: Responsive.h(20)),
 
                           Text('Add / Edit Item', style: AppTextStyles.h3()),
                           SizedBox(height: Responsive.h(10)),
-                          Form(
-                            key: _itemFormKey,
-                            autovalidateMode: AutovalidateMode.onUserInteraction,
-                            child: Column(
-                              children: [
-                                _buildProductSearch(),
-                                SizedBox(height: Responsive.h(10)),
-                                LabeledField(
-                                  label: 'Company (auto)',
-                                  field: IgnorePointer(
-                                    child: CustomTextField(
-                                      hint: 'Select a product first',
-                                      icon: Icons.factory_outlined,
-                                      controller: _itemCompanyCtrl,
-                                    ),
-                                  ),
-                                ),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: LabeledField(
-                                        label: 'Size (auto)',
-                                        field: IgnorePointer(
-                                          child: CustomTextField(
-                                            hint: 'Select a product first',
-                                            icon: Icons.straighten_outlined,
-                                            controller: _itemSizeCtrl,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: Responsive.w(10)),
-                                    Expanded(
-                                      child: LabeledField(
-                                        label: 'Unit (auto)',
-                                        field: IgnorePointer(
-                                          child: CustomTextField(
-                                            hint: 'Select a product first',
-                                            icon: Icons.square_foot_outlined,
-                                            controller: _itemUnitCtrl,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                // MRP and Rate share one row.
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: LabeledField(
-                                        label: 'MRP (auto)',
-                                        field: IgnorePointer(
-                                          child: CustomTextField(
-                                            hint: 'MRP',
-                                            icon: Icons.currency_rupee,
-                                            keyboardType: TextInputType.number,
-                                            controller: _itemMrpCtrl,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: Responsive.w(10)),
-                                    Expanded(
-                                      child: LabeledField(
-                                        label: 'Rate',
-                                        field:
-                                        CustomTextField(
-                                          hint: 'Rate',
-                                          icon: Icons.currency_rupee,
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          controller: _itemRateCtrl,
-                                          inputFormatters: DValidator.priceNumber,
-                                          validator: (v) {
-                                            final n = double.tryParse((v ?? '').trim());
-                                            if (n == null || n <= 0) return 'Enter a valid rate';
-                                            if (n > DValidator.maxPrice) {
-                                              return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
-                                            }
-                                            return null;
-                                          },
-                                          onChanged: (_) => setState(() {}),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                LabeledField(
-                                  label: _isBoxUnitProduct ? 'Quantity (Box)' : 'Quantity',
-                                  field:
-                                  CustomTextField(
-                                    hint: 'Enter quantity',
-                                    icon: Icons.numbers_outlined,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    controller: _itemQtyCtrl,
-                                    inputFormatters: DValidator.quantityNumber,
-                                    validator: (v) {
-                                      final n = double.tryParse((v ?? '').trim());
-                                      if (n == null || n <= 0) {
-                                        return _isBoxUnitProduct
-                                            ? 'Enter a valid box/piece quantity'
-                                            : 'Enter a valid quantity';
-                                      }
-                                      if (n > DValidator.maxQuantity) {
-                                        return 'Quantity can have at most ${DValidator.maxQuantityDigits} digits';
-                                      }
-                                      return null;
-                                    },
-                                    onChanged: (_) {
-                                      setState(_recomputeBoxQtyIfNeeded);
-                                    },
-                                  ),
-                                ),
-                                if (_isBoxUnitProduct)
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: LabeledField(
-                                          label: 'Box Quantity (auto)',
-                                          field: IgnorePointer(
-                                            child: CustomTextField(
-                                              hint: '0',
-                                              icon: Icons.inventory_2_outlined,
-                                              keyboardType: TextInputType.number,
-                                              controller: _itemBoxQtyCtrl,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(width: Responsive.w(10)),
-                                      Expanded(
-                                        child: LabeledField(
-                                          label: 'Piece Quantity',
-                                          field:
-                                          CustomTextField(
-                                            hint: 'Enter piece qty',
-                                            icon: Icons.widgets_outlined,
-                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                            controller: _itemPieceQtyCtrl,
-                                            inputFormatters: DValidator.quantityNumber,
-                                            validator: (v) {
-                                              final n = double.tryParse((v ?? '').trim());
-                                              if (n != null && n > DValidator.maxQuantity) {
-                                                return 'Piece quantity can have at most ${DValidator.maxQuantityDigits} digits';
-                                              }
-                                              return null;
-                                            },
-                                            onChanged: (_) => setState(() {}),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
+                          EstimateItemFormFields(
+                            formKey: _itemFormKey,
+                            productField: EstimateProductSearch(
+                              loading: _loadingProducts,
+                              products: _products,
+                              searchCtrl: _productSearchCtrl,
+                              focusNode: _productSearchFocus,
+                              selectedProduct: _selectedProduct,
+                              showSuggestions: _showProductSuggestions,
+                              onFieldTap: () => setState(() => _showProductSuggestions = true),
+                              onTextChanged: (text) {
+                                if (_selectedProduct != null &&
+                                    text != estimateProductDisplayString(_selectedProduct!)) {
+                                  _onProductSelected(null);
+                                }
+                                setState(() => _showProductSuggestions = true);
+                              },
+                              onClear: _clearProductSelection,
+                              onSelected: (p) {
+                                _onProductSelected(p);
+                                setState(() => _showProductSuggestions = false);
+                                _productSearchFocus.unfocus();
+                              },
                             ),
+                            companyCtrl: _itemCompanyCtrl,
+                            sizeCtrl: _itemSizeCtrl,
+                            unitCtrl: _itemUnitCtrl,
+                            mrpCtrl: _itemMrpCtrl,
+                            rateCtrl: _itemRateCtrl,
+                            qtyCtrl: _itemQtyCtrl,
+                            boxQtyCtrl: _itemBoxQtyCtrl,
+                            pieceQtyCtrl: _itemPieceQtyCtrl,
+                            isBoxUnit: _isBoxUnitProduct,
+                            onRateChanged: (_) => setState(() {}),
+                            onQtyChanged: (_) => setState(_recomputeBoxQtyIfNeeded),
+                            onPieceChanged: (_) => setState(() {}),
                           ),
-                          SizedBox(height: Responsive.h(6)),
-                          SizedBox(height: Responsive.h(14)),
+                          SizedBox(height: Responsive.h(20)),
+
                           if (_editingItemIndex != null)
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: Responsive.w(12), vertical: Responsive.h(8)),
-                              margin: EdgeInsets.only(bottom: Responsive.h(10)),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.edit_outlined,
-                                      size: 16, color: AppColors.primary),
-                                  SizedBox(width: Responsive.w(6)),
-                                  Expanded(
-                                    child: Text(
-                                      'Editing item #${_editingItemIndex! + 1}',
-                                      style: AppTextStyles.caption(),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: _cancelEditItem,
-                                    child: Text('Cancel',
-                                        style: AppTextStyles.bodyBold(color: AppColors.error)),
-                                  ),
-                                ],
-                              ),
+                            EstimateEditingBanner(
+                              itemNumber: _editingItemIndex! + 1,
+                              onCancel: _cancelEditItem,
                             ),
                           SizedBox(
                             width: double.infinity,
@@ -1099,8 +749,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape:
-                                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
                               ),
                             ),
                           ),
@@ -1124,10 +774,9 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                           else
                             ..._items.asMap().entries.map((entry) {
                               final index = entry.key;
-                              final item = entry.value;
-                              return _EstimateItemTile(
+                              return EstimateItemTile(
                                 serialNo: index + 1,
-                                item: item,
+                                item: entry.value,
                                 currency: currency,
                                 isEditing: _editingItemIndex == index,
                                 onDelete: () => _removeItem(index),
@@ -1152,229 +801,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
             },
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildProductSearch() {
-    if (_loadingProducts) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    // When a product is already chosen the box shows its full
-    // "name — company" text; treat that as "no search" so tapping the
-    // field lists every product instead of "No matching products".
-    final typed = _productSearchCtrl.text.trim();
-    final showingChosenText =
-        _selectedProduct != null && typed == _productDisplayString(_selectedProduct!);
-    final query = showingChosenText ? '' : typed.toLowerCase();
-
-    final filtered = query.isEmpty
-        ? _products
-        : _products.where((p) {
-      return p.name.toLowerCase().contains(query) ||
-          p.company.toLowerCase().contains(query) ||
-          p.size.toLowerCase().contains(query);
-    }).toList();
-
-    return LabeledField(
-      label: 'Select Product',
-      field: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextFormField(
-            controller: _productSearchCtrl,
-            focusNode: _productSearchFocus,
-            decoration: InputDecoration(
-              hintText: 'Search product by name',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _productSearchCtrl.text.isEmpty
-                  ? null
-                  : IconButton(
-                icon: const Icon(Icons.clear, size: 18),
-                tooltip: 'Clear',
-                onPressed: _clearProductSelection,
-              ),
-              filled: true,
-              fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
-              ),
-            ),
-            validator: (v) => DValidator.validateDropdown('product', _selectedProduct?.id),
-            // Tapping the field (even if it already has focus) opens the
-            // product list.
-            onTap: () => setState(() => _showProductSuggestions = true),
-            onChanged: (text) {
-              if (_selectedProduct != null &&
-                  text != _productDisplayString(_selectedProduct!)) {
-                _onProductSelected(null);
-              }
-              setState(() => _showProductSuggestions = true);
-            },
-          ),
-          if (_showProductSuggestions) ...[
-            SizedBox(height: Responsive.h(6)),
-            Container(
-              constraints: BoxConstraints(maxHeight: Responsive.h(220)),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: filtered.isEmpty
-                  ? Padding(
-                padding: EdgeInsets.all(Responsive.w(14)),
-                child: Text('No matching products', style: AppTextStyles.caption()),
-              )
-                  : ListView.separated(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final p = filtered[index];
-                  return ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.inventory_2_outlined, size: 18),
-                    title: Text(p.name, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                      '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () {
-                      _onProductSelected(p);
-                      setState(() => _showProductSuggestions = false);
-                      _productSearchFocus.unfocus();
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _EstimateItemTile extends StatelessWidget {
-  const _EstimateItemTile({
-    required this.serialNo,
-    required this.item,
-    required this.currency,
-    required this.onDelete,
-    required this.onEdit,
-    this.isEditing = false,
-  });
-
-  final int serialNo;
-  final _EstimateEditItem item;
-  final NumberFormat currency;
-  final VoidCallback onDelete;
-  final VoidCallback onEdit;
-  final bool isEditing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: Responsive.h(10)),
-      padding: EdgeInsets.all(Responsive.w(12)),
-      decoration: BoxDecoration(
-        color: isEditing ? AppColors.primary.withOpacity(0.06) : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: AppColors.surfaceAlt,
-            child: Text('$serialNo', style: AppTextStyles.caption()),
-          ),
-          SizedBox(width: Responsive.w(10)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(2)),
-                if (item.size.isNotEmpty || item.company.isNotEmpty)
-                  Text(
-                    '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}',
-                    style: AppTextStyles.caption(),
-                  ),
-                SizedBox(height: Responsive.h(2)),
-                Text(
-                  'Qty: ${_formatQty(item.quantity)}${item.unit.isNotEmpty ? ' ${item.unit}' : ''}'
-                      '${item.mrp > 0 ? '   MRP: ${_formatQty(item.mrp)}' : ''}'
-                      '   Rate: ${_formatQty(item.rate)}',
-                  style: AppTextStyles.caption(),
-                ),
-                if (item.isBoxUnit) ...[
-                  SizedBox(height: Responsive.h(2)),
-                  Text(
-                    'Box: ${_formatQty(item.boxQuantity)}   Piece: ${_formatQty(item.pieceQuantity)}',
-                    style: AppTextStyles.caption(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(currency.format(item.amount),
-                  style: AppTextStyles.bodyBold(color: AppColors.primary)),
-              SizedBox(height: Responsive.h(8)),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    onTap: onEdit,
-                    child: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
-                  ),
-                  SizedBox(width: Responsive.w(12)),
-                  InkWell(
-                    onTap: onDelete,
-                    child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class LabeledField extends StatelessWidget {
-  const LabeledField({super.key, required this.label, required this.field});
-  final String label;
-  final Widget field;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: Responsive.h(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppTextStyles.caption()),
-          SizedBox(height: Responsive.h(4)),
-          field,
-        ],
       ),
     );
   }

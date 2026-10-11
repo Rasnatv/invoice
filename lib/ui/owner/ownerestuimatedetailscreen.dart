@@ -1,10 +1,10 @@
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
+import 'package:tileshop/ui/owner/widget/ownerestimatedetailscreenwidget.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -37,12 +37,12 @@ class OwnerEstimateDetailsScreen extends StatelessWidget {
     return BlocProvider(
       create: (_) => OwnerEstimateDetailBloc()
         ..add(OwnerEstimateDetailLoadRequested(estimateId)),
-      child: _OwnerEstimateDetailView(estimateId: estimateId),
+      child: OwnerEstimateDetailView(estimateId: estimateId),
     );
   }
 }
 
-Future<void> _openUpdateScreen(BuildContext context, EstimateDetailModel detail) async {
+Future<void> openUpdateScreen(BuildContext context, EstimateDetailModel detail) async {
   final bloc = context.read<OwnerEstimateDetailBloc>();
   await Navigator.of(context).push(
     MaterialPageRoute(
@@ -56,29 +56,27 @@ Future<void> _openUpdateScreen(BuildContext context, EstimateDetailModel detail)
   bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
 }
 
-class _OwnerEstimateDetailView extends StatefulWidget {
-  const _OwnerEstimateDetailView({required this.estimateId});
+class OwnerEstimateDetailView extends StatefulWidget {
+  const OwnerEstimateDetailView({super.key, required this.estimateId});
   final String estimateId;
 
   @override
-  State<_OwnerEstimateDetailView> createState() => _OwnerEstimateDetailViewState();
+  State<OwnerEstimateDetailView> createState() => OwnerEstimateDetailViewState();
 }
 
-class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
-  final currencyFmt = const _CurrencyFmt();
-
+class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
   // spinner state while PDF / Excel is being built + handed to the share sheet.
-  bool _isGeneratingPdf = false;
-  bool _isGeneratingExcel = false;
+  bool isGeneratingPdf = false;
+  bool isGeneratingExcel = false;
 
-  bool _isOwner(EstimateDetailModel detail) {
+  bool checkIsOwner(EstimateDetailModel detail) {
     return detail.createdByDetails.roleLabel.trim().toLowerCase() == 'owner';
   }
 
   /// Manual refresh (pull-to-refresh + app bar button).
   /// Fires a reload and waits until the bloc finishes loading so the
   /// RefreshIndicator spinner stays visible for the right duration.
-  Future<void> _refresh(BuildContext context) async {
+  Future<void> refresh(BuildContext context) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
     bloc.add(OwnerEstimateDetailLoadRequested(widget.estimateId));
 
@@ -89,17 +87,6 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
           s.status != OwnerEstimateDetailStatus.initial,
     )
         .timeout(const Duration(seconds: 20), onTimeout: () => bloc.state);
-  }
-
-  /// Payment display helpers — prefer the server's pre-formatted labels
-  /// ("Cash", "05 Oct 2026") and fall back to the raw values.
-  String _paymentMethodText(EstimatePayment p) {
-    if (p.methodLabel.isNotEmpty) return p.methodLabel;
-    return p.method.isEmpty ? 'Payment' : p.method;
-  }
-
-  String _paymentDateText(EstimatePayment p) {
-    return p.dateFormatted.isNotEmpty ? p.dateFormatted : p.date;
   }
 
   @override
@@ -116,14 +103,14 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
             Builder(builder: (context) {
               return IconButton(
                 tooltip: 'Share as PDF',
-                icon: _isGeneratingPdf
+                icon: isGeneratingPdf
                     ? const SizedBox(
                   height: 20,
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
                     : const Icon(Icons.picture_as_pdf_rounded),
-                onPressed: _isGeneratingPdf
+                onPressed: isGeneratingPdf
                     ? null
                     : () {
                   final detail = context.read<OwnerEstimateDetailBloc>().state.detail;
@@ -131,7 +118,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                     AppSnackbar.error('Estimate data not loaded yet');
                     return;
                   }
-                  _generateAndSharePdf(detail, _isOwner(detail));
+                  generateAndSharePdf(detail, checkIsOwner(detail));
                 },
               );
             }),
@@ -139,14 +126,14 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
             Builder(builder: (context) {
               return IconButton(
                 tooltip: 'Share as Excel',
-                icon: _isGeneratingExcel
+                icon: isGeneratingExcel
                     ? const SizedBox(
                   height: 20,
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
                     : const Icon(Icons.grid_on_rounded),
-                onPressed: _isGeneratingExcel
+                onPressed: isGeneratingExcel
                     ? null
                     : () {
                   final detail = context.read<OwnerEstimateDetailBloc>().state.detail;
@@ -154,7 +141,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                     AppSnackbar.error('Estimate data not loaded yet');
                     return;
                   }
-                  _generateAndShareExcel(detail, _isOwner(detail));
+                  generateAndShareExcel(detail, checkIsOwner(detail));
                 },
               );
             }),
@@ -184,7 +171,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
               if (state.status == OwnerEstimateDetailStatus.failure ||
                   state.detail == null) {
                 return RefreshIndicator(
-                  onRefresh: () => _refresh(context),
+                  onRefresh: () => refresh(context),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
@@ -211,67 +198,67 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
 
               final detail = state.detail!;
               final isBusy = state.actionStatus == OwnerEstimateActionStatus.inProgress;
-              final isOwner = _isOwner(detail);
+              final isOwner = checkIsOwner(detail);
 
               return Column(
                 children: [
                   Expanded(
                     child: RefreshIndicator(
-                      onRefresh: () => _refresh(context),
+                      onRefresh: () => refresh(context),
                       child: ListView(
                         // Needed so pull-to-refresh works even when content is short
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: EdgeInsets.all(Responsive.w(18)),
                         children: [
-                          _buildHeader(detail),
+                          EstimateHeader(detail: detail),
                           SizedBox(height: Responsive.h(16)),
                           if (detail.notes.isNotEmpty) ...[
-                            _DetailSection(
+                            DetailSection(
                               title: 'Notes',
                               icon: Icons.sticky_note_2_outlined,
                               rows: [
-                                _Row('Notes', detail.notes, icon: Icons.sticky_note_2_outlined),
+                                DetailRow('Notes', detail.notes, icon: Icons.sticky_note_2_outlined),
                               ],
                             ),
                             SizedBox(height: Responsive.h(14)),
                           ],
-                          _DetailSection(
+                          DetailSection(
                             title: 'Customer Details',
                             icon: Icons.groups_2_outlined,
                             rows: [
-                              _Row('Name', detail.customerName, icon: Icons.groups_2_outlined),
-                              _Row('Phone', detail.customerPhone, icon: Icons.phone_outlined),
-                              _Row('Email', detail.customerEmail, icon: Icons.email_outlined),
-                              _Row('Address', detail.customerAddress, icon: Icons.location_on_outlined),
+                              DetailRow('Name', detail.customerName, icon: Icons.groups_2_outlined),
+                              DetailRow('Phone', detail.customerPhone, icon: Icons.phone_outlined),
+                              DetailRow('Email', detail.customerEmail, icon: Icons.email_outlined),
+                              DetailRow('Address', detail.customerAddress, icon: Icons.location_on_outlined),
                             ],
                           ),
                           SizedBox(height: Responsive.h(14)),
-                          _DetailSection(
+                          DetailSection(
                             title: 'Contractor Details',
                             icon: Icons.person_outline,
                             rows: [
-                              _Row('Name', detail.customer.name, icon: Icons.person_outline),
-                              _Row('Phone', detail.customer.phone, icon: Icons.phone_outlined),
-                              _Row('Email', detail.customer.email, icon: Icons.email_outlined),
+                              DetailRow('Name', detail.customer.name, icon: Icons.person_outline),
+                              DetailRow('Phone', detail.customer.phone, icon: Icons.phone_outlined),
+                              DetailRow('Email', detail.customer.email, icon: Icons.email_outlined),
                             ],
                           ),
                           if (detail.salesman.name.isNotEmpty) ...[
                             SizedBox(height: Responsive.h(14)),
-                            _DetailSection(
+                            DetailSection(
                               title: 'Salesman',
                               icon: Icons.badge_outlined,
                               rows: [
-                                _Row('Name', detail.salesman.name, icon: Icons.badge_outlined),
+                                DetailRow('Name', detail.salesman.name, icon: Icons.badge_outlined),
                               ],
                             ),
                           ],
                           if (detail.isApproved) ...[
                             SizedBox(height: Responsive.h(14)),
-                            _DetailSection(
+                            DetailSection(
                               title: 'Approval',
                               icon: Icons.check_circle_outline,
                               rows: [
-                                _Row(
+                                DetailRow(
                                   'Approved By',
                                   detail.approvedByDetails.name.isNotEmpty
                                       ? detail.approvedByDetails.name
@@ -279,38 +266,38 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                                   icon: Icons.check_circle_outline,
                                 ),
                                 if (detail.approvedAt.isNotEmpty)
-                                  _Row('Approved At', detail.approvedAt, icon: Icons.event_outlined),
+                                  DetailRow('Approved At', detail.approvedAt, icon: Icons.event_outlined),
                                 if (detail.approvalNotes.isNotEmpty)
-                                  _Row('Notes', detail.approvalNotes, icon: Icons.info_outline),
+                                  DetailRow('Notes', detail.approvalNotes, icon: Icons.info_outline),
                               ],
                             ),
                           ],
                           if (detail.quotation.exists) ...[
                             SizedBox(height: Responsive.h(14)),
-                            _DetailSection(
+                            DetailSection(
                               title: 'Linked Quotation',
                               icon: Icons.description_outlined,
                               rows: [
-                                _Row('Quotation No.', detail.quotation.quotationNumber,
+                                DetailRow('Quotation No.', detail.quotation.quotationNumber,
                                     icon: Icons.description_outlined),
-                                _Row('Status', detail.quotation.status, icon: Icons.flag_outlined),
+                                DetailRow('Status', detail.quotation.status, icon: Icons.flag_outlined),
                               ],
                             ),
                           ],
                           SizedBox(height: Responsive.h(20)),
-                          _buildItemsTable(detail, number, isOwner),
+                          EstimateItemsTable(detail: detail, number: number, isOwner: isOwner),
                           SizedBox(height: Responsive.h(16)),
-                          _buildSummary(detail, number),
+                          EstimateSummary(detail: detail, number: number),
                           if (detail.payments.isNotEmpty) ...[
                             SizedBox(height: Responsive.h(14)),
-                            _buildPayments(detail),
+                            EstimatePayments(detail: detail),
                           ],
                           SizedBox(height: Responsive.h(8)),
                         ],
                       ),
                     ),
                   ),
-                  _buildBottomBar(context, detail, isBusy),
+                  buildBottomBar(context, detail, isBusy),
                 ],
               );
             },
@@ -320,490 +307,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Header
-  // ---------------------------------------------------------------------
-
-  Widget _buildHeader(EstimateDetailModel detail) {
-    final statusColor = _statusColor(detail.status);
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withOpacity(0.07),
-            AppColors.primary.withOpacity(0.02),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Reference NO.',
-                        style: AppTextStyles.captionnew().copyWith(letterSpacing: 0.6)),
-                    SizedBox(height: Responsive.h(4)),
-                    Text(
-                      detail.estimateNumber,
-                      style: AppTextStyles.bodyBold(),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: Responsive.w(12)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('DATE', style: AppTextStyles.caption().copyWith(letterSpacing: 0.6)),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(detail.dateRaw, style: AppTextStyles.bodyBold()),
-                ],
-              ),
-            ],
-          ),
-          SizedBox(height: Responsive.h(14)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_statusIcon(detail.status), size: 14, color: statusColor),
-                SizedBox(width: Responsive.w(6)),
-                Text(
-                  _statusLabel(detail.status),
-                  style: AppTextStyles.bodyBold(color: statusColor)
-                      .copyWith(fontSize: Responsive.sp(12)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _statusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'approved':
-      case 'delivered':
-        return Icons.check_circle_rounded;
-      case 'rejected':
-        return Icons.cancel_rounded;
-      case 'despatched':
-        return Icons.local_shipping_rounded;
-      default:
-        return Icons.hourglass_top_rounded;
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // Items table (bill-style) — horizontal-scroll grid, print/export style
-  // ---------------------------------------------------------------------
-
-  Widget _buildItemsTable(EstimateDetailModel detail, NumberFormat number, bool isOwner) {
-    final totalQty = detail.items.fold<double>(0, (sum, i) => sum + i.quantity);
-    final totalAmount = detail.items.fold<double>(0, (sum, i) => sum + i.amount);
-    final totalIncentive = detail.items.fold<double>(
-        0, (sum, i) => sum + (i.isIncentiveEligible ? i.incentiveAmount : 0));
-
-    // Only show these columns if at least one item across the whole
-    // estimate actually has a value for them — otherwise the column
-    // would just be a strip of dashes. Rows without a value still show
-    // '-' in that column once it's visible.
-    final hasBoxQty = detail.items.any((i) => i.boxQuantity > 0);
-    final hasPieceQty = detail.items.any((i) => i.pieceQuantity > 0);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.list_alt_rounded, size: 15, color: AppColors.primary),
-                ),
-                SizedBox(width: Responsive.w(8)),
-                Text('Items', style: AppTextStyles.h3()),
-              ],
-            ),
-            Container(
-              padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('Total Items: ${detail.items.length}',
-                  style: AppTextStyles.bodyBold(color: AppColors.primary)),
-            ),
-          ],
-        ),
-        SizedBox(height: Responsive.h(12)),
-        if (detail.items.isEmpty)
-          Container(
-            padding: EdgeInsets.all(Responsive.w(14)),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Text('No items on this estimate.', style: AppTextStyles.caption()),
-          )
-        else
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Table(
-                border: TableBorder(
-                  horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
-                  verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
-                  bottom: BorderSide(color: AppColors.border),
-                ),
-                // Column widths are keyed by index, so build the map
-                // dynamically — the index of every column after Unit
-                // shifts depending on which of Box Qty / Piece Qty /
-                // Incentive are actually shown.
-                columnWidths: (() {
-                  final widths = <int, TableColumnWidth>{};
-                  var col = 0;
-                  widths[col++] = const FixedColumnWidth(34); // Sl.No
-                  widths[col++] = const FixedColumnWidth(150); // Item
-                  widths[col++] = const FixedColumnWidth(120); // Company
-                  widths[col++] = const FixedColumnWidth(90); // Size
-                  widths[col++] = const FixedColumnWidth(95); // Unit
-                  widths[col++] = const FixedColumnWidth(55); // Qty
-                  if (hasBoxQty) widths[col++] = const FixedColumnWidth(70); // Box Qty
-                  if (hasPieceQty) widths[col++] = const FixedColumnWidth(70); // Piece Qty
-                  widths[col++] = const FixedColumnWidth(75); // MRP
-                  widths[col++] = const FixedColumnWidth(75); // Rate
-                  widths[col++] = const FixedColumnWidth(110); // Amount
-                  if (!isOwner) widths[col++] = const FixedColumnWidth(110); // Incentive
-                  return widths;
-                })(),
-                children: [
-                  // ---- Header row ----
-                  TableRow(
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
-                      border: Border(
-                        bottom: BorderSide(
-                            color: AppColors.primary.withOpacity(0.3), width: 1.4),
-                      ),
-                    ),
-                    children: [
-                      _estHeaderCell('Sl.No', align: TextAlign.center),
-                      _estHeaderCell('Item'),
-                      _estHeaderCell('Company'),
-                      _estHeaderCell('Size'),
-                      _estHeaderCell('Unit'),
-                      _estHeaderCell('Qty', align: TextAlign.right),
-                      if (hasBoxQty) _estHeaderCell('Box Qty', align: TextAlign.right),
-                      if (hasPieceQty) _estHeaderCell('Piece Qty', align: TextAlign.right),
-                      _estHeaderCell('MRP', align: TextAlign.right),
-                      _estHeaderCell('Rate', align: TextAlign.right),
-                      _estHeaderCell('Amount', align: TextAlign.right),
-                      if (!isOwner) _estHeaderCell('Incentive', align: TextAlign.right),
-                    ],
-                  ),
-                  // ---- Data rows ----
-                  for (var i = 0; i < detail.items.length; i++)
-                    TableRow(
-                      decoration: BoxDecoration(
-                        color: i.isEven
-                            ? AppColors.surface
-                            : AppColors.surfaceAlt.withOpacity(0.4),
-                      ),
-                      children: [
-                        _estDataCell('${i + 1}', align: TextAlign.center),
-                        _estDataCell(detail.items[i].productName),
-                        _estDataCell(detail.items[i].companyName.isEmpty
-                            ? '-'
-                            : detail.items[i].companyName),
-                        _estDataCell(detail.items[i].productSize.isEmpty
-                            ? '-'
-                            : detail.items[i].productSize),
-                        _estDataCell(detail.items[i].unitName.isEmpty
-                            ? '-'
-                            : detail.items[i].unitName),
-                        _estDataCell(number.format(detail.items[i].quantity),
-                            align: TextAlign.right),
-                        if (hasBoxQty)
-                          _estDataCell(
-                            detail.items[i].boxQuantity > 0
-                                ? number.format(detail.items[i].boxQuantity)
-                                : '-',
-                            align: TextAlign.right,
-                          ),
-                        if (hasPieceQty)
-                          _estDataCell(
-                            detail.items[i].pieceQuantity > 0
-                                ? number.format(detail.items[i].pieceQuantity)
-                                : '-',
-                            align: TextAlign.right,
-                          ),
-                        _estDataCell(
-                            detail.items[i].mrp > 0
-                                ? number.format(detail.items[i].mrp)
-                                : '-',
-                            align: TextAlign.right),
-                        _estDataCell(number.format(detail.items[i].rate),
-                            align: TextAlign.right),
-                        _estDataCell(currencyFmt.f(detail.items[i].amount),
-                            align: TextAlign.right, bold: true),
-                        if (!isOwner)
-                          _estDataCell(
-                            detail.items[i].isIncentiveEligible
-                                ? currencyFmt.f(detail.items[i].incentiveAmount)
-                                : '-',
-                            align: TextAlign.right,
-                            bold: true,
-                            color: AppColors.success,
-                          ),
-                      ],
-                    ),
-                  // ---- Totals footer row ----
-                  TableRow(
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.06),
-                      border: Border(
-                        top: BorderSide(
-                            color: AppColors.primary.withOpacity(0.3), width: 1.2),
-                      ),
-                    ),
-                    children: [
-                      _estDataCell(''),
-                      _estDataCell('Total', bold: true),
-                      _estDataCell(''),
-                      _estDataCell(''),
-                      _estDataCell(''),
-                      _estDataCell(number.format(totalQty),
-                          align: TextAlign.right, bold: true),
-                      if (hasBoxQty) _estDataCell(''),
-                      if (hasPieceQty) _estDataCell(''),
-                      _estDataCell(''),
-                      _estDataCell(''),
-                      _estDataCell(currencyFmt.f(totalAmount),
-                          align: TextAlign.right, bold: true, color: AppColors.primary),
-                      if (!isOwner)
-                        _estDataCell(currencyFmt.f(totalIncentive),
-                            align: TextAlign.right, bold: true, color: AppColors.success),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _estHeaderCell(String text, {TextAlign align = TextAlign.left}) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(10)),
-      child: Text(
-        text,
-        textAlign: align,
-        maxLines: 2,
-        softWrap: true,
-        overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.captionnew().copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-
-  Widget _estDataCell(
-      String text, {
-        TextAlign align = TextAlign.left,
-        bool bold = false,
-        Color? color,
-      }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),
-      child: Text(
-        text,
-        textAlign: align,
-        maxLines: 3,
-        softWrap: true,
-        overflow: TextOverflow.ellipsis,
-        style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(color: color),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------
-  // Summary card
-  //   Subtotal, Handling Charge
-  //   with discount : Amount Before Discount, Discount, Grand Total (after)
-  //   no discount   : Grand Total
-  //   then Total Paid and the Balance strip.
-  // ---------------------------------------------------------------------
-
-  Widget _buildSummary(EstimateDetailModel detail, NumberFormat number) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(Responsive.w(16)),
-            child: Column(
-              children: [
-                _summaryRow('Total Sqrft', number.format(detail.totalSquareFeet)),
-                SizedBox(height: Responsive.h(8)),
-                _summaryRow('Subtotal', currencyFmt.f(detail.subtotal)),
-                SizedBox(height: Responsive.h(8)),
-                _summaryRow('Handling Charge', currencyFmt.f(detail.handlingCharge)),
-                SizedBox(height: Responsive.h(8)),
-                if (detail.hasDiscount) ...[
-                  _summaryRow('Amount Before Discount', currencyFmt.f(detail.grandTotal)),
-                  SizedBox(height: Responsive.h(8)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Discount (${detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel})',
-                          style: AppTextStyles.body(),
-                        ),
-                      ),
-                      Text('- ${currencyFmt.f(detail.discountAmount)}',
-                          style: AppTextStyles.bodyBold(color: Colors.red)),
-                    ],
-                  ),
-                  SizedBox(height: Responsive.h(8)),
-                  _summaryRow('Grand Total', currencyFmt.f(detail.amountAfterDiscount)),
-                ] else
-                  _summaryRow('Grand Total', currencyFmt.f(detail.grandTotal)),
-                SizedBox(height: Responsive.h(8)),
-                _summaryRow('Total Paid', currencyFmt.f(detail.totalPaid),
-                    valueColor: AppColors.success),
-              ],
-            ),
-          ),
-          // Balance strip
-          Container(
-            width: double.infinity,
-            padding:
-            EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(14)),
-            decoration: BoxDecoration(
-              color: detail.balanceAmount > 0
-                  ? Colors.red.withOpacity(0.06)
-                  : AppColors.success.withOpacity(0.08),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Balance Amount', style: AppTextStyles.h3()),
-                Text(
-                  currencyFmt.f(detail.balanceAmount),
-                  style: AppTextStyles.h2(
-                      color: detail.balanceAmount > 0 ? Colors.red : AppColors.success),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPayments(EstimateDetailModel detail) {
-    return _DetailSection(
-      title: 'Payments',
-      icon: Icons.payments_outlined,
-      rows: detail.payments.map((p) {
-        final date = _paymentDateText(p);
-        return _Row(
-          _paymentMethodText(p),
-          '${currencyFmt.f(p.amount)}${date.isNotEmpty ? ' · $date' : ''}',
-          icon: Icons.receipt_long_outlined,
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _summaryRow(String label, String value, {Color? valueColor}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: AppTextStyles.body()),
-        Text(value,
-            style: AppTextStyles.bodyBold(color: valueColor ?? Colors.black)),
-      ],
-    );
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'approved':
-      case 'delivered':
-        return AppColors.success;
-      case 'rejected':
-        return Colors.red;
-      case 'despatched':
-        return AppColors.primary;
-      default:
-        return Colors.orange;
-    }
-  }
-
-  String _statusLabel(String status) {
-    if (status.isEmpty) return 'Pending';
-    return status[0].toUpperCase() + status.substring(1).replaceAll('_', ' ');
-  }
-
-  Future<void> _showRejectDialog(BuildContext context, EstimateDetailModel detail) async {
+  Future<void> showRejectDialog(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
     final reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -860,7 +364,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
   // Bottom bar
   // ---------------------------------------------------------------------
 
-  Widget _buildBottomBar(BuildContext context, EstimateDetailModel detail, bool isBusy) {
+  Widget buildBottomBar(BuildContext context, EstimateDetailModel detail, bool isBusy) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -881,23 +385,23 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
               children: [
                 if (detail.isPendingApproval) ...[
                   SizedBox(width: Responsive.w(10)),
-                  _RoundIconButton(
+                  RoundIconButton(
                     icon: Icons.edit_outlined,
                     tooltip: 'Update',
-                    onPressed: () => _openUpdateScreen(context, detail),
+                    onPressed: () => openUpdateScreen(context, detail),
                   ),
                 ],
               ],
             ),
             SizedBox(height: Responsive.h(10)),
-            _buildActionBar(context, detail, isBusy),
+            buildActionBar(context, detail, isBusy),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildActionBar(BuildContext context, EstimateDetailModel detail, bool isBusy) {
+  Widget buildActionBar(BuildContext context, EstimateDetailModel detail, bool isBusy) {
     if (detail.isPendingApproval) {
       return Row(
         children: [
@@ -909,7 +413,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: isBusy ? null : () => _showRejectDialog(context, detail),
+              onPressed: isBusy ? null : () => showRejectDialog(context, detail),
               child: const Text('Reject'),
             ),
           ),
@@ -918,7 +422,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
             child: PrimaryButton(
               label: isBusy ? 'Please wait...' : 'Approve',
               height: 48,
-              onPressed: isBusy ? null : () => _showApproveDialog(context, detail),
+              onPressed: isBusy ? null : () => showApproveDialog(context, detail),
             ),
           ),
         ],
@@ -951,7 +455,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       return PrimaryButton(
         label: 'Send to Despatch',
         height: 48,
-        onPressed: () => _openDespatchSheet(context, detail),
+        onPressed: () => openDespatchSheet(context, detail),
       );
     }
 
@@ -968,9 +472,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(_statusIcon(detail.status), size: 18, color: AppColors.success),
+          Icon(statusIcon(detail.status), size: 18, color: AppColors.success),
           SizedBox(width: Responsive.w(6)),
-          Text(_statusLabel(detail.status),
+          Text(statusLabel(detail.status),
               style: AppTextStyles.bodyBold(color: AppColors.success)),
         ],
       ),
@@ -980,7 +484,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
   /// Pushes the despatch-sheet creation screen for [detail.id]. That screen
   /// pops with `true` once a despatch is successfully created, so on return
   /// we reload the estimate detail to pick up the new status.
-  Future<void> _openDespatchSheet(BuildContext context, EstimateDetailModel detail) async {
+  Future<void> openDespatchSheet(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
 
     final created = await Navigator.of(context).push<bool>(
@@ -994,7 +498,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     }
   }
 
-  Future<void> _showApproveDialog(BuildContext context, EstimateDetailModel detail) async {
+  Future<void> showApproveDialog(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
     final formKey = GlobalKey<FormState>();
 
@@ -1336,8 +840,8 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
   // PDF export + share
   // ---------------------------------------------------------------------
 
-  Future<void> _generateAndSharePdf(EstimateDetailModel d, bool isOwner) async {
-    setState(() => _isGeneratingPdf = true);
+  Future<void> generateAndSharePdf(EstimateDetailModel d, bool isOwner) async {
+    setState(() => isGeneratingPdf = true);
     try {
       final baseFont = await PdfGoogleFonts.notoSansRegular();
       final boldFont = await PdfGoogleFonts.notoSansBold();
@@ -1360,19 +864,19 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
             ],
           ),
           build: (context) => [
-            _pdfInfoSection(d),
+            pdfInfoSection(d),
             pw.SizedBox(height: 18),
             pw.Text('Items', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
-            _pdfItemsTable(d, isOwner),
+            pdfItemsTable(d, isOwner),
             pw.SizedBox(height: 14),
-            _pdfSummarySection(d),
+            pdfSummarySection(d),
             if (d.payments.isNotEmpty) ...[
               pw.SizedBox(height: 14),
               pw.Text('Payments',
                   style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
-              _pdfPaymentsTable(d),
+              pdfPaymentsTable(d),
             ],
           ],
         ),
@@ -1394,182 +898,16 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     } catch (e) {
       if (mounted) AppSnackbar.error('Failed to generate PDF: $e');
     } finally {
-      if (mounted) setState(() => _isGeneratingPdf = false);
+      if (mounted) setState(() => isGeneratingPdf = false);
     }
-  }
-
-  pw.Widget _pdfInfoSection(EstimateDetailModel d) {
-    final rows = <List<String>>[
-      ['Reference No.', d.estimateNumber],
-      ['Date', d.dateRaw],
-      ['Status', _statusLabel(d.status)],
-      ['Customer Name', d.customerName],
-      ['Customer Phone', d.customerPhone],
-      if (d.customerEmail.isNotEmpty) ['Customer Email', d.customerEmail],
-      if (d.customerAddress.isNotEmpty) ['Customer Address', d.customerAddress],
-      if (d.customer.name.isNotEmpty) ['Contractor Name', d.customer.name],
-      if (d.customer.phone.isNotEmpty) ['Contractor Phone', d.customer.phone],
-      if (d.salesman.name.isNotEmpty) ['Salesman', d.salesman.name],
-      if (d.notes.isNotEmpty) ['Notes', d.notes],
-    ];
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: rows
-          .map((r) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 4),
-        child: pw.Row(
-          children: [
-            pw.SizedBox(
-              width: 130,
-              child: pw.Text(r[0],
-                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-            ),
-            pw.Expanded(
-              child: pw.Text(
-                r[1].isEmpty ? '-' : r[1],
-                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      ))
-          .toList(),
-    );
-  }
-
-  pw.Widget _pdfItemsTable(EstimateDetailModel d, bool isOwner) {
-    // Same "only if at least one item has it" rule as the on-screen table,
-    // so the PDF/Excel exports stay consistent with what's shown on screen.
-    final hasBoxQty = d.items.any((i) => i.boxQuantity > 0);
-    final hasPieceQty = d.items.any((i) => i.pieceQuantity > 0);
-
-    final headers = [
-      '#',
-      'Item',
-      'Company',
-      'Size',
-      'Unit',
-      'Qty',
-      if (hasBoxQty) 'Box Qty',
-      if (hasPieceQty) 'Piece Qty',
-      'MRP',
-      'Rate',
-      'Amount',
-      if (!isOwner) 'Incentive',
-    ];
-    final data = <List<String>>[
-      for (var i = 0; i < d.items.length; i++)
-        [
-          '${i + 1}',
-          d.items[i].productName,
-          d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
-          d.items[i].productSize.isEmpty ? '-' : d.items[i].productSize,
-          d.items[i].unitName.isEmpty ? '-' : d.items[i].unitName,
-          d.items[i].quantity.toStringAsFixed(0),
-          if (hasBoxQty)
-            d.items[i].boxQuantity > 0 ? d.items[i].boxQuantity.toStringAsFixed(0) : '-',
-          if (hasPieceQty)
-            d.items[i].pieceQuantity > 0 ? d.items[i].pieceQuantity.toStringAsFixed(0) : '-',
-          d.items[i].mrp > 0 ? d.items[i].mrp.toStringAsFixed(0) : '-',
-          d.items[i].rate.toStringAsFixed(0),
-          currencyFmt.f(d.items[i].amount),
-          if (!isOwner)
-            d.items[i].isIncentiveEligible ? currencyFmt.f(d.items[i].incentiveAmount) : '-',
-        ],
-    ];
-
-    // Cell alignments are keyed by column index, so build the map
-    // dynamically to match wherever Box Qty / Piece Qty / Incentive
-    // land once the optional headers above are counted in.
-    final cellAlignments = <int, pw.Alignment>{0: pw.Alignment.center};
-    var col = 5; // Qty is always column index 5
-    cellAlignments[col++] = pw.Alignment.centerRight; // Qty
-    if (hasBoxQty) cellAlignments[col++] = pw.Alignment.centerRight; // Box Qty
-    if (hasPieceQty) cellAlignments[col++] = pw.Alignment.centerRight; // Piece Qty
-    cellAlignments[col++] = pw.Alignment.centerRight; // MRP
-    cellAlignments[col++] = pw.Alignment.centerRight; // Rate
-    cellAlignments[col++] = pw.Alignment.centerRight; // Amount
-    if (!isOwner) cellAlignments[col++] = pw.Alignment.centerRight; // Incentive
-
-    return pw.TableHelper.fromTextArray(
-      headers: headers,
-      data: data,
-      headerStyle:
-      pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
-      cellStyle: const pw.TextStyle(fontSize: 9),
-      cellAlignments: cellAlignments,
-      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-      rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-      oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
-    );
-  }
-
-  /// Same order as the on-screen summary card.
-  pw.Widget _pdfSummarySection(EstimateDetailModel d) {
-    final rows = <List<String>>[
-      ['Subtotal', currencyFmt.f(d.subtotal)],
-      ['Handling Charge', currencyFmt.f(d.handlingCharge)],
-      if (d.hasDiscount) ...[
-        ['Amount Before Discount', currencyFmt.f(d.grandTotal)],
-        [
-          'Discount (${d.discountTypeLabel.isEmpty ? d.discountType : d.discountTypeLabel})',
-          '- ${currencyFmt.f(d.discountAmount)}'
-        ],
-        ['Grand Total', currencyFmt.f(d.amountAfterDiscount)],
-      ] else
-        ['Grand Total', currencyFmt.f(d.grandTotal)],
-      ['Total Paid', currencyFmt.f(d.totalPaid)],
-      ['Balance Amount', currencyFmt.f(d.balanceAmount)],
-    ];
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.end,
-      children: rows
-          .map((r) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 4),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.end,
-          children: [
-            pw.Text('${r[0]}: ', style: const pw.TextStyle(fontSize: 10)),
-            pw.Text(r[1], style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-          ],
-        ),
-      ))
-          .toList(),
-    );
-  }
-
-  pw.Widget _pdfPaymentsTable(EstimateDetailModel d) {
-    final headers = ['Method', 'Amount', 'Date'];
-    final data = d.payments
-        .map((p) => [
-      _paymentMethodText(p),
-      currencyFmt.f(p.amount),
-      _paymentDateText(p).isEmpty ? '-' : _paymentDateText(p),
-    ])
-        .toList();
-
-    return pw.TableHelper.fromTextArray(
-      headers: headers,
-      data: data,
-      headerStyle:
-      pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
-      cellStyle: const pw.TextStyle(fontSize: 9),
-      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-      rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-      oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
-    );
   }
 
   // ---------------------------------------------------------------------
   // Excel export + share
   // ---------------------------------------------------------------------
 
-  Future<void> _generateAndShareExcel(EstimateDetailModel d, bool isOwner) async {
-    setState(() => _isGeneratingExcel = true);
+  Future<void> generateAndShareExcel(EstimateDetailModel d, bool isOwner) async {
+    setState(() => isGeneratingExcel = true);
     try {
       final excelFile = xls.Excel.createExcel();
       const sheetName = 'Estimate';
@@ -1589,7 +927,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
       addRow([]);
       addRow(['Reference No.', d.estimateNumber]);
       addRow(['Date', d.dateRaw]);
-      addRow(['Status', _statusLabel(d.status)]);
+      addRow(['Status', statusLabel(d.status)]);
       addRow(['Customer Name', d.customerName]);
       addRow(['Customer Phone', d.customerPhone]);
       addRow(['Customer Email', d.customerEmail]);
@@ -1657,9 +995,9 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
         addRow(['Method', 'Amount', 'Date']);
         for (final p in d.payments) {
           addRow([
-            _paymentMethodText(p),
+            paymentMethodText(p),
             currencyFmt.f(p.amount),
-            _paymentDateText(p).isEmpty ? '-' : _paymentDateText(p),
+            paymentDateText(p).isEmpty ? '-' : paymentDateText(p),
           ]);
         }
       }
@@ -1686,119 +1024,7 @@ class _OwnerEstimateDetailViewState extends State<_OwnerEstimateDetailView> {
     } catch (e) {
       if (mounted) AppSnackbar.error('Failed to generate Excel file: $e');
     } finally {
-      if (mounted) setState(() => _isGeneratingExcel = false);
+      if (mounted) setState(() => isGeneratingExcel = false);
     }
   }
-}
-
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, required this.onPressed, this.tooltip});
-  final IconData icon;
-  final VoidCallback? onPressed;
-  final String? tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    final button = InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Icon(icon, size: 20, color: AppColors.primary),
-      ),
-    );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
-  }
-}
-
-class _Row {
-  final String label;
-  final String value;
-  final IconData? icon;
-  _Row(this.label, this.value, {this.icon});
-}
-
-class _DetailSection extends StatelessWidget {
-  const _DetailSection({required this.title, required this.rows, this.icon});
-  final String title;
-  final List<_Row> rows;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (icon != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, size: 15, color: AppColors.primary),
-                ),
-                SizedBox(width: Responsive.w(8)),
-              ],
-              Text(title,
-                  style: AppTextStyles.bodyBold(color: AppColors.primary)
-                      .copyWith(fontSize: Responsive.sp(13.5))),
-            ],
-          ),
-          SizedBox(height: Responsive.h(12)),
-          ...rows.map((r) => Padding(
-            padding: EdgeInsets.only(bottom: Responsive.h(10)),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (r.icon != null) ...[
-                  Icon(r.icon, size: 15, color: AppColors.textHint),
-                  SizedBox(width: Responsive.w(8)),
-                ],
-                SizedBox(
-                  width: r.icon != null ? 86 : 100,
-                  child: Text(r.label, style: AppTextStyles.caption()),
-                ),
-                Expanded(
-                  child: Text(
-                    r.value.isEmpty ? '-' : r.value,
-                    style: AppTextStyles.bodyBold(),
-                  ),
-                ),
-              ],
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-}
-
-class _CurrencyFmt {
-  const _CurrencyFmt();
-  String f(double v) =>
-      NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2).format(v);
 }
