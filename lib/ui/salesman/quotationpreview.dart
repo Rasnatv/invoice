@@ -1,3 +1,5 @@
+
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +14,16 @@ import '../../bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../widgets/appsnackbar.dart';
+
+// UI only: standard column widths for the items grid.
+class _Col {
+  static const double sl = 60; // Sl.No
+  static const double text = 180; // Item / Company
+  static const double size = 120; // Size
+  static const double unit = 120; // Unit
+  static const double num = 120; // Qty, Box Qty, Piece Qty, MRP, Rate
+  static const double money = 180; // Amount, Incentive
+}
 
 class QuotationPreviewScreen extends StatefulWidget {
   const QuotationPreviewScreen({super.key, required this.id});
@@ -280,78 +292,113 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                           children: [
                             // ---- Header card ----
                             Container(
+                              width: double.infinity,
                               padding: EdgeInsets.all(Responsive.w(16)),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    AppColors.primary.withOpacity(0.07),
+                                    AppColors.primary.withOpacity(0.10),
                                     AppColors.primary.withOpacity(0.02),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                    color: AppColors.primary.withOpacity(0.14)),
+                                    color: AppColors.primary.withOpacity(0.16)),
                               ),
-                              child: Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                  Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('Quotation No.',
-                                          style: AppTextStyles.caption()),
-                                      Text(
-                                        estimate.quotationNumber.isEmpty
-                                            ? '#${estimate.id}'
-                                            : estimate.quotationNumber,
-                                        style: AppTextStyles.h3(),
+                                      const _IconBadge(
+                                          Icons.description_outlined,
+                                          size: 20),
+                                      // Status pill
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.14),
+                                          borderRadius:
+                                          BorderRadius.circular(20),
+                                          border: Border.all(
+                                              color:
+                                              statusColor.withOpacity(0.35)),
+                                        ),
+                                        child: Text(
+                                          estimate.status.isEmpty
+                                              ? '-'
+                                              : estimate.status,
+                                          style: AppTextStyles.bodyBold(
+                                              color: statusColor)
+                                              .copyWith(
+                                              fontSize: Responsive.sp(12)),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                  SizedBox(height: Responsive.h(14)),
+                                  Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                     children: [
-                                      Text('Date',
-                                          style: AppTextStyles.caption()),
-                                      Text(
-                                        estimate.date != null
-                                            ? DateFormat('dd-MM-yyyy')
-                                            .format(estimate.date!)
-                                            : estimate.dateRaw,
-                                        style: AppTextStyles.h3(),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                          children: [
+                                            Text('QUOTATION NO.',
+                                                style: AppTextStyles.caption()
+                                                    .copyWith(
+                                                    letterSpacing: 0.8)),
+                                            SizedBox(height: Responsive.h(4)),
+                                            Text(
+                                              estimate.quotationNumber.isEmpty
+                                                  ? '#${estimate.id}'
+                                                  : estimate.quotationNumber,
+                                              style: AppTextStyles.bodyBold()
+                                                  .copyWith(
+                                                  fontSize:
+                                                  Responsive.sp(16)),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(width: Responsive.w(12)),
+                                      Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                        children: [
+                                          Text('DATE',
+                                              style: AppTextStyles.caption()
+                                                  .copyWith(letterSpacing: 0.8)),
+                                          SizedBox(height: Responsive.h(4)),
+                                          Text(
+                                            estimate.date != null
+                                                ? DateFormat('dd-MM-yyyy')
+                                                .format(estimate.date!)
+                                                : estimate.dateRaw,
+                                            style: AppTextStyles.bodyBold(),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
                             ),
-                            SizedBox(height: Responsive.h(10)),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  estimate.status.isEmpty
-                                      ? '-'
-                                      : estimate.status,
-                                  style: AppTextStyles.bodyBold(
-                                      color: statusColor),
-                                ),
-                              ),
-                            ),
                             SizedBox(height: Responsive.h(16)),
 
                             _PreviewSection(
                               title: 'Customer Details',
+                              icon: Icons.groups_2_outlined,
                               rows: [
                                 _PreviewRow('Name', estimate.customer.name,
                                     icon: Icons.groups_2_outlined),
@@ -369,6 +416,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
 
                             _PreviewSection(
                               title: 'Contractor Details',
+                              icon: Icons.person_outline,
                               rows: [
                                 _PreviewRow('Name', estimate.contractor.name,
                                     icon: Icons.engineering_outlined),
@@ -378,13 +426,13 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                 _PreviewRow(
                                     'Email', estimate.contractor.email,
                                     icon: Icons.alternate_email),
-
                               ],
                             ),
                             SizedBox(height: Responsive.h(14)),
 
                             _PreviewSection(
                               title: 'Salesman',
+                              icon: Icons.badge_outlined,
                               rows: [
                                 _PreviewRow('Name', estimate.salesman.name,
                                     icon: Icons.badge_outlined),
@@ -395,26 +443,33 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Items', style: AppTextStyles.h3()),
+                                Row(
+                                  children: [
+                                    const _IconBadge(Icons.list_alt_rounded),
+                                    SizedBox(width: Responsive.w(10)),
+                                    Text('Items', style: AppTextStyles.h3()),
+                                  ],
+                                ),
                                 Container(
                                   padding: EdgeInsets.symmetric(
-                                      horizontal: Responsive.w(10),
-                                      vertical: Responsive.h(4)),
+                                      horizontal: Responsive.w(12),
+                                      vertical: Responsive.h(5)),
                                   decoration: BoxDecoration(
-                                    color: AppColors.surfaceAlt,
+                                    color: AppColors.primary.withOpacity(0.08),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
                                     'Total Items: ${estimate.itemsCount}',
                                     style: AppTextStyles.bodyBold(
-                                        color: AppColors.primary),
+                                        color: AppColors.primary)
+                                        .copyWith(fontSize: Responsive.sp(12)),
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: Responsive.h(10)),
+                            SizedBox(height: Responsive.h(12)),
 
-                            // ---- Bordered items table (wrapping text) ----
+                            // ---- Bordered items table ----
                             _InvoiceTable(
                               items: estimate.items,
                               showBox: hasBoxQty,
@@ -428,6 +483,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                             if (estimate.notes.isNotEmpty) ...[
                               _PreviewSection(
                                 title: 'Notes',
+                                icon: Icons.sticky_note_2_outlined,
                                 rows: [_PreviewRow('', estimate.notes)],
                               ),
                               SizedBox(height: Responsive.h(14)),
@@ -452,6 +508,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                             if (isApproved && estimate.payments.isNotEmpty) ...[
                               _PreviewSection(
                                 title: 'Payments',
+                                icon: Icons.payments_outlined,
                                 rows: estimate.payments.map((p) {
                                   final parsed = DateTime.tryParse(p.date);
                                   final dateText = parsed != null
@@ -477,7 +534,10 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                 estimate.items
                                     .any((i) => i.incentiveAmount > 0))
                               Container(
-                                padding: EdgeInsets.all(Responsive.w(14)),
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: Responsive.w(14),
+                                    vertical: Responsive.h(14)),
                                 decoration: BoxDecoration(
                                   color: AppColors.success.withOpacity(0.08),
                                   borderRadius: BorderRadius.circular(14),
@@ -491,10 +551,9 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                   children: [
                                     Row(
                                       children: [
-                                        Icon(Icons.percent,
-                                            size: 18,
+                                        _IconBadge(Icons.percent_rounded,
                                             color: AppColors.success),
-                                        SizedBox(width: Responsive.w(8)),
+                                        SizedBox(width: Responsive.w(10)),
                                         Text('Incentive Total',
                                             style: AppTextStyles.bodyBold(
                                                 color: AppColors.success)),
@@ -521,13 +580,18 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                     Container(
                       padding: EdgeInsets.fromLTRB(
                           Responsive.w(18),
-                          Responsive.h(10),
+                          Responsive.h(12),
                           Responsive.w(18),
-                          Responsive.h(14)),
+                          Responsive.h(16)),
                       decoration: BoxDecoration(
-                        color: AppColors.background,
-                        border:
-                        Border(top: BorderSide(color: AppColors.border)),
+                        color: AppColors.surface,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, -3),
+                          ),
+                        ],
                       ),
                       child: BlocBuilder<SalesmanQuotationBloc,
                           SalesmanQuotationState>(
@@ -602,6 +666,11 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                           ? AppColors.success.withOpacity(0.08)
                                           : AppColors.surfaceAlt,
                                       borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: isApproved
+                                            ? AppColors.success.withOpacity(0.3)
+                                            : AppColors.border,
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisAlignment:
@@ -662,7 +731,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
       double mrpTotal,
       bool isApproved,
       ) {
-    final gap = SizedBox(height: Responsive.h(6));
+    final gap = SizedBox(height: Responsive.h(10));
     final showDiscount = isApproved && q.hasDiscount;
     final showPayment = isApproved && q.showPaymentSummary;
     final payable = isApproved ? q.amountAfterDiscount : q.grandTotal;
@@ -670,15 +739,14 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
 
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: _cardDecoration(radius: 16),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const _CardTitle(title: 'Summary', icon: Icons.calculate_outlined),
           Padding(
-            padding: EdgeInsets.all(Responsive.w(14)),
+            padding: EdgeInsets.all(Responsive.w(16)),
             child: Column(
               children: [
                 _totalRow('Total Sq.Ft', number.format(q.totalSquareFeet)),
@@ -696,12 +764,11 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                     bold: true,
                     valueColor: Colors.red,
                   ),
-                  gap,
                 ],
-                const Divider(height: 20),
+                const Divider(height: 24),
                 _totalRow('Grand Total', fmt.format(payable), large: true),
                 if (showPayment) ...[
-                  SizedBox(height: Responsive.h(10)),
+                  gap,
                   _totalRow(
                     'Total Paid',
                     fmt.format(q.totalPaid),
@@ -716,9 +783,13 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
           if (showPayment)
             Container(
               width: double.infinity,
-              color: balanceColor.withOpacity(0.08),
+              decoration: BoxDecoration(
+                color: balanceColor.withOpacity(0.08),
+                border: Border(
+                    top: BorderSide(color: balanceColor.withOpacity(0.25))),
+              ),
               padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(14), vertical: Responsive.h(14)),
+                  horizontal: Responsive.w(16), vertical: Responsive.h(14)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -739,7 +810,9 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     final color = _balanceStatusColor(q.balanceStatus);
     final isPaid = q.balanceStatus == 'paid';
     return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(14)),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(14),
@@ -750,14 +823,13 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
         children: [
           Row(
             children: [
-              Icon(
+              _IconBadge(
                 isPaid
                     ? Icons.check_circle_outline
                     : Icons.hourglass_bottom_outlined,
-                size: 18,
                 color: color,
               ),
-              SizedBox(width: Responsive.w(8)),
+              SizedBox(width: Responsive.w(10)),
               Text('Payment Status',
                   style: AppTextStyles.bodyBold(color: color)),
             ],
@@ -782,18 +854,113 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
         ? AppTextStyles.h3().copyWith(fontWeight: FontWeight.w700)
         : AppTextStyles.body();
 
-    final valueStyle = large
+    final valueStyle = (large
         ? AppTextStyles.h2(color: valueColor ?? AppColors.primary)
         .copyWith(fontWeight: FontWeight.w800)
         : (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
-        .copyWith(color: valueColor);
+        .copyWith(color: valueColor))
+        .copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
 
+    // return Row(
+    //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    //   children: [
+    //     Text(label, style: labelStyle),
+    //     Text(value, style: valueStyle),
+    //   ],
+    // );
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(label, style: labelStyle),
-        Text(value, style: valueStyle),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                style: valueStyle,
+                maxLines: 1,
+                softWrap: false,
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// Shared look (UI only)
+// ---------------------------------------------------------------------
+
+BoxDecoration _cardDecoration({double radius = 14}) => BoxDecoration(
+  color: AppColors.surface,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border.withOpacity(0.8)),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 10,
+      offset: const Offset(0, 3),
+    ),
+  ],
+);
+
+class _IconBadge extends StatelessWidget {
+  const _IconBadge(this.icon, {this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+class _CardTitle extends StatelessWidget {
+  const _CardTitle({required this.title, this.icon});
+  final String title;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.05),
+        border: Border(
+            bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            _IconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              style: AppTextStyles.bodyBold(color: AppColors.primary)
+                  .copyWith(fontSize: Responsive.sp(14)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -806,48 +973,61 @@ class _PreviewRow {
 }
 
 class _PreviewSection extends StatelessWidget {
-  const _PreviewSection({required this.title, required this.rows});
+  const _PreviewSection({required this.title, required this.rows, this.icon});
   final String title;
   final List<_PreviewRow> rows;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: _cardDecoration(),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTextStyles.bodyBold(color: AppColors.primary)),
-          SizedBox(height: Responsive.h(10)),
-          ...rows.map((r) => Padding(
-            padding: EdgeInsets.only(bottom: Responsive.h(10)),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          _CardTitle(title: title, icon: icon),
+          Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(4)),
+            child: Column(
               children: [
-                if (r.icon != null) ...[
-                  Icon(r.icon, size: 16, color: AppColors.textHint),
-                  SizedBox(width: Responsive.w(8)),
+                for (var i = 0; i < rows.length; i++) ...[
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (rows[i].icon != null) ...[
+                          Icon(rows[i].icon,
+                              size: 16, color: AppColors.textHint),
+                          SizedBox(width: Responsive.w(10)),
+                        ],
+                        if (rows[i].label.isNotEmpty) ...[
+                          SizedBox(
+                            width: 92,
+                            child: Text(rows[i].label,
+                                style: AppTextStyles.caption()),
+                          ),
+                          SizedBox(width: Responsive.w(8)),
+                        ],
+                        Expanded(
+                          child: Text(
+                            rows[i].value.isEmpty ? '-' : rows[i].value,
+                            style: AppTextStyles.bodyBold(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (i != rows.length - 1)
+                    Divider(
+                        height: 1, color: AppColors.border.withOpacity(0.5)),
                 ],
-                if (r.label.isNotEmpty)
-                  SizedBox(
-                    width: r.icon != null ? 88 : 100,
-                    child: Text(r.label, style: AppTextStyles.caption()),
-                  ),
-                Expanded(
-                  child: Text(
-                    r.value.isEmpty ? '-' : r.value,
-                    style: AppTextStyles.bodyBold(),
-                  ),
-                ),
               ],
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -855,8 +1035,7 @@ class _PreviewSection extends StatelessWidget {
 }
 
 // =======================================================================
-// Bordered items table with wrapping text and a Total row
-// (same column widths / wrapping as Salesman Estimate Detail)
+// Bordered items table with a Total row — standard column widths
 // =======================================================================
 class _InvoiceTable extends StatelessWidget {
   const _InvoiceTable({
@@ -877,12 +1056,9 @@ class _InvoiceTable extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return Container(
-        padding: EdgeInsets.all(Responsive.w(14)),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
+        width: double.infinity,
+        padding: EdgeInsets.all(Responsive.w(18)),
+        decoration: _cardDecoration(),
         child: Text('No items on this quotation.',
             style: AppTextStyles.caption()),
       );
@@ -890,18 +1066,18 @@ class _InvoiceTable extends StatelessWidget {
 
     // label, width, alignment
     final cols = <(String, double, TextAlign)>[
-      ('Sl.No', 44, TextAlign.center),
-      ('Item', 150, TextAlign.left),
-      ('Company', 120, TextAlign.left),
-      ('Size', 90, TextAlign.left),
-      ('Qty', 60, TextAlign.right),
-      ('Unit', 75, TextAlign.left),
-      if (showBox) ('Box Qty', 70, TextAlign.right),
-      if (showPiece) ('Piece Qty', 75, TextAlign.right),
-      ('MRP', 80, TextAlign.right),
-      ('Rate', 75, TextAlign.right),
-      ('Amount', 100, TextAlign.right),
-      if (showIncentive) ('Incentive', 95, TextAlign.right),
+      ('Sl.No', _Col.sl, TextAlign.center),
+      ('Item', _Col.text, TextAlign.left),
+      ('Company', _Col.text, TextAlign.left),
+      ('Size', _Col.size, TextAlign.left),
+      ('Qty', _Col.num, TextAlign.right),
+      ('Unit', _Col.unit, TextAlign.left),
+      if (showBox) ('Box Qty', _Col.num, TextAlign.right),
+      if (showPiece) ('Piece Qty', _Col.num, TextAlign.right),
+      ('MRP', _Col.num, TextAlign.right),
+      ('Rate', _Col.num, TextAlign.right),
+      ('Amount', _Col.money, TextAlign.right),
+      if (showIncentive) ('Incentive', _Col.money, TextAlign.right),
     ];
 
     final amountCol = cols.indexWhere((c) => c.$1 == 'Amount');
@@ -913,45 +1089,49 @@ class _InvoiceTable extends StatelessWidget {
     final totalIncentive = items.fold<double>(
         0, (s, i) => s + (i.incentiveAmount > 0 ? i.incentiveAmount : 0));
 
+    final cellFont = Responsive.sp(12.5);
+
     Alignment alignOf(int c) => switch (cols[c].$3) {
       TextAlign.right => Alignment.centerRight,
       TextAlign.center => Alignment.center,
       _ => Alignment.centerLeft,
     };
 
-    // Header can wrap to 2 lines.
+    // Header stays on one line so every header looks the same.
     Widget headerCell(int c) => Container(
       alignment: alignOf(c),
       padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(8), vertical: Responsive.h(10)),
+          horizontal: Responsive.w(10), vertical: Responsive.h(12)),
       child: Text(
         cols[c].$1,
         textAlign: cols[c].$3,
-        maxLines: 2,
-        softWrap: true,
+        maxLines: 1,
+        softWrap: false,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.captionnew().copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-          letterSpacing: 0.3,
+        style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(
+          fontSize: cellFont,
+          letterSpacing: 0.2,
         ),
       ),
     );
 
-    // Data cells wrap (up to 3 lines) instead of spilling out of the column.
+    // Data cells are capped at two lines with an ellipsis.
     Widget dataCell(String text, int c, {bool bold = false, Color? color}) =>
         Container(
           alignment: alignOf(c),
           padding: EdgeInsets.symmetric(
-              horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+              horizontal: Responsive.w(10), vertical: Responsive.h(10)),
           child: Text(
             text,
             textAlign: cols[c].$3,
-            maxLines: 3,
-            softWrap: true,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
-                .copyWith(color: color),
+                .copyWith(
+              color: color,
+              fontSize: cellFont,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         );
 
@@ -976,14 +1156,16 @@ class _InvoiceTable extends StatelessWidget {
         decoration: BoxDecoration(
           color: i.isEven
               ? AppColors.surface
-              : AppColors.surfaceAlt.withOpacity(0.4),
+              : AppColors.surfaceAlt.withOpacity(0.45),
         ),
         children: [
           for (var c = 0; c < values.length; c++)
             dataCell(
               values[c],
               c,
-              bold: c == amountCol || (showIncentive && c == incentiveCol),
+              bold: c == 1 ||
+                  c == amountCol ||
+                  (showIncentive && c == incentiveCol),
               color: (showIncentive && c == incentiveCol)
                   ? AppColors.success
                   : null,
@@ -1000,10 +1182,10 @@ class _InvoiceTable extends StatelessWidget {
       if (showIncentive) values[incentiveCol] = currency.format(totalIncentive);
       return TableRow(
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.06),
+          color: AppColors.primary.withOpacity(0.07),
           border: Border(
             top: BorderSide(
-                color: AppColors.primary.withOpacity(0.3), width: 1.2),
+                color: AppColors.primary.withOpacity(0.35), width: 1.2),
           ),
         ),
         children: [
@@ -1022,45 +1204,58 @@ class _InvoiceTable extends StatelessWidget {
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          border: TableBorder.all(color: AppColors.border, width: 0.8),
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          columnWidths: {
-            for (var c = 0; c < cols.length; c++)
-              c: FixedColumnWidth(cols[c].$2),
-          },
-          children: [
-            TableRow(
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
-                border: Border(
-                  bottom: BorderSide(
-                      color: AppColors.primary.withOpacity(0.3), width: 1.4),
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: _cardDecoration(),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Table(
+              border: TableBorder(
+                horizontalInside:
+                BorderSide(color: AppColors.border.withOpacity(0.45)),
+                verticalInside:
+                BorderSide(color: AppColors.border.withOpacity(0.30)),
               ),
-              children: [for (var c = 0; c < cols.length; c++) headerCell(c)],
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              columnWidths: {
+                for (var c = 0; c < cols.length; c++)
+                  c: FixedColumnWidth(cols[c].$2),
+              },
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.09),
+                    border: Border(
+                      bottom: BorderSide(
+                          color: AppColors.primary.withOpacity(0.35),
+                          width: 1.4),
+                    ),
+                  ),
+                  children: [
+                    for (var c = 0; c < cols.length; c++) headerCell(c)
+                  ],
+                ),
+                for (var i = 0; i < items.length; i++) itemRow(i, items[i]),
+                totalRow(),
+              ],
             ),
-            for (var i = 0; i < items.length; i++) itemRow(i, items[i]),
-            totalRow(),
+          ),
+        ),
+        SizedBox(height: Responsive.h(6)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.swipe_rounded, size: 14, color: AppColors.textHint),
+            SizedBox(width: Responsive.w(4)),
+            Text('Swipe sideways to see all columns',
+                style: AppTextStyles.caption()
+                    .copyWith(fontSize: Responsive.sp(11))),
           ],
         ),
-      ),
+      ],
     );
   }
 }

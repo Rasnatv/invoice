@@ -13,6 +13,7 @@ import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
 import '../../models/owner_models/owner_estimateactionmodel.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
 import 'owner_estimateupdation.dart';
@@ -54,6 +55,7 @@ Future<void> openUpdateScreen(BuildContext context, EstimateDetailModel detail) 
   );
   // Reload after coming back so the page always shows the latest data.
   bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
+  ownerDataRefresh.value++; // estimate may have been edited
 }
 
 class OwnerEstimateDetailView extends StatefulWidget {
@@ -152,9 +154,11 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
             // Only react when the action status actually changes, so the
             // snackbar doesn't re-fire on every later emit.
             listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
+
             listener: (context, state) {
               if (state.actionStatus == OwnerEstimateActionStatus.success) {
                 AppSnackbar.success(state.actionMessage ?? 'Done');
+                ownerDataRefresh.value++; // approve/reject done -> refresh dashboard + list
               } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
                 AppSnackbar.error(state.actionMessage ?? 'Action failed');
               }
@@ -481,9 +485,7 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
     );
   }
 
-  /// Pushes the despatch-sheet creation screen for [detail.id]. That screen
-  /// pops with `true` once a despatch is successfully created, so on return
-  /// we reload the estimate detail to pick up the new status.
+
   Future<void> openDespatchSheet(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
 
@@ -495,6 +497,7 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
 
     if (created == true) {
       bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
+      ownerDataRefresh.value++; // status changed to despatched
     }
   }
 
@@ -548,18 +551,30 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
 
     Widget previewRow(String label, String value,
         {bool bold = false, Color? color, double size = 0}) {
-      final base = bold ? AppTextStyles.bodyBold() : AppTextStyles.body();
+      final base = bold ? AppTextStyles.bodyBold() : AppTextStyles.bodyBold();
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(label, style: AppTextStyles.body()),
-            Text(
-              value,
-              style: base.copyWith(
-                color: color,
-                fontSize: size > 0 ? size : null,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: base.copyWith(
+                      color: color,
+                      fontSize: size > 0 ? size : null,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -868,7 +883,8 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
             pw.SizedBox(height: 18),
             pw.Text('Items', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
-            pdfItemsTable(d, isOwner),
+            // pdfItemsTable(d, isOwner),
+            pdfItemsTable(d, true), //
             pw.SizedBox(height: 14),
             pdfSummarySection(d),
             if (d.payments.isNotEmpty) ...[

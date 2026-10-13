@@ -16,8 +16,6 @@ import '../../../widgets/custom_text_field.dart';
 import '../../../widgets/primary_button.dart';
 import 'ownerestimatetype.dart';
 
-
-
 class _UnitFieldVisibility {
   final bool showSize;
   final bool showPacking;
@@ -897,10 +895,11 @@ class _AddedItemTile extends StatelessWidget {
 
 // =====================================================================
 // STEP 3 — PREVIEW
-// Box Qty / Piece Qty columns only render when at least one item in the
-// preview actually has box/piece quantities. Discount and Payment are
-// owner-only add-ons captured here for the Approve step; they don't
-// change the server-calculated preview totals shown below them.
+// Items are shown in an Excel-style grid with all columns (Sl.No, Item,
+// Company, Size, Qty, Unit, Box/Piece Qty, MRP, Rate, Amount). Box Qty /
+// Piece Qty columns only render when at least one item has them.
+// Discount and Payment are NOT shown here — they are collected in the
+// Approve dialog.
 // =====================================================================
 
 class PreviewStep extends StatelessWidget {
@@ -916,16 +915,7 @@ class PreviewStep extends StatelessWidget {
     required this.contractorEmail,
     required this.handlingChargeCtrl,
     required this.notesCtrl,
-    this.discountType,
-    this.discountValue,
-    this.paymentAmount,
     required this.onHandlingChargeChanged,
-    required this.onAddDiscount,
-    required this.onEditDiscount,
-    required this.onClearDiscount,
-    required this.onAddPayment,
-    required this.onEditPayment,
-    required this.onClearPayment,
     required this.onRetryPreview,
     required this.onSaveDraft,
     required this.onApprove,
@@ -942,17 +932,7 @@ class PreviewStep extends StatelessWidget {
   final TextEditingController handlingChargeCtrl;
   final TextEditingController notesCtrl;
 
-  final String? discountType;
-  final double? discountValue;
-  final double? paymentAmount;
-
   final VoidCallback onHandlingChargeChanged;
-  final VoidCallback onAddDiscount;
-  final VoidCallback onEditDiscount;
-  final VoidCallback onClearDiscount;
-  final VoidCallback onAddPayment;
-  final VoidCallback onEditPayment;
-  final VoidCallback onClearPayment;
   final VoidCallback onRetryPreview;
   final VoidCallback onSaveDraft;
   final VoidCallback onApprove;
@@ -998,27 +978,7 @@ class PreviewStep extends StatelessWidget {
               final preview = state.preview;
               if (preview == null) return const SizedBox.shrink();
 
-              // Only show Box Qty / Piece Qty columns if at least one
-              // item actually has box/piece quantities.
-              final hasBoxPieceData =
-              preview.items.any((item) => item.boxQuantity > 0 || item.pieceQuantity > 0);
-
-              // ---- Grand total / discount / payment (display only) ----
               final grandTotal = preview.totals.grandTotal;
-              final hasDiscount =
-                  discountType != null && discountValue != null && discountValue! > 0;
-              double discountAmount = 0;
-              if (hasDiscount) {
-                discountAmount = discountType == QuotationDiscountType.percentage
-                    ? grandTotal * discountValue! / 100
-                    : discountValue!;
-                if (discountAmount > grandTotal) discountAmount = grandTotal;
-              }
-              final totalAfterDiscount = grandTotal - discountAmount;
-              final hasPayment = paymentAmount != null && paymentAmount! > 0;
-              final balanceDue = (totalAfterDiscount - (paymentAmount ?? 0))
-                  .clamp(0, double.infinity)
-                  .toDouble();
 
               return ListView(
                 padding: EdgeInsets.all(Responsive.w(18)),
@@ -1085,54 +1045,11 @@ class PreviewStep extends StatelessWidget {
                   ),
                   SizedBox(height: Responsive.h(10)),
 
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: MaterialStateProperty.all(AppColors.surfaceAlt),
-                        headingTextStyle: AppTextStyles.bodyBold(),
-                        dataTextStyle: AppTextStyles.body(),
-                        columnSpacing: 18,
-                        columns: [
-                          const DataColumn(label: Text('Sl.No')),
-                          const DataColumn(label: Text('Item')),
-                          const DataColumn(label: Text('Company')),
-                          const DataColumn(label: Text('Size')),
-                          const DataColumn(label: Text('Qty'), numeric: true),
-                          const DataColumn(label: Text('Unit')),
-                          if (hasBoxPieceData) const DataColumn(label: Text('Box Qty'), numeric: true),
-                          if (hasBoxPieceData) const DataColumn(label: Text('Piece Qty'), numeric: true),
-                          const DataColumn(label: Text('MRP'), numeric: true),
-                          const DataColumn(label: Text('Rate'), numeric: true),
-                          const DataColumn(label: Text('Amount'), numeric: true),
-                        ],
-                        rows: preview.items.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final item = entry.value;
-                          return DataRow(cells: [
-                            DataCell(Text('${i + 1}')),
-                            DataCell(Text(item.productName)),
-                            DataCell(Text(item.productCompany.isEmpty ? '-' : item.productCompany)),
-                            DataCell(Text(item.productSize.isEmpty ? '-' : item.productSize)),
-                            DataCell(Text(number.format(item.quantity))),
-                            DataCell(Text(item.productUnit)),
-                            if (hasBoxPieceData)
-                              DataCell(Text(item.boxQuantity > 0 ? number.format(item.boxQuantity) : '-')),
-                            if (hasBoxPieceData)
-                              DataCell(Text(item.pieceQuantity > 0 ? number.format(item.pieceQuantity) : '-')),
-                            DataCell(Text(item.mrp > 0 ? number.format(item.mrp) : '-')),
-                            DataCell(Text(number.format(item.rate))),
-                            DataCell(Text(currency.format(item.amount), style: AppTextStyles.bodyBold())),
-                          ]);
-                        }).toList(),
-                      ),
-                    ),
+                  // ---------- Items table (Excel-style grid) ----------
+                  _ItemsTable(
+                    items: preview.items,
+                    currency: currency,
+                    number: number,
                   ),
                   SizedBox(height: Responsive.h(16)),
 
@@ -1160,6 +1077,7 @@ class PreviewStep extends StatelessWidget {
                   ),
                   SizedBox(height: Responsive.h(10)),
 
+                  // ---------- Totals (overflow-safe) ----------
                   Container(
                     padding: EdgeInsets.all(Responsive.w(14)),
                     decoration: BoxDecoration(
@@ -1174,85 +1092,29 @@ class PreviewStep extends StatelessWidget {
                         SizedBox(height: Responsive.h(6)),
                         _totalRow('Handling Charge', currency.format(preview.totals.handlingCharge)),
                         const Divider(height: 20),
-                        // Grand total (server value, before any owner discount).
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Text(
-                              'Grand Total',
-                              style: hasDiscount ? AppTextStyles.body() : AppTextStyles.h3(),
-                            ),
-                            Text(
-                              currency.format(grandTotal),
-                              style: hasDiscount
-                                  ? AppTextStyles.body()
-                                  : AppTextStyles.h2(color: AppColors.primary),
+                            Text('Grand Total', style: AppTextStyles.h3()),
+                            SizedBox(width: Responsive.w(12)),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    currency.format(grandTotal),
+                                    maxLines: 1,
+                                    style: AppTextStyles.h2(color: AppColors.primary),
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        // Discount applied -> show "Discount - value" and the
-                        // total after discount.
-                        if (hasDiscount) ...[
-                          SizedBox(height: Responsive.h(6)),
-                          _totalRow(
-                            discountType == QuotationDiscountType.percentage
-                                ? 'Discount (${_formatNum(discountValue!)}%)'
-                                : 'Discount',
-                            '- ${currency.format(discountAmount)}',
-                          ),
-                          const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Total After Discount', style: AppTextStyles.h3()),
-                              Text(currency.format(totalAfterDiscount),
-                                  style: AppTextStyles.h2(color: AppColors.primary)),
-                            ],
-                          ),
-                        ],
-                        // Payment received is shown only here, in the totals section.
-                        if (hasPayment) ...[
-                          SizedBox(height: Responsive.h(6)),
-                          _totalRow('Payment Received', '- ${currency.format(paymentAmount!)}'),
-                          const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Balance Due', style: AppTextStyles.h3()),
-                              Text(currency.format(balanceDue),
-                                  style: AppTextStyles.h2(color: AppColors.primary)),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
-                  ),
-                  SizedBox(height: Responsive.h(16)),
-
-                  Text('Owner Adjustments', style: AppTextStyles.h3()),
-                  SizedBox(height: Responsive.h(10)),
-
-                  _AdjustmentCard(
-                    icon: Icons.discount_outlined,
-                    title: 'Additional Discount',
-                    valueLabel: discountType == null || discountValue == null
-                        ? null
-                        : (discountType == QuotationDiscountType.percentage
-                        ? '${_formatNum(discountValue!)}%'
-                        : currency.format(discountValue!)),
-                    onAdd: onAddDiscount,
-                    onEdit: onEditDiscount,
-                    onClear: onClearDiscount,
-                  ),
-                  SizedBox(height: Responsive.h(10)),
-
-                  _AdjustmentCard(
-                    icon: Icons.payments_outlined,
-                    title: 'Payment Received',
-                    valueLabel: paymentAmount == null ? null : currency.format(paymentAmount!),
-                    onAdd: onAddPayment,
-                    onEdit: onEditPayment,
-                    onClear: onClearPayment,
                   ),
                   SizedBox(height: Responsive.h(12)),
                 ],
@@ -1292,76 +1154,190 @@ class PreviewStep extends StatelessWidget {
     );
   }
 
-  static String _formatNum(double value) =>
-      value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
-
   Widget _totalRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: AppTextStyles.body()),
-        Text(value, style: AppTextStyles.body()),
+        SizedBox(width: Responsive.w(12)),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(value, maxLines: 1, style: AppTextStyles.body()),
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
-class _AdjustmentCard extends StatelessWidget {
-  const _AdjustmentCard({
-    required this.icon,
-    required this.title,
-    required this.valueLabel,
-    required this.onAdd,
-    required this.onEdit,
-    required this.onClear,
+// =====================================================================
+// ITEMS TABLE — Excel-style grid (all columns, borders on every cell)
+// Columns stretch to the screen width; if the screen is too narrow the
+// table scrolls sideways instead of squeezing the text.
+// =====================================================================
+
+class _ItemsTable extends StatelessWidget {
+  const _ItemsTable({
+    required this.items,
+    required this.currency,
+    required this.number,
   });
 
-  final IconData icon;
-  final String title;
-  final String? valueLabel;
-  final VoidCallback onAdd;
-  final VoidCallback onEdit;
-  final VoidCallback onClear;
+  // Change `dynamic` to your preview item model type if you want strict typing.
+  final List<dynamic> items;
+  final NumberFormat currency;
+  final NumberFormat number;
+
+  static const double _padH = 8;
+  static const double _padV = 10;
+
+  Widget _head(String text, {bool right = false}) => Container(
+    alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+    padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: _padV),
+    child: Text(
+      text,
+      maxLines: 1,
+      style: AppTextStyles.bodyBold(),
+    ),
+  );
+
+  Widget _text(String text, {bool right = false, bool bold = false}) => Container(
+    alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+    padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: _padV),
+    child: Text(
+      text,
+      textAlign: right ? TextAlign.right : TextAlign.left,
+      style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
+    ),
+  );
+
+  // Numbers use the SAME font size as every other cell. They never wrap
+  // or shrink — the columns are simply wide enough (table scrolls if not).
+  Widget _num(String text, {bool bold = false}) => Container(
+    alignment: Alignment.centerRight,
+    padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: _padV),
+    child: Text(
+      text,
+      maxLines: 1,
+      softWrap: false,
+      textAlign: TextAlign.right,
+      style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final hasValue = valueLabel != null;
+    final hasBoxPieceData =
+    items.any((item) => item.boxQuantity > 0 || item.pieceQuantity > 0);
+
+    // label, minimum width, right-aligned?
+    final cols = <_Col>[
+      const _Col('Sl.No', 60),
+      const _Col('Item', 180),
+      const _Col('Company', 180),
+      const _Col('Size', 120),
+      const _Col('Qty', 80, right: true),
+      const _Col('Unit', 100),
+      if (hasBoxPieceData) const _Col('Box Qty', 85, right: true),
+      if (hasBoxPieceData) const _Col('Piece Qty', 95, right: true),
+      const _Col('MRP', 120, right: true),
+      const _Col('Rate', 120, right: true),
+      const _Col('Amount', 180, right: true),
+    ];
+
+    final minTotal = cols.fold<double>(0, (a, c) => a + c.minWidth);
+
+    final gridBorder = TableBorder.all(color: AppColors.border, width: 1);
+
     return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.primary),
-          SizedBox(width: Responsive.w(10)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tableWidth =
+          minTotal > constraints.maxWidth ? minTotal : constraints.maxWidth;
+
+          final table = SizedBox(
+            width: tableWidth,
+            child: Table(
+              border: gridBorder,
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              // Flex by minimum width => columns stretch proportionally
+              columnWidths: {
+                for (var i = 0; i < cols.length; i++)
+                  i: FlexColumnWidth(cols[i].minWidth),
+              },
               children: [
-                Text(title, style: AppTextStyles.bodyBold()),
-                if (hasValue) ...[
-                  SizedBox(height: Responsive.h(2)),
-                  Text(valueLabel!, style: AppTextStyles.caption(color: AppColors.primary)),
-                ],
+                // ---------- Header row ----------
+                TableRow(
+                  decoration: BoxDecoration(color: AppColors.surfaceAlt),
+                  children: [
+                    for (final c in cols) _head(c.label, right: c.right),
+                  ],
+                ),
+
+                // ---------- Data rows ----------
+                ...List.generate(items.length, (i) {
+                  final item = items[i];
+                  final company = (item.productCompany as String).trim();
+                  final size = (item.productSize as String).trim();
+
+                  return TableRow(
+                    decoration: BoxDecoration(
+                      color: i.isOdd
+                          ? AppColors.surfaceAlt.withOpacity(0.35)
+                          : AppColors.surface,
+                    ),
+                    children: [
+                      _text('${i + 1}'),
+                      _text(item.productName as String),
+                      _text(company.isEmpty ? '-' : company),
+                      _text(size.isEmpty ? '-' : size),
+                      _num(number.format(item.quantity)),
+                      _text(item.productUnit as String),
+                      if (hasBoxPieceData)
+                        _num(item.boxQuantity > 0
+                            ? number.format(item.boxQuantity)
+                            : '-'),
+                      if (hasBoxPieceData)
+                        _num(item.pieceQuantity > 0
+                            ? number.format(item.pieceQuantity)
+                            : '-'),
+                      _num(item.mrp > 0 ? number.format(item.mrp) : '-'),
+                      _num(number.format(item.rate)),
+                      _num(currency.format(item.amount), bold: true),
+                    ],
+                  );
+                }),
               ],
             ),
-          ),
-          if (hasValue) ...[
-            InkWell(onTap: onEdit, child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary)),
-            SizedBox(width: Responsive.w(10)),
-            InkWell(onTap: onClear, child: const Icon(Icons.close, size: 18, color: AppColors.error)),
-          ] else
-            InkWell(
-              onTap: onAdd,
-              child: Text('Add', style: AppTextStyles.bodyBold(color: AppColors.primary)),
-            ),
-        ],
+          );
+
+          // Fits the screen -> no scroll. Too wide -> scroll sideways.
+          if (minTotal <= constraints.maxWidth) return table;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: table,
+          );
+        },
       ),
     );
   }
+}
+
+class _Col {
+  final String label;
+  final double minWidth;
+  final bool right;
+  const _Col(this.label, this.minWidth, {this.right = false});
 }
 
 class _PreviewRow {

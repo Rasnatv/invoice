@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -34,6 +35,7 @@ class _CompanySetupView extends StatefulWidget {
 }
 
 class _CompanySetupViewState extends State<_CompanySetupView> {
+  // ---------------- UNCHANGED: form logic ----------------
   Future<void> _openCompanyForm(BuildContext context, {CompanyModel? company}) async {
     final bloc = context.read<CompanyBloc>();
     final formKey = GlobalKey<FormState>();
@@ -63,26 +65,24 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  company == null ? 'Add Company' : 'Edit Company',
+                  company == null ? 'Add Brand' : 'Edit Brand',
                   style: AppTextStyles.h6(),
                 ),
                 SizedBox(height: Responsive.h(16)),
                 TextFormField(
                   controller: nameCtrl,
                   textCapitalization: TextCapitalization.words,
-                  inputFormatters: DValidator.textWithLimit,
-                  decoration: const InputDecoration(labelText: 'Company Name'),
-                  validator: (v) =>
-                      DValidator.validateRequired(v, message: 'Company name is required'),
+                  inputFormatters: DValidator.brandNameText,
+                  decoration: const InputDecoration(labelText: 'Brand Name'),
+                  validator: DValidator.validateBrandName,
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: codeCtrl,
                   textCapitalization: TextCapitalization.characters,
-                  inputFormatters: DValidator.textWithLimit,
-                  decoration: const InputDecoration(labelText: 'Company Code'),
-                  validator: (v) =>
-                      DValidator.validateRequired(v, message: 'Company code is required'),
+                  inputFormatters: DValidator.brandCodeText,
+                  decoration: const InputDecoration(labelText: 'Brand Code'),
+                  validator: DValidator.validateBrandCode,
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
@@ -161,12 +161,12 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
     );
   }
 
-
+  // ---------------- UNCHANGED: delete logic ----------------
   Future<void> _confirmDelete(BuildContext context, CompanyModel company) async {
     final bloc = context.read<CompanyBloc>();
     final confirmed = await showConfirmDialog(
       context,
-      title: 'Delete Company?',
+      title: 'Delete Brand?',
       message: 'This will remove "${company.name}". This cannot be undone.',
       confirmText: 'Delete',
       confirmColor: AppColors.error,
@@ -195,12 +195,12 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
         },
         child: NetworkAwareWrapper(child: Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(title: Text('Company Setup', style: AppTextStyles.h6())),
+          appBar: AppBar(title: Text('Brand Setup', style: AppTextStyles.h6())),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _openCompanyForm(context),
             backgroundColor: AppColors.primary,
             icon: const Icon(Icons.add, color: Colors.white),
-            label: Text('Add Company', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
+            label: Text('Add Brand', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
           ),
           body: SafeArea(
             child: BlocBuilder<CompanyBloc, CompanyState>(
@@ -232,30 +232,31 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                   );
                 }
 
+                // ---------------- NEW: modern empty state ----------------
                 if (state.companies.isEmpty) {
-                  return
-                    Column(children: [
-                      SizedBox(height: 350,),
-                      Icon(Icons.business, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
-                      SizedBox(height: Responsive.h(10)),
-                      Center(
-                    child: Text('No companies added yet', style: AppTextStyles.subtitle()),
-                    )] );
+                  return const _EmptyBrands();
                 }
 
+                // ---------------- NEW: modern list ----------------
                 return RefreshIndicator(
                   onRefresh: () async => context.read<CompanyBloc>().add(const LoadCompanies()),
                   child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(
                       Responsive.w(16),
                       Responsive.h(14),
                       Responsive.w(16),
                       Responsive.h(90),
                     ),
-                    itemCount: state.companies.length,
-                    separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                    // +1 => section title
+                    itemCount: state.companies.length + 1,
+                    separatorBuilder: (_, index) =>
+                        SizedBox(height: Responsive.h(index == 0 ? 14 : 10)),
                     itemBuilder: (context, index) {
-                      final company = state.companies[index];
+                      if (index == 0) {
+                        return const _SectionTitle(title: 'All Brands');
+                      }
+                      final company = state.companies[index - 1];
                       return _CompanyCard(
                         company: company,
                         onEdit: () => _openCompanyForm(context, company: company),
@@ -272,6 +273,68 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
   }
 }
 
+/// NEW: Small section label above the list.
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+/// NEW: Clean centered empty state.
+class _EmptyBrands extends StatelessWidget {
+  const _EmptyBrands();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 88,
+              width: 88,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.storefront_outlined, size: 40, color: AppColors.primary),
+            ),
+            SizedBox(height: Responsive.h(16)),
+            Text('No brands added yet', style: AppTextStyles.bodyBold()),
+            SizedBox(height: Responsive.h(6)),
+            Text(
+              'Tap "Add Brand" to create your first brand.',
+              style: AppTextStyles.caption(),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// RESTYLED: Modern brand card (avatar + name + code chip + website).
 class _CompanyCard extends StatelessWidget {
   const _CompanyCard({required this.company, required this.onEdit, required this.onDelete});
 
@@ -279,65 +342,114 @@ class _CompanyCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  String get _initial {
+    final name = company.name.trim();
+    return name.isEmpty ? '?' : name[0].toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasWebsite = company.website != null && company.website!.trim().isNotEmpty;
+
     return Container(
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Avatar
+          Container(
+            height: 48,
+            width: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _initial,
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(width: Responsive.w(12)),
+
+          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  company.name,
+                  style: AppTextStyles.bodyBold(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: Responsive.h(6)),
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        company.name,
-                        style: AppTextStyles.bodyBold(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    SizedBox(width: Responsive.w(8)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
+                        color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        company.code,
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tag_rounded, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 3),
+                          Text(
+                            company.code,
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    if (hasWebsite) ...[
+                      SizedBox(width: Responsive.w(8)),
+                      Icon(Icons.language_rounded,
+                          size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          company.website!,
+                          style: AppTextStyles.caption(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                if (company.website != null) ...[
-                  SizedBox(height: Responsive.h(3)),
-                  Text(
-                    company.website!,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ],
             ),
           ),
+
+          // Menu
           PopupMenuButton<String>(
             padding: EdgeInsets.zero,
-            icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+            color: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textSecondary),
             onSelected: (value) {
               if (value == 'edit') onEdit();
               if (value == 'delete') onDelete();

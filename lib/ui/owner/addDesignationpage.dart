@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -32,6 +30,7 @@ class _AddDesignationPageState extends State<AddDesignationPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
 
+  // ---------------- UNCHANGED: logic ----------------
   @override
   void initState() {
     super.initState();
@@ -55,6 +54,29 @@ class _AddDesignationPageState extends State<AddDesignationPage> {
     } else {
       bloc.add(AddDesignation(name));
     }
+  }
+
+  // ---------------- RESTYLED: UI ----------------
+  InputDecoration _fieldDecoration() {
+    OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: color, width: width),
+    );
+
+    return InputDecoration(
+      labelText: 'Designation name',
+      hintText: 'e.g. Regional Sales Manager',
+      hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
+      prefixIcon: const Icon(Icons.badge_outlined, color: _primary, size: 20),
+      filled: true,
+      fillColor: const Color(0xFFFAFAF8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      border: border(const Color(0xFFE7E5E0)),
+      enabledBorder: border(const Color(0xFFE7E5E0)),
+      focusedBorder: border(_primary, 1.5),
+      errorBorder: border(AppColors.error),
+      focusedErrorBorder: border(AppColors.error, 1.5),
+    );
   }
 
   @override
@@ -83,92 +105,160 @@ class _AddDesignationPageState extends State<AddDesignationPage> {
           builder: (context, state) {
             final isSubmitting = state is DesignationActionLoading;
 
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      widget.isEditing
-                          ? 'Update the designation name'
-                          : 'Create a new salesman designation',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black54,
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // NEW: header section
+                      Row(
+                        children: [
+                          Container(
+                            height: 48,
+                            width: 48,
+                            decoration: BoxDecoration(
+                              color: _primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.work_outline_rounded,
+                                color: _primary, size: 24),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.isEditing
+                                      ? 'Update designation'
+                                      : 'New designation',
+                                  style: AppTextStyles.bodyBold(),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  widget.isEditing
+                                      ? 'Update the designation name'
+                                      : 'Create a new salesman designation',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _nameController,
-                      autofocus: true,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => isSubmitting ? null : _submit(),
-                      inputFormatters: DValidator.lettersOnly,
-                      decoration: InputDecoration(
-                        labelText: 'Designation name',
-                        hintText: 'e.g. Regional Sales Manager',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE7E5E0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE7E5E0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: _primary, width: 1.5),
-                        ),
-                      ),
-                      validator: (value) {
-                        // Use DValidator for validation
-                        final nameValidator = DValidator.validateName('Designation', value);
-                        if (nameValidator != null) return nameValidator;
+                      const SizedBox(height: 20),
 
-                        // Additional validation for minimum length
-                        if (value != null && value.trim().length < 2) {
-                          return 'Designation name must be at least 2 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: Responsive.h(48),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                      // NEW: form card section
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE7E5E0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        onPressed: isSubmitting ? null : _submit,
-                        child: isSubmitting
-                            ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: Colors.white,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 4,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: _primary,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('Designation Details',
+                                    style: AppTextStyles.bodyBold()),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _nameController,
+                              autofocus: true,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => isSubmitting ? null : _submit(),
+                              inputFormatters: DValidator.lettersOnly,
+                              decoration: _fieldDecoration(),
+                              validator: (value) {
+                                // Use DValidator for validation
+                                final nameValidator =
+                                DValidator.validateName('Designation', value);
+                                if (nameValidator != null) return nameValidator;
+
+                                // Additional validation for minimum length
+                                if (value != null && value.trim().length < 2) {
+                                  return 'Designation name must be at least 2 characters';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: Responsive.h(48),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
-                        )
-                            : Text(
-                          widget.isEditing ? 'Save Changes' : 'Add Designation',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15.5,
-                            color: Colors.white,
+                          onPressed: isSubmitting ? null : _submit,
+                          child: isSubmitting
+                              ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                              : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                widget.isEditing
+                                    ? Icons.check_circle_outline
+                                    : Icons.add_circle_outline,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                widget.isEditing ? 'Save Changes' : 'Add Designation',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15.5,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );

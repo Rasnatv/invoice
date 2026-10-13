@@ -115,33 +115,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
           ],
         ),
         body: SafeArea(child: _buildBody(data)),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        floatingActionButton: data == null
-            ? null
-            : Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FloatingActionButton(
-              heroTag: 'share_payment_history',
-              backgroundColor: AppColors.surface,
-              foregroundColor: AppColors.textPrimary,
-              onPressed: () => AppSnackbar.warning('Sharing coming soon'),
-              child: const Icon(Icons.share_outlined),
-            ),
-            SizedBox(height: Responsive.h(12)),
-            FloatingActionButton(
-              heroTag: 'record_payment',
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              onPressed:
-              data.paymentSummary.isFullyPaid ? null : _openRecordPayment,
-              child: const Icon(Icons.edit_outlined),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      )); }
 
   BoxDecoration get _cardDecoration => BoxDecoration(
     color: AppColors.surface,

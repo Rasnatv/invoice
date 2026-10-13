@@ -192,7 +192,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Grand Total', style: AppTextStyles.bodyBold()),
+                      Text('Grand Total', style: AppTextStyles.h3()),
                       Text(
                         bill.grandTotalFormatted.isNotEmpty
                             ? bill.grandTotalFormatted

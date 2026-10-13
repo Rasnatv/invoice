@@ -1,5 +1,6 @@
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
@@ -26,8 +27,6 @@ import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/primary_button.dart';
-
-
 
 class OwnerCreateEstimateScreen extends StatelessWidget {
   const OwnerCreateEstimateScreen({super.key});
@@ -101,7 +100,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   Timer? _previewDebounce;
   static const _previewDebounceDuration = Duration(milliseconds: 500);
 
-  // --- Step 3: owner-only — Discount / Payment / Salesman assignment ---
+  // --- Owner-only values, collected in the Approve dialog ---
   String? _discountType; // 'percentage' | 'fixed'
   double? _discountValue;
   String? _discountNotes;
@@ -587,15 +586,48 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     );
   }
 
+  /// Save as Quotation — NO discount / payment is sent.
   void _saveDraft() {
     if (!_validateDetails()) return;
     final request = _buildRequest(action: 'save_quotation');
     context.read<OwnerEstimateBloc>().add(OwnerQuotationSubmitRequested(request));
   }
 
+  // ---------------- Approve dialog: Salesman + Discount + Payment (all optional) ----------------
+
   Future<void> _showApproveDialog() async {
     final bloc = context.read<OwnerEstimateBloc>();
     SalesmanActiveModel? dialogSelection = bloc.state.selectedSalesman;
+
+    // Discount (optional)
+    String? discType = _discountType; // null = no discount
+    final discValueCtrl = TextEditingController(
+      text: _discountValue != null ? _formatPrice(_discountValue!) : '',
+    );
+    final discNotesCtrl = TextEditingController(text: _discountNotes ?? '');
+
+    // Payment (optional)
+    final payAmountCtrl = TextEditingController(
+      text: _paymentAmount != null ? _formatPrice(_paymentAmount!) : '',
+    );
+    final payRefCtrl = TextEditingController(text: _paymentReference ?? '');
+    final payNotesCtrl = TextEditingController(text: _paymentNotes ?? '');
+    String payMethod = _paymentMethod;
+    DateTime payDate = _paymentDate ?? DateTime.now();
+
+    final formKey = GlobalKey<FormState>();
+    final money = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+
+    Widget sectionTitle(String text, IconData icon) => Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -605,59 +637,297 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
             return BlocBuilder<OwnerEstimateBloc, OwnerEstimateState>(
               bloc: bloc,
               builder: (context, state) {
-                return AlertDialog(
-                  title: const Text('Approve Estimate'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'You can approve this estimate directly, or optionally '
-                            'assign it to a salesman first.',
-                      ),
-                      SizedBox(height: Responsive.h(16)),
-                      if (state.salesmenStatus == LoadStatus.loading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (state.salesmenStatus == LoadStatus.failure)
-                        Row(
-                          children: [
-                            Expanded(
+                // ---- Payable amount (display only, from server grand total) ----
+                final grandTotal = state.preview?.totals.grandTotal ?? 0;
+                final discValue = double.tryParse(discValueCtrl.text.trim()) ?? 0;
+                double discAmount = 0;
+                if (discType != null && discValue > 0) {
+                  discAmount = discType == QuotationDiscountType.percentage
+                      ? grandTotal * discValue / 100
+                      : discValue;
+                  if (discAmount > grandTotal) discAmount = grandTotal;
+                }
+                final payable = grandTotal - discAmount;
+                final received = double.tryParse(payAmountCtrl.text.trim()) ?? 0;
+                final balance =
+                (payable - received).clamp(0, double.infinity).toDouble();
+
+                Widget amountRow(String label, double value,
+                    {bool bold = false, Color? color}) =>
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: TextStyle(
+                                fontWeight: bold ? FontWeight.w700 : FontWeight.w400),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
                               child: Text(
-                                state.salesmenError ?? 'Failed to load salesmen.',
-                                style: AppTextStyles.caption(color: AppColors.error),
+                                money.format(value),
+                                maxLines: 1,
+                                style: TextStyle(
+                                    fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+                                    color: color),
                               ),
                             ),
-                            TextButton(
-                              onPressed: () => bloc.add(const ActiveSalesmenRequested()),
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        )
-                      else
-                        DropdownButtonFormField<SalesmanActiveModel?>(
-                          value: dialogSelection,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Salesman (optional)',
-                            prefixIcon: Icon(Icons.person_outline),
-                            border: OutlineInputBorder(),
                           ),
-                          items: [
-                            const DropdownMenuItem<SalesmanActiveModel?>(
-                              value: null,
-                              child: Text('No salesman — approve directly'),
+                        ],
+                      ),
+                    );
+
+                return AlertDialog(
+                  title: const Text('Approve Estimate'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: SingleChildScrollView(
+                      child: Form(
+                        key: formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ---------- Salesman (optional) ----------
+                            sectionTitle('Assign Salesman', Icons.person_outline),
+                            if (state.salesmenStatus == LoadStatus.loading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            else if (state.salesmenStatus == LoadStatus.failure)
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      state.salesmenError ?? 'Failed to load salesmen.',
+                                      style: AppTextStyles.caption(color: AppColors.error),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => bloc.add(const ActiveSalesmenRequested()),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              )
+                            else
+                              DropdownButtonFormField<SalesmanActiveModel?>(
+                                value: dialogSelection,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Salesman (optional)',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<SalesmanActiveModel?>(
+                                    value: null,
+                                    child: Text('No salesman — approve directly'),
+                                  ),
+                                  ...state.salesmen.map(
+                                        (s) => DropdownMenuItem<SalesmanActiveModel?>(
+                                      value: s,
+                                      child: Text(s.displayLabel, overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (s) => setDialogState(() => dialogSelection = s),
+                              ),
+
+                            // ---------- Additional Discount (optional) ----------
+                            sectionTitle('Additional Discount (optional)', Icons.percent),
+                            DropdownButtonFormField<String?>(
+                              value: discType,
+                              decoration: const InputDecoration(
+                                labelText: 'Discount Type',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: const [
+                                DropdownMenuItem<String?>(value: null, child: Text('None')),
+                                DropdownMenuItem<String?>(
+                                  value: QuotationDiscountType.percentage,
+                                  child: Text('Percentage'),
+                                ),
+                                DropdownMenuItem<String?>(
+                                  value: QuotationDiscountType.fixed,
+                                  child: Text('Fixed'),
+                                ),
+                              ],
+                              onChanged: (v) => setDialogState(() => discType = v),
                             ),
-                            ...state.salesmen.map((s) => DropdownMenuItem<SalesmanActiveModel?>(
-                              value: s,
-                              child: Text(s.displayLabel, overflow: TextOverflow.ellipsis),
-                            )),
+                            if (discType != null) ...[
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: discValueCtrl,
+                                onChanged: (_) => setDialogState(() {}),
+                                keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: DValidator.decimalWithLimit(
+                                  maxIntDigits: discType == QuotationDiscountType.percentage
+                                      ? 3
+                                      : DValidator.maxPriceDigits,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: discType == QuotationDiscountType.percentage
+                                      ? 'Discount %'
+                                      : 'Discount Amount',
+                                  prefixText:
+                                  discType == QuotationDiscountType.percentage ? null : '₹ ',
+                                  suffixText:
+                                  discType == QuotationDiscountType.percentage ? '%' : null,
+                                  border: const OutlineInputBorder(),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Enter a value or choose "None"';
+                                  }
+                                  final parsed = double.tryParse(value.trim());
+                                  if (parsed == null || parsed < 0) {
+                                    return 'Enter a valid value';
+                                  }
+                                  if (discType == QuotationDiscountType.percentage &&
+                                      parsed > 100) {
+                                    return 'Percentage can\'t exceed 100';
+                                  }
+                                  if (discType != QuotationDiscountType.percentage &&
+                                      parsed > DValidator.maxPrice) {
+                                    return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                            ],
+
+                            // ---------- Payable Amount ----------
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceAlt,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: [
+                                  amountRow('Grand Total', grandTotal),
+                                  if (discAmount > 0)
+                                    amountRow('Discount', discAmount, color: AppColors.error),
+                                  const Divider(height: 16),
+                                  amountRow('Payable Amount', payable,
+                                      bold: true, color: AppColors.primary),
+                                  if (received > 0) ...[
+                                    amountRow('Amount Received', received),
+                                    amountRow('Balance Due', balance, bold: true),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            // ---------- Payment Received (optional) ----------
+                            sectionTitle('Payment Received (optional)', Icons.payments_outlined),
+                            TextFormField(
+                              controller: payAmountCtrl,
+                              keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: DValidator.priceNumber,
+                              onChanged: (_) => setDialogState(() {}),
+                              decoration: const InputDecoration(
+                                labelText: 'Amount Received',
+                                prefixText: '₹ ',
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return null; // optional
+                                }
+                                final parsed = double.tryParse(value.trim());
+                                if (parsed == null || parsed < 0) {
+                                  return 'Enter a valid amount';
+                                }
+                                if (parsed > DValidator.maxPrice) {
+                                  return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                }
+                                if (grandTotal > 0 && parsed > payable + 0.005) {
+                                  return 'Cannot exceed payable amount (${money.format(payable)})';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (payAmountCtrl.text.trim().isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: payMethod,
+                                decoration: const InputDecoration(
+                                  labelText: 'Payment Method',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.cash, child: Text('Cash')),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.cheque, child: Text('Cheque')),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.online, child: Text('Online')),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.credit, child: Text('Credit')),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.bankTransfer,
+                                      child: Text('Bank Transfer')),
+                                ],
+                                onChanged: (v) =>
+                                    setDialogState(() => payMethod = v ?? payMethod),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: payRefCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Reference (optional)',
+                                  hintText: 'Cheque no. / Transaction ID',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              InkWell(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: dialogContext,
+                                    initialDate: payDate,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                  );
+                                  if (picked != null) {
+                                    setDialogState(() => payDate = picked);
+                                  }
+                                },
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Payment Date',
+                                    border: OutlineInputBorder(),
+                                    suffixIcon: Icon(Icons.calendar_today_outlined),
+                                  ),
+                                  child: Text(DateFormat('dd-MM-yyyy').format(payDate)),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: payNotesCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Notes (optional)',
+                                  hintText: 'e.g. Advance payment',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
                           ],
-                          onChanged: (s) => setDialogState(() => dialogSelection = s),
                         ),
-                    ],
+                      ),
+                    ),
                   ),
                   actions: [
                     TextButton(
@@ -665,10 +935,12 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                       child: const Text('Cancel'),
                     ),
                     ElevatedButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(true),
-                      child: Text(
-                        dialogSelection != null ? 'Approve & Assign' : 'Approve',
-                      ),
+                      onPressed: () {
+                        if (formKey.currentState!.validate()) {
+                          Navigator.of(dialogContext).pop(true);
+                        }
+                      },
+                      child: Text(dialogSelection != null ? 'Approve & Assign' : 'Approve'),
                     ),
                   ],
                 );
@@ -680,274 +952,50 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     );
 
     if (confirmed == true) {
+      // Discount: only if a type is chosen AND a value entered
+      final discVal = double.tryParse(discValueCtrl.text.trim());
+      if (discType != null && discVal != null) {
+        _discountType = discType;
+        _discountValue = discVal;
+        _discountNotes =
+        discNotesCtrl.text.trim().isEmpty ? null : discNotesCtrl.text.trim();
+      } else {
+        _discountType = null;
+        _discountValue = null;
+        _discountNotes = null;
+      }
+
+      // Payment: only if an amount is entered
+      final payAmt = double.tryParse(payAmountCtrl.text.trim());
+      if (payAmt != null) {
+        _paymentAmount = payAmt;
+        _paymentMethod = payMethod;
+        _paymentReference =
+        payRefCtrl.text.trim().isEmpty ? null : payRefCtrl.text.trim();
+        _paymentDate = payDate;
+        _paymentNotes =
+        payNotesCtrl.text.trim().isEmpty ? null : payNotesCtrl.text.trim();
+      } else {
+        _paymentAmount = null;
+        _paymentMethod = QuotationPaymentMethod.cash;
+        _paymentReference = null;
+        _paymentDate = null;
+        _paymentNotes = null;
+      }
+
       if (dialogSelection != null) {
         bloc.add(SalesmanSelected(dialogSelection!));
       }
+
       final request = _buildRequest(
         action: 'approve',
         salesmanId: dialogSelection != null ? int.tryParse(dialogSelection!.id) : null,
       );
+      debugPrint('APPROVE BODY: ${jsonEncode(request.toJson())}'); // temporary, for testing
       bloc.add(OwnerQuotationSubmitRequested(request));
     }
-  }
-
-  // ---------------- Discount / Payment dialogs (Preview step) ----------------
-
-  Future<void> _showAddDiscountDialog() async {
-    String type = _discountType ?? QuotationDiscountType.percentage;
-    final valueCtrl = TextEditingController(
-      text: _discountValue != null ? _formatPrice(_discountValue!) : '',
-    );
-    final notesCtrl = TextEditingController(text: _discountNotes ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Text('Additional Discount'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: type,
-                      decoration: const InputDecoration(
-                        labelText: 'Discount Type',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: null, child: Text('None')),
-                        DropdownMenuItem(
-                          value: QuotationDiscountType.percentage,
-                          child: Text('Percentage'),
-                        ),
-                        DropdownMenuItem(
-                          value: QuotationDiscountType.fixed,
-                          child: Text('Fixed '),
-                        ),
-                      ],
-                      onChanged: (v) => setDialogState(() => type = v ?? type),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: valueCtrl,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      // Percentage: max 3 digits (100). Fixed: max 8 digits.
-                      inputFormatters: DValidator.decimalWithLimit(
-                        maxIntDigits: type == QuotationDiscountType.percentage
-                            ? 3
-                            : DValidator.maxPriceDigits,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: type == QuotationDiscountType.percentage
-                            ? 'Discount %'
-                            : 'Discount Amount',
-                        prefixText: type == QuotationDiscountType.percentage ? null : '₹ ',
-                        suffixText: type == QuotationDiscountType.percentage ? '%' : null,
-                        border: const OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return 'Value is required';
-                        final parsed = double.tryParse(value.trim());
-                        if (parsed == null || parsed < 0) return 'Enter a valid value';
-                        if (type == QuotationDiscountType.percentage && parsed > 100) {
-                          return 'Percentage can\'t exceed 100';
-                        }
-                        if (type != QuotationDiscountType.percentage &&
-                            parsed > DValidator.maxPrice) {
-                          return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.of(dialogContext).pop(true);
-                    }
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result == true) {
-      setState(() {
-        _discountType = type;
-        _discountValue = double.tryParse(valueCtrl.text.trim());
-        _discountNotes = notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim();
-      });
-    }
-  }
-
-  void _clearDiscount() {
-    setState(() {
-      _discountType = null;
-      _discountValue = null;
-      _discountNotes = null;
-    });
-  }
-
-  Future<void> _showAddPaymentDialog() async {
-    final amountCtrl = TextEditingController(
-      text: _paymentAmount != null ? _formatPrice(_paymentAmount!) : '',
-    );
-    final referenceCtrl = TextEditingController(text: _paymentReference ?? '');
-    final notesCtrl = TextEditingController(text: _paymentNotes ?? '');
-    String method = _paymentMethod;
-    DateTime date = _paymentDate ?? DateTime.now();
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Text('Payment Received'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: amountCtrl,
-                        autofocus: true,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        // Payment amount: max 8 digits (+ up to 2 decimals)
-                        inputFormatters: DValidator.priceNumber,
-                        decoration: const InputDecoration(
-                          labelText: 'Amount Received',
-                          prefixText: '₹ ',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) return 'Amount is required';
-                          final parsed = double.tryParse(value.trim());
-                          if (parsed == null || parsed < 0) return 'Enter a valid amount';
-                          if (parsed > DValidator.maxPrice) {
-                            return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: method,
-                        decoration: const InputDecoration(
-                          labelText: 'Payment Method',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: QuotationPaymentMethod.cash, child: Text('Cash')),
-                          DropdownMenuItem(value: QuotationPaymentMethod.cheque, child: Text('Cheque')),
-                          DropdownMenuItem(value: QuotationPaymentMethod.online, child: Text('Online')),
-                          DropdownMenuItem(value: QuotationPaymentMethod.credit, child: Text('Credit')),
-                          DropdownMenuItem(
-                              value: QuotationPaymentMethod.bankTransfer, child: Text('Bank Transfer')),
-                        ],
-                        onChanged: (v) => setDialogState(() => method = v ?? method),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: referenceCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Reference (optional)',
-                          hintText: 'Cheque no. / Transaction ID',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: dialogContext,
-                            initialDate: date,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) setDialogState(() => date = picked);
-                        },
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Payment Date',
-                            border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.calendar_today_outlined),
-                          ),
-                          child: Text(DateFormat('dd-MM-yyyy').format(date)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: notesCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes (optional)',
-                          hintText: 'e.g. Advance payment',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.of(dialogContext).pop(true);
-                    }
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result == true) {
-      setState(() {
-        _paymentAmount = double.tryParse(amountCtrl.text.trim());
-        _paymentMethod = method;
-        _paymentReference = referenceCtrl.text.trim().isEmpty ? null : referenceCtrl.text.trim();
-        _paymentDate = date;
-        _paymentNotes = notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim();
-      });
-    }
-  }
-
-  void _clearPayment() {
-    setState(() {
-      _paymentAmount = null;
-      _paymentMethod = QuotationPaymentMethod.cash;
-      _paymentReference = null;
-      _paymentDate = null;
-      _paymentNotes = null;
-    });
+    // Note: dialog controllers are intentionally not disposed here —
+    // the dialog is still animating out and would throw "used after dispose".
   }
 
   // ---------------- Back handling between steps ----------------
@@ -989,7 +1037,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
             // Go to the owner dashboard, then tell the shell (dashboard)
             // and the Estimates tab to reload their data.
             context.go('/owner');
-            ownerDataRefresh.value++; // NEW
+            ownerDataRefresh.value++;
           } else if (state.submitStatus == SubmitStatus.failure) {
             _showError(state.submitError ?? 'Something went wrong. Please try again.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());
@@ -1001,98 +1049,91 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
             if (didPop) return;
             _onWillPop();
           },
-          child: NetworkAwareWrapper(child: Scaffold(
-            backgroundColor: AppColors.background,
-            appBar: AppBar(
-              title: Text(_appBarTitle),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  if (_step == EstimateStep.details) {
-                    Navigator.of(context).pop();
-                  } else {
-                    _onWillPop();
-                  }
-                },
+          child: NetworkAwareWrapper(
+            child: Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: AppBar(
+                title: Text(_appBarTitle),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    if (_step == EstimateStep.details) {
+                      Navigator.of(context).pop();
+                    } else {
+                      _onWillPop();
+                    }
+                  },
+                ),
+              ),
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    StepIndicator(step: _step),
+                    Expanded(
+                      child: switch (_step) {
+                        EstimateStep.details => DetailsStep(
+                          date: _date,
+                          onDateChanged: (d) => setState(() => _date = d),
+                          partyNameCtrl: _partyNameCtrl,
+                          addressCtrl: _addressCtrl,
+                          phoneCtrl: _phoneCtrl,
+                          customerEmailCtrl: _customerEmailCtrl,
+                          contractorNameCtrl: _contractorNameCtrl,
+                          contractorPhoneCtrl: _contractorPhoneCtrl,
+                          contractorEmailCtrl: _contractorEmailCtrl,
+                          contractorAddressCtrl: _contractorAddressCtrl,
+                          onSelectSiteVisit: _selectSiteVisit,
+                          onNext: _goToAddItems,
+                        ),
+                        EstimateStep.addItems => AddItemsStep(
+                          selectedProduct: _selectedProduct,
+                          onProductSelected: _onProductSelected,
+                          itemCompanyCtrl: _itemCompanyCtrl,
+                          itemSizeCtrl: _itemSizeCtrl,
+                          itemUnitCtrl: _itemUnitCtrl,
+                          itemPackingCtrl: _itemPackingCtrl,
+                          itemMrpCtrl: _itemMrpCtrl,
+                          itemQtyCtrl: _itemQtyCtrl,
+                          itemBoxQtyCtrl: _itemBoxQtyCtrl,
+                          itemPieceQtyCtrl: _itemPieceQtyCtrl,
+                          itemRateCtrl: _itemRateCtrl,
+                          isAdding: _isAddingItem,
+                          onQuantityChanged: _onQuantityChanged,
+                          items: _items,
+                          editingIndex: _editingItemIndex,
+                          onAddItem: _addItemToList,
+                          onEditItem: _editItem,
+                          onCancelEdit: _cancelEditItem,
+                          onRemoveItem: _removeItem,
+                          onCancel: () => setState(() => _step = EstimateStep.details),
+                          onSaveItems: _goToPreview,
+                        ),
+                      // Discount / Payment params removed — they now live in the Approve dialog.
+                        EstimateStep.preview => PreviewStep(
+                          date: _date,
+                          partyName: _partyNameCtrl.text,
+                          address: _addressCtrl.text,
+                          phone: _phoneCtrl.text,
+                          customerEmail: _customerEmailCtrl.text,
+                          contractorName: _contractorNameCtrl.text,
+                          contractorPhone: _contractorPhoneCtrl.text,
+                          contractorEmail: _contractorEmailCtrl.text,
+                          handlingChargeCtrl: _handlingChargeCtrl,
+                          notesCtrl: _notesCtrl,
+                          onHandlingChargeChanged: () {
+                            setState(() {});
+                            _schedulePreviewFetch();
+                          },
+                          onSaveDraft: _saveDraft,
+                          onApprove: _showApproveDialog,
+                          onRetryPreview: _fetchPreview,
+                        ),
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-            body: SafeArea(
-              child: Column(
-                children: [
-                  StepIndicator(step: _step),
-                  Expanded(
-                    child: switch (_step) {
-                      EstimateStep.details => DetailsStep(
-                        date: _date,
-                        onDateChanged: (d) => setState(() => _date = d),
-                        partyNameCtrl: _partyNameCtrl,
-                        addressCtrl: _addressCtrl,
-                        phoneCtrl: _phoneCtrl,
-                        customerEmailCtrl: _customerEmailCtrl,
-                        contractorNameCtrl: _contractorNameCtrl,
-                        contractorPhoneCtrl: _contractorPhoneCtrl,
-                        contractorEmailCtrl: _contractorEmailCtrl,
-                        contractorAddressCtrl: _contractorAddressCtrl,
-                        onSelectSiteVisit: _selectSiteVisit,
-                        onNext: _goToAddItems,
-                      ),
-                      EstimateStep.addItems => AddItemsStep(
-                        selectedProduct: _selectedProduct,
-                        onProductSelected: _onProductSelected,
-                        itemCompanyCtrl: _itemCompanyCtrl,
-                        itemSizeCtrl: _itemSizeCtrl,
-                        itemUnitCtrl: _itemUnitCtrl,
-                        itemPackingCtrl: _itemPackingCtrl,
-                        itemMrpCtrl: _itemMrpCtrl,
-                        itemQtyCtrl: _itemQtyCtrl,
-                        itemBoxQtyCtrl: _itemBoxQtyCtrl,
-                        itemPieceQtyCtrl: _itemPieceQtyCtrl,
-                        itemRateCtrl: _itemRateCtrl,
-                        isAdding: _isAddingItem,
-                        onQuantityChanged: _onQuantityChanged,
-                        items: _items,
-                        editingIndex: _editingItemIndex,
-                        onAddItem: _addItemToList,
-                        onEditItem: _editItem,
-                        onCancelEdit: _cancelEditItem,
-                        onRemoveItem: _removeItem,
-                        onCancel: () => setState(() => _step = EstimateStep.details),
-                        onSaveItems: _goToPreview,
-                      ),
-                      EstimateStep.preview => PreviewStep(
-                        date: _date,
-                        partyName: _partyNameCtrl.text,
-                        address: _addressCtrl.text,
-                        phone: _phoneCtrl.text,
-                        customerEmail: _customerEmailCtrl.text,
-                        contractorName: _contractorNameCtrl.text,
-                        contractorPhone: _contractorPhoneCtrl.text,
-                        contractorEmail: _contractorEmailCtrl.text,
-                        handlingChargeCtrl: _handlingChargeCtrl,
-                        notesCtrl: _notesCtrl,
-                        discountType: _discountType,
-                        discountValue: _discountValue,
-                        paymentAmount: _paymentAmount,
-                        onHandlingChargeChanged: () {
-                          setState(() {});
-                          _schedulePreviewFetch();
-                        },
-                        onAddDiscount: _showAddDiscountDialog,
-                        onEditDiscount: _showAddDiscountDialog,
-                        onClearDiscount: _clearDiscount,
-                        onAddPayment: _showAddPaymentDialog,
-                        onEditPayment: _showAddPaymentDialog,
-                        onClearPayment: _clearPayment,
-                        onSaveDraft: _saveDraft,
-                        onApprove: _showApproveDialog,
-                        onRetryPreview: _fetchPreview,
-                      ),
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
           ),
         ));
   }

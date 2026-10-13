@@ -174,7 +174,7 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
                           },
                           icon: const Icon(Icons.business, color: AppColors.primary),
                           label: Text(
-                            '+ Add Company',
+                            '+ Add Brand',
                             style: AppTextStyles.bodyBold().copyWith(color: AppColors.primary),
                           ),
                           style: OutlinedButton.styleFrom(

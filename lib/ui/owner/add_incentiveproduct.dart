@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -55,25 +54,14 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
   String? _selectedCompanyId;
   String? _selectedUnitId;
 
-  // Default for a brand-new product is "None" for both incentive type and
-  // bonus type. Editing an existing product overrides this from the saved
-  // data in initState() below.
   ProductIncentiveType _incentiveType = ProductIncentiveType.none;
   ProductBonusType _bonusType = ProductBonusType.none;
 
-  // True once we've synced _selectedCompanyId/_selectedUnitId against the
-  // loaded dropdown lists at least once. Prevents re-running the sync (and
-  // fighting user edits) on every rebuild.
   bool _dropdownSelectionSynced = false;
 
-  // True when the currently-selected unit's API record has
-  // show_pieces_per_box = "1". Controls whether the Pieces per Box field
-  // shows up / gets auto-filled / gets sent to the API. Packing itself is
-  // now shown for every unit regardless of this flag.
   bool _isBoxUnit = false;
 
-  // Guards against feedback loops when we programmatically set
-  // _piecesPerBoxCtrl.text from inside the packing listener.
+
   bool _syncingPiecesFromPacking = false;
 
   bool get _isEditing => widget.product != null;
@@ -330,7 +318,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                   TextFormField(
                     controller: _nameCtrl,
                     inputFormatters: DValidator.textWithLimit,
-                    decoration: const InputDecoration(hintText: 'e.g. Marvel Statuario'),
                     validator: (v) =>
                         DValidator.validateRequired(v, message: 'Product name is required'),
                   ),
@@ -348,7 +335,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       isExpanded: true,
                       initialValue: _selectedCompanyId,
                       decoration: InputDecoration(
-                        hintText: dropdownsLoading ? 'Loading...' : 'Select company',
+                        hintText: dropdownsLoading ? 'Loading...' : 'Select brand',
                       ),
                       items: state.companies
                           .map((c) => DropdownMenuItem(
@@ -359,7 +346,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       onChanged: dropdownsLoading
                           ? null
                           : (v) => setState(() => _selectedCompanyId = v),
-                      validator: (v) => DValidator.validateDropdown('company', v),
+                      validator: (v) => DValidator.validateDropdown('Brand', v),
                     ),
                   SizedBox(height: Responsive.h(14)),
 
@@ -374,9 +361,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             _FieldLabel('Size'),
                             TextFormField(
                               controller: _sizeCtrl,
-                              inputFormatters: DValidator.textWithLimit,
-                              decoration: const InputDecoration(hintText: 'e.g. 600x1200'),
-                              //validator: (v) =>DValidator.validateRequired(v, message: 'Size is required'),
+                              inputFormatters: DValidator.sizeText,
+                              // decoration: InputDecoration(hintText: 'e.g. 36mm or 600x1200',),
+
+                              validator: DValidator.validateSize,
                             ),
                           ],
                         ),
@@ -429,7 +417,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             _FieldLabel('Packing'),
                             TextFormField(
                               controller: _packingCtrl,
-                              inputFormatters: DValidator.textWithLimit,
+                              inputFormatters: DValidator.packingText,
                               //decoration: const InputDecoration(hintText: 'e.g. 8pcs/box'),
                             ),
                           ],
@@ -459,6 +447,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                   ),
                   SizedBox(height: Responsive.h(14)),
 
+                  // MRP and Selling Rate: max 7 digits + 2 decimals.
+                  // Selling rate cannot be higher than MRP.
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -470,9 +460,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             TextFormField(
                               controller: _mrpCtrl,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: DValidator.decimalNumber,
-                              decoration: const InputDecoration(hintText: 'e.g. 650'),
-                              validator: _requiredNumberValidator,
+                              inputFormatters: DValidator.mrpNumber,
+                              validator: DValidator.validateMrp,
                             ),
                           ],
                         ),
@@ -486,9 +475,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             TextFormField(
                               controller: _rateCtrl,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: DValidator.decimalNumber,
-                              decoration: const InputDecoration(hintText: 'e.g. 50'),
-                              validator: _requiredNumberValidator,
+                              inputFormatters: DValidator.mrpNumber,
+                              validator: (v) =>
+                                  DValidator.validateRate(v, mrpText: _mrpCtrl.text),
                             ),
                           ],
                         ),

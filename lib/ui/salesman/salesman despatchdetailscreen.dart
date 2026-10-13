@@ -120,7 +120,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Grand Total', style: AppTextStyles.bodyBold()),
+                    Text('Grand Total', style: AppTextStyles.h3()),
                     Text(
                       _currency(dispatch.grandTotal),
                       style: AppTextStyles.bodyBold(color: AppColors.primary)
@@ -194,9 +194,9 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
           columnWidths: const {
             0: FixedColumnWidth(32),   // #
             1: FixedColumnWidth(160),  // Item
-            2: FixedColumnWidth(140),  // Company
-            3: FixedColumnWidth(110),  // Size
-            4: FixedColumnWidth(70),   // Unit
+            2: FixedColumnWidth(250),  // Company
+            3: FixedColumnWidth(190),  // Size
+            4: FixedColumnWidth(100),   // Unit
             5: FixedColumnWidth(50),   // Box
             6: FixedColumnWidth(50),   // Pcs
             7: FixedColumnWidth(70),   // Qty
@@ -207,7 +207,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
               children: [
                 _headerCell('#'),
                 _headerCell('Item'),
-                _headerCell('Company'),
+                _headerCell('Company',),
                 _headerCell('Size'),
                 _headerCell('Unit'),
                 _headerCell('Box', align: TextAlign.right),

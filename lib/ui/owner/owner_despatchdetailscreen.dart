@@ -198,7 +198,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Grand Total', style: AppTextStyles.bodyBold()),
+                        Text('Grand Total', style: AppTextStyles.h3()),
                         Text(
                           _currency(dispatch.grandTotal),
                           style: AppTextStyles.bodyBold(color: AppColors.primary)

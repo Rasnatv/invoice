@@ -9,6 +9,7 @@ import '../../../core/utils/responsive.dart';
 import '../../bloc/ownerbloc/addincentive/addincentive_bloc.dart';
 import '../../bloc/ownerbloc/addincentive/addincentive_event.dart';
 import '../../bloc/ownerbloc/addincentive/addincentive_state.dart';
+import '../../core/validator/validationfile.dart';
 import '../../models/owner_models/owner_incentivesetupmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
@@ -315,17 +316,6 @@ class _AddIncentiveViewState extends State<_AddIncentiveView> {
   }
 }
 
-/// SCREEN 2 — "Salesman Monthly Incentive Setup"
-///
-/// Opened only after a salesman is picked on AddIncentiveScreen. Loads
-/// the existing setup (if any) for the chosen year/month via
-/// POST /salesman-incentive-setup/get, and saves via
-/// POST /salesman-incentive-setup/save. Shares the same
-/// SalesmanIncentiveBloc instance as screen 1 (passed via
-/// BlocProvider.value).
-///
-/// When the loaded setup has bonus_status.is_paid == 1 the screen becomes
-/// read-only: fields are locked and Save / Remove are hidden.
 class SalesmanIncentiveSetupScreen extends StatefulWidget {
   const SalesmanIncentiveSetupScreen({
     super.key,
@@ -639,16 +629,17 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                         SizedBox(height: Responsive.h(10)),
                         Text('Monthly Target Amount (₹)', style: AppTextStyles.caption()),
                         SizedBox(height: Responsive.h(6)),
+                        // ---- Target amount: max 8 digits + 2 decimals, > 0 ----
                         TextFormField(
                           controller: _targetCtrl,
                           enabled: !_isPaid,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: DValidator.targetNumber,
                           decoration: const InputDecoration(hintText: 'e.g. 300000'),
                           validator: (v) {
                             if (!_enabled || !_useTarget) return null;
-                            if (v == null || v.trim().isEmpty) return 'Required';
-                            if (double.tryParse(v.trim()) == null) return 'Enter a valid number';
-                            return null;
+                            return DValidator.validateTargetAmount(v);
                           },
                         ),
                         SizedBox(height: Responsive.h(16)),
@@ -663,7 +654,14 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                               label: const Text('Fixed Amount'),
                               selected: _bonusType == BonusType.fixed,
                               selectedColor: AppColors.primary.withOpacity(0.18),
-                              onSelected: _isPaid ? null : (_) => setState(() => _bonusType = BonusType.fixed),
+                              // Clear the old value on switch so a fixed amount
+                              // never carries over as a (wrong) percentage.
+                              onSelected: _isPaid
+                                  ? null
+                                  : (_) => setState(() {
+                                _bonusType = BonusType.fixed;
+                                _bonusCtrl.clear();
+                              }),
                             ),
                           ),
                           SizedBox(width: Responsive.w(10)),
@@ -672,7 +670,12 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                               label: const Text('Percentage'),
                               selected: _bonusType == BonusType.percent,
                               selectedColor: AppColors.primary.withOpacity(0.18),
-                              onSelected: _isPaid ? null : (_) => setState(() => _bonusType = BonusType.percent),
+                              onSelected: _isPaid
+                                  ? null
+                                  : (_) => setState(() {
+                                _bonusType = BonusType.percent;
+                                _bonusCtrl.clear();
+                              }),
                             ),
                           ),
                         ],
@@ -686,10 +689,15 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                         style: AppTextStyles.caption(),
                       ),
                       SizedBox(height: Responsive.h(6)),
+                      // ---- Incentive: fixed (max 7 digits, <= target) or percent (<= 100) ----
                       TextFormField(
                         controller: _bonusCtrl,
                         enabled: !_isPaid,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: _bonusType == BonusType.percent
+                            ? DValidator.percentNumber
+                            : DValidator.fixedBonusNumber,
                         decoration: InputDecoration(
                           hintText: _bonusType == BonusType.fixed ? 'e.g. 5000' : 'e.g. 2',
                           prefixText: _bonusType == BonusType.fixed ? '₹ ' : null,
@@ -697,9 +705,11 @@ class _SalesmanIncentiveSetupScreenState extends State<SalesmanIncentiveSetupScr
                         ),
                         validator: (v) {
                           if (!_enabled) return null;
-                          if (v == null || v.trim().isEmpty) return 'Required';
-                          if (double.tryParse(v.trim()) == null) return 'Enter a valid number';
-                          return null;
+                          return DValidator.validateBonusValue(
+                            v,
+                            isPercent: _bonusType == BonusType.percent,
+                            targetText: _useTarget ? _targetCtrl.text : null,
+                          );
                         },
                       ),
                     ],

@@ -116,13 +116,26 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
     }
   }
 
+  /// Joining date can be today or any earlier date. Future dates are
+  /// not selectable (greyed out in the calendar).
   Future<void> _pickJoiningDate() async {
-    final now = DateTime.now();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final firstDate = DateTime(today.year - 10);
+
+    // initialDate must be between firstDate and lastDate (today), otherwise
+    // showDatePicker throws. This also covers an old saved date that is in
+    // the future or older than 10 years when editing.
+    DateTime initial = _joiningDate != null
+        ? DateUtils.dateOnly(_joiningDate!)
+        : today;
+    if (initial.isAfter(today)) initial = today;
+    if (initial.isBefore(firstDate)) initial = firstDate;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _joiningDate ?? now,
-      firstDate: DateTime(now.year - 10),
-      lastDate: DateTime(now.year + 1),
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: today, // <-- no dates after today
     );
     if (picked != null) {
       setState(() => _joiningDate = picked);
@@ -155,6 +168,12 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
 
     if (_joiningDate == null) {
       AppSnackbar.warning('Please select a joining date');
+      return;
+    }
+    // Safety check: joining date can't be after today.
+    if (DateUtils.dateOnly(_joiningDate!)
+        .isAfter(DateUtils.dateOnly(DateTime.now()))) {
+      AppSnackbar.warning('Joining date cannot be in the future');
       return;
     }
     if (_selectedDesignation == null) {
@@ -285,7 +304,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
                 ),
                 SizedBox(height: Responsive.h(16)),
 
-                // Joining Date Field
+                // Joining Date Field (today or earlier only)
                 Text('Joining Date', style: AppTextStyles.bodyBold()),
                 SizedBox(height: Responsive.h(6)),
                 InkWell(

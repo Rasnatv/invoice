@@ -12,6 +12,7 @@ import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_state.dart';
 import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_bloc.dart';
 import 'package:tileshop/models/salesmanmodels/salesman_dashboardmodel.dart'; // DashboardHomeRecentEstimate etc.
 import '../../widgets/monthlysale.dart';
+import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/owner_widgets.dart'; // StatusBadge
 import '../../widgets/ownerdashboardscreen_shimmer.dart';
 
@@ -24,8 +25,42 @@ class OwnerDashboardScreen extends StatelessWidget {
   }
 }
 
-class _OwnerDashboardView extends StatelessWidget {
+// class _OwnerDashboardView extends StatelessWidget {
+//   const _OwnerDashboardView();
+//
+//   /// True only when at least one month has a sale greater than 0.
+//   bool _hasSalesData(List<dynamic> monthlySales) {
+//     if (monthlySales.isEmpty) return false;
+//     return monthlySales.any((m) => (m.total as num) > 0);
+//   }
+//
+//   @override
+
+ // Widget build(BuildContext context) {
+class _OwnerDashboardView extends StatefulWidget {
   const _OwnerDashboardView();
+
+  @override
+  State<_OwnerDashboardView> createState() => _OwnerDashboardViewState();
+}
+
+class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
+  @override
+  void initState() {
+    super.initState();
+    ownerDataRefresh.addListener(_onOwnerDataChanged);
+  }
+
+  @override
+  void dispose() {
+    ownerDataRefresh.removeListener(_onOwnerDataChanged);
+    super.dispose();
+  }
+
+  void _onOwnerDataChanged() {
+    if (!mounted) return;
+    context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
+  }
 
   /// True only when at least one month has a sale greater than 0.
   bool _hasSalesData(List<dynamic> monthlySales) {

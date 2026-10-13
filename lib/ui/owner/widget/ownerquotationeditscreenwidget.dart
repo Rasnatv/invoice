@@ -669,7 +669,6 @@ class OwnerTotalsCard extends StatelessWidget {
         children: [
           gap,
           TotalRow('Total Sq.Ft', number.format(totalSqft)),
-          if (mrpTotal > 0) ...[gap, TotalRow('Total MRP', currency.format(mrpTotal))],
           gap,
           TotalRow('Items Total', currency.format(itemsTotal)),
           gap,

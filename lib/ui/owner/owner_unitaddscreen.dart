@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -32,6 +33,7 @@ class _UnitSetupView extends StatefulWidget {
 }
 
 class _UnitSetupViewState extends State<_UnitSetupView> {
+  // ---------------- UNCHANGED: form logic ----------------
   Future<void> _openUnitForm(BuildContext context, {UnitModel? unit}) async {
     final bloc = context.read<UnitBloc>();
     final formKey = GlobalKey<FormState>();
@@ -64,17 +66,15 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                 TextFormField(
                   controller: nameCtrl,
                   decoration: const InputDecoration(labelText: 'Unit Name'),
-                  inputFormatters: DValidator.textWithLimit,
-                  validator: (v) =>
-                      DValidator.validateRequired(v, message: 'Unit name is required'),
+                  inputFormatters: DValidator.unitNameText,
+                  validator: DValidator.validateUnitName,
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: abbrCtrl,
                   decoration: const InputDecoration(labelText: 'Abbreviation'),
-                  inputFormatters: DValidator.textWithLimit,
-                  validator: (v) =>
-                      DValidator.validateRequired(v, message: 'Abbreviation is required'),
+                  inputFormatters: DValidator.unitAbbrText,
+                  validator: DValidator.validateUnitAbbr,
                 ),
                 SizedBox(height: Responsive.h(20)),
                 SizedBox(
@@ -131,6 +131,7 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
     );
   }
 
+  // ---------------- UNCHANGED: delete logic ----------------
   Future<void> _confirmDelete(BuildContext context, UnitModel unit) async {
     final bloc = context.read<UnitBloc>();
     final confirmed = await showDialog<bool>(
@@ -215,23 +216,31 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                   );
                 }
 
+                // ---------------- NEW: modern empty state ----------------
                 if (state.units.isEmpty) {
-                  return Center(child: Text('No units added yet', style: AppTextStyles.subtitle()));
+                  return const _EmptyUnits();
                 }
 
+                // ---------------- NEW: section title + modern list ----------------
                 return RefreshIndicator(
                   onRefresh: () async => context.read<UnitBloc>().add(const LoadUnits()),
                   child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(
                       Responsive.w(16),
                       Responsive.h(14),
                       Responsive.w(16),
                       Responsive.h(90),
                     ),
-                    itemCount: state.units.length,
-                    separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
+                    // +1 => section title
+                    itemCount: state.units.length + 1,
+                    separatorBuilder: (_, index) =>
+                        SizedBox(height: Responsive.h(index == 0 ? 14 : 10)),
                     itemBuilder: (context, index) {
-                      final unit = state.units[index];
+                      if (index == 0) {
+                        return const _SectionTitle(title: 'All Units');
+                      }
+                      final unit = state.units[index - 1];
                       return _UnitCard(
                         unit: unit,
                         onEdit: () => _openUnitForm(context, unit: unit),
@@ -248,6 +257,68 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
   }
 }
 
+/// NEW: Small section label above the list.
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+/// NEW: Clean centered empty state.
+class _EmptyUnits extends StatelessWidget {
+  const _EmptyUnits();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 88,
+              width: 88,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.straighten_rounded, size: 40, color: AppColors.primary),
+            ),
+            SizedBox(height: Responsive.h(16)),
+            Text('No units added yet', style: AppTextStyles.bodyBold()),
+            SizedBox(height: Responsive.h(6)),
+            Text(
+              'Tap "Add Unit" to create your first unit.',
+              style: AppTextStyles.caption(),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// RESTYLED: Modern unit card (icon avatar + name + abbreviation chip).
 class _UnitCard extends StatelessWidget {
   const _UnitCard({required this.unit, required this.onEdit, required this.onDelete});
 
@@ -261,24 +332,69 @@ class _UnitCard extends StatelessWidget {
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Icon avatar
+          Container(
+            height: 48,
+            width: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.straighten_rounded, size: 22, color: AppColors.primary),
+          ),
+          SizedBox(width: Responsive.w(12)),
+
+          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(unit.name, style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(3)),
-                Text(unit.abbreviation, style: AppTextStyles.caption()),
+                Text(
+                  unit.name,
+                  style: AppTextStyles.bodyBold(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: Responsive.h(6)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    unit.abbreviation,
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+
+          // Menu
           PopupMenuButton<String>(
             padding: EdgeInsets.zero,
-            icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+            color: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textSecondary),
             onSelected: (value) {
               if (value == 'edit') onEdit();
               if (value == 'delete') onDelete();

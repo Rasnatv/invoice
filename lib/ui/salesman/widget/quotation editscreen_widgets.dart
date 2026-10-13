@@ -699,7 +699,7 @@ class QeTotalsCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Grand Total', style: AppTextStyles.h3()),
+              Text('Grand Total', style: AppTextStyles.balanceamount()),
               Text(currency.format(grandTotal),
                   style: AppTextStyles.h2(color: AppColors.primary)),
             ],

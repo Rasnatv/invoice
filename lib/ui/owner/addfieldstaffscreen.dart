@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -159,11 +158,21 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                 return InkWell(
                                   borderRadius: BorderRadius.circular(14),
                                   onTap: () async {
+                                    final now = DateTime.now();
+                                    final today =
+                                    DateTime(now.year, now.month, now.day);
+
+                                    // initialDate must never be after lastDate,
+                                    // otherwise showDatePicker throws an assertion
+                                    // error (edit mode with a saved future date).
+                                    DateTime initial = date ?? today;
+                                    if (initial.isAfter(today)) initial = today;
+
                                     final picked = await showDatePicker(
                                       context: sheetContext,
-                                      initialDate: date ?? DateTime.now(),
+                                      initialDate: initial,
                                       firstDate: DateTime(2000),
-                                      lastDate: DateTime(2100),
+                                      lastDate: today, // future dates are disabled
                                     );
                                     if (picked != null) {
                                       joiningDate.value = picked;
@@ -172,12 +181,14 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                   },
                                   child: InputDecorator(
                                     decoration: InputDecoration(
-                                      labelText: 'Joining Date',
                                       floatingLabelBehavior: FloatingLabelBehavior.always,
                                       prefixIcon: Icon(Icons.calendar_today_outlined,
                                           color: AppColors.textSecondary, size: 20),
-                                      errorText:
-                                      hasError ? 'Please select joining date' : null,
+                                      errorText: hasError
+                                          ? (date == null
+                                          ? 'Please select joining date'
+                                          : 'Joining date cannot be in the future')
+                                          : null,
                                       filled: true,
                                       fillColor: AppColors.background,
                                       contentPadding: EdgeInsets.symmetric(
@@ -270,6 +281,16 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                     showDateError.value = true;
                                     return;
                                   }
+
+                                  // Block a saved future date from being re-saved.
+                                  final now = DateTime.now();
+                                  final today =
+                                  DateTime(now.year, now.month, now.day);
+                                  if (joiningDate.value!.isAfter(today)) {
+                                    showDateError.value = true;
+                                    return;
+                                  }
+
                                   if (!formValid) return;
 
                                   // dd-MM-yyyy -> update API

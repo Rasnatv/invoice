@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -167,11 +168,20 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                         InkWell(
                           borderRadius: BorderRadius.circular(14),
                           onTap: () async {
+                            final now = DateTime.now();
+                            final today = DateTime(now.year, now.month, now.day);
+
+                            // initialDate must never be after lastDate, otherwise
+                            // showDatePicker throws an assertion error (edit mode
+                            // with a saved future date).
+                            DateTime initial = joiningDate ?? today;
+                            if (initial.isAfter(today)) initial = today;
+
                             final picked = await showDatePicker(
                               context: sheetContext,
-                              initialDate: joiningDate ?? DateTime.now(),
+                              initialDate: initial,
                               firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
+                              lastDate: today, // future dates are disabled
                             );
                             if (picked != null) {
                               setSheetState(() {
@@ -182,11 +192,14 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                           },
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: 'Joining Date',
                               floatingLabelBehavior: FloatingLabelBehavior.always,
                               prefixIcon: Icon(Icons.event_outlined,
                                   color: AppColors.textSecondary, size: 20),
-                              errorText: showDateError ? 'Please select joining date' : null,
+                              errorText: showDateError
+                                  ? (joiningDate == null
+                                  ? 'Please select joining date'
+                                  : 'Joining date cannot be in the future')
+                                  : null,
                               filled: true,
                               fillColor: AppColors.background,
                               contentPadding: EdgeInsets.symmetric(
@@ -229,6 +242,15 @@ class _OwnerDriverViewState extends State<_OwnerDriverView> {
                                 setSheetState(() => showDateError = true);
                                 return;
                               }
+
+                              // Block a saved future date from being re-saved.
+                              final now = DateTime.now();
+                              final today = DateTime(now.year, now.month, now.day);
+                              if (joiningDate!.isAfter(today)) {
+                                setSheetState(() => showDateError = true);
+                                return;
+                              }
+
                               if (!formValid) return;
 
                               if (isEdit) {

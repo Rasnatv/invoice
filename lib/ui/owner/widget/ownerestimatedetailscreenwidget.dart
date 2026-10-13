@@ -1,3 +1,5 @@
+
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -20,7 +22,21 @@ class CurrencyFmt {
 const currencyFmt = CurrencyFmt();
 
 // ---------------------------------------------------------------------
-// Helper functions
+// Standard column widths for the items grid.
+// Every row uses the same widths so the table looks uniform.
+// ---------------------------------------------------------------------
+
+class EstCol {
+  static const double sl = 60; // Sl.No
+  static const double text = 250; // Item / Company
+  static const double size = 120; // Size
+  static const double unit = 190; // Unit
+  static const double num = 150; // Qty, Box Qty, Piece Qty, MRP, Rate
+  static const double money = 200; // Amount, Incentive
+}
+
+// ---------------------------------------------------------------------
+// Helpers
 // ---------------------------------------------------------------------
 
 /// Payment display helpers — prefer the server's pre-formatted labels
@@ -67,6 +83,41 @@ String statusLabel(String status) {
   return status[0].toUpperCase() + status.substring(1).replaceAll('_', ' ');
 }
 
+/// Shared card decoration so every block on the page looks consistent.
+BoxDecoration cardDecoration({double radius = 14}) => BoxDecoration(
+  color: AppColors.surface,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border.withOpacity(0.8)),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 10,
+      offset: const Offset(0, 3),
+    ),
+  ],
+);
+
+/// Small rounded icon badge used in section titles.
+class IconBadge extends StatelessWidget {
+  const IconBadge(this.icon, {super.key, this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------
 // Small widgets
 // ---------------------------------------------------------------------
@@ -79,17 +130,21 @@ class RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = InkWell(
-      onTap: onPressed,
+    final button = Material(
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Icon(icon, size: 20, color: AppColors.primary),
         ),
-        child: Icon(icon, size: 20, color: AppColors.primary),
       ),
     );
     if (tooltip == null) return button;
@@ -114,63 +169,74 @@ class DetailSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: cardDecoration(),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              if (icon != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, size: 15, color: AppColors.primary),
-                ),
-                SizedBox(width: Responsive.w(8)),
-              ],
-              Text(title,
-                  style: AppTextStyles.bodyBold(color: AppColors.primary)
-                      .copyWith(fontSize: Responsive.sp(13.5))),
-            ],
-          ),
-          SizedBox(height: Responsive.h(12)),
-          ...rows.map((r) => Padding(
-            padding: EdgeInsets.only(bottom: Responsive.h(10)),
+          // Title bar
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+              border: Border(
+                bottom: BorderSide(color: AppColors.border.withOpacity(0.7)),
+              ),
+            ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (r.icon != null) ...[
-                  Icon(r.icon, size: 15, color: AppColors.textHint),
-                  SizedBox(width: Responsive.w(8)),
+                if (icon != null) ...[
+                  IconBadge(icon!),
+                  SizedBox(width: Responsive.w(10)),
                 ],
-                SizedBox(
-                  width: r.icon != null ? 86 : 100,
-                  child: Text(r.label, style: AppTextStyles.caption()),
-                ),
                 Expanded(
                   child: Text(
-                    r.value.isEmpty ? '-' : r.value,
-                    style: AppTextStyles.bodyBold(),
+                    title,
+                    style: AppTextStyles.bodyBold(color: AppColors.primary)
+                        .copyWith(fontSize: Responsive.sp(14)),
                   ),
                 ),
               ],
             ),
-          )),
+          ),
+          // Rows
+          Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(4)),
+            child: Column(
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (rows[i].icon != null) ...[
+                          Icon(rows[i].icon, size: 16, color: AppColors.textHint),
+                          SizedBox(width: Responsive.w(10)),
+                        ],
+                        SizedBox(
+                          width: 92,
+                          child: Text(rows[i].label, style: AppTextStyles.caption()),
+                        ),
+                        SizedBox(width: Responsive.w(8)),
+                        Expanded(
+                          child: Text(
+                            rows[i].value.isEmpty ? '-' : rows[i].value,
+                            style: AppTextStyles.bodyBold(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (i != rows.length - 1)
+                    Divider(height: 1, color: AppColors.border.withOpacity(0.5)),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -178,19 +244,24 @@ class DetailSection extends StatelessWidget {
 }
 
 class SummaryRow extends StatelessWidget {
-  const SummaryRow(this.label, this.value, {super.key, this.valueColor});
+  const SummaryRow(this.label, this.value, {super.key, this.valueColor, this.bold = false});
   final String label;
   final String value;
   final Color? valueColor;
+  final bool bold;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.body()),
-        Text(value,
-            style: AppTextStyles.bodyBold(color: valueColor ?? Colors.black)),
+        Text(label, style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body()),
+        Text(
+          value,
+          style: AppTextStyles.body(color: valueColor ?? Colors.black).copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
       ],
     );
   }
@@ -214,12 +285,12 @@ class EstimateHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.primary.withOpacity(0.07),
+            AppColors.primary.withOpacity(0.10),
             AppColors.primary.withOpacity(0.02),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.14)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,16 +299,44 @@ class EstimateHeader extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const IconBadge(Icons.receipt_long_rounded, size: 20),
+              // Status pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withOpacity(0.35)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(statusIcon(detail.status), size: 14, color: color),
+                    SizedBox(width: Responsive.w(6)),
+                    Text(
+                      statusLabel(detail.status),
+                      style: AppTextStyles.bodyBold(color: color)
+                          .copyWith(fontSize: Responsive.sp(12)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: Responsive.h(14)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Reference NO.',
-                        style: AppTextStyles.captionnew().copyWith(letterSpacing: 0.6)),
+                    Text('REFERENCE NO.',
+                        style: AppTextStyles.caption().copyWith(letterSpacing: 0.8)),
                     SizedBox(height: Responsive.h(4)),
                     Text(
                       detail.estimateNumber,
-                      style: AppTextStyles.bodyBold(),
+                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(16)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -247,32 +346,12 @@ class EstimateHeader extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('DATE', style: AppTextStyles.caption().copyWith(letterSpacing: 0.6)),
+                  Text('DATE', style: AppTextStyles.caption().copyWith(letterSpacing: 0.8)),
                   SizedBox(height: Responsive.h(4)),
                   Text(detail.dateRaw, style: AppTextStyles.bodyBold()),
                 ],
               ),
             ],
-          ),
-          SizedBox(height: Responsive.h(14)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(statusIcon(detail.status), size: 14, color: color),
-                SizedBox(width: Responsive.w(6)),
-                Text(
-                  statusLabel(detail.status),
-                  style: AppTextStyles.bodyBold(color: color)
-                      .copyWith(fontSize: Responsive.sp(12)),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -281,7 +360,7 @@ class EstimateHeader extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------
-// Items table (bill-style) — horizontal-scroll grid, print/export style
+// Items table (bill-style) — horizontal-scroll grid, standard widths
 // ---------------------------------------------------------------------
 
 class EstimateItemsTable extends StatelessWidget {
@@ -303,10 +382,7 @@ class EstimateItemsTable extends StatelessWidget {
     final totalIncentive = detail.items.fold<double>(
         0, (sum, i) => sum + (i.isIncentiveEligible ? i.incentiveAmount : 0));
 
-    // Only show these columns if at least one item across the whole
-    // estimate actually has a value for them — otherwise the column
-    // would just be a strip of dashes. Rows without a value still show
-    // '-' in that column once it's visible.
+    // Only show these columns if at least one item has a value for them.
     final hasBoxQty = detail.items.any((i) => i.boxQuantity > 0);
     final hasPieceQty = detail.items.any((i) => i.pieceQuantity > 0);
 
@@ -318,93 +394,73 @@ class EstimateItemsTable extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.list_alt_rounded, size: 15, color: AppColors.primary),
-                ),
-                SizedBox(width: Responsive.w(8)),
+                const IconBadge(Icons.list_alt_rounded),
+                SizedBox(width: Responsive.w(10)),
                 Text('Items', style: AppTextStyles.h3()),
               ],
             ),
             Container(
               padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(10), vertical: Responsive.h(4)),
+                  horizontal: Responsive.w(12), vertical: Responsive.h(5)),
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
+                color: AppColors.primary.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Total Items: ${detail.items.length}',
-                  style: AppTextStyles.bodyBold(color: AppColors.primary)),
+              child: Text(
+                '${detail.items.length} ${detail.items.length == 1 ? 'item' : 'items'}',
+                style: AppTextStyles.bodyBold(color: AppColors.primary)
+                    .copyWith(fontSize: Responsive.sp(12)),
+              ),
             ),
           ],
         ),
         SizedBox(height: Responsive.h(12)),
         if (detail.items.isEmpty)
           Container(
-            padding: EdgeInsets.all(Responsive.w(14)),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
+            width: double.infinity,
+            padding: EdgeInsets.all(Responsive.w(18)),
+            decoration: cardDecoration(),
             child: Text('No items on this estimate.', style: AppTextStyles.caption()),
           )
         else
           Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+            decoration: cardDecoration(),
             clipBehavior: Clip.antiAlias,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Table(
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                 border: TableBorder(
-                  horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
-                  verticalInside: BorderSide(color: AppColors.border.withOpacity(0.5)),
-                  bottom: BorderSide(color: AppColors.border),
+                  horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.45)),
+                  verticalInside: BorderSide(color: AppColors.border.withOpacity(0.30)),
                 ),
-                // Column widths are keyed by index, so build the map
-                // dynamically — the index of every column after Unit
-                // shifts depending on which of Box Qty / Piece Qty /
-                // Incentive are actually shown.
+                // Keyed by index, so built dynamically — every column after
+                // Qty shifts depending on which optional columns are shown.
                 columnWidths: (() {
                   final widths = <int, TableColumnWidth>{};
                   var col = 0;
-                  widths[col++] = const FixedColumnWidth(34); // Sl.No
-                  widths[col++] = const FixedColumnWidth(150); // Item
-                  widths[col++] = const FixedColumnWidth(120); // Company
-                  widths[col++] = const FixedColumnWidth(90); // Size
-                  widths[col++] = const FixedColumnWidth(95); // Unit
-                  widths[col++] = const FixedColumnWidth(55); // Qty
-                  if (hasBoxQty) widths[col++] = const FixedColumnWidth(70); // Box Qty
-                  if (hasPieceQty) widths[col++] = const FixedColumnWidth(70); // Piece Qty
-                  widths[col++] = const FixedColumnWidth(75); // MRP
-                  widths[col++] = const FixedColumnWidth(75); // Rate
-                  widths[col++] = const FixedColumnWidth(110); // Amount
-                  if (!isOwner) widths[col++] = const FixedColumnWidth(110); // Incentive
+                  widths[col++] = const FixedColumnWidth(EstCol.sl); // Sl.No
+                  widths[col++] = const FixedColumnWidth(EstCol.text); // Item
+                  widths[col++] = const FixedColumnWidth(EstCol.text); // Company
+                  widths[col++] = const FixedColumnWidth(EstCol.size); // Size
+                  widths[col++] = const FixedColumnWidth(EstCol.unit); // Unit
+                  widths[col++] = const FixedColumnWidth(EstCol.num); // Qty
+                  if (hasBoxQty) widths[col++] = const FixedColumnWidth(EstCol.num);
+                  if (hasPieceQty) widths[col++] = const FixedColumnWidth(EstCol.num);
+                  widths[col++] = const FixedColumnWidth(EstCol.num); // MRP
+                  widths[col++] = const FixedColumnWidth(EstCol.num); // Rate
+                  widths[col++] = const FixedColumnWidth(EstCol.money); // Amount
+                  if (!isOwner) widths[col++] = const FixedColumnWidth(EstCol.money); // Incentive
                   return widths;
                 })(),
                 children: [
                   // ---- Header row ----
                   TableRow(
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withOpacity(0.09),
                       border: Border(
                         bottom: BorderSide(
-                            color: AppColors.primary.withOpacity(0.3), width: 1.4),
+                            color: AppColors.primary.withOpacity(0.35), width: 1.4),
                       ),
                     ),
                     children: [
@@ -428,11 +484,11 @@ class EstimateItemsTable extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: i.isEven
                             ? AppColors.surface
-                            : AppColors.surfaceAlt.withOpacity(0.4),
+                            : AppColors.surfaceAlt.withOpacity(0.45),
                       ),
                       children: [
                         estDataCell('${i + 1}', align: TextAlign.center),
-                        estDataCell(detail.items[i].productName),
+                        estDataCell(detail.items[i].productName, bold: true),
                         estDataCell(detail.items[i].companyName.isEmpty
                             ? '-'
                             : detail.items[i].companyName),
@@ -481,10 +537,10 @@ class EstimateItemsTable extends StatelessWidget {
                   // ---- Totals footer row ----
                   TableRow(
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.06),
+                      color: AppColors.primary.withOpacity(0.07),
                       border: Border(
                         top: BorderSide(
-                            color: AppColors.primary.withOpacity(0.3), width: 1.2),
+                            color: AppColors.primary.withOpacity(0.35), width: 1.2),
                       ),
                     ),
                     children: [
@@ -510,23 +566,37 @@ class EstimateItemsTable extends StatelessWidget {
               ),
             ),
           ),
+        if (detail.items.isNotEmpty) ...[
+          SizedBox(height: Responsive.h(6)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.swipe_rounded, size: 14, color: AppColors.textHint),
+              SizedBox(width: Responsive.w(4)),
+              Text('Swipe sideways to see all columns',
+                  style: AppTextStyles.caption().copyWith(fontSize: Responsive.sp(11))),
+            ],
+          ),
+        ],
       ],
     );
   }
 
+  // One font size shared by the header and every data cell
+  static double get cellFontSize => Responsive.sp(12.5);
+
   Widget estHeaderCell(String text, {TextAlign align = TextAlign.left}) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(10)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(12)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 2,
-        softWrap: true,
+        maxLines: 1,
+        softWrap: false,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.captionnew().copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-          letterSpacing: 0.3,
+        style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(
+          fontSize: cellFontSize,
+          letterSpacing: 0.2,
         ),
       ),
     );
@@ -539,26 +609,22 @@ class EstimateItemsTable extends StatelessWidget {
         Color? color,
       }) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(10)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 3,
-        softWrap: true,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(color: color),
+        style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(
+          color: color,
+          fontSize: cellFontSize,
+          fontFeatures: const [FontFeature.tabularFigures()], // digits line up
+        ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------
-// Summary card
-//   Subtotal, Handling Charge
-//   with discount : Amount Before Discount, Discount, Grand Total (after)
-//   no discount   : Grand Total
-//   then Total Paid and the Balance strip.
-// ---------------------------------------------------------------------
 
 class EstimateSummary extends StatelessWidget {
   const EstimateSummary({super.key, required this.detail, required this.number});
@@ -567,53 +633,82 @@ class EstimateSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasBalance = detail.balanceAmount > 0;
+    final balanceColor = hasBalance ? Colors.red : AppColors.success;
+    final discountLabel =
+    detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel;
+
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: cardDecoration(radius: 16),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title bar
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(16), vertical: Responsive.h(12)),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+              border: Border(bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
+            ),
+            child: Row(
+              children: [
+                const IconBadge(Icons.calculate_outlined),
+                SizedBox(width: Responsive.w(10)),
+                Text('Summary',
+                    style: AppTextStyles.bodyBold(color: AppColors.primary)
+                        .copyWith(fontSize: Responsive.sp(14))),
+              ],
+            ),
+          ),
           Padding(
             padding: EdgeInsets.all(Responsive.w(16)),
             child: Column(
               children: [
                 SummaryRow('Total Sqrft', number.format(detail.totalSquareFeet)),
-                SizedBox(height: Responsive.h(8)),
+                SizedBox(height: Responsive.h(10)),
                 SummaryRow('Subtotal', currencyFmt.f(detail.subtotal)),
-                SizedBox(height: Responsive.h(8)),
+                SizedBox(height: Responsive.h(10)),
                 SummaryRow('Handling Charge', currencyFmt.f(detail.handlingCharge)),
-                SizedBox(height: Responsive.h(8)),
                 if (detail.hasDiscount) ...[
+                  SizedBox(height: Responsive.h(10)),
                   SummaryRow('Amount Before Discount', currencyFmt.f(detail.grandTotal)),
-                  SizedBox(height: Responsive.h(8)),
+                  SizedBox(height: Responsive.h(10)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          'Discount (${detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel})',
-                          style: AppTextStyles.body(),
+                        child: Text('Discount ($discountLabel)',
+                            style: AppTextStyles.body()),
+                      ),
+                      Text(
+                        '- ${currencyFmt.f(detail.discountAmount)}',
+                        style: AppTextStyles.bodyBold(color: Colors.red).copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                      Text('- ${currencyFmt.f(detail.discountAmount)}',
-                          style: AppTextStyles.bodyBold(color: Colors.red)),
                     ],
                   ),
-                  SizedBox(height: Responsive.h(8)),
-                  SummaryRow('Grand Total', currencyFmt.f(detail.amountAfterDiscount)),
-                ] else
-                  SummaryRow('Grand Total', currencyFmt.f(detail.grandTotal)),
-                SizedBox(height: Responsive.h(8)),
+                ],
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+                  child: Divider(height: 1, color: AppColors.border),
+                ),
+                // Grand total highlighted
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Grand Total', style: AppTextStyles.h3()),
+                    Text(
+                      currencyFmt.f(
+                          detail.hasDiscount ? detail.amountAfterDiscount : detail.grandTotal),
+                      style: AppTextStyles.balanceamount(),
+                    ),
+                  ],
+                ),
+                SizedBox(height: Responsive.h(10)),
                 SummaryRow('Total Paid', currencyFmt.f(detail.totalPaid),
                     valueColor: AppColors.success),
               ],
@@ -622,22 +717,30 @@ class EstimateSummary extends StatelessWidget {
           // Balance strip
           Container(
             width: double.infinity,
-            padding:
-            EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(14)),
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(16), vertical: Responsive.h(14)),
             decoration: BoxDecoration(
-              color: detail.balanceAmount > 0
-                  ? Colors.red.withOpacity(0.06)
-                  : AppColors.success.withOpacity(0.08),
+              color: balanceColor.withOpacity(0.08),
+              border: Border(top: BorderSide(color: balanceColor.withOpacity(0.25))),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Balance Amount', style: AppTextStyles.h3()),
-                Text(
-                  currencyFmt.f(detail.balanceAmount),
-                  style: AppTextStyles.h2(
-                      color: detail.balanceAmount > 0 ? Colors.red : AppColors.success),
+                Row(
+                  children: [
+                    Icon(
+                      hasBalance
+                          ? Icons.account_balance_wallet_outlined
+                          : Icons.verified_rounded,
+                      size: 18,
+                      color: balanceColor,
+                    ),
+                    SizedBox(width: Responsive.w(8)),
+                    Text('Balance Amount', style: AppTextStyles.h3()),
+                  ],
                 ),
+                Text(currencyFmt.f(detail.balanceAmount),
+                    style: AppTextStyles.balanceamount(color: balanceColor)),
               ],
             ),
           ),
@@ -657,17 +760,104 @@ class EstimatePayments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DetailSection(
-      title: 'Payments',
-      icon: Icons.payments_outlined,
-      rows: detail.payments.map((p) {
-        final date = paymentDateText(p);
-        return DetailRow(
-          paymentMethodText(p),
-          '${currencyFmt.f(p.amount)}${date.isNotEmpty ? ' · $date' : ''}',
-          icon: Icons.receipt_long_outlined,
-        );
-      }).toList(),
+    final totalPaid = detail.payments.fold<double>(0, (s, p) => s + p.amount);
+
+    return Container(
+      width: double.infinity,
+      decoration: cardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+              border: Border(bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
+            ),
+            child: Row(
+              children: [
+                const IconBadge(Icons.payments_outlined),
+                SizedBox(width: Responsive.w(10)),
+                Expanded(
+                  child: Text('Payments',
+                      style: AppTextStyles.bodyBold(color: AppColors.primary)
+                          .copyWith(fontSize: Responsive.sp(14))),
+                ),
+                Text(
+                  '${detail.payments.length} ${detail.payments.length == 1 ? 'entry' : 'entries'}',
+                  style: AppTextStyles.caption(),
+                ),
+              ],
+            ),
+          ),
+          for (var i = 0; i < detail.payments.length; i++) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.receipt_long_outlined,
+                        size: 18, color: AppColors.success),
+                  ),
+                  SizedBox(width: Responsive.w(12)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(paymentMethodText(detail.payments[i]),
+                            style: AppTextStyles.bodyBold()),
+                        SizedBox(height: Responsive.h(2)),
+                        Text(
+                          paymentDateText(detail.payments[i]).isEmpty
+                              ? '-'
+                              : paymentDateText(detail.payments[i]),
+                          style: AppTextStyles.caption(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    currencyFmt.f(detail.payments[i].amount),
+                    style: AppTextStyles.bodyBold(color: AppColors.success).copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (i != detail.payments.length - 1)
+              Divider(height: 1, color: AppColors.border.withOpacity(0.5)),
+          ],
+          // Footer total
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.06),
+              border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.7))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total Received', style: AppTextStyles.bodyBold()),
+                Text(currencyFmt.f(totalPaid),
+                    style: AppTextStyles.bodyBold(color: AppColors.success)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -676,54 +866,85 @@ class EstimatePayments extends StatelessWidget {
 // PDF builders
 // ---------------------------------------------------------------------
 
+const _pdfPrimary = PdfColors.blueGrey800;
+const _pdfLine = PdfColors.grey400;
+const _pdfSoft = PdfColors.grey100;
+
+/// Two-column bordered info block (long values like address / notes go
+/// full-width underneath).
 pw.Widget pdfInfoSection(EstimateDetailModel d) {
-  final rows = <List<String>>[
+  final pairs = <List<String>>[
     ['Reference No.', d.estimateNumber],
     ['Date', d.dateRaw],
     ['Status', statusLabel(d.status)],
+    if (d.salesman.name.isNotEmpty) ['Salesman', d.salesman.name],
     ['Customer Name', d.customerName],
     ['Customer Phone', d.customerPhone],
     if (d.customerEmail.isNotEmpty) ['Customer Email', d.customerEmail],
-    if (d.customerAddress.isNotEmpty) ['Customer Address', d.customerAddress],
     if (d.customer.name.isNotEmpty) ['Contractor Name', d.customer.name],
     if (d.customer.phone.isNotEmpty) ['Contractor Phone', d.customer.phone],
-    if (d.salesman.name.isNotEmpty) ['Salesman', d.salesman.name],
+  ];
+  final wide = <List<String>>[
+    if (d.customerAddress.isNotEmpty) ['Customer Address', d.customerAddress],
     if (d.notes.isNotEmpty) ['Notes', d.notes],
   ];
 
-  return pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: rows
-        .map((r) => pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 4),
-      child: pw.Row(
+  pw.Widget cell(List<String> r) => pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 6),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(r[0].toUpperCase(),
+            style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+        pw.SizedBox(height: 1.5),
+        pw.Text(r[1].isEmpty ? '-' : r[1],
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+      ],
+    ),
+  );
+
+  final rowsWidgets = <pw.Widget>[];
+  for (var i = 0; i < pairs.length; i += 2) {
+    rowsWidgets.add(
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.SizedBox(
-            width: 130,
-            child: pw.Text(r[0],
-                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-          ),
+          pw.Expanded(child: cell(pairs[i])),
+          pw.SizedBox(width: 16),
           pw.Expanded(
-            child: pw.Text(
-              r[1].isEmpty ? '-' : r[1],
-              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-            ),
+            child: i + 1 < pairs.length ? cell(pairs[i + 1]) : pw.SizedBox(),
           ),
         ],
       ),
-    ))
-        .toList(),
+    );
+  }
+  for (final w in wide) {
+    rowsWidgets.add(cell(w));
+  }
+
+  return pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.fromLTRB(12, 10, 12, 4),
+    decoration: pw.BoxDecoration(
+      color: _pdfSoft,
+      border: pw.Border.all(color: _pdfLine, width: 0.5),
+      borderRadius: pw.BorderRadius.circular(4),
+    ),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: rowsWidgets,
+    ),
   );
 }
 
+
 pw.Widget pdfItemsTable(EstimateDetailModel d, bool isOwner) {
-  // Same "only if at least one item has it" rule as the on-screen table,
-  // so the PDF/Excel exports stay consistent with what's shown on screen.
+  // Same "only if at least one item has it" rule as the Excel export.
   final hasBoxQty = d.items.any((i) => i.boxQuantity > 0);
   final hasPieceQty = d.items.any((i) => i.pieceQuantity > 0);
 
   final headers = [
-    '#',
+    'Sl No',
     'Item',
     'Company',
     'Size',
@@ -757,65 +978,133 @@ pw.Widget pdfItemsTable(EstimateDetailModel d, bool isOwner) {
       ],
   ];
 
-  // Cell alignments are keyed by column index, so build the map
-  // dynamically to match wherever Box Qty / Piece Qty / Incentive
-  // land once the optional headers above are counted in.
-  final cellAlignments = <int, pw.Alignment>{0: pw.Alignment.center};
+  // Alignments are keyed by column index — built dynamically so they follow
+  // wherever Box Qty / Piece Qty / Incentive land.
+  final cellAlignments = <int, pw.Alignment>{
+    0: pw.Alignment.center,
+    1: pw.Alignment.centerLeft,
+    2: pw.Alignment.centerLeft,
+    3: pw.Alignment.centerLeft,
+    4: pw.Alignment.centerLeft,
+  };
   var col = 5; // Qty is always column index 5
   cellAlignments[col++] = pw.Alignment.centerRight; // Qty
-  if (hasBoxQty) cellAlignments[col++] = pw.Alignment.centerRight; // Box Qty
-  if (hasPieceQty) cellAlignments[col++] = pw.Alignment.centerRight; // Piece Qty
+  if (hasBoxQty) cellAlignments[col++] = pw.Alignment.centerRight;
+  if (hasPieceQty) cellAlignments[col++] = pw.Alignment.centerRight;
   cellAlignments[col++] = pw.Alignment.centerRight; // MRP
   cellAlignments[col++] = pw.Alignment.centerRight; // Rate
   cellAlignments[col++] = pw.Alignment.centerRight; // Amount
   if (!isOwner) cellAlignments[col++] = pw.Alignment.centerRight; // Incentive
 
+  // Number columns size themselves to their content, so Amount (and other
+  // numbers) never wrap onto a second line. Text columns share what's left.
+  final colWidths = <int, pw.TableColumnWidth>{};
+  var c = 0;
+  colWidths[c++] = const pw.IntrinsicColumnWidth(); // Sl
+  colWidths[c++] = const pw.FlexColumnWidth(); // Item
+  colWidths[c++] = const pw.FlexColumnWidth(); // Company
+  colWidths[c++] = const pw.FlexColumnWidth(); // Size
+  colWidths[c++] = const pw.IntrinsicColumnWidth(); // Unit
+  colWidths[c++] = const pw.IntrinsicColumnWidth(); // Qty
+  if (hasBoxQty) colWidths[c++] = const pw.IntrinsicColumnWidth();
+  if (hasPieceQty) colWidths[c++] = const pw.IntrinsicColumnWidth();
+  colWidths[c++] = const pw.IntrinsicColumnWidth(); // MRP
+  colWidths[c++] = const pw.IntrinsicColumnWidth(); // Rate
+  colWidths[c++] = const pw.IntrinsicColumnWidth(); // Amount
+  if (!isOwner) colWidths[c++] = const pw.IntrinsicColumnWidth(); // Incentive
+
   return pw.TableHelper.fromTextArray(
     headers: headers,
     data: data,
+    columnWidths: colWidths,
+    cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 6),
     headerStyle:
-    pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-    headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
-    cellStyle: const pw.TextStyle(fontSize: 9),
+    pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+    headerDecoration: const pw.BoxDecoration(color: _pdfPrimary),
+    headerAlignments: cellAlignments, // header aligns with its column
+    cellStyle: const pw.TextStyle(fontSize: 8),
     cellAlignments: cellAlignments,
-    border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+    border: pw.TableBorder.all(color: _pdfLine, width: 0.5),
     rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-    oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+    oddRowDecoration: const pw.BoxDecoration(color: _pdfSoft),
   );
 }
 
-/// Same order as the on-screen summary card.
 pw.Widget pdfSummarySection(EstimateDetailModel d) {
-  final rows = <List<String>>[
-    ['Subtotal', currencyFmt.f(d.subtotal)],
-    ['Handling Charge', currencyFmt.f(d.handlingCharge)],
-    if (d.hasDiscount) ...[
-      ['Amount Before Discount', currencyFmt.f(d.grandTotal)],
-      [
-        'Discount (${d.discountTypeLabel.isEmpty ? d.discountType : d.discountTypeLabel})',
-        '- ${currencyFmt.f(d.discountAmount)}'
-      ],
-      ['Grand Total', currencyFmt.f(d.amountAfterDiscount)],
-    ] else
-      ['Grand Total', currencyFmt.f(d.grandTotal)],
-    ['Total Paid', currencyFmt.f(d.totalPaid)],
-    ['Balance Amount', currencyFmt.f(d.balanceAmount)],
-  ];
+  final discountLabel = d.discountTypeLabel.isEmpty ? d.discountType : d.discountTypeLabel;
 
-  return pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.end,
-    children: rows
-        .map((r) => pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 4),
+  pw.Widget line(String label, String value,
+      {bool bold = false, PdfColor? color, double size = 10}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
       child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.end,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text('${r[0]}: ', style: const pw.TextStyle(fontSize: 10)),
-          pw.Text(r[1], style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+          pw.Text(label,
+              style: pw.TextStyle(
+                  fontSize: size,
+                  fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.SizedBox(width: 14),
+          pw.Text(value,
+              softWrap: false, // amount always stays on one line
+              style: pw.TextStyle(
+                  fontSize: size, fontWeight: pw.FontWeight.bold, color: color)),
         ],
       ),
-    ))
-        .toList(),
+    );
+  }
+
+  final hasBalance = d.balanceAmount > 0;
+
+  return pw.Align(
+    alignment: pw.Alignment.centerRight,
+    child: pw.Container(
+      width: 300, // was 250
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _pdfLine, width: 0.5),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Column(
+        children: [
+          line('Subtotal', currencyFmt.f(d.subtotal)),
+          line('Handling Charge', currencyFmt.f(d.handlingCharge)),
+          if (d.hasDiscount) ...[
+            line('Amount Before Discount', currencyFmt.f(d.grandTotal)),
+            line('Discount ($discountLabel)', '- ${currencyFmt.f(d.discountAmount)}',
+                color: PdfColors.red700),
+          ],
+          pw.Divider(color: _pdfLine, thickness: 0.5, height: 10),
+          line('Grand Total',
+              currencyFmt.f(d.hasDiscount ? d.amountAfterDiscount : d.grandTotal),
+              bold: true, size: 12),
+          line('Total Paid', currencyFmt.f(d.totalPaid), color: PdfColors.green800),
+          pw.SizedBox(height: 4),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            color: hasBalance ? PdfColors.red50 : PdfColors.green50,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Balance Amount',
+                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(width: 14),
+                pw.Text(
+                  currencyFmt.f(d.balanceAmount),
+                  softWrap: false,
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: hasBalance ? PdfColors.red700 : PdfColors.green800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
 
@@ -829,15 +1118,24 @@ pw.Widget pdfPaymentsTable(EstimateDetailModel d) {
   ])
       .toList();
 
+  const alignments = <int, pw.Alignment>{
+    0: pw.Alignment.centerLeft,
+    1: pw.Alignment.centerRight,
+    2: pw.Alignment.centerLeft,
+  };
+
   return pw.TableHelper.fromTextArray(
     headers: headers,
     data: data,
+    cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
     headerStyle:
     pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-    headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
+    headerDecoration: const pw.BoxDecoration(color: _pdfPrimary),
+    headerAlignments: alignments,
     cellStyle: const pw.TextStyle(fontSize: 9),
-    border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+    cellAlignments: alignments,
+    border: pw.TableBorder.all(color: _pdfLine, width: 0.5),
     rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
-    oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+    oddRowDecoration: const pw.BoxDecoration(color: _pdfSoft),
   );
 }
