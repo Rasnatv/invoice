@@ -1,6 +1,8 @@
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/owner/paymenthistory.dart';
 import '../../../core/constants/app_colors.dart';
@@ -10,28 +12,42 @@ import '../../../models/salesmanmodels/salesmanownerestimatemodel.dart';
 import '../../bloc/ownerbloc/ownerestimatelist/ownerestimatelist_bloc.dart';
 import '../../bloc/ownerbloc/ownerestimatelist/ownerestimatelist_event.dart';
 import '../../bloc/ownerbloc/ownerestimatelist/ownerestimatelistevent_state.dart';
-import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/owner_estimateshimmer.dart';
 import 'ownerestuimatedetailscreen.dart';
 import 'ownerrescorpayment.dart';
 
 class OwnerEstimatesScreen extends StatelessWidget {
-  const OwnerEstimatesScreen({super.key, this.initialFilter = 'all'});
+  const OwnerEstimatesScreen({
+    super.key,
+    this.initialFilter = 'all',
+    this.refreshSignal,
+  });
   final String initialFilter;
+
+  /// Incremented by the shell every time the Estimates tab is tapped.
+  final ValueListenable<int>? refreshSignal;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
+      lazy: false, // create the bloc and fire the API call immediately
       create: (_) =>
       OwnerEstimatesBloc()..add(const OwnerEstimatesLoadRequested()),
-      child: _OwnerEstimatesView(initialFilter: initialFilter),
+      child: _OwnerEstimatesView(
+        initialFilter: initialFilter,
+        refreshSignal: refreshSignal,
+      ),
     );
   }
 }
 
 class _OwnerEstimatesView extends StatefulWidget {
-  const _OwnerEstimatesView({required this.initialFilter});
+  const _OwnerEstimatesView({
+    required this.initialFilter,
+    this.refreshSignal,
+  });
   final String initialFilter;
+  final ValueListenable<int>? refreshSignal;
 
   @override
   State<_OwnerEstimatesView> createState() => _OwnerEstimatesViewState();
@@ -47,8 +63,8 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
 
     _scrollCtrl.addListener(_onScroll);
 
-    // Refresh this list whenever an estimate is created/approved.
-    ownerDataRefresh.addListener(_onExternalRefresh);
+    // Refresh whenever the Estimates tab is tapped.
+    widget.refreshSignal?.addListener(_onTabSelected);
 
     if (widget.initialFilter != 'all') {
       // Applied once the first load lands filters/state.
@@ -58,6 +74,14 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
         );
       });
     }
+  }
+
+  /// Called every time the Estimates tab is tapped in the shell.
+  void _onTabSelected() {
+    if (!mounted) return;
+    context
+        .read<OwnerEstimatesBloc>()
+        .add(const OwnerEstimatesRefreshRequested());
   }
 
   /// Load the next page when the user is near the bottom.
@@ -88,24 +112,11 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     });
   }
 
-  /// Same event the pull-to-refresh sends.
-  void _onExternalRefresh() {
-    if (!mounted) return;
-    final bloc = context.read<OwnerEstimatesBloc>();
-    bloc.add(const OwnerEstimatesRefreshRequested());
-
-    // One more shortly after, in case the backend had not finished saving.
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      bloc.add(const OwnerEstimatesRefreshRequested());
-    });
-  }
-
   @override
   void dispose() {
+    widget.refreshSignal?.removeListener(_onTabSelected);
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
-    ownerDataRefresh.removeListener(_onExternalRefresh);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -116,6 +127,14 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
         builder: (_) => OwnerEstimateDetailsScreen(estimateId: estimate.id),
       ),
     );
+    if (mounted) {
+      context
+          .read<OwnerEstimatesBloc>()
+          .add(const OwnerEstimatesRefreshRequested());
+    }
+  }
+  Future<void> _onCreateEstimateTap() async {
+    await context.push('/owner/create-estimate');
     if (mounted) {
       context
           .read<OwnerEstimatesBloc>()
@@ -174,10 +193,36 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
+        // appBar: AppBar(
+        //   title: Text('Estimates', style: AppTextStyles.h6()),
+        //   backgroundColor: AppColors.primary,
+        //   foregroundColor: Colors.white,
+        // ),
         appBar: AppBar(
           title: Text('Estimates', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
+          actions: [
+            Padding(
+              padding: EdgeInsets.only(right: Responsive.w(12)),
+              child: TextButton.icon(
+                onPressed: _onCreateEstimateTap,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                  'Create',
+                  style: AppTextStyles.bodyBold(color: AppColors.primary),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         body: SafeArea(
           child: BlocBuilder<OwnerEstimatesBloc, OwnerEstimatesState>(

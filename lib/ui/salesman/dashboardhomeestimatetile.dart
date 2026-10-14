@@ -1,5 +1,4 @@
 
-
 import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/constants/app_text_styles.dart';
@@ -39,7 +38,10 @@ class DashboardRecentEstimateTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: Responsive.w(16), vertical: Responsive.h(12)),
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(16),
+          vertical: Responsive.h(12),
+        ),
         child: Row(
           children: [
             Container(
@@ -48,29 +50,38 @@ class DashboardRecentEstimateTile extends StatelessWidget {
                 color: statusColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.description_rounded, size: 18, color: statusColor),
+              child: Icon(
+                Icons.description_rounded,
+                size: 18,
+                color: statusColor,
+              ),
             ),
             SizedBox(width: Responsive.w(12)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 14 / w600 - estimate number
                   Text(
                     estimate.estimateNumber,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.bodyBold(color: AppColors.black)
-                        .copyWith(fontSize: Responsive.sp(13.5)),
+                    style: AppTextStyles.h3(color: AppColors.black),
                   ),
                   SizedBox(height: Responsive.h(2)),
+                  // 12 / w400 - customer name
                   Text(
                     estimate.customerName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+                    style: AppTextStyles.subtitle(),
                   ),
                   SizedBox(height: Responsive.h(2)),
-                  Text(estimate.dateFormatted,style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(11)),)
+                  // 11 / w400 - date
+                  Text(
+                    estimate.dateFormatted,
+                    style: AppTextStyles.captionnew(),
+                  ),
                 ],
               ),
             ),
@@ -78,25 +89,25 @@ class DashboardRecentEstimateTile extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // 14 / w600 - amount
                 Text(
                   estimate.grandTotalFormatted,
-                  style: AppTextStyles.bodyBold(color: AppColors.black)
-                      .copyWith(fontSize: Responsive.sp(13.5)),
+                  style: AppTextStyles.balanceamount(color: AppColors.black),
                 ),
-                SizedBox(height: Responsive.h(4)),
+                SizedBox(height: Responsive.h(6)),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(3)),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.w(8),
+                    vertical: Responsive.h(3),
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
+                  // 11 / w600 - status
                   child: Text(
                     estimate.statusLabel,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: Responsive.sp(10.5),
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: AppTextStyles.captioref(color: statusColor),
                   ),
                 ),
               ],

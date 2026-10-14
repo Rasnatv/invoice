@@ -71,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             size: Responsive.w(46), color: AppColors.primary),
                       ),
                       SizedBox(height: Responsive.h(14)),
-                      Text(profile?.name ?? '-', style: AppTextStyles.h2()),
+                      Text(profile?.name ?? '-', style: AppTextStyles.h3()),
                       Text(profile?.mobile ?? '-', style: AppTextStyles.body()),
                       Text(profile?.email ?? '-',
                           style: AppTextStyles.caption()),

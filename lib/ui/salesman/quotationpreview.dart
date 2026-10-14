@@ -796,7 +796,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                   Text('Balance Due', style: AppTextStyles.h3()),
                   Text(
                     fmt.format(q.balanceAmount),
-                    style: AppTextStyles.h2(color: balanceColor),
+                    style: AppTextStyles.h3(color: balanceColor),
                   ),
                 ],
               ),
@@ -855,7 +855,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
         : AppTextStyles.body();
 
     final valueStyle = (large
-        ? AppTextStyles.h2(color: valueColor ?? AppColors.primary)
+        ? AppTextStyles.h3(color: valueColor ?? AppColors.primary)
         .copyWith(fontWeight: FontWeight.w800)
         : (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
         .copyWith(color: valueColor))

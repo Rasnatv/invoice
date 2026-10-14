@@ -75,8 +75,29 @@ class _DashboardShellState extends State<DashboardShell> {
 
             return Scaffold(
               body: IndexedStack(index: index, children: screens),
+              // bottomNavigationBar: BottomNavigationBar(
+              //   currentIndex: index,
+              //   onTap: (i) => context.read<NavCubit>().changeTab(i),
+              //   items: _items
+              //       .map((item) => BottomNavigationBarItem(
+              //     icon: Icon(item.icon),
+              //     label: item.label,
+              //   ))
+              //       .toList(),
+              // ),
               bottomNavigationBar: BottomNavigationBar(
                 currentIndex: index,
+                type: BottomNavigationBarType.fixed,
+                selectedFontSize: 11,
+                unselectedFontSize: 11,
+                selectedLabelStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                ),
                 onTap: (i) => context.read<NavCubit>().changeTab(i),
                 items: _items
                     .map((item) => BottomNavigationBarItem(

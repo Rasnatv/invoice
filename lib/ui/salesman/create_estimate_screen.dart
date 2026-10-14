@@ -537,12 +537,62 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     });
   }
 
-  void _goToPreview() {
+  /// Save Items -> Preview.
+  /// If an edit was never applied ("Update Item" not tapped) or a product
+  /// was picked but never added, ask the user what to do instead of
+  /// silently dropping it. Pending values are always cleared before moving
+  /// on, so they don't reappear when the user comes back from Preview.
+  Future<void> _goToPreview() async {
+    final isEditing = _editingItemIndex != null;
+    final hasPendingNew = !isEditing && _selectedProduct != null;
+
+    if (isEditing || hasPendingNew) {
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(isEditing ? 'Item not updated' : 'Item not added'),
+          content: Text(
+            isEditing
+                ? 'You changed item #${_editingItemIndex! + 1} but did not tap '
+                '"Update Item". The price/amount shown on the next screen will '
+                'still be the OLD one.'
+                : 'You selected a product but did not tap "Add Item". '
+                'It will not be included in the estimate.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('discard'),
+              child: Text(isEditing ? 'Keep old item' : 'Skip it'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop('apply'),
+              child: Text(isEditing ? 'Update now' : 'Add now'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted || choice == null) return;
+
+      if (choice == 'apply') {
+        await _addItemToList(); // recalculates amount from the server
+        if (!mounted) return;
+        // Validation / API failed -> stay on this step so the user can fix it
+        if (_editingItemIndex != null || _selectedProduct != null) return;
+      }
+    }
+
     if (_items.isEmpty) {
       _showError('Please add at least one item');
       return;
     }
-    setState(() => _step = EstimateStep.preview);
+
+    setState(() {
+      _editingItemIndex = null;
+      _resetItemFields();
+      _step = EstimateStep.preview;
+    });
     _requestPreview();
   }
 
@@ -636,7 +686,12 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
       return false;
     }
     if (_step == EstimateStep.addItems) {
-      setState(() => _step = EstimateStep.details);
+      // Drop any unsaved edit / half-filled item form when leaving this step
+      setState(() {
+        _editingItemIndex = null;
+        _resetItemFields();
+        _step = EstimateStep.details;
+      });
       return false;
     }
     return true;
@@ -679,7 +734,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
           child: Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(
-              title: Text(_appBarTitle),
+              title: Text(_appBarTitle,style: AppTextStyles.h6(),),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () {
@@ -732,7 +787,11 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                         onEditItem: _editItem,
                         onCancelEdit: _cancelEditItem,
                         onRemoveItem: _removeItem,
-                        onCancel: () => setState(() => _step = EstimateStep.details),
+                        onCancel: () => setState(() {
+                          _editingItemIndex = null;
+                          _resetItemFields();
+                          _step = EstimateStep.details;
+                        }),
                         onSaveItems: _goToPreview,
                       ),
                       EstimateStep.preview => PreviewStep(

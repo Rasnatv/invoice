@@ -488,12 +488,62 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     });
   }
 
-  void _goToPreview() {
+  /// Save Items -> Preview.
+  /// Any pending (un-updated) edit or half-filled item form is discarded,
+  /// so the old item keeps its old amount and the stale values don't
+  /// reappear when the user comes back from Preview.
+  Future<void> _goToPreview() async {
+    final isEditing = _editingItemIndex != null;
+    final hasPendingNew = !isEditing && _selectedProduct != null;
+
+    // An edit (or a half-filled new item) was never applied -> tell the user
+    if (isEditing || hasPendingNew) {
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(isEditing ? 'Item not updated' : 'Item not added'),
+          content: Text(
+            isEditing
+                ? 'You changed item #${_editingItemIndex! + 1} but did not tap '
+                '"Update Item". The price/amount shown on the next screen will '
+                'still be the OLD one.'
+                : 'You selected a product but did not tap "Add Item". '
+                'It will not be included in the estimate.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('discard'),
+              child: Text(isEditing ? 'Keep old item' : 'Skip it'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop('apply'),
+              child: Text(isEditing ? 'Update now' : 'Add now'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted || choice == null) return;
+
+      if (choice == 'apply') {
+        await _addItemToList(); // recalculates amount from the server
+        if (!mounted) return;
+        // Validation / API failed -> stay on this step so the user can fix it
+        if (_editingItemIndex != null || _selectedProduct != null) return;
+      }
+    }
+
     if (_items.isEmpty) {
       _showError('Please add at least one item');
       return;
     }
-    setState(() => _step = EstimateStep.preview);
+
+    setState(() {
+      _editingItemIndex = null;
+      _resetItemFields();
+      _step = EstimateStep.preview;
+    });
     _fetchPreview();
   }
 
@@ -1006,7 +1056,12 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
       return false;
     }
     if (_step == EstimateStep.addItems) {
-      setState(() => _step = EstimateStep.details);
+      // Drop any unsaved edit / half-filled item form when leaving this step
+      setState(() {
+        _editingItemIndex = null;
+        _resetItemFields();
+        _step = EstimateStep.details;
+      });
       return false;
     }
     return true;
@@ -1105,7 +1160,11 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                           onEditItem: _editItem,
                           onCancelEdit: _cancelEditItem,
                           onRemoveItem: _removeItem,
-                          onCancel: () => setState(() => _step = EstimateStep.details),
+                          onCancel: () => setState(() {
+                            _editingItemIndex = null;
+                            _resetItemFields();
+                            _step = EstimateStep.details;
+                          }),
                           onSaveItems: _goToPreview,
                         ),
                       // Discount / Payment params removed — they now live in the Approve dialog.

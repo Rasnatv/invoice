@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -524,14 +525,41 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   // ---------------- Submit ----------------
 
+  /// First validation message among all main-form fields (null if all pass).
+  /// Used so the user is told WHICH field blocks "Save Changes" instead of a
+  /// generic message, and so the console shows the reason.
+  String? _firstFormError() {
+    final errors = <String, String?>{
+      'Customer name': _validateCustomerName(_nameCtrl.text),
+      'Customer phone': _validateCustomerPhone(_phoneCtrl.text),
+      'Customer email': _validateOptionalEmail(_emailCtrl.text),
+      'Contractor name': _validateContractorName(_contractorNameCtrl.text),
+      'Contractor phone': _validateContractorPhone(_contractorPhoneCtrl.text),
+      'Contractor email': _validateOptionalEmail(_contractorEmailCtrl.text),
+      'Handling charge': _validateHandlingCharge(_handlingChargeCtrl.text),
+    };
+    errors.forEach((field, msg) {
+      if (msg != null) debugPrint('SAVE validation -> $field: $msg');
+    });
+    for (final e in errors.entries) {
+      if (e.value != null) return e.value;
+    }
+    return null;
+  }
+
   void _submit(BuildContext context) {
+    debugPrint('SAVE tapped (items=${_items.length})');
+
     final formValid = _formKey.currentState?.validate() ?? true;
-    if (!formValid) {
-      AppSnackbar.error('Please fix the highlighted fields');
+    final firstError = _firstFormError();
+    if (!formValid || firstError != null) {
+      debugPrint('SAVE blocked by validation: formValid=$formValid firstError=$firstError');
+      AppSnackbar.error(firstError ?? 'Please fix the highlighted fields');
       return;
     }
 
     if (_items.isEmpty) {
+      debugPrint('SAVE blocked: no items');
       AppSnackbar.error('Add at least one item.');
       return;
     }
@@ -540,8 +568,10 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
         .map((row) => EstimateUpdateItem(
       productId: row.productId,
       quantity: row.quantity,
-      boxQuantity: row.boxQuantity,
-      pieceQuantity: row.pieceQuantity,
+      // Only send box/piece when they have a value, so the payload
+      // matches the API sample (product_id, quantity, rate).
+      boxQuantity: row.boxQuantity > 0 ? row.boxQuantity : null,
+      pieceQuantity: row.pieceQuantity > 0 ? row.pieceQuantity : null,
       rate: row.rate,
     ))
         .toList();
@@ -564,7 +594,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       items: updateItems,
     );
 
-    debugPrint('OwnerEstimateUpdateScreen: submitting update payload: '
+    debugPrint('SAVE dispatching OwnerEstimateUpdateRequested: '
         '${jsonEncode(request.toJson())}');
 
     context.read<OwnerEstimateDetailBloc>().add(OwnerEstimateUpdateRequested(request));

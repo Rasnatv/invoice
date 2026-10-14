@@ -43,6 +43,20 @@ class OwnerEstimateDetailsScreen extends StatelessWidget {
   }
 }
 
+// Future<void> openUpdateScreen(BuildContext context, EstimateDetailModel detail) async {
+//   final bloc = context.read<OwnerEstimateDetailBloc>();
+//   await Navigator.of(context).push(
+//     MaterialPageRoute(
+//       builder: (_) => BlocProvider.value(
+//         value: bloc,
+//         child: OwnerEstimateUpdateScreen(detail: detail),
+//       ),
+//     ),
+//   );
+//   // Reload after coming back so the page always shows the latest data.
+//   bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
+//   ownerDataRefresh.value++; // estimate may have been edited
+// }
 Future<void> openUpdateScreen(BuildContext context, EstimateDetailModel detail) async {
   final bloc = context.read<OwnerEstimateDetailBloc>();
   await Navigator.of(context).push(
@@ -55,7 +69,6 @@ Future<void> openUpdateScreen(BuildContext context, EstimateDetailModel detail) 
   );
   // Reload after coming back so the page always shows the latest data.
   bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
-  ownerDataRefresh.value++; // estimate may have been edited
 }
 
 class OwnerEstimateDetailView extends StatefulWidget {
@@ -158,7 +171,6 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
             listener: (context, state) {
               if (state.actionStatus == OwnerEstimateActionStatus.success) {
                 AppSnackbar.success(state.actionMessage ?? 'Done');
-                ownerDataRefresh.value++; // approve/reject done -> refresh dashboard + list
               } else if (state.actionStatus == OwnerEstimateActionStatus.failure) {
                 AppSnackbar.error(state.actionMessage ?? 'Action failed');
               }
@@ -497,7 +509,6 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
 
     if (created == true) {
       bloc.add(OwnerEstimateDetailLoadRequested(detail.id));
-      ownerDataRefresh.value++; // status changed to despatched
     }
   }
 

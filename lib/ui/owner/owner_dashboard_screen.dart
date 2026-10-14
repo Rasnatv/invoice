@@ -21,22 +21,53 @@ class OwnerDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _OwnerDashboardView(); // ⬅️ just this — no BlocProvider wrapping anymore
+    return const _OwnerDashboardView();
   }
 }
 
-// class _OwnerDashboardView extends StatelessWidget {
-//   const _OwnerDashboardView();
-//
-//   /// True only when at least one month has a sale greater than 0.
-//   bool _hasSalesData(List<dynamic> monthlySales) {
-//     if (monthlySales.isEmpty) return false;
-//     return monthlySales.any((m) => (m.total as num) > 0);
-//   }
-//
-//   @override
+// ---------------- ACTION DATA (grouped) ----------------
+// Colors removed: every action now uses the app's primary color.
 
- // Widget build(BuildContext context) {
+class _ActionItem {
+  const _ActionItem(this.icon, this.label, this.route);
+  final IconData icon;
+  final String label;
+  final String route;
+}
+
+class _ActionGroup {
+  const _ActionGroup(this.title, this.items);
+  final String title;
+  final List<_ActionItem> items;
+}
+
+const List<_ActionGroup> _actionGroups = [
+  _ActionGroup('Sales & Billing', [
+    _ActionItem(Icons.inventory_2_outlined, 'Product Setup', '/owner/product-setup'),
+    _ActionItem(Icons.receipt_long_rounded, 'Estimates', '/owner/estimates'),
+    _ActionItem(Icons.request_quote_outlined, 'Quotations', '/owner/quotations'),
+    _ActionItem(Icons.bar_chart_rounded, 'Reports', '/owner/reports'),
+  ]),
+  _ActionGroup('Team', [
+    _ActionItem(Icons.groups_2_outlined, 'Salesmen', '/owner/salesmen'),
+    _ActionItem(Icons.monetization_on_outlined, 'Salesman Incentive', '/owner/incentives'),
+    _ActionItem(Icons.calendar_month_rounded, 'Monthly Target', '/owner/monthly-target'),
+    _ActionItem(Icons.badge_outlined, 'Designations', '/owner/designation-list'),
+  ]),
+  _ActionGroup('Field Operations', [
+    _ActionItem(Icons.assignment_ind_rounded, 'Field Staff', '/field-staff'),
+    _ActionItem(Icons.paid_outlined, 'Field Staff Incentive', '/owner/fieldstaff-incentive'),
+    _ActionItem(Icons.location_on_outlined, 'Site Visits', '/owner/site-visits'),
+    _ActionItem(Icons.local_shipping_rounded, 'Driver', '/owner/drivers'),
+  ]),
+];
+
+/// All actions in one flat list for the quick access grid.
+final List<_ActionItem> _quickActions =
+_actionGroups.expand((g) => g.items).toList();
+
+// ---------------- SCREEN ----------------
+
 class _OwnerDashboardView extends StatefulWidget {
   const _OwnerDashboardView();
 
@@ -62,7 +93,6 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
     context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
   }
 
-  /// True only when at least one month has a sale greater than 0.
   bool _hasSalesData(List<dynamic> monthlySales) {
     if (monthlySales.isEmpty) return false;
     return monthlySales.any((m) => (m.total as num) > 0);
@@ -72,7 +102,7 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    final today = DateFormat('dd MMM yyyy, EEEE').format(DateTime.now());
+    final today = DateFormat('EEEE, dd MMM yyyy').format(DateTime.now());
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good Morning'
@@ -80,213 +110,130 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      body: BlocBuilder<OwnerDashboardBloc, OwnerDashboardState>(
-        builder: (context, state) {
-          // First load (no data yet at all): show the full-page shimmer
-          // instead of a half-populated header + spinners.
-          if (state.status == OwnerDashboardStatus.loading) {
-            return const OwnerDashboardFullShimmer();
-          }
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: BlocBuilder<OwnerDashboardBloc, OwnerDashboardState>(
+          builder: (context, state) {
+            if (state.status == OwnerDashboardStatus.loading) {
+              return const OwnerDashboardFullShimmer();
+            }
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
-              await context.read<OwnerDashboardBloc>().stream.firstWhere(
-                    (s) => s.status != OwnerDashboardStatus.refreshing,
-              );
-            },
-            child: state.status == OwnerDashboardStatus.refreshing
-                ? const OwnerDashboardRefreshShimmer()
-                : CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _OwnerHeader(
-                    greeting: greeting,
-                    dateLabel: today,
-                    userName: state.userName,
-                    totalEstimates: state.totalEstimates,
-                    dispatched: state.dispatchBills,
-                    quotations: state.quotations,
-                    pending: state.pending,
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
+                await context.read<OwnerDashboardBloc>().stream.firstWhere(
+                      (s) => s.status != OwnerDashboardStatus.refreshing,
+                );
+              },
+              child: state.status == OwnerDashboardStatus.refreshing
+                  ? const OwnerDashboardRefreshShimmer()
+                  : CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _OwnerHeader(
+                      greeting: greeting,
+                      dateLabel: today,
+                      userName: state.userName,
+                      totalEstimates: state.totalEstimates,
+                      dispatched: state.dispatchBills,
+                      quotations: state.quotations,
+                      pending: state.pending,
+                    ),
                   ),
-                ),
-                SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      SizedBox(height: Responsive.h(70)),
-                      const _SectionTitle(title: 'Quick Actions'),
-                      SizedBox(height: Responsive.h(14)),
-                      SizedBox(
-                        height: Responsive.h(100),
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: 13,
-                          separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
-                          itemBuilder: (context, i) {
-                            final actions = <_QuickActionData>[
-                              _QuickActionData(
-                                icon: Icons.note_add_rounded,
-                                label: 'Create\nEstimate',
-                                color: AppColors.primary,
-                                onTap: () => context.push('/owner/create-estimate'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.receipt_long_rounded,
-                                label: 'Estimates',
-                                color: const Color(0xFF0EA5E9),
-                                onTap: () => context.push('/owner/estimates'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.request_quote_outlined,
-                                label: 'Quotations',
-                                color: const Color(0xFFF59E0B),
-                                onTap: () => context.push('/owner/quotations'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.inventory_2_outlined,
-                                label: 'Product Setup',
-                                color: const Color(0xFF9F1A49),
-                                onTap: () => context.push('/owner/product-setup'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.bar_chart_rounded,
-                                label: 'Reports',
-                                color: const Color(0xFF16A34A),
-                                onTap: () => context.push('/owner/reports'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.calendar_month,
-                                label: 'Monthly Target',
-                                color: const Color(0xFF1EBA95),
-                                onTap: () => context.push('/owner/monthly-target'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.badge_outlined,
-                                label: 'Designations',
-                                color: const Color(0xFFB19D18),
-                                onTap: () => context.push('/owner/designation-list'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.groups_2_outlined,
-                                label: 'Salesmen',
-                                color: const Color(0xFFEC4899),
-                                onTap: () => context.push('/owner/salesmen'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.monetization_on,
-                                label: 'Salesman Incentive',
-                                color: const Color(0xFFA02CE1),
-                                onTap: () => context.push('/owner/incentives'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.assignment_ind_rounded,
-                                label: 'Field Staff',
-                                color: const Color(0xFF0B4718),
-                                onTap: () => context.push('/field-staff'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.bar_chart_rounded,
-                                label: 'Field Staff Incentive',
-                                color: const Color(0xFF16A34A),
-                                onTap: () => context.push('/owner/fieldstaff-incentive'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.location_on_outlined,
-                                label: 'Site Visits',
-                                color: const Color(0xFF1A348A),
-                                onTap: () => context.push('/owner/site-visits'),
-                              ),
-                              _QuickActionData(
-                                icon: Icons.local_shipping_rounded,
-                                label: 'Driver',
-                                color: const Color(0xFF06B6D4),
-                                onTap: () => context.push('/owner/drivers'),
-                              ),
+                  SliverToBoxAdapter(child: SizedBox(height: Responsive.h(76))),
 
-                            ];
-
-                            final a = actions[i];
-                            return SizedBox(
-                              width: Responsive.w(84),
-                              child: _QuickActionCard(
-                                icon: a.icon,
-                                label: a.label,
-                                color: a.color,
-                                onTap: a.onTap,
-                              ),
-                            );
-                          },
-                        ),
+                  // ---------- QUICK ACTIONS ----------
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      Responsive.w(20),
+                      0,
+                      Responsive.w(20),
+                      Responsive.h(6),
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _SectionTitle(title: 'Quick Actions'),
+                          SizedBox(height: Responsive.h(10)),
+                          const _QuickAccessPanel(),
+                          SizedBox(height: Responsive.h(14)),
+                        ],
                       ),
-                      SizedBox(height: Responsive.h(28)),
-                      const _SectionTitle(title: 'Sales Overview'),
-                      SizedBox(height: Responsive.h(14)),
-                      // Show chart only when at least one month has sales
-                      if (!_hasSalesData(state.monthlySales))
-                        const _EmptyState(
-                          icon: Icons.bar_chart_rounded,
-                          message: 'No sales overview',
-                        )
-                      else
-                        _CardWrapper(
-                          child: MonthlySalesSection(
-                            monthlySales: state.monthlySales
-                                .map(
-                                  (m) => MonthlySales(
+                    ),
+                  ),
+
+                  // ---------- SALES + RECENT ----------
+                  SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        SizedBox(height: Responsive.h(6)),
+                        const _SectionTitle(title: 'Sales Overview'),
+                        SizedBox(height: Responsive.h(12)),
+                        if (!_hasSalesData(state.monthlySales))
+                          const _EmptyState(
+                            icon: Icons.bar_chart_rounded,
+                            message: 'No sales yet this year',
+                          )
+                        else
+                          _CardWrapper(
+                            child: MonthlySalesSection(
+                              monthlySales: state.monthlySales
+                                  .map((m) => MonthlySales(
                                 monthLabel: m.month,
                                 amount: m.total.toDouble(),
-                              ),
-                            )
-                                .toList(),
-                            currency: currency,
+                              ))
+                                  .toList(),
+                              currency: currency,
+                            ),
                           ),
+                        SizedBox(height: Responsive.h(26)),
+                        _SectionTitle(
+                          title: 'Recent Estimates',
+                          actionLabel: 'View all',
+                          onAction: () => context.push('/owner/estimates'),
                         ),
-                      SizedBox(height: Responsive.h(28)),
-                      _SectionTitle(
-                        title: 'Recent Estimates',
-                        actionLabel: 'View All',
-                        onAction: () => context.push('/owner/estimates'),
-                      ),
-                      SizedBox(height: Responsive.h(14)),
-                      if (state.status == OwnerDashboardStatus.failure)
-                        _ErrorState(
-                          message: state.errorMessage ?? 'Failed to load dashboard.',
-                          onRetry: () => context
-                              .read<OwnerDashboardBloc>()
-                              .add(const OwnerDashboardRequested()),
-                        )
-                      else if (state.recentEstimates.isEmpty)
-                        const _EmptyState(
-                          icon: Icons.description_outlined,
-                          message: 'No estimates yet',
-                        )
-                      else
-                        Column(
-                          children: [
-                            for (int i = 0; i < state.recentEstimates.length; i++) ...[
-                              _RecentEstimateCard(
-                                estimate: state.recentEstimates[i],
-                                onTap: () => context.push('/owner/estimate-detail/${state.recentEstimates[i].id}'),
-                              ),
-                              if (i != state.recentEstimates.length - 1)
-                                SizedBox(height: Responsive.h(10)),
+                        SizedBox(height: Responsive.h(12)),
+                        if (state.status == OwnerDashboardStatus.failure)
+                          _ErrorState(
+                            message: state.errorMessage ?? 'Could not load the dashboard.',
+                            onRetry: () => context
+                                .read<OwnerDashboardBloc>()
+                                .add(const OwnerDashboardRequested()),
+                          )
+                        else if (state.recentEstimates.isEmpty)
+                          const _EmptyState(
+                            icon: Icons.description_outlined,
+                            message: 'No estimates yet. Create your first one.',
+                          )
+                        else
+                          Column(
+                            children: [
+                              for (int i = 0; i < state.recentEstimates.length; i++) ...[
+                                _RecentEstimateCard(
+                                  estimate: state.recentEstimates[i],
+                                  onTap: () => context.push(
+                                      '/owner/estimate-detail/${state.recentEstimates[i].id}'),
+                                ),
+                                if (i != state.recentEstimates.length - 1)
+                                  SizedBox(height: Responsive.h(10)),
+                              ],
                             ],
-                          ],
-                        ),
-                      SizedBox(height: Responsive.h(30)),
-                    ]),
+                          ),
+                        SizedBox(height: Responsive.h(30)),
+                      ]),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -317,67 +264,68 @@ class _OwnerHeader extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Container(
+          width: double.infinity,
           padding: EdgeInsets.fromLTRB(
             Responsive.w(20),
-            Responsive.h(20),
+            Responsive.h(18),
             Responsive.w(20),
-            Responsive.h(46),
+            Responsive.h(54),
           ),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
-            ),
+            color: AppColors.primary,
             borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(32),
-              bottomRight: Radius.circular(32),
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
             ),
           ),
           child: SafeArea(
             bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      child: const Icon(Icons.storefront_rounded, color: Colors.white),
-                    ),
-                    SizedBox(width: Responsive.w(12)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            greeting,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
-                              fontSize: Responsive.sp(12),
-                            ),
-                          ),
-                          Text(
-                            userName.isNotEmpty ? userName : 'Owner Dashboard',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold(color: Colors.white)
-                                .copyWith(fontSize: Responsive.sp(17)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 24),
                 ),
-                SizedBox(height: Responsive.h(14)),
-                Row(
+                SizedBox(width: Responsive.w(12)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        greeting,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: Responsive.sp(12),
+                        ),
+                      ),
+                      SizedBox(height: Responsive.h(2)),
+                      Text(
+                        userName.isNotEmpty ? userName : 'Owner Dashboard',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodyBold(color: Colors.white)
+                            .copyWith(fontSize: Responsive.sp(18)),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white.withOpacity(0.85)),
-                    SizedBox(width: Responsive.w(6)),
+                    Icon(Icons.calendar_today_rounded,
+                        size: 14, color: Colors.white.withOpacity(0.8)),
+                    SizedBox(height: Responsive.h(4)),
                     Text(
                       dateLabel,
-                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: Responsive.sp(12)),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: Responsive.sp(10.5),
+                      ),
                     ),
                   ],
                 ),
@@ -388,22 +336,18 @@ class _OwnerHeader extends StatelessWidget {
         Positioned(
           left: Responsive.w(20),
           right: Responsive.w(20),
-          bottom: -Responsive.h(60),
+          bottom: -Responsive.h(52),
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(8)),
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(14), horizontal: Responsive.w(6)),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.06),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -413,8 +357,8 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$totalEstimates',
                     label: 'Total',
-                    color: AppColors.primary,
                     icon: Icons.description_rounded,
+                    color: AppColors.primary, // maroon
                   ),
                 ),
                 _statDivider(),
@@ -422,8 +366,8 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$dispatched',
                     label: 'Dispatched',
-                    color: const Color(0xFF0EA5E9),
                     icon: Icons.local_shipping_rounded,
+                    color: const Color(0xFF7C3AED), // purple
                   ),
                 ),
                 _statDivider(),
@@ -431,8 +375,8 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$quotations',
                     label: 'Quotations',
-                    color: const Color(0xFFF59E0B),
                     icon: Icons.request_quote_rounded,
+                    color: const Color(0xFF16A34A), // green
                   ),
                 ),
                 _statDivider(),
@@ -440,8 +384,8 @@ class _OwnerHeader extends StatelessWidget {
                   child: _MiniStat(
                     value: '$pending',
                     label: 'Pending',
-                    color: const Color(0xFFEF4444),
                     icon: Icons.hourglass_bottom_rounded,
+                    color: const Color(0xFFF59E0B), // orange
                   ),
                 ),
               ],
@@ -454,66 +398,41 @@ class _OwnerHeader extends StatelessWidget {
 
   Widget _statDivider() => Container(
     width: 1,
-    height: 30,
-    color: AppColors.textSecondary.withOpacity(0.12),
+    height: 34,
+    color: AppColors.textSecondary.withOpacity(0.14),
   );
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white.withOpacity(0.15),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(9),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-      ),
-    );
-  }
 }
 
 class _MiniStat extends StatelessWidget {
   const _MiniStat({
     required this.value,
     required this.label,
-    required this.color,
     required this.icon,
+    required this.color,
   });
 
   final String value;
   final String label;
-  final Color color;
   final IconData icon;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 14, color: color),
-        ),
+        // Each stat has its own icon color.
+        Icon(icon, size: 18, color: color),
         SizedBox(height: Responsive.h(6)),
         Text(
           value,
-          style: AppTextStyles.bodyBold(color: AppColors.black).copyWith(fontSize: Responsive.sp(16)),
+          style: AppTextStyles.bodyBold(color: AppColors.black)
+              .copyWith(fontSize: Responsive.sp(17)),
         ),
         SizedBox(height: Responsive.h(2)),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(10.5)),
         ),
       ],
@@ -521,7 +440,7 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-// ---------------- SECTION TITLE ----------------
+// ---------------- SECTION TITLES ----------------
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, this.actionLabel, this.onAction});
@@ -536,14 +455,23 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: AppTextStyles.bodyBold(color: AppColors.black).copyWith(fontSize: Responsive.sp(16)),
+          style: AppTextStyles.bodyBold(color: AppColors.black)
+              .copyWith(fontSize: Responsive.sp(16)),
         ),
         if (actionLabel != null)
           GestureDetector(
             onTap: onAction,
-            child: Text(
-              actionLabel!,
-              style: TextStyle(color: AppColors.primary, fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w600),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                actionLabel!,
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: Responsive.sp(12.5),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
       ],
@@ -551,82 +479,88 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-// ---------------- QUICK ACTIONS ----------------
+// ---------------- QUICK ACCESS (one flat grid) ----------------
 
-class _QuickActionData {
-  const _QuickActionData({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
+class _QuickAccessPanel extends StatelessWidget {
+  const _QuickAccessPanel();
 
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(6), vertical: Responsive.h(8)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: GridView.count(
+        crossAxisCount: 4,
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 0,
+        crossAxisSpacing: 0,
+        childAspectRatio: 0.9,
+        children: [
+          for (final a in _quickActions)
+            _ActionTile(
+              icon: a.icon,
+              label: a.label,
+              onTap: () => context.push(a.route),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  const _QuickActionCard({
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
     required this.icon,
     required this.label,
-    required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: Responsive.h(10), horizontal: Responsive.w(4)),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.textSecondary.withOpacity(0.10)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(2), vertical: Responsive.h(6)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: AppColors.primary, size: 22),
+            ),
+            SizedBox(height: Responsive.h(5)),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.black,
+                fontSize: Responsive.sp(10),
+                fontWeight: FontWeight.w500,
+                height: 1.15,
               ),
-              SizedBox(height: Responsive.h(5)),
-              Flexible(
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.bodyBold(color: AppColors.black)
-                      .copyWith(fontSize: Responsive.sp(10.5), height: 1.1),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -647,14 +581,8 @@ class _CardWrapper extends StatelessWidget {
       padding: padding ?? EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
       ),
       child: child,
     );
@@ -673,12 +601,12 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CardWrapper(
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: Responsive.h(24)),
+        padding: EdgeInsets.symmetric(vertical: Responsive.h(22)),
         child: Column(
           children: [
-            Icon(icon, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(icon, size: 38, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(10)),
-            Text(message, style: AppTextStyles.subtitle()),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
           ],
         ),
       ),
@@ -695,21 +623,19 @@ class _ErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CardWrapper(
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
+        padding: EdgeInsets.symmetric(vertical: Responsive.h(18)),
         child: Column(
           children: [
-            Icon(Icons.error_outline_rounded, size: 36, color: AppColors.textSecondary.withOpacity(0.5)),
+            Icon(Icons.error_outline_rounded,
+                size: 36, color: AppColors.textSecondary.withOpacity(0.5)),
             SizedBox(height: Responsive.h(10)),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
             ),
-            SizedBox(height: Responsive.h(12)),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(onPressed: onRetry, child: const Text('Try again')),
           ],
         ),
       ),
@@ -717,61 +643,76 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
+// ---------------- RECENT ESTIMATE ----------------
+
 class _RecentEstimateCard extends StatelessWidget {
-  const _RecentEstimateCard({
-    required this.estimate,
-    required this.onTap,
-  });
+  const _RecentEstimateCard({required this.estimate, required this.onTap});
 
   final DashboardHomeRecentEstimate estimate;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: EdgeInsets.all(Responsive.w(14)),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    '${estimate.estimateNumber}'
-                    ,
-                    style: AppTextStyles.bodyBold(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: EdgeInsets.all(Responsive.w(14)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
+              ),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      estimate.estimateNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyBold(),
+                    ),
+                    SizedBox(height: Responsive.h(2)),
+                    Text(
+                      estimate.customerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption(),
+                    ),
+                    SizedBox(height: Responsive.h(2)),
+                    Text(estimate.dateFormatted, style: AppTextStyles.caption()),
+                  ],
+                ),
+              ),
+              SizedBox(width: Responsive.w(8)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    estimate.grandTotalFormatted,
+                    style: AppTextStyles.bodyBold(color: AppColors.primary),
                   ),
-                ),
-                StatusBadge(status: estimate.statusLabel),
-              ],
-            ),
-            SizedBox(height: Responsive.h(4)),
-            Text( estimate.customerName, style: AppTextStyles.caption()),
-            SizedBox(height: Responsive.h(8)),
-            const Divider(height: 1, color: AppColors.border),
-            SizedBox(height: Responsive.h(8)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(estimate.dateFormatted, style: AppTextStyles.caption()),
-                Text(
-                  estimate.grandTotalFormatted,
-                  style: AppTextStyles.bodyBold(color: AppColors.primary),
-                ),
-              ],
-            ),
-          ],
+                  SizedBox(height: Responsive.h(6)),
+                  StatusBadge(status: estimate.statusLabel),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

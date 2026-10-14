@@ -303,8 +303,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                                             estimate.estimateNumber.isEmpty
                                                 ? '#${estimate.id}'
                                                 : estimate.estimateNumber,
-                                            style: AppTextStyles.bodyBold()
-                                                .copyWith(fontSize: Responsive.sp(16)),
+                                            style: AppTextStyles.h6(color: Colors.black),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
@@ -759,7 +758,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                   Text('Balance Due', style: AppTextStyles.h3()),
                   Text(
                     currency.format(estimate.balanceAmount),
-                    style: AppTextStyles.h2(
+                    style: AppTextStyles.h3(
                         color: estimate.balanceAmount > 0 ? Colors.red : AppColors.success),
                   ),
                 ],
@@ -783,7 +782,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
         Text(
           value,
           style: (large
-              ? AppTextStyles.h2(color: valueColor ?? AppColors.primary)
+              ? AppTextStyles.h3(color: valueColor ?? AppColors.primary)
               .copyWith(fontWeight: FontWeight.w800)
               : AppTextStyles.body(color: valueColor ?? Colors.black))
               .copyWith(fontFeatures: const [FontFeature.tabularFigures()]),

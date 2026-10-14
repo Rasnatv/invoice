@@ -701,7 +701,7 @@ class QeTotalsCard extends StatelessWidget {
             children: [
               Text('Grand Total', style: AppTextStyles.balanceamount()),
               Text(currency.format(grandTotal),
-                  style: AppTextStyles.h2(color: AppColors.primary)),
+                  style: AppTextStyles.h3(color: AppColors.primary)),
             ],
           ),
         ],
