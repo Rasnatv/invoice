@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -11,19 +10,20 @@ import '../../../core/utils/responsive.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_bloc.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotation_event.dart';
 import '../../bloc/ownerbloc/ownerviewquatation/owner_viewquotations_state.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 
+/// Status colours (same palette as the Estimates screen).
 Color quotationStatusColor(String status) {
   switch (status.toLowerCase()) {
     case 'approved':
-      return Colors.green;
+      return AppColors.success;
     case 'submitted':
     case 'pending':
     case 'sent':
-      return Colors.orange;
+      return const Color(0xFFF59E0B);
     case 'rejected':
-      return Colors.red;
     case 'cancelled':
-      return Colors.red;
+      return const Color(0xFFDC2626);
     case 'draft':
       return Colors.blueGrey;
     default:
@@ -62,7 +62,7 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
   // we know to refresh this list. Returning without any change (plain
   // back navigation) returns `false`/null and skips the refresh.
   Future<void> _openQuotationDetails(OwnerviewQuotationModel q) async {
-    // Captured before the await — reading it off `context` afterwards is
+    // Captured before the await - reading it off `context` afterwards is
     // unsafe if this element gets deactivated while the detail screen is open.
     final bloc = context.read<QuotationBloc>();
 
@@ -91,19 +91,38 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
     final currency =
     NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), 0, Responsive.w(20), Responsive.h(24));
+
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as Estimates) ----------
         appBar: AppBar(
           title: Text('Quotations', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
         ),
+
         body: SafeArea(
           child: BlocBuilder<QuotationBloc, QuotationState>(
             builder: (context, state) {
+              // ---- loading skeleton ----
               if (state is QuotationLoading || state is QuotationInitial) {
-                return const Center(child: CircularProgressIndicator());
+                return Padding(
+                  padding: EdgeInsets.only(top: Responsive.h(14)),
+                  child: ShimmerListPlaceholder(
+                    itemCount: 6,
+                    padding: listPadding,
+                    separatorHeight: Responsive.h(10),
+                    itemBuilder: (context, i) =>
+                    const _QuotationCardSkeleton(),
+                  ),
+                );
               }
 
+              // ---- error ----
               if (state is QuotationError) {
                 return _ErrorView(
                   message: state.message ?? 'Failed to load quotations.',
@@ -115,21 +134,31 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
 
               final loaded = state as QuotationLoaded;
               final filteredQuotations = loaded.visibleQuotations;
-              // Only auto-load-more when there's no active search filter —
+              // Only auto-load-more when there's no active search filter -
               // pagination fetches raw pages from the API, which won't line up
               // with a client-side filtered/searched view.
               final canLoadMore = loaded.searchQuery.trim().isEmpty;
 
               return Column(
                 children: [
+                  // Search
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                        Responsive.h(14), Responsive.w(20), 0),
+                    child: _SearchField(
+                      controller: _searchCtrl,
+                      hint: 'Search by customer, ID or salesman',
+                      onChanged: (value) => context
+                          .read<QuotationBloc>()
+                          .add(SearchQuotationsEvent(value)),
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(12)),
+
                   // My Quotations / Salesman Quotations toggle
                   Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      Responsive.w(16),
-                      Responsive.h(14),
-                      Responsive.w(16),
-                      Responsive.h(10),
-                    ),
+                    padding:
+                    EdgeInsets.symmetric(horizontal: Responsive.w(20)),
                     child: _QuotationFilterToggle(
                       value: loaded.filter,
                       onChanged: (value) => context
@@ -137,26 +166,7 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
                           .add(FilterQuotationsEvent(value)),
                     ),
                   ),
-
-                  // Search Bar
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      Responsive.w(16),
-                      0,
-                      Responsive.w(16),
-                      Responsive.h(10),
-                    ),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (value) => context
-                          .read<QuotationBloc>()
-                          .add(SearchQuotationsEvent(value)),
-                      decoration: const InputDecoration(
-                        hintText: 'Search by customer, ID or salesman',
-                        prefixIcon: Icon(Icons.search_rounded),
-                      ),
-                    ),
-                  ),
+                  SizedBox(height: Responsive.h(12)),
 
                   // Quotation List
                   Expanded(
@@ -178,26 +188,39 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
                               .add(const RefreshQuotationsEvent());
                         },
                         child: filteredQuotations.isEmpty
-                            ? ListView(
-                          padding: EdgeInsets.only(top: Responsive.h(270)),
-                          children: [
-                            Icon(Icons.description_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
-                            SizedBox(height: Responsive.h(10)),
-                            Center(
-                              child: Text(
-                                'No quotations found',
-                                style: AppTextStyles.subtitle(),
+                            ? LayoutBuilder(
+                          builder: (context, constraints) =>
+                              SingleChildScrollView(
+                                physics:
+                                const AlwaysScrollableScrollPhysics(),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                      minHeight: constraints.maxHeight),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.description_outlined,
+                                          size: 44,
+                                          color: AppColors.textSecondary
+                                              .withOpacity(0.4),
+                                        ),
+                                        SizedBox(height: Responsive.h(10)),
+                                        Text(
+                                          'No quotations found',
+                                          style: AppTextStyles.subtitle(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
                         )
                             : ListView.separated(
-                          padding: EdgeInsets.fromLTRB(
-                            Responsive.w(16),
-                            0,
-                            Responsive.w(16),
-                            Responsive.h(20),
-                          ),
+                          physics:
+                          const AlwaysScrollableScrollPhysics(),
+                          padding: listPadding,
                           itemCount: filteredQuotations.length +
                               (canLoadMore && loaded.isLoadingMore
                                   ? 1
@@ -206,15 +229,16 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
                               SizedBox(height: Responsive.h(10)),
                           itemBuilder: (context, index) {
                             if (index >= filteredQuotations.length) {
-                              return Padding(
-                                padding: EdgeInsets.symmetric(
-                                    vertical: Responsive.h(16)),
-                                child: const Center(
+                              return const Padding(
+                                padding:
+                                EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
                                     child: CircularProgressIndicator()),
                               );
                             }
                             final q = filteredQuotations[index];
                             return _QuotationCard(
+                              key: ValueKey(q.id),
                               quotation: q,
                               currency: currency,
                               showSalesman: loaded.filter ==
@@ -236,33 +260,155 @@ class _OwnerQuotationsViewState extends State<_OwnerQuotationsView> {
   }
 }
 
-/// Error state shown when the quotations list fails to load.
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
+// =====================================================================
+// SMALL REUSABLE PIECES (private to this file)
+// =====================================================================
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.hint,
+    required this.onChanged,
+  });
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  OutlineInputBorder _border(Color c) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: c),
+  );
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(Responsive.w(24)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline_rounded,
-                color: AppColors.error, size: Responsive.w(40)),
-            SizedBox(height: Responsive.h(12)),
-            Text(message,
-                textAlign: TextAlign.center, style: AppTextStyles.body()),
-            SizedBox(height: Responsive.h(16)),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: AppTextStyles.body(),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        hintText: hint,
+        hintStyle: AppTextStyles.body(color: AppColors.textHint),
+        prefixIcon: Icon(Icons.search_rounded,
+            size: 20, color: AppColors.textSecondary),
+        contentPadding: EdgeInsets.symmetric(vertical: Responsive.h(13)),
+        border: _border(AppColors.border),
+        enabledBorder: _border(AppColors.border),
+        focusedBorder: _border(AppColors.primary),
+      ),
+    );
+  }
+}
+
+class _ListCard extends StatelessWidget {
+  const _ListCard({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(Responsive.w(14)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: child,
         ),
       ),
     );
   }
 }
+
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: AppColors.primary, size: 20),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.text,
+    this.color = AppColors.textSecondary,
+  });
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        SizedBox(width: Responsive.w(6)),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: Responsive.sp(11),
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// FILTER TOGGLE
+// =====================================================================
 
 class _QuotationFilterToggle extends StatelessWidget {
   const _QuotationFilterToggle({
@@ -278,8 +424,8 @@ class _QuotationFilterToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
@@ -317,20 +463,23 @@ class _ToggleOption extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
           padding: EdgeInsets.symmetric(vertical: Responsive.h(9)),
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
+            borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: selected
-                ? AppTextStyles.bodyBold(color: Colors.white)
-                : AppTextStyles.body(color: AppColors.textHint),
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: Responsive.sp(11.5),
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
           ),
         ),
       ),
@@ -338,9 +487,89 @@ class _ToggleOption extends StatelessWidget {
   }
 }
 
-// Quotation Card Widget
+// =====================================================================
+// ERROR / SKELETON
+// =====================================================================
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuotationCardSkeleton extends StatelessWidget {
+  const _QuotationCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ListCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const ShimmerBox(width: 42, height: 42, borderRadius: 12),
+              SizedBox(width: Responsive.w(12)),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 120, height: 13),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 160, height: 11),
+                  ],
+                ),
+              ),
+              const ShimmerBox(width: 60, height: 20, borderRadius: 20),
+            ],
+          ),
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ShimmerBox(width: 80, height: 12),
+              ShimmerBox(width: 90, height: 16),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// QUOTATION CARD
+// =====================================================================
+
 class _QuotationCard extends StatelessWidget {
   const _QuotationCard({
+    super.key,
     required this.quotation,
     required this.currency,
     required this.onTap,
@@ -356,129 +585,89 @@ class _QuotationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = quotationStatusColor(quotation.status);
 
-    return InkWell(
+    return _ListCard(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: EdgeInsets.all(Responsive.w(14)),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.assignment_outlined,
-                          size: 14, color: AppColors.textSecondary),
-                      SizedBox(width: Responsive.w(4)),
-                      Expanded(
-                        child: Text(
-                          quotation.quotationNumber,
-                          style: AppTextStyles.bodyBold(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    quotation.status.isEmpty ? '-' : quotation.status,
-                    style: AppTextStyles.caption(color: statusColor),
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: Responsive.h(4)),
-
-// Row 2: Customer name (+ salesman when shown)
-            Row(
-              children: [
-                const Icon(Icons.person_outline_rounded,
-                    size: 14, color: AppColors.textSecondary),
-                SizedBox(width: Responsive.w(4)),
-                Expanded(
-                  child: Text(
-                    quotation.customerName,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (showSalesman) ...[
-                  SizedBox(width: Responsive.w(10)),
-                  const Icon(Icons.badge_outlined,
-                      size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: Responsive.w(4)),
-                  Expanded(
-                    child: Text(
-                      quotation.salesmanName,
-                      style: AppTextStyles.caption(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-
-            SizedBox(height: Responsive.h(4)),
-
-            Row(
-              children: [
-                const Icon(Icons.phone_outlined,
-                    size: 14, color: AppColors.textSecondary),
-                SizedBox(width: Responsive.w(4)),
-                Text(
-                  quotation.customerPhone,
-                  style: AppTextStyles.caption(),
-                ),
-              ],
-            ),
-
-            SizedBox(height: Responsive.h(8)),
-            const Divider(height: 1, color: AppColors.border),
-            SizedBox(height: Responsive.h(8)),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- top: icon, number + customer, status ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _IconTile(icon: Icons.assignment_outlined),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      quotation.date,
-                      style: AppTextStyles.caption(),
+                      quotation.quotationNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyBold(),
                     ),
+                    SizedBox(height: Responsive.h(2)),
                     Text(
-                      '${quotation.totalItemsValue} items',
-                      style: AppTextStyles.caption(
-                          color: AppColors.textSecondary),
+                      quotation.customerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.caption(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
-                Text(
-                  currency.format(quotation.grandTotalValue),
-                  style: AppTextStyles.bodyBold(color: AppColors.primary),
-                ),
-              ],
+              ),
+              SizedBox(width: Responsive.w(8)),
+              _StatusPill(
+                label: quotation.status.isEmpty ? '-' : quotation.status,
+                color: statusColor,
+              ),
+            ],
+          ),
+
+          // ---- phone / salesman ----
+          if (quotation.customerPhone.isNotEmpty) ...[
+            SizedBox(height: Responsive.h(10)),
+            _InfoRow(
+              icon: Icons.phone_outlined,
+              text: quotation.customerPhone,
             ),
           ],
-        ),
+          if (showSalesman && quotation.salesmanName.isNotEmpty) ...[
+            SizedBox(height: Responsive.h(6)),
+            _InfoRow(
+              icon: Icons.badge_outlined,
+              color: AppColors.primary,
+              text: 'Salesman: ${quotation.salesmanName}',
+            ),
+          ],
+
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+
+          // ---- bottom: date, items, total ----
+          Row(
+            children: [
+              Icon(Icons.calendar_today_rounded,
+                  size: 13, color: AppColors.textSecondary),
+              SizedBox(width: Responsive.w(6)),
+              Expanded(
+                child: Text(
+                  '${quotation.date}  •  ${quotation.totalItemsValue} items',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                ),
+              ),
+              SizedBox(width: Responsive.w(6)),
+              Text(
+                currency.format(quotation.grandTotalValue),
+                style: AppTextStyles.amount(color: AppColors.primary),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -60,14 +60,12 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   @override
   void initState() {
     super.initState();
-
     _scrollCtrl.addListener(_onScroll);
 
     // Refresh whenever the Estimates tab is tapped.
     widget.refreshSignal?.addListener(_onTabSelected);
 
     if (widget.initialFilter != 'all') {
-      // Applied once the first load lands filters/state.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<OwnerEstimatesBloc>().add(
           OwnerEstimatesFilterChanged(widget.initialFilter),
@@ -76,13 +74,14 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     }
   }
 
-  /// Called every time the Estimates tab is tapped in the shell.
-  void _onTabSelected() {
+  void _refresh() {
     if (!mounted) return;
     context
         .read<OwnerEstimatesBloc>()
         .add(const OwnerEstimatesRefreshRequested());
   }
+
+  void _onTabSelected() => _refresh();
 
   /// Load the next page when the user is near the bottom.
   void _onScroll() {
@@ -96,8 +95,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   }
 
   /// Filters/search are client-side, so a filtered list can be too short
-  /// to scroll. In that case keep loading pages until it fills or the
-  /// server runs out.
+  /// to scroll. Keep loading pages until it fills or the server runs out.
   void _maybeLoadMore(OwnerEstimatesState state) {
     if (!state.hasMore || state.isLoadingMore) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -127,19 +125,12 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
         builder: (_) => OwnerEstimateDetailsScreen(estimateId: estimate.id),
       ),
     );
-    if (mounted) {
-      context
-          .read<OwnerEstimatesBloc>()
-          .add(const OwnerEstimatesRefreshRequested());
-    }
+    _refresh();
   }
+
   Future<void> _onCreateEstimateTap() async {
     await context.push('/owner/create-estimate');
-    if (mounted) {
-      context
-          .read<OwnerEstimatesBloc>()
-          .add(const OwnerEstimatesRefreshRequested());
-    }
+    _refresh();
   }
 
   Future<void> _onPayNowTap(SalesmanowrEstimateModel estimate) async {
@@ -156,12 +147,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
         ),
       ),
     );
-
-    if (result == true && mounted) {
-      context
-          .read<OwnerEstimatesBloc>()
-          .add(const OwnerEstimatesRefreshRequested());
-    }
+    if (result == true) _refresh();
   }
 
   Future<void> _onPaymentHistoryTap(SalesmanowrEstimateModel estimate) async {
@@ -176,14 +162,8 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
         ),
       ),
     );
-
-    // A payment could have been recorded from inside the history screen
-    // (via its own "record payment" FAB), so refresh the list balances too.
-    if (result == true && mounted) {
-      context
-          .read<OwnerEstimatesBloc>()
-          .add(const OwnerEstimatesRefreshRequested());
-    }
+    // A payment may have been recorded inside the history screen.
+    if (result == true) _refresh();
   }
 
   @override
@@ -193,37 +173,14 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
-        // appBar: AppBar(
-        //   title: Text('Estimates', style: AppTextStyles.h6()),
-        //   backgroundColor: AppColors.primary,
-        //   foregroundColor: Colors.white,
-        // ),
+
+        // ---------- APPBAR (unchanged) ----------
         appBar: AppBar(
           title: Text('Estimates', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          actions: [
-            Padding(
-              padding: EdgeInsets.only(right: Responsive.w(12)),
-              child: TextButton.icon(
-                onPressed: _onCreateEstimateTap,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(
-                  'Create',
-                  style: AppTextStyles.bodyBold(color: AppColors.primary),
-                ),
-                style: TextButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primary,
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
+
         body: SafeArea(
           child: BlocBuilder<OwnerEstimatesBloc, OwnerEstimatesState>(
             builder: (context, state) {
@@ -233,17 +190,14 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
               return Column(
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(Responsive.w(16),
-                        Responsive.h(14), Responsive.w(16), 0),
-                    child: TextField(
+                    padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                        Responsive.h(14), Responsive.w(20), 0),
+                    child: _SearchField(
                       controller: _searchCtrl,
+                      hint: 'Search salesman, contractor or phone',
                       onChanged: (v) => context
                           .read<OwnerEstimatesBloc>()
                           .add(OwnerEstimatesSearchQueryChanged(v)),
-                      decoration: const InputDecoration(
-                        hintText: 'Search salesman, contractor or phone',
-                        prefixIcon: Icon(Icons.search_rounded),
-                      ),
                     ),
                   ),
                   SizedBox(height: Responsive.h(12)),
@@ -268,28 +222,18 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
 
   Widget _buildFilterChips(BuildContext context, OwnerEstimatesState state) {
     return SizedBox(
-      height: 42,
+      height: 34,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
         itemCount: state.filters.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final f = state.filters[i];
-          final selected = f.key == state.activeFilter;
-          return ChoiceChip(
-            label: Text('${f.label} (${f.count})'),
-            selected: selected,
-            selectedColor: AppColors.primary,
-            backgroundColor: AppColors.surface,
-            labelStyle: AppTextStyles.bodyBold(
-                color: selected ? Colors.white : AppColors.textPrimary),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(
-                  color: selected ? AppColors.primary : AppColors.border),
-            ),
-            onSelected: (_) => context
+          return _FilterChip(
+            label: f.label,
+            selected: f.key == state.activeFilter,
+            onTap: () => context
                 .read<OwnerEstimatesBloc>()
                 .add(OwnerEstimatesFilterChanged(f.key)),
           );
@@ -303,15 +247,15 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
 
     return ShimmerLoading(
       child: SizedBox(
-        height: 42,
+        height: 34,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+          padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
           itemCount: chipCount,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (context, i) => ShimmerBox(
             width: widths[i % widths.length],
-            height: 32,
+            height: 30,
             borderRadius: 20,
           ),
         ),
@@ -320,6 +264,9 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   }
 
   Widget _buildBody(BuildContext context, OwnerEstimatesState state) {
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), 0, Responsive.w(20), Responsive.h(24));
+
     if (state.status == OwnerEstimatesStatus.loading) {
       final int skeletonCount = state.filteredEstimates.isNotEmpty
           ? state.filteredEstimates.length.clamp(1, 8)
@@ -327,8 +274,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
 
       return ShimmerListPlaceholder(
         itemCount: skeletonCount,
-        padding: EdgeInsets.fromLTRB(
-            Responsive.w(16), 0, Responsive.w(16), Responsive.h(20)),
+        padding: listPadding,
         separatorHeight: Responsive.h(10),
         itemBuilder: (context, i) => const _OwnerEstimateCardSkeleton(),
       );
@@ -337,9 +283,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     if (state.status == OwnerEstimatesStatus.failure) {
       return _ErrorView(
         message: state.errorMessage ?? 'Failed to load estimates.',
-        onRetry: () => context
-            .read<OwnerEstimatesBloc>()
-            .add(const OwnerEstimatesRefreshRequested()),
+        onRetry: _refresh,
       );
     }
 
@@ -353,9 +297,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
       }
 
       return RefreshIndicator(
-        onRefresh: () async => context
-            .read<OwnerEstimatesBloc>()
-            .add(const OwnerEstimatesRefreshRequested()),
+        onRefresh: () async => _refresh(),
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -367,7 +309,7 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
                   children: [
                     Icon(
                       Icons.description_outlined,
-                      size: Responsive.w(48),
+                      size: 44,
                       color: AppColors.textSecondary.withOpacity(0.4),
                     ),
                     SizedBox(height: Responsive.h(10)),
@@ -382,14 +324,11 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
     }
 
     return RefreshIndicator(
-      onRefresh: () async => context
-          .read<OwnerEstimatesBloc>()
-          .add(const OwnerEstimatesRefreshRequested()),
+      onRefresh: () async => _refresh(),
       child: ListView.separated(
         controller: _scrollCtrl,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-            Responsive.w(16), 0, Responsive.w(16), Responsive.h(20)),
+        padding: listPadding,
         itemCount:
         state.filteredEstimates.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
@@ -416,7 +355,272 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   }
 }
 
-/// Error state shown when the estimates list fails to load.
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.hint,
+    required this.onChanged,
+  });
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  OutlineInputBorder _border(Color c) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: c),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: AppTextStyles.body(),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        hintText: hint,
+        hintStyle: AppTextStyles.body(color: AppColors.textHint),
+        prefixIcon: Icon(Icons.search_rounded,
+            size: 20, color: AppColors.textSecondary),
+        contentPadding: EdgeInsets.symmetric(vertical: Responsive.h(13)),
+        border: _border(AppColors.border),
+        enabledBorder: _border(AppColors.border),
+        focusedBorder: _border(AppColors.primary),
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(12), vertical: Responsive.h(6)),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: Responsive.sp(11.5),
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            SizedBox(width: Responsive.w(6)),
+
+
+
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ListCard extends StatelessWidget {
+  const _ListCard({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(Responsive.w(14)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: AppColors.primary, size: 20),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.text,
+    this.color = AppColors.textSecondary,
+  });
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        SizedBox(width: Responsive.w(6)),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: Responsive.sp(11),
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _BalanceBar extends StatelessWidget {
+  const _BalanceBar({required this.amountText, required this.onPressed});
+  final String amountText;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    const red = Color(0xFFDC2626);
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          Responsive.w(10), Responsive.h(6), Responsive.w(6), Responsive.h(6)),
+      decoration: BoxDecoration(
+        color: red.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.account_balance_wallet_outlined,
+              size: 16, color: red),
+          SizedBox(width: Responsive.w(6)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Balance due',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: Responsive.sp(10),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  amountText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold(color: red),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 30,
+            child: ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: Size.zero,
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(14)),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                'Pay Now',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: Responsive.sp(11),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// ERROR / SKELETON
+// =====================================================================
+
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
   final String message;
@@ -431,12 +635,12 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.error_outline_rounded,
-                color: AppColors.error, size: Responsive.w(40)),
-            SizedBox(height: Responsive.h(12)),
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
             Text(message,
-                textAlign: TextAlign.center, style: AppTextStyles.body()),
-            SizedBox(height: Responsive.h(16)),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(onPressed: onRetry, child: const Text('Try again')),
           ],
         ),
       ),
@@ -449,39 +653,33 @@ class _OwnerEstimateCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _ListCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const ShimmerBox(width: 140, height: 14),
-              Row(
-                children: [
-                  const ShimmerCircle(diameter: 18),
-                  SizedBox(width: Responsive.w(8)),
-                  const ShimmerBox(width: 60, height: 20, borderRadius: 20),
-                ],
+              const ShimmerBox(width: 42, height: 42, borderRadius: 12),
+              SizedBox(width: Responsive.w(12)),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 120, height: 13),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 160, height: 11),
+                  ],
+                ),
               ),
+              const ShimmerBox(width: 60, height: 20, borderRadius: 20),
             ],
           ),
-          SizedBox(height: Responsive.h(10)),
-          const ShimmerBox(width: 180, height: 14),
-          SizedBox(height: Responsive.h(8)),
-          const ShimmerBox(width: 130, height: 12),
           SizedBox(height: Responsive.h(12)),
           const Divider(height: 1, color: AppColors.border),
           SizedBox(height: Responsive.h(10)),
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               ShimmerBox(width: 80, height: 12),
               ShimmerBox(width: 90, height: 16),
             ],
@@ -491,6 +689,10 @@ class _OwnerEstimateCardSkeleton extends StatelessWidget {
     );
   }
 }
+
+// =====================================================================
+// ESTIMATE CARD
+// =====================================================================
 
 class _OwnerEstimateCard extends StatelessWidget {
   const _OwnerEstimateCard({
@@ -506,182 +708,122 @@ class _OwnerEstimateCard extends StatelessWidget {
   final VoidCallback onPayNow;
   final VoidCallback onHistoryTap;
 
-  @override
-  Widget build(BuildContext context) {
-    final bool showBalance = estimate.hasBalance;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: EdgeInsets.all(Responsive.w(14)),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    ' ${estimate.estimateNumber}',
-                    style: AppTextStyles.bodyBold(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  onPressed: onHistoryTap,
-                  icon: const Icon(Icons.history, size: 20),
-                  color: AppColors.textSecondary,
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Payment History',
-                ),
-                SizedBox(width: Responsive.w(6)),
-                _StatusChip(
-                    label: estimate.statusLabel, statusKey: estimate.statusKey),
-              ],
-            ),
-            SizedBox(height: Responsive.h(4)),
-            Row(
-              children: [
-                SizedBox(width: Responsive.w(4)),
-                Expanded(
-                  child: Text(
-                    estimate.customerName,
-                    style: AppTextStyles.caption(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            if (estimate.contractorName.isNotEmpty) ...[
-              SizedBox(height: Responsive.h(4)),
-              Row(
-                children: [
-                  const Icon(Icons.engineering_outlined,
-                      size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: Responsive.w(4)),
-                  Expanded(
-                    child: Text(
-                      'Contractor:${estimate.contractorName}',
-                      style: AppTextStyles.caption(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (estimate.isApproved) ...[
-              SizedBox(height: Responsive.h(4)),
-              Row(
-                children: [
-                  const Icon(Icons.verified_outlined,
-                      size: 14, color: AppColors.primary),
-                  SizedBox(width: Responsive.w(4)),
-                  Expanded(
-                    child: Text(
-                      'Approved by ${estimate.approvedBy}'
-                          '${estimate.approvedAt.isNotEmpty ? ' · ${estimate.approvedAt}' : ''}',
-                      style: AppTextStyles.caption(color: AppColors.primary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            SizedBox(height: Responsive.h(8)),
-            const Divider(height: 1, color: AppColors.border),
-            SizedBox(height: Responsive.h(8)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(estimate.date, style: AppTextStyles.caption()),
-                Text(estimate.grandTotalFormatted,
-                    style: AppTextStyles.bodyBold(color: AppColors.primary)),
-              ],
-            ),
-            if (showBalance) ...[
-              SizedBox(height: Responsive.h(6)),
-              Row(
-                children: [
-                  const Icon(Icons.error_outline, size: 14, color: Colors.red),
-                  SizedBox(width: Responsive.w(4)),
-                  Expanded(
-                    child: Text(
-                      'Balance: ${estimate.balanceAmountFormatted}',
-                      style: AppTextStyles.bodyBold(color: Colors.red),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  SizedBox(width: Responsive.w(8)),
-                  SizedBox(
-                    height: 32,
-                    child: ElevatedButton(
-                      onPressed: onPayNow,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: Responsive.w(12)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(
-                        'Pay Now',
-                        style: AppTextStyles.caption(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.statusKey});
-  final String label;
-  final String statusKey;
-
-  Color get _color {
-    switch (statusKey) {
+  Color get _statusColor {
+    switch (estimate.statusKey) {
       case 'approved':
         return AppColors.success;
       case 'rejected':
-        return Colors.red;
+        return const Color(0xFFDC2626);
       case 'despatched':
         return AppColors.primary;
       case 'pending_approval':
       default:
-        return Colors.orange;
+        return const Color(0xFFF59E0B);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: _color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
+    return _ListCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- top: icon, number + customer, status ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _IconTile(icon: Icons.description_outlined),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      estimate.estimateNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyBold(),
+                    ),
+                    SizedBox(height: Responsive.h(2)),
+                    Text(
+                      estimate.customerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.caption(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: Responsive.w(8)),
+              _StatusPill(label: estimate.statusLabel, color: _statusColor),
+            ],
+          ),
+
+          // ---- contractor / approved ----
+          if (estimate.contractorName.isNotEmpty) ...[
+            SizedBox(height: Responsive.h(10)),
+            _InfoRow(
+              icon: Icons.engineering_outlined,
+              text: 'Contractor: ${estimate.contractorName}',
+            ),
+          ],
+          if (estimate.isApproved) ...[
+            SizedBox(height: Responsive.h(6)),
+            _InfoRow(
+              icon: Icons.verified_outlined,
+              color: AppColors.primary,
+              text: 'Approved by ${estimate.approvedBy}'
+                  '${estimate.approvedAt.isNotEmpty ? ' · ${estimate.approvedAt}' : ''}',
+            ),
+          ],
+
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+
+          // ---- bottom: date, history, total ----
+          Row(
+            children: [
+              Icon(Icons.calendar_today_rounded,
+                  size: 13, color: AppColors.textSecondary),
+              SizedBox(width: Responsive.w(6)),
+              Expanded(
+                child: Text(
+                  estimate.date,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                ),
+              ),
+              InkWell(
+                onTap: onHistoryTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(Icons.history_rounded,
+                      size: 25, color: AppColors.textSecondary),
+                ),
+              ),
+              SizedBox(width: Responsive.w(6)),
+              Text(
+                estimate.grandTotalFormatted,
+                style: AppTextStyles.amount(color: AppColors.primary),
+              ),
+            ],
+          ),
+
+          // ---- balance ----
+          if (estimate.hasBalance) ...[
+            SizedBox(height: Responsive.h(10)),
+            _BalanceBar(
+              amountText: estimate.balanceAmountFormatted,
+              onPressed: onPayNow,
+            ),
+          ],
+        ],
       ),
-      child: Text(label, style: AppTextStyles.caption(color: _color)),
     );
   }
 }

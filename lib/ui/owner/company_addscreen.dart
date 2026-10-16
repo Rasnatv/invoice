@@ -14,6 +14,15 @@ import '../../bloc/ownerbloc/company/company_bloc.dart';
 import '../../bloc/ownerbloc/company/company_event.dart';
 import '../../bloc/ownerbloc/company/company_state.dart';
 
+/// Shared input decoration so every field uses the app font.
+InputDecoration _inputDec(String label, {String? hint}) => InputDecoration(
+  labelText: label,
+  hintText: hint,
+  labelStyle: AppTextStyles.body(color: AppColors.textHint),
+  hintStyle: AppTextStyles.body(color: AppColors.textHint),
+  errorStyle: AppTextStyles.caption(color: AppColors.error),
+);
+
 class CompanySetupScreen extends StatelessWidget {
   const CompanySetupScreen({super.key});
 
@@ -35,8 +44,9 @@ class _CompanySetupView extends StatefulWidget {
 }
 
 class _CompanySetupViewState extends State<_CompanySetupView> {
-  // ---------------- UNCHANGED: form logic ----------------
-  Future<void> _openCompanyForm(BuildContext context, {CompanyModel? company}) async {
+  // ---------------- form logic (unchanged) ----------------
+  Future<void> _openCompanyForm(BuildContext context,
+      {CompanyModel? company}) async {
     final bloc = context.read<CompanyBloc>();
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: company?.name);
@@ -56,7 +66,8 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
             left: Responsive.w(16),
             right: Responsive.w(16),
             top: Responsive.h(16),
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + Responsive.h(16),
+            bottom:
+            MediaQuery.of(sheetContext).viewInsets.bottom + Responsive.h(16),
           ),
           child: Form(
             key: formKey,
@@ -71,33 +82,37 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                 SizedBox(height: Responsive.h(16)),
                 TextFormField(
                   controller: nameCtrl,
+                  style: AppTextStyles.body(),
                   textCapitalization: TextCapitalization.words,
                   inputFormatters: DValidator.brandNameText,
-                  decoration: const InputDecoration(labelText: 'Brand Name'),
+                  decoration: _inputDec('Brand Name'),
                   validator: DValidator.validateBrandName,
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: codeCtrl,
+                  style: AppTextStyles.body(),
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: DValidator.brandCodeText,
-                  decoration: const InputDecoration(labelText: 'Brand Code'),
+                  decoration: _inputDec('Brand Code'),
                   validator: DValidator.validateBrandCode,
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: websiteCtrl,
+                  style: AppTextStyles.body(),
                   keyboardType: TextInputType.url,
                   inputFormatters: DValidator.textWithLimit,
-                  decoration: const InputDecoration(
-                    labelText: 'Website (optional)',
-                    hintText: 'https://example.com',
+                  decoration: _inputDec(
+                    'Website (optional)',
+                    hint: 'https://example.com',
                   ),
                   validator: (v) {
                     final value = v?.trim() ?? '';
                     if (value.isEmpty) return null;
                     final uri = Uri.tryParse(value);
-                    if (uri == null || !(uri.isScheme('HTTP') || uri.isScheme('HTTPS'))) {
+                    if (uri == null ||
+                        !(uri.isScheme('HTTP') || uri.isScheme('HTTPS'))) {
                       return 'Enter a valid URL starting with http:// or https://';
                     }
                     return null;
@@ -113,7 +128,10 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                         onPressed: state.isSubmitting
                             ? null
                             : () {
-                          if (!(formKey.currentState?.validate() ?? false)) return;
+                          if (!(formKey.currentState?.validate() ??
+                              false)) {
+                            return;
+                          }
                           final website = websiteCtrl.text.trim();
                           if (company == null) {
                             bloc.add(AddCompanyRequested(
@@ -133,8 +151,10 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: EdgeInsets.symmetric(
+                              vertical: Responsive.h(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: state.isSubmitting
                             ? const SizedBox(
@@ -147,7 +167,8 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                         )
                             : Text(
                           company == null ? 'Add' : 'Update',
-                          style: AppTextStyles.bodyBold().copyWith(color: Colors.white),
+                          style: AppTextStyles.bodyBold(
+                              color: Colors.white),
                         ),
                       );
                     },
@@ -161,8 +182,9 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
     );
   }
 
-  // ---------------- UNCHANGED: delete logic ----------------
-  Future<void> _confirmDelete(BuildContext context, CompanyModel company) async {
+  // ---------------- delete logic (unchanged) ----------------
+  Future<void> _confirmDelete(
+      BuildContext context, CompanyModel company) async {
     final bloc = context.read<CompanyBloc>();
     final confirmed = await showConfirmDialog(
       context,
@@ -181,35 +203,45 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
     Responsive.init(context);
 
     return BlocListener<CompanyBloc, CompanyState>(
-        listenWhen: (previous, current) =>
-        previous.errorMessage != current.errorMessage ||
-            previous.successMessage != current.successMessage,
-        listener: (context, state) {
-          if (state.errorMessage != null) {
-            AppSnackbar.error(state.errorMessage!);
-            context.read<CompanyBloc>().add(const CompanyMessageConsumed());
-          } else if (state.successMessage != null) {
-            AppSnackbar.success(state.successMessage!);
-            context.read<CompanyBloc>().add(const CompanyMessageConsumed());
-          }
-        },
-        child: NetworkAwareWrapper(child: Scaffold(
+      listenWhen: (previous, current) =>
+      previous.errorMessage != current.errorMessage ||
+          previous.successMessage != current.successMessage,
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          AppSnackbar.error(state.errorMessage!);
+          context.read<CompanyBloc>().add(const CompanyMessageConsumed());
+        } else if (state.successMessage != null) {
+          AppSnackbar.success(state.successMessage!);
+          context.read<CompanyBloc>().add(const CompanyMessageConsumed());
+        }
+      },
+      child: NetworkAwareWrapper(
+        child: Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(title: Text('Brand Setup', style: AppTextStyles.h6())),
+          appBar: AppBar(
+            title: Text('Brand Setup', style: AppTextStyles.h6()),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _openCompanyForm(context),
             backgroundColor: AppColors.primary,
             icon: const Icon(Icons.add, color: Colors.white),
-            label: Text('Add Brand', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
+            label: Text(
+              'Add Brand',
+              style: AppTextStyles.bodyBold(color: Colors.white),
+            ),
           ),
           body: SafeArea(
             child: BlocBuilder<CompanyBloc, CompanyState>(
               builder: (context, state) {
-                if (state.status == CompanyStatus.loading && state.companies.isEmpty) {
+                if (state.status == CompanyStatus.loading &&
+                    state.companies.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (state.status == CompanyStatus.failure && state.companies.isEmpty) {
+                if (state.status == CompanyStatus.failure &&
+                    state.companies.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: EdgeInsets.all(Responsive.w(20)),
@@ -223,8 +255,12 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                           ),
                           SizedBox(height: Responsive.h(12)),
                           OutlinedButton(
-                            onPressed: () => context.read<CompanyBloc>().add(const LoadCompanies()),
-                            child: const Text('Retry'),
+                            onPressed: () => context
+                                .read<CompanyBloc>()
+                                .add(const LoadCompanies()),
+                            child: Text('Retry',
+                                style: AppTextStyles.bodyBold(
+                                    color: AppColors.primary)),
                           ),
                         ],
                       ),
@@ -232,14 +268,13 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                   );
                 }
 
-                // ---------------- NEW: modern empty state ----------------
                 if (state.companies.isEmpty) {
                   return const _EmptyBrands();
                 }
 
-                // ---------------- NEW: modern list ----------------
                 return RefreshIndicator(
-                  onRefresh: () async => context.read<CompanyBloc>().add(const LoadCompanies()),
+                  onRefresh: () async =>
+                      context.read<CompanyBloc>().add(const LoadCompanies()),
                   child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(
@@ -259,7 +294,8 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
                       final company = state.companies[index - 1];
                       return _CompanyCard(
                         company: company,
-                        onEdit: () => _openCompanyForm(context, company: company),
+                        onEdit: () =>
+                            _openCompanyForm(context, company: company),
                         onDelete: () => _confirmDelete(context, company),
                       );
                     },
@@ -269,11 +305,12 @@ class _CompanySetupViewState extends State<_CompanySetupView> {
             ),
           ),
         ),
-        ));
+      ),
+    );
   }
 }
 
-/// NEW: Small section label above the list.
+/// Small section label above the list.
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
 
@@ -298,7 +335,7 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// NEW: Clean centered empty state.
+/// Clean centered empty state.
 class _EmptyBrands extends StatelessWidget {
   const _EmptyBrands();
 
@@ -317,14 +354,15 @@ class _EmptyBrands extends StatelessWidget {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.storefront_outlined, size: 40, color: AppColors.primary),
+              child: Icon(Icons.storefront_outlined,
+                  size: 40, color: AppColors.primary),
             ),
             SizedBox(height: Responsive.h(16)),
             Text('No brands added yet', style: AppTextStyles.bodyBold()),
             SizedBox(height: Responsive.h(6)),
             Text(
               'Tap "Add Brand" to create your first brand.',
-              style: AppTextStyles.caption(),
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -334,9 +372,10 @@ class _EmptyBrands extends StatelessWidget {
   }
 }
 
-/// RESTYLED: Modern brand card (avatar + name + code chip + website).
+/// Brand card (avatar + name + code chip + website).
 class _CompanyCard extends StatelessWidget {
-  const _CompanyCard({required this.company, required this.onEdit, required this.onDelete});
+  const _CompanyCard(
+      {required this.company, required this.onEdit, required this.onDelete});
 
   final CompanyModel company;
   final VoidCallback onEdit;
@@ -349,7 +388,8 @@ class _CompanyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasWebsite = company.website != null && company.website!.trim().isNotEmpty;
+    final hasWebsite =
+        company.website != null && company.website!.trim().isNotEmpty;
 
     return Container(
       padding: EdgeInsets.all(Responsive.w(14)),
@@ -380,8 +420,9 @@ class _CompanyCard extends StatelessWidget {
             child: Text(
               _initial,
               style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
                 color: AppColors.primary,
-                fontSize: 20,
+                fontSize: Responsive.sp(18),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -403,7 +444,8 @@ class _CompanyCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -411,13 +453,15 @@ class _CompanyCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.tag_rounded, size: 12, color: AppColors.primary),
+                          Icon(Icons.tag_rounded,
+                              size: 12, color: AppColors.primary),
                           const SizedBox(width: 3),
                           Text(
                             company.code,
                             style: TextStyle(
+                              fontFamily: AppTextStyles.fontFamily,
                               color: AppColors.primary,
-                              fontSize: 11,
+                              fontSize: Responsive.sp(10.5),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -432,7 +476,8 @@ class _CompanyCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           company.website!,
-                          style: AppTextStyles.caption(),
+                          style: AppTextStyles.caption(
+                              color: AppColors.textSecondary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -448,30 +493,35 @@ class _CompanyCard extends StatelessWidget {
           PopupMenuButton<String>(
             padding: EdgeInsets.zero,
             color: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textSecondary),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            icon: Icon(Icons.more_vert,
+                size: 20, color: AppColors.textSecondary),
             onSelected: (value) {
               if (value == 'edit') onEdit();
               if (value == 'delete') onDelete();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
-                    SizedBox(width: 8),
-                    Text('Edit'),
+                    const Icon(Icons.edit_outlined,
+                        size: 18, color: AppColors.textPrimary),
+                    const SizedBox(width: 8),
+                    Text('Edit', style: AppTextStyles.body()),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: AppColors.error)),
+                    const Icon(Icons.delete_outline,
+                        size: 18, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    Text('Delete',
+                        style: AppTextStyles.body(color: AppColors.error)),
                   ],
                 ),
               ),

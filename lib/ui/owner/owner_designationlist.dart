@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -6,10 +5,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/designation_provider.dart';
-import '../../core/utils/confirmation_dialogue.dart';
 import '../../core/utils/delete_helper.dart';
 import '../../models/owner_models/designationmodel.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 import '../../bloc/ownerbloc/designation/designationbloc.dart';
 import '../../bloc/ownerbloc/designation/designationevent.dart';
 import '../../bloc/ownerbloc/designation/designationstate.dart';
@@ -32,121 +31,130 @@ class DesignationListPage extends StatelessWidget {
 class _DesignationListView extends StatelessWidget {
   const _DesignationListView();
 
-  static const Color _primary = Color(0xFF2F5D50);
-  static const Color _accent = Color(0xFFE8A33D);
+  void _refresh(BuildContext context) =>
+      context.read<DesignationBloc>().add(FetchDesignations());
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
+
     return NetworkAwareWrapper(
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F7F5),
+        backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as Drivers / Estimates) ----------
         appBar: AppBar(
+          title: Text('Designations', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          elevation: 0,
-          title: Text(
-            'Designations',
-            style: AppTextStyles.h6().copyWith(fontSize: Responsive.sp(18)),
-          ),
-        ),
-        body: ResponsiveCenter(
-          child: BlocConsumer<DesignationBloc, DesignationState>(
-            listener: (context, state) {
-              if (state is DesignationActionSuccess) {
-                if (state.message != null) AppSnackbar.success(state.message!);
-              } else if (state is DesignationActionFailure) {
-                if (state.message != null) AppSnackbar.error(state.message!);
-              } else if (state is DesignationError) {
-                if (state.message != null) AppSnackbar.error(state.message!);
-              }
-            },
-            builder: (context, state) {
-              if (state is DesignationLoading || state is DesignationInitial) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    color: _primary,
+          actions: [
+            Padding(
+              padding: EdgeInsets.only(right: Responsive.w(12)),
+              child: TextButton.icon(
+                onPressed: () => _openAddEditPage(context),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                  'Add',
+                  style: AppTextStyles.bodyBold(color: AppColors.primary),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                );
-              }
+                ),
+              ),
+            ),
+          ],
+        ),
 
-              if (state is DesignationError) {
-                return _ErrorView(
-                  message: state.message,
-                  onRetry: () =>
-                      context.read<DesignationBloc>().add(FetchDesignations()),
-                );
-              }
+        body: SafeArea(
+          child: ResponsiveCenter(
+            child: BlocConsumer<DesignationBloc, DesignationState>(
+              listener: (context, state) {
+                if (state is DesignationActionSuccess) {
+                  if (state.message != null) {
+                    AppSnackbar.success(state.message!);
+                  }
+                } else if (state is DesignationActionFailure) {
+                  if (state.message != null) AppSnackbar.error(state.message!);
+                } else if (state is DesignationError) {
+                  if (state.message != null) AppSnackbar.error(state.message!);
+                }
+              },
+              builder: (context, state) {
+                // ---- loading skeleton ----
+                if (state is DesignationLoading ||
+                    state is DesignationInitial) {
+                  return ShimmerListPlaceholder(
+                    itemCount: 6,
+                    padding: listPadding,
+                    separatorHeight: Responsive.h(10),
+                    itemBuilder: (context, i) =>
+                    const _DesignationCardSkeleton(),
+                  );
+                }
 
-              List<DesignationModel> designations = [];
-              if (state is DesignationLoaded) designations = state.designations;
-              if (state is DesignationActionSuccess) {
-                designations = state.designations;
-              }
+                // ---- error ----
+                if (state is DesignationError) {
+                  return _ErrorView(
+                    message: state.message ?? 'Could not load designations.',
+                    onRetry: () => _refresh(context),
+                  );
+                }
 
-              // Empty state (still pull-to-refresh enabled)
-              if (designations.isEmpty) {
-                return RefreshIndicator(
-                  color: _primary,
-                  onRefresh: () async {
-                    context.read<DesignationBloc>().add(FetchDesignations());
-                  },
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        SizedBox(
-                          height: constraints.maxHeight,
+                List<DesignationModel> designations = [];
+                if (state is DesignationLoaded) {
+                  designations = state.designations;
+                }
+                if (state is DesignationActionSuccess) {
+                  designations = state.designations;
+                }
+
+                // ---- empty (pull-to-refresh still enabled) ----
+                if (designations.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: () async => _refresh(context),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints:
+                          BoxConstraints(minHeight: constraints.maxHeight),
                           child: const _EmptyDesignationState(),
                         ),
-                      ],
+                      ),
                     ),
+                  );
+                }
+
+                // ---- list ----
+                return RefreshIndicator(
+                  onRefresh: () async => _refresh(context),
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: listPadding,
+                    itemCount: designations.length,
+                    separatorBuilder: (_, __) =>
+                        SizedBox(height: Responsive.h(10)),
+                    itemBuilder: (context, index) {
+                      final designation = designations[index];
+                      return _DesignationCard(
+                        key: ValueKey(designation.id),
+                        designation: designation,
+                        onEdit: () =>
+                            _openAddEditPage(context, designation: designation),
+                        onDelete: () => _confirmDelete(context, designation),
+                      );
+                    },
                   ),
                 );
-              }
-
-              return RefreshIndicator(
-                color: _primary,
-                onRefresh: () async {
-                  context.read<DesignationBloc>().add(FetchDesignations());
-                },
-                child: ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
-                    Responsive.w(16),
-                    Responsive.h(16),
-                    Responsive.w(16),
-                    Responsive.h(96),
-                  ),
-                  itemCount: designations.length,
-                  separatorBuilder: (_, __) =>
-                      SizedBox(height: Responsive.h(10)),
-                  itemBuilder: (context, index) {
-                    final designation = designations[index];
-                    return _DesignationCard(
-                      designation: designation,
-                      primary: _primary,
-                      accent: _accent,
-                      onEdit: () =>
-                          _openAddEditPage(context, designation: designation),
-                      onDelete: () => _confirmDelete(context, designation),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          onPressed: () => _openAddEditPage(context),
-          icon: const Icon(Icons.add),
-          label: Text(
-            'Add Designation',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: Responsive.sp(14),
+              },
             ),
           ),
         ),
@@ -177,87 +185,143 @@ class _DesignationListView extends StatelessWidget {
   }
 }
 
-class _DesignationCard extends StatelessWidget {
-  final DesignationModel designation;
-  final Color primary;
-  final Color accent;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+// =====================================================================
+// SMALL REUSABLE PIECES (private to this file)
+// =====================================================================
 
-  const _DesignationCard({
-    required this.designation,
-    required this.primary,
-    required this.accent,
-    required this.onEdit,
-    required this.onDelete,
-  });
+class _ListCard extends StatelessWidget {
+  const _ListCard({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final avatarSize = Responsive.w(42);
-
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(Responsive.w(14)),
-      elevation: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Responsive.w(14)),
-          border: Border.all(color: const Color(0xFFE7E5E0)),
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(16),
-          vertical: Responsive.h(14),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: avatarSize,
-              height: avatarSize,
-              decoration: BoxDecoration(
-                color: accent.withOpacity(0.18),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                designation.name.isNotEmpty
-                    ? designation.name[0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                  color: primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: Responsive.sp(16),
-                ),
-              ),
-            ),
-            SizedBox(width: Responsive.w(14)),
-            Expanded(
-              child: Text(
-                designation.name,
-                style: TextStyle(
-                  fontSize: Responsive.sp(15.5),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.edit_outlined, size: Responsive.w(20)),
-              color: primary,
-              onPressed: onEdit,
-              tooltip: 'Edit',
-            ),
-            IconButton(
-              icon: Icon(Icons.delete_outline, size: Responsive.w(20)),
-              color: Colors.red.shade400,
-              onPressed: onDelete,
-              tooltip: 'Delete',
-            ),
-          ],
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(Responsive.w(14)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: child,
         ),
       ),
     );
   }
 }
+
+// =====================================================================
+// DESIGNATION CARD
+// =====================================================================
+
+class _DesignationCard extends StatelessWidget {
+  const _DesignationCard({
+    super.key,
+    required this.designation,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final DesignationModel designation;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  String get _initial => designation.name.isNotEmpty
+      ? designation.name[0].toUpperCase()
+      : '?';
+
+  @override
+  Widget build(BuildContext context) {
+    return _ListCard(
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _initial,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                color: AppColors.primary,
+                fontSize: Responsive.sp(16),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(width: Responsive.w(12)),
+          Expanded(
+            child: Text(
+              designation.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyBold(),
+            ),
+          ),
+          SizedBox(width: Responsive.w(8)),
+          SizedBox(
+            width: 30,
+            height: 24,
+            child: PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              icon: Icon(Icons.more_vert,
+                  size: 20, color: AppColors.textSecondary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  onEdit();
+                } else if (value == 'delete') {
+                  onDelete();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined,
+                          size: 18, color: AppColors.primary),
+                      SizedBox(width: Responsive.w(8)),
+                      Text('Edit', style: AppTextStyles.body()),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline,
+                          size: 18, color: AppColors.error),
+                      const SizedBox(width: 8),
+                      Text('Delete',
+                          style: AppTextStyles.body(color: AppColors.error)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// EMPTY / ERROR / SKELETON
+// =====================================================================
 
 /// Shown when there are no designations at all.
 class _EmptyDesignationState extends StatelessWidget {
@@ -271,7 +335,11 @@ class _EmptyDesignationState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.badge_outlined, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(
+              Icons.badge_outlined,
+              size: 44,
+              color: AppColors.textSecondary.withOpacity(0.4),
+            ),
             SizedBox(height: Responsive.h(10)),
             Text(
               'Add your first designation to get started',
@@ -286,9 +354,9 @@ class _EmptyDesignationState extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  final String? message;
-  final VoidCallback onRetry;
   const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -298,25 +366,41 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: Responsive.w(48),
-              color: Colors.red.shade300,
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
             ),
-            SizedBox(height: Responsive.h(12)),
-            if (message != null)
-              Text(
-                message!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.black54,
-                  fontSize: Responsive.sp(14),
-                ),
-              ),
-            SizedBox(height: Responsive.h(16)),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DesignationCardSkeleton extends StatelessWidget {
+  const _DesignationCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ListCard(
+      child: Row(
+        children: [
+          const ShimmerBox(width: 42, height: 42, borderRadius: 12),
+          SizedBox(width: Responsive.w(12)),
+          const Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ShimmerBox(width: 140, height: 13),
+            ),
+          ),
+          const ShimmerBox(width: 20, height: 20, borderRadius: 10),
+        ],
       ),
     );
   }

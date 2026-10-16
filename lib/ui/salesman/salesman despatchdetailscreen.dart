@@ -1,5 +1,3 @@
-
-
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -27,7 +25,8 @@ class SalesmanDispatchDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => DispatchDetailBloc(DispatchProvider())..add(FetchDispatchDetail(dispatchId)),
+      create: (_) =>
+      DispatchDetailBloc(DispatchProvider())..add(FetchDispatchDetail(dispatchId)),
       child: _SalesmanDispatchDetailView(dispatchId: dispatchId),
     );
   }
@@ -38,11 +37,13 @@ class _SalesmanDispatchDetailView extends StatefulWidget {
   final String dispatchId;
 
   @override
-  State<_SalesmanDispatchDetailView> createState() => _SalesmanDispatchDetailViewState();
+  State<_SalesmanDispatchDetailView> createState() =>
+      _SalesmanDispatchDetailViewState();
 }
 
-class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView> {
-  // Signature capture is upload-only (no draw pad) and optional — the
+class _SalesmanDispatchDetailViewState
+    extends State<_SalesmanDispatchDetailView> {
+  // Signature capture is upload-only (no draw pad) and optional: the
   // salesman can mark a dispatch delivered with either, both, or neither
   // signature attached.
   File? _customerSigFile;
@@ -53,89 +54,97 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Despatch Bill Details', style: AppTextStyles.h6()),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
-        listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
-        listener: (context, state) {
-          if (state.actionStatus == DispatchActionStatus.success) {
-            AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
-            setState(() {
-              _customerSigFile = null;
-              _driverSigFile = null;
-            });
-            context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
-          } else if (state.actionStatus == DispatchActionStatus.failure) {
-            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
-            context.read<DispatchDetailBloc>().add(const ClearDispatchActionStatus());
-          }
-        },
-        builder: (context, state) {
-          if (state.status == DispatchDetailStatus.initial ||
-              state.status == DispatchDetailStatus.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
 
-          if (state.status == DispatchDetailStatus.failure && state.dispatch == null) {
-            return _ErrorView(
-              message: state.errorMessage ?? 'Failed to load dispatch bill',
-              onRetry: () => context
+        // ---------- APPBAR (same as owner) ----------
+        appBar: AppBar(
+          title: Text('Dispatch Details', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
+          listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
+          listener: (context, state) {
+            if (state.actionStatus == DispatchActionStatus.success) {
+              AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
+              setState(() {
+                _customerSigFile = null;
+                _driverSigFile = null;
+              });
+              context
                   .read<DispatchDetailBloc>()
-                  .add(FetchDispatchDetail(widget.dispatchId)),
-            );
-          }
-
-          final dispatch = state.dispatch!;
-          final isActing = state.actionStatus == DispatchActionStatus.inProgress;
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              final bloc = context.read<DispatchDetailBloc>();
-              bloc.add(RefreshDispatchDetail(widget.dispatchId));
-              await bloc.stream.firstWhere(
-                    (s) => s.status == DispatchDetailStatus.success || s.status == DispatchDetailStatus.failure,
+                  .add(const ClearDispatchActionStatus());
+            } else if (state.actionStatus == DispatchActionStatus.failure) {
+              AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
+              context
+                  .read<DispatchDetailBloc>()
+                  .add(const ClearDispatchActionStatus());
+            }
+          },
+          builder: (context, state) {
+            // ---- loading ----
+            if (state.status == DispatchDetailStatus.initial ||
+                state.status == DispatchDetailStatus.loading) {
+              return Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               );
-            },
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                Responsive.w(18),
-                Responsive.w(18),
-                Responsive.w(18),
-                Responsive.h(24) + MediaQuery.of(context).viewPadding.bottom,
-              ),
-              children: [
-                _StatusBanner(dispatch: dispatch),
-                SizedBox(height: Responsive.h(16)),
-                _infoCard(dispatch),
-                SizedBox(height: Responsive.h(18)),
-                Text('Items', style: AppTextStyles.h3()),
-                SizedBox(height: Responsive.h(10)),
-                _itemsTable(dispatch),
-                SizedBox(height: Responsive.h(16)),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Grand Total', style: AppTextStyles.h3()),
-                    Text(
-                      _currency(dispatch.grandTotal),
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)
-                          .copyWith(fontSize: Responsive.sp(16)),
-                    ),
-                  ],
+            }
+
+            // ---- error ----
+            if (state.status == DispatchDetailStatus.failure &&
+                state.dispatch == null) {
+              return _ErrorView(
+                message: state.errorMessage ?? 'Failed to load dispatch bill',
+                onRetry: () => context
+                    .read<DispatchDetailBloc>()
+                    .add(FetchDispatchDetail(widget.dispatchId)),
+              );
+            }
+
+            final dispatch = state.dispatch!;
+            final isActing =
+                state.actionStatus == DispatchActionStatus.inProgress;
+
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                final bloc = context.read<DispatchDetailBloc>();
+                bloc.add(RefreshDispatchDetail(widget.dispatchId));
+                await bloc.stream.firstWhere(
+                      (s) =>
+                  s.status == DispatchDetailStatus.success ||
+                      s.status == DispatchDetailStatus.failure,
+                );
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.w(20),
+                  Responsive.h(14),
+                  Responsive.w(20),
+                  Responsive.h(24) + MediaQuery.of(context).padding.bottom,
                 ),
-                SizedBox(height: Responsive.h(22)),
-                _actionSection(context, dispatch, isActing),
-              ],
-            ),
-          );
-        },
+                children: [
+                  _StatusBanner(dispatch: dispatch),
+                  SizedBox(height: Responsive.h(14)),
+                  _infoCard(dispatch),
+                  SizedBox(height: Responsive.h(18)),
+                  const _SectionHeader('Items'),
+                  SizedBox(height: Responsive.h(10)),
+                  _itemsTable(dispatch),
+                  SizedBox(height: Responsive.h(14)),
+                  _grandTotalCard(dispatch),
+                  SizedBox(height: Responsive.h(20)),
+                  _actionSection(context, dispatch, isActing),
+                ],
+              ),
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 
   // ---------- sections ----------
@@ -143,71 +152,96 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   Widget _infoCard(DispatchDetail d) {
     final dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
     return Container(
+      width: double.infinity,
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
           _infoRow('DS Number', d.dsNumber),
           _infoRow('Ref. No.', d.refNo),
-          _infoRow('Party Name', d.partyName),
+          _infoRow('Customer Name', d.partyName),
           _infoRow('Contact Number', d.contactNumber),
           _infoRow('Delivery Address', d.deliveryAddress),
-          _infoRow('Driver Name', d.driverName),
-          if (d.despatchedAt != null) _infoRow('Despatched At', dateFmt.format(d.despatchedAt!)),
-          if (d.deliveryNotes.isNotEmpty) _infoRow('Delivery Notes', d.deliveryNotes),
+          _infoRow(
+            'Driver Name',
+            d.driverName,
+            isLast: d.despatchedAt == null && d.deliveryNotes.isEmpty,
+          ),
+          if (d.despatchedAt != null)
+            _infoRow(
+              'Despatched At',
+              dateFmt.format(d.despatchedAt!),
+              isLast: d.deliveryNotes.isEmpty,
+            ),
+          if (d.deliveryNotes.isNotEmpty)
+            _infoRow('Delivery Notes', d.deliveryNotes, isLast: true),
         ],
       ),
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(String label, String value, {bool isLast = false}) {
     return Padding(
-      padding: EdgeInsets.only(bottom: Responsive.h(6)),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : Responsive.h(8)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 130, child: Text(label, style: AppTextStyles.caption())),
-          Expanded(child: Text(value.isEmpty ? '-' : value, style: AppTextStyles.bodyBold())),
+          SizedBox(
+            width: 130,
+            child: Text(label,
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
+          ),
+          Expanded(
+            child: Text(value.isEmpty ? '-' : value,
+                style: AppTextStyles.bodyBold()),
+          ),
         ],
       ),
     );
   }
+
   Widget _itemsTable(DispatchDetail d) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Table(
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           border: TableBorder(
-            horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
-            verticalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+            horizontalInside:
+            BorderSide(color: AppColors.border.withOpacity(0.6)),
+            verticalInside:
+            BorderSide(color: AppColors.border.withOpacity(0.6)),
           ),
+          // Fixed widths: the table can be wider than the screen and
+          // scroll horizontally.
           columnWidths: const {
-            0: FixedColumnWidth(32),   // #
-            1: FixedColumnWidth(160),  // Item
-            2: FixedColumnWidth(250),  // Company
-            3: FixedColumnWidth(190),  // Size
-            4: FixedColumnWidth(100),   // Unit
-            5: FixedColumnWidth(50),   // Box
-            6: FixedColumnWidth(50),   // Pcs
-            7: FixedColumnWidth(70),   // Qty
+            0: FixedColumnWidth(32), // #
+            1: FixedColumnWidth(160), // Item
+            2: FixedColumnWidth(140), // Company
+            3: FixedColumnWidth(110), // Size
+            4: FixedColumnWidth(95), // Unit
+            5: FixedColumnWidth(50), // Box
+            6: FixedColumnWidth(50), // Pcs
+            7: FixedColumnWidth(60), // Qty
           },
           children: [
             TableRow(
-              decoration: const BoxDecoration(color: AppColors.surfaceAlt),
+              decoration:
+              BoxDecoration(color: AppColors.primary.withOpacity(0.08)),
               children: [
                 _headerCell('#'),
                 _headerCell('Item'),
-                _headerCell('Company',),
+                _headerCell('Company'),
                 _headerCell('Size'),
                 _headerCell('Unit'),
                 _headerCell('Box', align: TextAlign.right),
@@ -218,17 +252,27 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
             for (var i = 0; i < d.items.length; i++)
               TableRow(
                 decoration: BoxDecoration(
-                  color: i.isEven ? AppColors.surface : AppColors.surfaceAlt.withOpacity(0.35),
+                  color: i.isEven ? Colors.white : AppColors.background,
                 ),
                 children: [
                   _dataCell('${i + 1}'),
-                  _dataCell(d.items[i].productName),
-                  _dataCell(d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName),
-                  _dataCell(d.items[i].productSize),
-                  _dataCell(d.items[i].packing.isEmpty ? '-' : d.items[i].packing),
-                  _dataCell(d.items[i].boxes.toStringAsFixed(0), align: TextAlign.right),
-                  _dataCell(d.items[i].pieces.toStringAsFixed(0), align: TextAlign.right),
-                  _dataCell(d.items[i].quantity.toStringAsFixed(0), align: TextAlign.right, bold: true),
+                  _dataCell(d.items[i].productName.isEmpty
+                      ? '-'
+                      : d.items[i].productName),
+                  _dataCell(d.items[i].companyName.isEmpty
+                      ? '-'
+                      : d.items[i].companyName),
+                  _dataCell(d.items[i].productSize.isEmpty
+                      ? '-'
+                      : d.items[i].productSize),
+                  _dataCell(
+                      d.items[i].packing.isEmpty ? '-' : d.items[i].packing),
+                  _dataCell(d.items[i].boxes.toStringAsFixed(0),
+                      align: TextAlign.right),
+                  _dataCell(d.items[i].pieces.toStringAsFixed(0),
+                      align: TextAlign.right),
+                  _dataCell(d.items[i].quantity.toStringAsFixed(0),
+                      align: TextAlign.right, bold: true),
                 ],
               ),
           ],
@@ -236,42 +280,98 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
       ),
     );
   }
+
   Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(8), vertical: Responsive.h(9)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 1,
+        maxLines: 3,
+        softWrap: true,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.captionnew().copyWith(fontWeight: FontWeight.w700),
+        style: AppTextStyles.caption(color: AppColors.textPrimary)
+            .copyWith(fontWeight: FontWeight.w700),
       ),
     );
   }
 
-  Widget _dataCell(String text, {TextAlign align = TextAlign.left, bool bold = false}) {
+  Widget _dataCell(String text,
+      {TextAlign align = TextAlign.left, bool bold = false}) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(8)),
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(8), vertical: Responsive.h(8)),
       child: Text(
         text,
         textAlign: align,
-        maxLines: 1,
-        softWrap: false,
-        overflow: TextOverflow.visible,
+        maxLines: 3, // wraps up to 3 lines instead of overflowing
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
         style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
+      ),
+    );
+  }
+
+  Widget _grandTotalCard(DispatchDetail d) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Grand Total', style: AppTextStyles.bodyBold()),
+          Text(_currency(d.grandTotal),
+              style: AppTextStyles.amount(color: AppColors.primary)),
+        ],
+      ),
+    );
+  }
+
+  /// Full-width primary button, same as the owner screen.
+  Widget _primaryButton({
+    required String label,
+    required bool loading,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: Responsive.h(48),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: loading
+            ? const SizedBox(
+          height: 22,
+          width: 22,
+          child: CircularProgressIndicator(
+              strokeWidth: 2.4, color: Colors.white),
+        )
+            : Text(label, style: AppTextStyles.bodyBold(color: Colors.white)),
       ),
     );
   }
 
   /// Pending -> "Mark as In Transit" button.
   /// In transit -> two OPTIONAL signature upload blocks + "Mark as Delivered".
-  /// Delivered -> read-only signatures (server-hosted image URLs), no actions.
-  Widget _actionSection(BuildContext context, DispatchDetail d, bool isActing) {
+  /// Delivered -> read-only signatures, no actions.
+  Widget _actionSection(
+      BuildContext context, DispatchDetail d, bool isActing) {
     if (d.isDelivered) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Signatures', style: AppTextStyles.h3()),
+          const _SectionHeader('Signatures'),
           SizedBox(height: Responsive.h(10)),
           _signatureImage('Customer Signature', d.customerSignature),
           SizedBox(height: Responsive.h(14)),
@@ -284,10 +384,10 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Capture Signatures', style: AppTextStyles.h3()),
+          const _SectionHeader('Capture Signatures'),
           SizedBox(height: Responsive.h(4)),
           Text('Optional — you can mark as delivered without these.',
-              style: AppTextStyles.caption()),
+              style: AppTextStyles.caption(color: AppColors.textSecondary)),
           SizedBox(height: Responsive.h(10)),
           _signatureUploadBlock(
             label: 'Customer Signature (optional)',
@@ -303,34 +403,21 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
             onClearFile: () => setState(() => _driverSigFile = null),
           ),
           SizedBox(height: Responsive.h(18)),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: isActing ? null : () => _confirmMarkDelivered(context, d.id),
-              child: isActing
-                  ? const SizedBox(
-                height: 20, width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              )
-                  : const Text('Mark as Delivered'),
-            ),
+          _primaryButton(
+            label: 'Mark as Delivered',
+            loading: isActing,
+            onPressed:
+            isActing ? null : () => _confirmMarkDelivered(context, d.id),
           ),
         ],
       );
     }
 
     // pending
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isActing ? null : () => _confirmMarkInTransit(context, d.id),
-        child: isActing
-            ? const SizedBox(
-          height: 20, width: 20,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-        )
-            : const Text('Mark as In Transit'),
-      ),
+    return _primaryButton(
+      label: 'Mark as In Transit',
+      loading: isActing,
+      onPressed: isActing ? null : () => _confirmMarkInTransit(context, d.id),
     );
   }
 
@@ -345,7 +432,8 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.caption()),
+        Text(label,
+            style: AppTextStyles.caption(color: AppColors.textSecondary)),
         SizedBox(height: Responsive.h(6)),
         if (file != null)
           _pickedImagePreview(file, onClear: onClearFile)
@@ -355,24 +443,28 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     );
   }
 
+  BoxDecoration get _signatureBoxDecoration => BoxDecoration(
+    color: AppColors.background,
+    border: Border.all(color: AppColors.border),
+    borderRadius: BorderRadius.circular(14),
+  );
+
   Widget _uploadPlaceholder({required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         height: 100,
         width: double.infinity,
         alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: _signatureBoxDecoration,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.upload_file_rounded, size: 22),
+            Icon(Icons.upload_file_rounded, size: 22, color: AppColors.primary),
             SizedBox(height: Responsive.h(4)),
-            Text('Tap to upload signature image', style: AppTextStyles.caption()),
+            Text('Tap to upload signature image',
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -385,10 +477,7 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
         Container(
           height: 100,
           width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          decoration: _signatureBoxDecoration,
           clipBehavior: Clip.antiAlias,
           child: Image.file(file, fit: BoxFit.contain),
         ),
@@ -408,24 +497,20 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     );
   }
 
-  /// Renders an already-saved signature. The mark-delivered API returns
-  /// these as plain hosted image URLs (e.g.
-  /// "https://.../storage/signatures/xxx.png") rather than base64 data
-  /// URIs, so we branch on that; base64 handling stays as a fallback for
-  /// any older records that still carry a data URI.
+  /// Renders an already-saved signature. The API returns these as hosted
+  /// image URLs; base64 handling stays as a fallback for older records.
   Widget _signatureImage(String label, String? sigData) {
     Widget content;
 
     if (sigData == null || sigData.isEmpty) {
       content = _placeholderBox('Not captured');
-    } else if (sigData.startsWith('http://') || sigData.startsWith('https://')) {
+    } else if (sigData.startsWith('http://') ||
+        sigData.startsWith('https://')) {
       content = Container(
         height: 100,
         width: double.infinity,
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: _signatureBoxDecoration,
+        clipBehavior: Clip.antiAlias,
         child: Image.network(
           sigData,
           fit: BoxFit.contain,
@@ -439,7 +524,8 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
               ),
             );
           },
-          errorBuilder: (_, __, ___) => _placeholderBox('Could not load signature'),
+          errorBuilder: (_, __, ___) =>
+              _placeholderBox('Could not load signature'),
         ),
       );
     } else {
@@ -448,10 +534,8 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
         content = Container(
           height: 100,
           width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          decoration: _signatureBoxDecoration,
+          clipBehavior: Clip.antiAlias,
           child: Image.memory(base64Decode(raw), fit: BoxFit.contain),
         );
       } catch (_) {
@@ -462,7 +546,8 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.caption()),
+        Text(label,
+            style: AppTextStyles.caption(color: AppColors.textSecondary)),
         SizedBox(height: Responsive.h(6)),
         content,
       ],
@@ -472,12 +557,11 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   Widget _placeholderBox(String text) {
     return Container(
       height: 100,
+      width: double.infinity,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(text, style: AppTextStyles.caption()),
+      decoration: _signatureBoxDecoration,
+      child: Text(text,
+          style: AppTextStyles.caption(color: AppColors.textSecondary)),
     );
   }
 
@@ -515,12 +599,12 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
       message: 'This confirms the dispatch has left for delivery.',
       confirmText: 'Confirm',
     );
-    if (confirmed) {
+    if (confirmed && context.mounted) {
       context.read<DispatchDetailBloc>().add(MarkInTransitRequested(id));
     }
   }
 
-  /// Signatures are optional — whatever was (or wasn't) uploaded just gets
+  /// Signatures are optional: whatever was (or wasn't) uploaded just gets
   /// sent straight through. No blocking validation here.
   Future<void> _confirmMarkDelivered(BuildContext context, String id) async {
     final customerSig = await _fileToBase64(_customerSigFile);
@@ -535,7 +619,35 @@ class _SalesmanDispatchDetailViewState extends State<_SalesmanDispatchDetailView
   }
 
   String _currency(double value) =>
-      NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(value);
+      NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0)
+          .format(value);
+}
+
+// =====================================================================
+// SMALL REUSABLE PIECES (private to this file, same as owner screen)
+// =====================================================================
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
 }
 
 class _StatusBanner extends StatelessWidget {
@@ -552,11 +664,13 @@ class _StatusBanner extends StatelessWidget {
     if (dispatch.isDelivered) {
       color = AppColors.info;
       icon = Icons.check_circle_rounded;
-      text = 'Delivered on ${dispatch.deliveredAt != null ? dateFmt.format(dispatch.deliveredAt!) : '-'}';
+      text =
+      'Delivered on ${dispatch.deliveredAt != null ? dateFmt.format(dispatch.deliveredAt!) : '-'}';
     } else if (dispatch.isInTransit) {
       color = AppColors.warning;
       icon = Icons.local_shipping_rounded;
-      text = 'In transit${dispatch.despatchedAt != null ? ' since ${dateFmt.format(dispatch.despatchedAt!)}' : ''}';
+      text =
+      'In transit${dispatch.despatchedAt != null ? ' since ${dateFmt.format(dispatch.despatchedAt!)}' : ''}';
     } else {
       color = AppColors.warning;
       icon = Icons.local_shipping_outlined;
@@ -564,21 +678,28 @@ class _StatusBanner extends StatelessWidget {
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(10)),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 20),
           SizedBox(width: Responsive.w(8)),
           Expanded(
-            child: Text(text,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: Responsive.sp(12.5))),
+            child: Text(text, style: AppTextStyles.bodyBold(color: color)),
           ),
         ],
       ),
     );
   }
 }
+
+// =====================================================================
+// ERROR VIEW
+// =====================================================================
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
@@ -593,11 +714,16 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 40, color: Colors.redAccent),
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
             SizedBox(height: Responsive.h(10)),
-            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
-            SizedBox(height: Responsive.h(14)),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
+            ),
           ],
         ),
       ),

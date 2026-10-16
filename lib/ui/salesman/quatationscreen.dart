@@ -1,8 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
+import 'package:tileshop/ui/owner/widget/ownerestimatedetailscreenwidget.dart'; // StatusPill, statusLabel
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -11,6 +11,7 @@ import '../../bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 import 'quotationpreview.dart';
 
 class QuotationListScreen extends StatelessWidget {
@@ -69,21 +70,34 @@ class _QuotationListViewState extends State<_QuotationListView> {
     });
   }
 
+  Future<void> _refresh(BuildContext context) async {
+    final bloc = context.read<SalesmanQuotationBloc>();
+    bloc.add(const QuotationListRequested());
+    await bloc.stream.firstWhere((s) => s.listStatus != QuotationLoadStatus.loading);
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
 
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as owner) ----------
         appBar: AppBar(
           title: Text('Quotations', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
         ),
         body: SafeArea(
           child: BlocListener<SalesmanQuotationBloc, SalesmanQuotationState>(
             listenWhen: (prev, curr) =>
-            prev.deleteStatus != curr.deleteStatus || prev.submitStatus != curr.submitStatus,
+            prev.deleteStatus != curr.deleteStatus ||
+                prev.submitStatus != curr.submitStatus,
             listener: (context, state) {
               if (state.deleteStatus == QuotationActionStatus.success) {
                 AppSnackbar.success('Quotation deleted.');
@@ -109,47 +123,52 @@ class _QuotationListViewState extends State<_QuotationListView> {
                   prev.isLoadingMore != curr.isLoadingMore ||
                   prev.loadMoreFailed != curr.loadMoreFailed,
               builder: (context, state) {
+                // ---- loading skeleton ----
                 if (state.listStatus == QuotationLoadStatus.loading && state.list.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (state.listStatus == QuotationLoadStatus.failure && state.list.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.error_outline, size: 40, color: AppColors.error),
-                        SizedBox(height: Responsive.h(10)),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: Responsive.w(24)),
-                          child: Text(
-                            state.listError ?? 'Failed to load quotations.',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.body(color: AppColors.error),
-                          ),
-                        ),
-                        SizedBox(height: Responsive.h(10)),
-                        TextButton(
-                          onPressed: () => context
-                              .read<SalesmanQuotationBloc>()
-                              .add(const QuotationListRequested()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                  return ShimmerListPlaceholder(
+                    itemCount: 6,
+                    padding: listPadding,
+                    separatorHeight: Responsive.h(10),
+                    itemBuilder: (context, i) => const _QuotationCardSkeleton(),
                   );
                 }
 
+                // ---- error ----
+                if (state.listStatus == QuotationLoadStatus.failure && state.list.isEmpty) {
+                  return _ErrorView(
+                    message: state.listError ?? 'Failed to load quotations.',
+                    onRetry: () => context
+                        .read<SalesmanQuotationBloc>()
+                        .add(const QuotationListRequested()),
+                  );
+                }
+
+                // ---- empty (still pull-to-refresh) ----
                 if (state.list.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.description_rounded, size: 48, color: AppColors.textHint),
-                        SizedBox(height: Responsive.h(10)),
-                        Text('No quotations yet',
-                            style: AppTextStyles.body(color: AppColors.textHint)),
-                      ],
+                  return RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () => _refresh(context),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.request_quote_outlined,
+                                  size: 44,
+                                  color: AppColors.textSecondary.withOpacity(0.4),
+                                ),
+                                SizedBox(height: Responsive.h(10)),
+                                Text('No quotations yet', style: AppTextStyles.subtitle()),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 }
@@ -160,16 +179,12 @@ class _QuotationListViewState extends State<_QuotationListView> {
                     state.listHasMore || state.isLoadingMore || state.loadMoreFailed;
 
                 return RefreshIndicator(
-                  onRefresh: () async {
-                    final bloc = context.read<SalesmanQuotationBloc>();
-                    bloc.add(const QuotationListRequested());
-                    await bloc.stream
-                        .firstWhere((s) => s.listStatus != QuotationLoadStatus.loading);
-                  },
+                  color: AppColors.primary,
+                  onRefresh: () => _refresh(context),
                   child: ListView.separated(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.all(Responsive.w(18)),
+                    padding: listPadding,
                     itemCount: state.list.length + (showFooter ? 1 : 0),
                     separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
                     itemBuilder: (context, index) {
@@ -181,19 +196,14 @@ class _QuotationListViewState extends State<_QuotationListView> {
                               onPressed: () => context
                                   .read<SalesmanQuotationBloc>()
                                   .add(const QuotationLoadMoreRequested()),
-                              child: const Text('Failed to load more. Tap to retry'),
+                              child: Text('Failed to load more. Tap to retry',
+                                  style: AppTextStyles.link()),
                             ),
                           );
                         }
-                        return Padding(
-                          padding: EdgeInsets.symmetric(vertical: Responsive.h(8)),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
                         );
                       }
 
@@ -231,21 +241,31 @@ class _QuotationListViewState extends State<_QuotationListView> {
 
   Future<void> _confirmDelete(BuildContext context, QuotationListItem quotation) async {
     final bloc = context.read<SalesmanQuotationBloc>();
+    const red = Color(0xFFDC2626);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete quotation?'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Delete quotation?', style: AppTextStyles.bodyBold()),
         content: Text(
           'This will permanently delete ${quotation.quotationNumber.isNotEmpty ? quotation.quotationNumber : 'this quotation'}. This action cannot be undone.',
+          style: AppTextStyles.body(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: AppTextStyles.bodyBold(color: AppColors.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: red,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text('Delete', style: TextStyle(color: AppColors.error)),
+            child: Text('Delete', style: AppTextStyles.bodyBold(color: Colors.white)),
           ),
         ],
       ),
@@ -255,6 +275,10 @@ class _QuotationListViewState extends State<_QuotationListView> {
     }
   }
 }
+
+// =====================================================================
+// CARD
+// =====================================================================
 
 class _QuotationTile extends StatelessWidget {
   const _QuotationTile({
@@ -271,112 +295,230 @@ class _QuotationTile extends StatelessWidget {
   final VoidCallback onDelete;
   final bool isDeleting;
 
-  Color _statusColor() {
+  Color get _statusColor {
     switch (quotation.status.toLowerCase()) {
-      case 'draft':
-        return AppColors.textHint;
-      case 'sent':
-        return Colors.orange;
       case 'approved':
         return AppColors.success;
       case 'rejected':
-        return AppColors.error;
+        return const Color(0xFFDC2626);
+      case 'sent':
+        return const Color(0xFFF59E0B);
+      case 'draft':
       default:
-        return AppColors.textHint;
+        return AppColors.textSecondary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor();
+    final dateText = quotation.date != null
+        ? DateFormat('dd-MM-yyyy').format(quotation.date!)
+        : '-';
 
     return Opacity(
       opacity: isDeleting ? 0.5 : 1,
-      child: InkWell(
-        onTap: isDeleting ? null : onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: EdgeInsets.all(Responsive.w(14)),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
-                child: Icon(Icons.request_quote_outlined, color: AppColors.primary, size: 20),
-              ),
-              SizedBox(width: Responsive.w(12)),
-              Expanded(
-                child: Column(
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: isDeleting ? null : onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(Responsive.w(14)),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ---- top: icon, number + customer, status ----
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
+                    const _IconTile(icon: Icons.request_quote_outlined),
+                    SizedBox(width: Responsive.w(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
                             quotation.quotationNumber.isEmpty
                                 ? '#${quotation.id}'
                                 : quotation.quotationNumber,
-                            style: AppTextStyles.bodyBold(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyBold(),
                           ),
-                        ),
-                        SizedBox(width: Responsive.w(8)),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
+                          SizedBox(height: Responsive.h(2)),
+                          Text(
+                            quotation.customerName.isEmpty
+                                ? 'No party name'
+                                : quotation.customerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption(color: AppColors.textSecondary),
                           ),
-                          child: Text(
-                            quotation.status.isEmpty ? '-' : quotation.status,
-                            style: AppTextStyles.caption(color: statusColor),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    SizedBox(height: Responsive.h(4)),
-                    Text(
-                      quotation.customerName.isEmpty ? 'No party name' : quotation.customerName,
-                      style: AppTextStyles.caption(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: Responsive.h(2)),
-                    Text(
-                      '${quotation.date != null ? DateFormat('dd-MM-yyyy').format(quotation.date!) : '-'}  •  ${quotation.totalItems} items',
-                      style: AppTextStyles.caption(color: AppColors.textHint),
+                    SizedBox(width: Responsive.w(8)),
+                    StatusPill(
+                      label: quotation.status.isEmpty ? '-' : statusLabel(quotation.status),
+                      color: _statusColor,
                     ),
                   ],
                 ),
-              ),
-              SizedBox(width: Responsive.w(6)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(currency.format(quotation.grandTotal),
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)),
-                  SizedBox(height: Responsive.h(4)),
-                  isDeleting
-                      ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                      : InkWell(
-                    onTap: onDelete,
-                    child: Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                  ),
-                ],
-              ),
-            ],
+
+                SizedBox(height: Responsive.h(12)),
+                const Divider(height: 1, color: AppColors.border),
+                SizedBox(height: Responsive.h(10)),
+
+                // ---- bottom: date + items, delete, total ----
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded,
+                        size: 13, color: AppColors.textSecondary),
+                    SizedBox(width: Responsive.w(6)),
+                    Expanded(
+                      child: Text(
+                        '$dateText  •  ${quotation.totalItems} items',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    isDeleting
+                        ? const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                        : InkWell(
+                      onTap: onDelete,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(Icons.delete_outline,
+                            size: 19, color: AppColors.error),
+                      ),
+                    ),
+                    SizedBox(width: Responsive.w(6)),
+                    Text(
+                      currency.format(quotation.grandTotal),
+                      style: AppTextStyles.amount(color: AppColors.primary),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: AppColors.primary, size: 20),
+    );
+  }
+}
+
+// =====================================================================
+// ERROR / SKELETON
+// =====================================================================
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.link()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuotationCardSkeleton extends StatelessWidget {
+  const _QuotationCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const ShimmerBox(width: 42, height: 42, borderRadius: 12),
+              SizedBox(width: Responsive.w(12)),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 120, height: 13),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 160, height: 11),
+                  ],
+                ),
+              ),
+              const ShimmerBox(width: 60, height: 20, borderRadius: 20),
+            ],
+          ),
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ShimmerBox(width: 100, height: 12),
+              ShimmerBox(width: 90, height: 16),
+            ],
+          ),
+        ],
       ),
     );
   }

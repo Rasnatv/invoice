@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
@@ -644,6 +643,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   }
 
   // ---------------- Approve dialog: Salesman + Discount + Payment (all optional) ----------------
+  // Styled to match the Approve Estimate dialog used in the estimate detail screen.
 
   Future<void> _showApproveDialog() async {
     final bloc = context.read<OwnerEstimateBloc>();
@@ -668,16 +668,48 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     final formKey = GlobalKey<FormState>();
     final money = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-    Widget sectionTitle(String text, IconData icon) => Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
+    // ---- dialog text styles (same look as the detail-screen approve dialog) ----
+    final labelStyle = AppTextStyles.caption(color: AppColors.textSecondary)
+        .copyWith(fontSize: Responsive.sp(12));
+    final inputStyle = AppTextStyles.body().copyWith(fontSize: Responsive.sp(13));
+    final errorStyle = AppTextStyles.caption(color: AppColors.error)
+        .copyWith(fontSize: Responsive.sp(11));
+    final headingStyle =
+    AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(13.5));
+
+    Widget previewRow(String label, String value, {bool bold = false, Color? color}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: Responsive.sp(12),
+                  color: bold ? AppColors.textPrimary : AppColors.textSecondary,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: Responsive.sp(12.5),
+                      fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+                      color: color ?? AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -702,233 +734,272 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                 final balance =
                 (payable - received).clamp(0, double.infinity).toDouble();
 
-                Widget amountRow(String label, double value,
-                    {bool bold = false, Color? color}) =>
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            label,
-                            style: TextStyle(
-                                fontWeight: bold ? FontWeight.w700 : FontWeight.w400),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                money.format(value),
-                                maxLines: 1,
-                                style: TextStyle(
-                                    fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-                                    color: color),
-                              ),
-                            ),
-                          ),
-                        ],
+                return Theme(
+                  data: Theme.of(dialogContext).copyWith(
+                    inputDecorationTheme: InputDecorationTheme(
+                      labelStyle: labelStyle,
+                      floatingLabelStyle: labelStyle,
+                      hintStyle: labelStyle,
+                      prefixStyle: inputStyle,
+                      suffixStyle: inputStyle,
+                      errorStyle: errorStyle,
+                      filled: true,
+                      fillColor: AppColors.background,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: Responsive.w(14),
+                        vertical: Responsive.h(14),
                       ),
-                    );
-
-                return AlertDialog(
-                  title: const Text('Approve Estimate'),
-                  content: SizedBox(
-                    width: double.maxFinite,
-                    child: SingleChildScrollView(
-                      child: Form(
-                        key: formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ---------- Salesman (optional) ----------
-                            sectionTitle('Assign Salesman', Icons.person_outline),
-                            if (state.salesmenStatus == LoadStatus.loading)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8),
-                                child: Center(child: CircularProgressIndicator()),
-                              )
-                            else if (state.salesmenStatus == LoadStatus.failure)
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      state.salesmenError ?? 'Failed to load salesmen.',
-                                      style: AppTextStyles.caption(color: AppColors.error),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    textTheme: Theme.of(dialogContext).textTheme.copyWith(
+                      titleMedium: inputStyle, // typed text + dropdown value
+                      bodyLarge: inputStyle,
+                    ),
+                  ),
+                  child: AlertDialog(
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: Text('Approve Estimate', style: headingStyle),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: SingleChildScrollView(
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ---------- Salesman (optional) ----------
+                              Text('Assign Salesman (optional)', style: headingStyle),
+                              const SizedBox(height: 6),
+                              if (state.salesmenStatus == LoadStatus.loading)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Center(child: CircularProgressIndicator()),
+                                )
+                              else if (state.salesmenStatus == LoadStatus.failure)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        state.salesmenError ?? 'Failed to load salesmen.',
+                                        style: errorStyle,
+                                      ),
                                     ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => bloc.add(const ActiveSalesmenRequested()),
-                                    child: const Text('Retry'),
-                                  ),
-                                ],
-                              )
-                            else
-                              DropdownButtonFormField<SalesmanActiveModel?>(
-                                value: dialogSelection,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Salesman (optional)',
-                                  border: OutlineInputBorder(),
+                                    TextButton(
+                                      onPressed: () =>
+                                          bloc.add(const ActiveSalesmenRequested()),
+                                      child: Text('Retry',
+                                          style: AppTextStyles.bodyBold(
+                                              color: AppColors.primary)),
+                                    ),
+                                  ],
+                                )
+                              else
+                                DropdownButtonFormField<SalesmanActiveModel?>(
+                                  value: dialogSelection,
+                                  isExpanded: true,
+                                  style: inputStyle,
+                                  decoration:
+                                  const InputDecoration(labelText: 'Salesman'),
+                                  items: [
+                                    DropdownMenuItem<SalesmanActiveModel?>(
+                                      value: null,
+                                      child: Text('No salesman — approve directly',
+                                          style: inputStyle),
+                                    ),
+                                    ...state.salesmen.map(
+                                          (s) => DropdownMenuItem<SalesmanActiveModel?>(
+                                        value: s,
+                                        child: Text(s.displayLabel,
+                                            style: inputStyle,
+                                            overflow: TextOverflow.ellipsis),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (s) =>
+                                      setDialogState(() => dialogSelection = s),
                                 ),
+
+                              // ---------- Discount (optional) ----------
+                              const SizedBox(height: 16),
+                              Text('Discount', style: headingStyle),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String?>(
+                                value: discType,
+                                style: inputStyle,
                                 items: [
-                                  const DropdownMenuItem<SalesmanActiveModel?>(
-                                    value: null,
-                                    child: Text('No salesman — approve directly'),
-                                  ),
-                                  ...state.salesmen.map(
-                                        (s) => DropdownMenuItem<SalesmanActiveModel?>(
-                                      value: s,
-                                      child: Text(s.displayLabel, overflow: TextOverflow.ellipsis),
-                                    ),
-                                  ),
+                                  DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: Text('No discount', style: inputStyle)),
+                                  DropdownMenuItem<String?>(
+                                      value: QuotationDiscountType.percentage,
+                                      child: Text('Percentage', style: inputStyle)),
+                                  DropdownMenuItem<String?>(
+                                      value: QuotationDiscountType.fixed,
+                                      child: Text('Fixed', style: inputStyle)),
                                 ],
-                                onChanged: (s) => setDialogState(() => dialogSelection = s),
+                                onChanged: (v) => setDialogState(() => discType = v),
+                              ),
+                              if (discType != null) ...[
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: discValueCtrl,
+                                  style: inputStyle,
+                                  onChanged: (_) => setDialogState(() {}),
+                                  keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: DValidator.decimalWithLimit(
+                                    maxIntDigits:
+                                    discType == QuotationDiscountType.percentage
+                                        ? 3
+                                        : DValidator.maxPriceDigits,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText:
+                                    discType == QuotationDiscountType.percentage
+                                        ? 'Discount %'
+                                        : 'Discount Amount',
+                                    prefixText:
+                                    discType == QuotationDiscountType.percentage
+                                        ? null
+                                        : '₹ ',
+                                    suffixText:
+                                    discType == QuotationDiscountType.percentage
+                                        ? '%'
+                                        : null,
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Enter a value or choose "No discount"';
+                                    }
+                                    final parsed = double.tryParse(value.trim());
+                                    if (parsed == null || parsed < 0) {
+                                      return 'Enter a valid value';
+                                    }
+                                    if (discType == QuotationDiscountType.percentage &&
+                                        parsed > 100) {
+                                      return 'Cannot exceed 100%';
+                                    }
+                                    if (discType != QuotationDiscountType.percentage &&
+                                        parsed > DValidator.maxPrice) {
+                                      return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+
+                              // ---- PAYABLE AMOUNT: shown right before Amount Received ----
+                              const SizedBox(height: 16),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    previewRow('Grand Total', money.format(grandTotal)),
+                                    if (discType != null && discAmount > 0)
+                                      previewRow(
+                                        discType == QuotationDiscountType.percentage
+                                            ? 'Discount (${discValueCtrl.text.trim().isEmpty ? '0' : discValueCtrl.text.trim()}%)'
+                                            : 'Discount',
+                                        '- ${money.format(discAmount)}',
+                                        color: AppColors.error,
+                                      ),
+                                    const Divider(height: 14, color: AppColors.border),
+                                    previewRow(
+                                      'Payable Amount',
+                                      money.format(payable),
+                                      bold: true,
+                                      color: AppColors.primary,
+                                    ),
+                                  ],
+                                ),
                               ),
 
-                            // ---------- Additional Discount (optional) ----------
-                            sectionTitle('Additional Discount (optional)', Icons.percent),
-                            DropdownButtonFormField<String?>(
-                              value: discType,
-                              decoration: const InputDecoration(
-                                labelText: 'Discount Type',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: const [
-                                DropdownMenuItem<String?>(value: null, child: Text('None')),
-                                DropdownMenuItem<String?>(
-                                  value: QuotationDiscountType.percentage,
-                                  child: Text('Percentage'),
-                                ),
-                                DropdownMenuItem<String?>(
-                                  value: QuotationDiscountType.fixed,
-                                  child: Text('Fixed'),
-                                ),
-                              ],
-                              onChanged: (v) => setDialogState(() => discType = v),
-                            ),
-                            if (discType != null) ...[
-                              const SizedBox(height: 12),
+                              // ---------- Initial Payment (optional) ----------
+                              const SizedBox(height: 16),
+                              Text('Initial Payment (optional)', style: headingStyle),
+                              const SizedBox(height: 6),
                               TextFormField(
-                                controller: discValueCtrl,
-                                onChanged: (_) => setDialogState(() {}),
+                                controller: payAmountCtrl,
+                                style: inputStyle,
                                 keyboardType:
                                 const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: DValidator.decimalWithLimit(
-                                  maxIntDigits: discType == QuotationDiscountType.percentage
-                                      ? 3
-                                      : DValidator.maxPriceDigits,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: discType == QuotationDiscountType.percentage
-                                      ? 'Discount %'
-                                      : 'Discount Amount',
-                                  prefixText:
-                                  discType == QuotationDiscountType.percentage ? null : '₹ ',
-                                  suffixText:
-                                  discType == QuotationDiscountType.percentage ? '%' : null,
-                                  border: const OutlineInputBorder(),
+                                inputFormatters: DValidator.priceNumber,
+                                onChanged: (_) => setDialogState(() {}),
+                                decoration: const InputDecoration(
+                                  labelText: 'Amount Received',
+                                  prefixText: '₹ ',
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
-                                    return 'Enter a value or choose "None"';
+                                    return null; // optional
                                   }
                                   final parsed = double.tryParse(value.trim());
                                   if (parsed == null || parsed < 0) {
-                                    return 'Enter a valid value';
+                                    return 'Enter a valid amount';
                                   }
-                                  if (discType == QuotationDiscountType.percentage &&
-                                      parsed > 100) {
-                                    return 'Percentage can\'t exceed 100';
-                                  }
-                                  if (discType != QuotationDiscountType.percentage &&
-                                      parsed > DValidator.maxPrice) {
+                                  if (parsed > DValidator.maxPrice) {
                                     return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                  }
+                                  if (grandTotal > 0 && parsed > payable + 0.005) {
+                                    return 'Cannot exceed payable amount (${money.format(payable)})';
                                   }
                                   return null;
                                 },
                               ),
-                              const SizedBox(height: 12),
-
-                            ],
-
-                            // ---------- Payable Amount ----------
-                            const SizedBox(height: 16),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceAlt,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                children: [
-                                  amountRow('Grand Total', grandTotal),
-                                  if (discAmount > 0)
-                                    amountRow('Discount', discAmount, color: AppColors.error),
-                                  const Divider(height: 16),
-                                  amountRow('Payable Amount', payable,
-                                      bold: true, color: AppColors.primary),
-                                  if (received > 0) ...[
-                                    amountRow('Amount Received', received),
-                                    amountRow('Balance Due', balance, bold: true),
+                              const SizedBox(height: 8),
+                              // Live balance after the amount received.
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Balance Due', style: AppTextStyles.bodyBold()),
+                                    Text(
+                                      money.format(balance),
+                                      style: AppTextStyles.bodyBold(
+                                        color: balance > 0
+                                            ? AppColors.error
+                                            : AppColors.success,
+                                      ),
+                                    ),
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
-
-                            // ---------- Payment Received (optional) ----------
-                            sectionTitle('Payment Received (optional)', Icons.payments_outlined),
-                            TextFormField(
-                              controller: payAmountCtrl,
-                              keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: DValidator.priceNumber,
-                              onChanged: (_) => setDialogState(() {}),
-                              decoration: const InputDecoration(
-                                labelText: 'Amount Received',
-                                prefixText: '₹ ',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return null; // optional
-                                }
-                                final parsed = double.tryParse(value.trim());
-                                if (parsed == null || parsed < 0) {
-                                  return 'Enter a valid amount';
-                                }
-                                if (parsed > DValidator.maxPrice) {
-                                  return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
-                                }
-                                if (grandTotal > 0 && parsed > payable + 0.005) {
-                                  return 'Cannot exceed payable amount (${money.format(payable)})';
-                                }
-                                return null;
-                              },
-                            ),
-                            if (payAmountCtrl.text.trim().isNotEmpty) ...[
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
                                 value: payMethod,
-                                decoration: const InputDecoration(
-                                  labelText: 'Payment Method',
-                                  border: OutlineInputBorder(),
-                                ),
-                                items: const [
+                                style: inputStyle,
+                                decoration:
+                                const InputDecoration(labelText: 'Payment Method'),
+                                items: [
                                   DropdownMenuItem(
-                                      value: QuotationPaymentMethod.cash, child: Text('Cash')),
+                                      value: QuotationPaymentMethod.cash,
+                                      child: Text('Cash', style: inputStyle)),
                                   DropdownMenuItem(
-                                      value: QuotationPaymentMethod.cheque, child: Text('Cheque')),
+                                      value: QuotationPaymentMethod.cheque,
+                                      child: Text('Cheque', style: inputStyle)),
                                   DropdownMenuItem(
-                                      value: QuotationPaymentMethod.online, child: Text('Online')),
+                                      value: QuotationPaymentMethod.online,
+                                      child: Text('Online', style: inputStyle)),
                                   DropdownMenuItem(
-                                      value: QuotationPaymentMethod.credit, child: Text('Credit')),
+                                      value: QuotationPaymentMethod.credit,
+                                      child: Text('Credit', style: inputStyle)),
                                   DropdownMenuItem(
                                       value: QuotationPaymentMethod.bankTransfer,
-                                      child: Text('Bank Transfer')),
+                                      child: Text('Bank Transfer', style: inputStyle)),
                                 ],
                                 onChanged: (v) =>
                                     setDialogState(() => payMethod = v ?? payMethod),
@@ -936,14 +1007,14 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: payRefCtrl,
+                                style: inputStyle,
                                 decoration: const InputDecoration(
-                                  labelText: 'Reference (optional)',
-                                  hintText: 'Cheque no. / Transaction ID',
-                                  border: OutlineInputBorder(),
+                                  labelText: 'Payment Reference (optional)',
                                 ),
                               ),
                               const SizedBox(height: 12),
                               InkWell(
+                                borderRadius: BorderRadius.circular(14),
                                 onTap: () async {
                                   final picked = await showDatePicker(
                                     context: dialogContext,
@@ -958,41 +1029,52 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                 child: InputDecorator(
                                   decoration: const InputDecoration(
                                     labelText: 'Payment Date',
-                                    border: OutlineInputBorder(),
-                                    suffixIcon: Icon(Icons.calendar_today_outlined),
                                   ),
-                                  child: Text(DateFormat('dd-MM-yyyy').format(payDate)),
+                                  child: Text(
+                                    DateFormat('dd-MM-yyyy').format(payDate),
+                                    style: inputStyle,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: payNotesCtrl,
+                                style: inputStyle,
                                 decoration: const InputDecoration(
-                                  labelText: 'Notes (optional)',
-                                  hintText: 'e.g. Advance payment',
-                                  border: OutlineInputBorder(),
+                                  labelText: 'Payment Notes (optional)',
                                 ),
                               ),
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: Text('Cancel',
+                            style:
+                            AppTextStyles.bodyBold(color: AppColors.textSecondary)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: () {
+                          if (formKey.currentState!.validate()) {
+                            Navigator.of(dialogContext).pop(true);
+                          }
+                        },
+                        child: Text(
+                          dialogSelection != null ? 'Approve & Assign' : 'Approve',
+                          style: AppTextStyles.bodyBold(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (formKey.currentState!.validate()) {
-                          Navigator.of(dialogContext).pop(true);
-                        }
-                      },
-                      child: Text(dialogSelection != null ? 'Approve & Assign' : 'Approve'),
-                    ),
-                  ],
                 );
               },
             );
@@ -1108,7 +1190,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
             child: Scaffold(
               backgroundColor: AppColors.background,
               appBar: AppBar(
-                title: Text(_appBarTitle),
+                title: Text(_appBarTitle,style: AppTextStyles.h6(),),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () {

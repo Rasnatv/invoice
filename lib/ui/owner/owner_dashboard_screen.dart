@@ -26,13 +26,16 @@ class OwnerDashboardScreen extends StatelessWidget {
 }
 
 // ---------------- ACTION DATA (grouped) ----------------
-// Colors removed: every action now uses the app's primary color.
+// Every action uses the app's primary color.
 
 class _ActionItem {
-  const _ActionItem(this.icon, this.label, this.route);
+  const _ActionItem(this.icon, this.label, this.route, {this.primary = false});
   final IconData icon;
   final String label;
   final String route;
+
+  /// Primary actions are the ones visible before the user taps the arrow.
+  final bool primary;
 }
 
 class _ActionGroup {
@@ -43,16 +46,20 @@ class _ActionGroup {
 
 const List<_ActionGroup> _actionGroups = [
   _ActionGroup('Sales & Billing', [
+    _ActionItem(Icons.receipt_sharp, 'Create Estimate', '/owner/create-estimate',
+        primary: true),
+    _ActionItem(Icons.receipt_long_rounded, 'Estimates', '/owner/estimates',
+        primary: true),
+    _ActionItem(Icons.request_quote_outlined, 'Quotations', '/owner/quotations',
+        primary: true),
     _ActionItem(Icons.inventory_2_outlined, 'Product Setup', '/owner/product-setup'),
-    _ActionItem(Icons.receipt_long_rounded, 'Estimates', '/owner/estimates'),
-    _ActionItem(Icons.request_quote_outlined, 'Quotations', '/owner/quotations'),
-    _ActionItem(Icons.bar_chart_rounded, 'Reports', '/owner/reports'),
   ]),
   _ActionGroup('Team', [
-    _ActionItem(Icons.groups_2_outlined, 'Salesmen', '/owner/salesmen'),
+    _ActionItem(Icons.groups_2_outlined, 'Salesmen', '/owner/salesmen',
+        primary: true),
     _ActionItem(Icons.monetization_on_outlined, 'Salesman Incentive', '/owner/incentives'),
     _ActionItem(Icons.calendar_month_rounded, 'Monthly Target', '/owner/monthly-target'),
-    _ActionItem(Icons.badge_outlined, 'Designations', '/owner/designation-list'),
+    _ActionItem(Icons.bar_chart_rounded, 'Reports', '/owner/reports'),
   ]),
   _ActionGroup('Field Operations', [
     _ActionItem(Icons.assignment_ind_rounded, 'Field Staff', '/field-staff'),
@@ -62,9 +69,19 @@ const List<_ActionGroup> _actionGroups = [
   ]),
 ];
 
-/// All actions in one flat list for the quick access grid.
-final List<_ActionItem> _quickActions =
+final List<_ActionItem> _allActions =
 _actionGroups.expand((g) => g.items).toList();
+
+/// Primary actions first, then the rest, so positions don't jump
+/// when the panel expands.
+final List<_ActionItem> _quickActions = [
+  ..._allActions.where((a) => a.primary),
+  ..._allActions.where((a) => !a.primary),
+];
+
+/// How many actions show before the arrow is tapped.
+/// (Set to 8 if you want two rows visible.)
+const int _collapsedCount = 4;
 
 // ---------------- SCREEN ----------------
 
@@ -296,12 +313,11 @@ class _OwnerHeader extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Greeting (12 / w400)
                       Text(
                         greeting,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: Responsive.sp(12),
-                        ),
+                        style: AppTextStyles.caption(
+                            color: Colors.white.withOpacity(0.8)),
                       ),
                       SizedBox(height: Responsive.h(2)),
                       Text(
@@ -320,12 +336,12 @@ class _OwnerHeader extends StatelessWidget {
                     Icon(Icons.calendar_today_rounded,
                         size: 14, color: Colors.white.withOpacity(0.8)),
                     SizedBox(height: Responsive.h(4)),
+                    // Date (10.5 / w400)
                     Text(
                       dateLabel,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: Responsive.sp(10.5),
-                      ),
+                      style: AppTextStyles.captionnew(
+                          color: Colors.white.withOpacity(0.8))
+                          .copyWith(fontSize: Responsive.sp(10.5)),
                     ),
                   ],
                 ),
@@ -358,7 +374,7 @@ class _OwnerHeader extends StatelessWidget {
                     value: '$totalEstimates',
                     label: 'Total',
                     icon: Icons.description_rounded,
-                    color: AppColors.primary, // maroon
+                    color: AppColors.primary,
                   ),
                 ),
                 _statDivider(),
@@ -367,7 +383,7 @@ class _OwnerHeader extends StatelessWidget {
                     value: '$dispatched',
                     label: 'Dispatched',
                     icon: Icons.local_shipping_rounded,
-                    color: const Color(0xFF7C3AED), // purple
+                    color: const Color(0xFF520B95),
                   ),
                 ),
                 _statDivider(),
@@ -376,7 +392,7 @@ class _OwnerHeader extends StatelessWidget {
                     value: '$quotations',
                     label: 'Quotations',
                     icon: Icons.request_quote_rounded,
-                    color: const Color(0xFF16A34A), // green
+                    color: const Color(0xFF16A34A),
                   ),
                 ),
                 _statDivider(),
@@ -385,7 +401,7 @@ class _OwnerHeader extends StatelessWidget {
                     value: '$pending',
                     label: 'Pending',
                     icon: Icons.hourglass_bottom_rounded,
-                    color: const Color(0xFFF59E0B), // orange
+                    color: const Color(0xFFF59E0B),
                   ),
                 ),
               ],
@@ -420,7 +436,6 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Each stat has its own icon color.
         Icon(icon, size: 18, color: color),
         SizedBox(height: Responsive.h(6)),
         Text(
@@ -433,7 +448,8 @@ class _MiniStat extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(10.5)),
+          style: AppTextStyles.captionnew(color: AppColors.textSecondary)
+              .copyWith(fontSize: Responsive.sp(10.5)),
         ),
       ],
     );
@@ -466,11 +482,8 @@ class _SectionTitle extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Text(
                 actionLabel!,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: Responsive.sp(12.5),
-                  fontWeight: FontWeight.w600,
-                ),
+                style: AppTextStyles.link()
+                    .copyWith(fontSize: Responsive.sp(12.5)),
               ),
             ),
           ),
@@ -479,13 +492,24 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-// ---------------- QUICK ACCESS (one flat grid) ----------------
+// ---------------- QUICK ACCESS (collapsible grid) ----------------
 
-class _QuickAccessPanel extends StatelessWidget {
+class _QuickAccessPanel extends StatefulWidget {
   const _QuickAccessPanel();
 
   @override
+  State<_QuickAccessPanel> createState() => _QuickAccessPanelState();
+}
+
+class _QuickAccessPanelState extends State<_QuickAccessPanel> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final canExpand = _quickActions.length > _collapsedCount;
+    final visible =
+    _expanded ? _quickActions : _quickActions.take(_collapsedCount).toList();
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
@@ -495,21 +519,59 @@ class _QuickAccessPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
       ),
-      child: GridView.count(
-        crossAxisCount: 4,
-        shrinkWrap: true,
-        padding: EdgeInsets.zero,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 0,
-        crossAxisSpacing: 0,
-        childAspectRatio: 0.9,
+      child: Column(
         children: [
-          for (final a in _quickActions)
-            _ActionTile(
-              icon: a.icon,
-              label: a.label,
-              onTap: () => context.push(a.route),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 0,
+              crossAxisSpacing: 0,
+              childAspectRatio: 0.9,
+              children: [
+                for (final a in visible)
+                  _ActionTile(
+                    icon: a.icon,
+                    label: a.label,
+                    onTap: () => context.push(a.route),
+                  ),
+              ],
             ),
+          ),
+          if (canExpand) ...[
+            const Divider(height: 1, color: AppColors.border),
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: Responsive.h(6)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _expanded ? 'Show less' : 'More',
+                      style: AppTextStyles.link(),
+                    ),
+                    SizedBox(width: Responsive.w(4)),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 22,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -548,17 +610,13 @@ class _ActionTile extends StatelessWidget {
               child: Icon(icon, color: AppColors.primary, size: 22),
             ),
             SizedBox(height: Responsive.h(5)),
+            // Quick action label (10 / w500 / height 1.15)
             Text(
               label,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.black,
-                fontSize: Responsive.sp(10),
-                fontWeight: FontWeight.w500,
-                height: 1.15,
-              ),
+              style: AppTextStyles.tabLabel(color: AppColors.black),
             ),
           ],
         ),
@@ -632,10 +690,13 @@ class _ErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
+              style: AppTextStyles.subtitle(),
             ),
             SizedBox(height: Responsive.h(10)),
-            TextButton(onPressed: onRetry, child: const Text('Try again')),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.link()),
+            ),
           ],
         ),
       ),

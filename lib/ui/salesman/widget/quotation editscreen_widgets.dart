@@ -70,6 +70,149 @@ class EditItem {
   }
 }
 
+// ===========================================================================
+// SHARED LOOK (same as the Owner / Salesman create-estimate screens)
+// ===========================================================================
+
+/// White card, radius 16, 1px border, no shadow.
+BoxDecoration qeCardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+class QeIconBadge extends StatelessWidget {
+  const QeIconBadge(this.icon, {super.key, this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+class QePill extends StatelessWidget {
+  const QePill({super.key, required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class QeSectionHeader extends StatelessWidget {
+  const QeSectionHeader(this.title, {super.key});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+class QeCardTitle extends StatelessWidget {
+  const QeCardTitle({super.key, required this.title, this.icon, this.trailing});
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            QeIconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Card with a title bar and a padded body.
+class QeSectionCard extends StatelessWidget {
+  const QeSectionCard({
+    super.key,
+    required this.title,
+    required this.child,
+    this.icon,
+    this.trailing,
+  });
+  final String title;
+  final Widget child;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: qeCardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          QeCardTitle(title: title, icon: icon, trailing: trailing),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                Responsive.w(14), Responsive.h(14), Responsive.w(14), Responsive.h(6)),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class QeTotalRow extends StatelessWidget {
   const QeTotalRow(this.label, this.value, {super.key});
   final String label;
@@ -78,10 +221,19 @@ class QeTotalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.body()),
-        Text(value, style: AppTextStyles.body()),
+        Text(label, style: AppTextStyles.body(color: AppColors.textSecondary)),
+        SizedBox(width: Responsive.w(12)),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(value, maxLines: 1, style: AppTextStyles.bodyBold()),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -274,7 +426,6 @@ class QeItemFormFields extends StatelessWidget {
       child: Column(
         children: [
           productField,
-          SizedBox(height: Responsive.h(10)),
           LabeledField(
             label: 'Company (auto)',
             field: IgnorePointer(
@@ -456,10 +607,12 @@ class QeProductDropdown extends StatelessWidget {
         }
         if (state.productsStatus == LoadStatus.failure && state.products.isEmpty) {
           return Container(
+            margin: EdgeInsets.only(bottom: Responsive.h(12)),
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
               color: AppColors.error.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.error.withOpacity(0.25)),
             ),
             child: Row(
               children: [
@@ -472,7 +625,7 @@ class QeProductDropdown extends StatelessWidget {
                 TextButton(
                   onPressed: () =>
                       context.read<SalesmanEstimateBloc>().add(const ActiveProductsRequested()),
-                  child: const Text('Retry'),
+                  child: Text('Retry', style: AppTextStyles.bodyBold()),
                 ),
               ],
             ),
@@ -501,26 +654,35 @@ class QeProductDropdown extends StatelessWidget {
               TextFormField(
                 controller: searchCtrl,
                 focusNode: focusNode,
+                style: AppTextStyles.body(),
                 decoration: InputDecoration(
                   hintText: 'Search product by name',
-                  prefixIcon: const Icon(Icons.search),
+                  hintStyle: AppTextStyles.body(color: AppColors.textHint),
+                  prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
                   suffixIcon: searchCtrl.text.isEmpty
                       ? null
                       : IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
+                    icon: Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
                     tooltip: 'Clear',
                     onPressed: onClear,
                   ),
                   filled: true,
-                  fillColor: AppColors.surface,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.border),
+                  fillColor: AppColors.background,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: Responsive.w(14),
+                    vertical: Responsive.h(14),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.border),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.error),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.error),
                   ),
                 ),
                 validator: (v) => DValidator.validateDropdown(
@@ -533,37 +695,41 @@ class QeProductDropdown extends StatelessWidget {
               if (showSuggestions) ...[
                 SizedBox(height: Responsive.h(6)),
                 Container(
+                  width: double.infinity,
                   constraints: BoxConstraints(maxHeight: Responsive.h(220)),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
+                  decoration: qeCardDecoration(radius: 14),
+                  clipBehavior: Clip.antiAlias,
                   child: filtered.isEmpty
                       ? Padding(
                     padding: EdgeInsets.all(Responsive.w(14)),
-                    child: Text('No matching products', style: AppTextStyles.caption()),
+                    child: Text('No matching products',
+                        style: AppTextStyles.caption(color: AppColors.textSecondary)),
                   )
                       : ListView.separated(
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AppColors.border),
                     itemBuilder: (context, index) {
                       final p = filtered[index];
                       return ListTile(
                         dense: true,
-                        leading: const Icon(Icons.inventory_2_outlined, size: 18),
-                        title: Text(p.name, overflow: TextOverflow.ellipsis),
+                        leading: const QeIconBadge(Icons.inventory_2_outlined, size: 14),
+                        title: Text(p.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyBold()),
                         subtitle: Text(
                           '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
                           overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption(color: AppColors.textSecondary),
                         ),
                         onTap: () => onSelected(p),
                       );
                     },
                   ),
                 ),
+                SizedBox(height: Responsive.h(12)),
               ],
             ],
           ),
@@ -586,17 +752,21 @@ class QeEditingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(10)),
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
       ),
       child: Row(
         children: [
           const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
           SizedBox(width: Responsive.w(6)),
-          Expanded(child: Text('Editing item #$itemNumber', style: AppTextStyles.caption())),
+          Expanded(
+            child: Text('Editing item #$itemNumber',
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
+          ),
           InkWell(
             onTap: onCancel,
             child: Text('Cancel', style: AppTextStyles.bodyBold(color: AppColors.error)),
@@ -655,7 +825,7 @@ class QeOtherDetailsSection extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Totals card
+// Totals card (rendered as a titled "Summary" card)
 // ---------------------------------------------------------------------------
 class QeTotalsCard extends StatelessWidget {
   const QeTotalsCard({
@@ -679,31 +849,44 @@ class QeTotalsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gap = SizedBox(height: Responsive.h(6));
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    final gap = SizedBox(height: Responsive.h(10));
+    return QeSectionCard(
+      title: 'Summary',
+      icon: Icons.calculate_outlined,
       child: Column(
         children: [
-          gap,
           QeTotalRow('Total Sq.Ft', number.format(totalSqft)),
           if (mrpTotal > 0) ...[gap, QeTotalRow('Total MRP', currency.format(mrpTotal))],
           gap,
           QeTotalRow('Items Total', currency.format(itemsTotal)),
           gap,
           QeTotalRow('Handling Charge', currency.format(handling)),
-          const Divider(height: 20),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+            child: const Divider(height: 1, color: AppColors.border),
+          ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('Grand Total', style: AppTextStyles.balanceamount()),
-              Text(currency.format(grandTotal),
-                  style: AppTextStyles.h3(color: AppColors.primary)),
+              Text('Grand Total', style: AppTextStyles.bodyBold()),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      currency.format(grandTotal),
+                      maxLines: 1,
+                      style: AppTextStyles.amount(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
+          SizedBox(height: Responsive.h(8)),
         ],
       ),
     );
@@ -722,23 +905,22 @@ class QeIncentiveTotalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
       decoration: BoxDecoration(
         color: AppColors.success.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.success.withOpacity(0.3)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Icon(Icons.percent, size: 18, color: AppColors.success),
-              SizedBox(width: Responsive.w(8)),
-              Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
-            ],
+          QeIconBadge(Icons.percent, color: AppColors.success, size: 14),
+          SizedBox(width: Responsive.w(10)),
+          Expanded(
+            child: Text('Incentive Total',
+                style: AppTextStyles.bodyBold(color: AppColors.success)),
           ),
-          Text(currency.format(total), style: AppTextStyles.h3(color: AppColors.success)),
+          Text(currency.format(total),
+              style: AppTextStyles.bodyBold(color: AppColors.success)),
         ],
       ),
     );
@@ -769,8 +951,9 @@ class IncentivePreviewCard extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -780,7 +963,8 @@ class IncentivePreviewCard extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 SizedBox(width: Responsive.w(10)),
-                Text('Checking incentive…', style: AppTextStyles.caption()),
+                Text('Checking incentive…',
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ],
             ),
           );
@@ -791,7 +975,8 @@ class IncentivePreviewCard extends StatelessWidget {
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
               color: AppColors.error.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.error.withOpacity(0.25)),
             ),
             child: Text(
               state.incentiveError ?? 'Couldn\'t fetch incentive for this item.',
@@ -807,8 +992,9 @@ class IncentivePreviewCard extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -819,7 +1005,7 @@ class IncentivePreviewCard extends StatelessWidget {
                     incentive.eligibilityReason.isNotEmpty
                         ? incentive.eligibilityReason
                         : 'Not eligible for incentive on this quantity/rate.',
-                    style: AppTextStyles.caption(),
+                    style: AppTextStyles.caption(color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -831,30 +1017,28 @@ class IncentivePreviewCard extends StatelessWidget {
           padding: EdgeInsets.all(Responsive.w(12)),
           decoration: BoxDecoration(
             color: AppColors.success.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.success.withOpacity(0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.percent, size: 16, color: AppColors.success),
-                      SizedBox(width: Responsive.w(6)),
-                      Text('Incentive on this item',
-                          style: AppTextStyles.bodyBold(color: AppColors.success)),
-                    ],
+                  QeIconBadge(Icons.percent, color: AppColors.success, size: 14),
+                  SizedBox(width: Responsive.w(8)),
+                  Expanded(
+                    child: Text('Incentive on this item',
+                        style: AppTextStyles.bodyBold(color: AppColors.success)),
                   ),
                   Text(currency.format(incentive.totalIncentive),
                       style: AppTextStyles.bodyBold(color: AppColors.success)),
                 ],
               ),
               if (incentive.eligibilityReason.isNotEmpty) ...[
-                SizedBox(height: Responsive.h(4)),
-                Text(incentive.eligibilityReason, style: AppTextStyles.caption()),
+                SizedBox(height: Responsive.h(6)),
+                Text(incentive.eligibilityReason,
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ],
             ],
           ),
@@ -889,91 +1073,110 @@ class EditItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: Responsive.h(10)),
-      padding: EdgeInsets.all(Responsive.w(12)),
-      decoration: BoxDecoration(
-        color: isEditing ? AppColors.primary.withOpacity(0.06) : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: AppColors.surfaceAlt,
-            child: Text('$serialNo', style: AppTextStyles.caption()),
-          ),
-          SizedBox(width: Responsive.w(10)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(2)),
-                if (item.size.isNotEmpty || item.company.isNotEmpty)
-                  Text(
-                    '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}',
-                    style: AppTextStyles.caption(),
-                  ),
-                SizedBox(height: Responsive.h(2)),
-                Text(
-                  'Qty: ${item.quantity.toStringAsFixed(0)} ${item.unit}'
-                      '${item.mrp > 0 ? '   MRP: ${item.mrp.toStringAsFixed(0)}' : ''}'
-                      '   Rate: ${item.rate.toStringAsFixed(0)}',
-                  style: AppTextStyles.caption(),
-                ),
-                if (item.incentiveEligible && item.incentiveAmount > 0) ...[
-                  SizedBox(height: Responsive.h(2)),
-                  Row(
-                    children: [
-                      Icon(Icons.percent, size: 12, color: AppColors.success),
-                      SizedBox(width: Responsive.w(3)),
-                      Text(
-                        'Incentive: ${currency.format(item.incentiveAmount)}',
-                        style: AppTextStyles.caption(color: AppColors.success),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+    final hasBoxPiece = item.boxQuantity > 0 || item.pieceQuantity > 0;
+
+    return Opacity(
+      opacity: isRemoving ? 0.6 : 1,
+      child: Container(
+        margin: EdgeInsets.only(bottom: Responsive.h(10)),
+        padding: EdgeInsets.all(Responsive.w(14)),
+        decoration: BoxDecoration(
+          color: isEditing ? AppColors.primary.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text('$serialNo', style: AppTextStyles.caption(color: AppColors.primary)),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(currency.format(item.amount),
-                  style: AppTextStyles.bodyBold(color: AppColors.primary)),
-              SizedBox(height: Responsive.h(8)),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+            SizedBox(width: Responsive.w(10)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InkWell(
-                    onTap: isRemoving ? null : onEdit,
-                    child: Icon(
-                      Icons.edit_outlined,
-                      size: 20,
-                      color: isRemoving ? AppColors.textHint : AppColors.primary,
+                  Text(item.name, style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(2)),
+                  if (item.size.isNotEmpty || item.company.isNotEmpty)
+                    Text(
+                      '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}',
+                      style: AppTextStyles.caption(color: AppColors.textSecondary),
                     ),
+                  SizedBox(height: Responsive.h(2)),
+                  Text(
+                    'Qty: ${item.quantity.toStringAsFixed(0)} ${item.unit}'
+                        '${item.mrp > 0 ? '   MRP: ${item.mrp.toStringAsFixed(0)}' : ''}'
+                        '   Rate: ${item.rate.toStringAsFixed(0)}',
+                    style: AppTextStyles.caption(color: AppColors.textSecondary),
                   ),
-                  SizedBox(width: Responsive.w(14)),
-                  if (isRemoving)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    InkWell(
-                      onTap: onDelete,
-                      child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                  if (hasBoxPiece) ...[
+                    SizedBox(height: Responsive.h(2)),
+                    Text(
+                      'Box: ${item.boxQuantity.toStringAsFixed(0)}   Piece: ${item.pieceQuantity.toStringAsFixed(0)}',
+                      style: AppTextStyles.caption(color: AppColors.textSecondary),
                     ),
+                  ],
+                  if (item.incentiveEligible && item.incentiveAmount > 0) ...[
+                    SizedBox(height: Responsive.h(4)),
+                    Row(
+                      children: [
+                        Icon(Icons.percent, size: 12, color: AppColors.success),
+                        SizedBox(width: Responsive.w(3)),
+                        Text(
+                          'Incentive: ${currency.format(item.incentiveAmount)}',
+                          style: AppTextStyles.caption(color: AppColors.success),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
-            ],
-          ),
-        ],
+            ),
+            SizedBox(width: Responsive.w(8)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(currency.format(item.amount),
+                    style: AppTextStyles.bodyBold(color: AppColors.primary)),
+                SizedBox(height: Responsive.h(8)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: isRemoving ? null : onEdit,
+                      child: Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: isRemoving ? AppColors.textHint : AppColors.primary,
+                      ),
+                    ),
+                    SizedBox(width: Responsive.w(14)),
+                    if (isRemoving)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      InkWell(
+                        onTap: onDelete,
+                        child:
+                        const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

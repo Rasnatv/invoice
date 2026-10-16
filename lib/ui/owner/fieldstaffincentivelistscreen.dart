@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../Apiprovider/ownerfieldsstaffincentiveprovider.dart';
 import '../../bloc/ownerbloc/fieldstaffincentive/fieldstaff_incentive_bloc.dart';
 import '../../bloc/ownerbloc/fieldstaffincentive/fieldstaff_incentive_event.dart';
@@ -10,10 +10,23 @@ import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/owner_models/fieldstaffincentivemodel.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 import 'fieldstaff_incentivedetailscreen.dart';
 
+/// Status colours shared by the list pill (same palette as Estimates).
+Color _incentiveStatusColor(String status) {
+  switch (status) {
+    case 'paid':
+      return AppColors.success;
+    case 'approved':
+      return Colors.blue.shade700;
+    case 'pending':
+    default:
+      return const Color(0xFFF59E0B);
+  }
+}
 
-/// Public entry point — provides the bloc, loads current-month data.
+/// Public entry point - provides the bloc, loads current-month data.
 class FieldStaffIncentiveScreen extends StatelessWidget {
   const FieldStaffIncentiveScreen({super.key});
 
@@ -41,7 +54,8 @@ class _FieldStaffIncentiveView extends StatefulWidget {
   const _FieldStaffIncentiveView();
 
   @override
-  State<_FieldStaffIncentiveView> createState() => _FieldStaffIncentiveViewState();
+  State<_FieldStaffIncentiveView> createState() =>
+      _FieldStaffIncentiveViewState();
 }
 
 class _FieldStaffIncentiveViewState extends State<_FieldStaffIncentiveView> {
@@ -64,7 +78,8 @@ class _FieldStaffIncentiveViewState extends State<_FieldStaffIncentiveView> {
     super.dispose();
   }
 
-  void _pickFieldStaff(BuildContext context, FieldStaffIncentiveState state) async {
+  void _pickFieldStaff(
+      BuildContext context, FieldStaffIncentiveState state) async {
     final selected = await showModalBottomSheet<String?>(
       context: context,
       backgroundColor: Colors.white,
@@ -79,15 +94,16 @@ class _FieldStaffIncentiveViewState extends State<_FieldStaffIncentiveView> {
             children: [
               ListTile(
                 leading: Icon(Icons.groups_outlined, color: AppColors.primary),
-                title: const Text('All Field Staff'),
+                title: Text('All Field Staff', style: AppTextStyles.body()),
                 selected: state.selectedFieldStaffId == null,
                 onTap: () => Navigator.pop(sheetContext, ''),
               ),
               const Divider(height: 1),
               ...state.fieldStaffOptions.map(
                     (staff) => ListTile(
-                  leading: Icon(Icons.person_outline, color: AppColors.primary),
-                  title: Text(staff.name),
+                  leading:
+                  Icon(Icons.person_outline, color: AppColors.primary),
+                  title: Text(staff.name, style: AppTextStyles.body()),
                   selected: state.selectedFieldStaffId == staff.id,
                   onTap: () => Navigator.pop(sheetContext, staff.id),
                 ),
@@ -104,7 +120,8 @@ class _FieldStaffIncentiveViewState extends State<_FieldStaffIncentiveView> {
         .add(FilterByFieldStaff(selected.isEmpty ? null : selected));
   }
 
-  void _pickDateRange(BuildContext context, FieldStaffIncentiveState state) async {
+  void _pickDateRange(
+      BuildContext context, FieldStaffIncentiveState state) async {
     final initialRange = DateTimeRange(
       start: DateTime.tryParse(state.dateFrom) ?? DateTime.now(),
       end: DateTime.tryParse(state.dateTo) ?? DateTime.now(),
@@ -126,235 +143,258 @@ class _FieldStaffIncentiveViewState extends State<_FieldStaffIncentiveView> {
   static String _fmtDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  String _dateRangeLabel(FieldStaffIncentiveState state) {
+    if (state.dateFrom.isEmpty || state.dateTo.isEmpty) {
+      return 'Select Date Range';
+    }
+    return '${state.dateFrom}  to  ${state.dateTo}';
+  }
+
+  Widget _buildFilters(BuildContext context, FieldStaffIncentiveState state) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          Responsive.w(20), Responsive.h(14), Responsive.w(20), 0),
+      child: Column(
+        children: [
+          _FilterTile(
+            icon: Icons.groups_outlined,
+            text: state.selectedFieldStaffName,
+            onTap: () => _pickFieldStaff(context, state),
+          ),
+          SizedBox(height: Responsive.h(10)),
+          _FilterTile(
+            icon: Icons.date_range_outlined,
+            text: _dateRangeLabel(state),
+            onTap: () => _pickDateRange(context, state),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: BlocConsumer<FieldStaffIncentiveBloc, FieldStaffIncentiveState>(
-        listener: (context, state) {
-          if (state.errorMessage != null) {
-            AppSnackbar.error(state.errorMessage!);
-            context.read<FieldStaffIncentiveBloc>().add(const ClearIncentiveListFeedback());
-          }
-        },
-        builder: (context, state) {
-          if (state.status == FieldStaffIncentiveStatus.loading && state.incentives.isEmpty) {
-            return Column(
-              children: [
-                _Header(
-                  state: state,
-                  onPickStaff: () => _pickFieldStaff(context, state),
-                  onPickDateRange: () => _pickDateRange(context, state),
-                ),
-                const Expanded(child: Center(child: CircularProgressIndicator())),
-              ],
-            );
-          }
 
-          return RefreshIndicator(
-            onRefresh: () async =>
-                context.read<FieldStaffIncentiveBloc>().add(const RefreshFieldStaffIncentives()),
-            child: CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _Header(
-                    state: state,
-                    onPickStaff: () => _pickFieldStaff(context, state),
-                    onPickDateRange: () => _pickDateRange(context, state),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _StatusTabs(state: state),
-                ),
-                if (state.incentives.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyIncentiveState(),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      Responsive.w(20),
-                      Responsive.h(4),
-                      Responsive.w(20),
-                      Responsive.h(24),
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                          if (index == state.incentives.length) {
-                            return Padding(
-                              padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              ),
-                            );
-                          }
-                          final incentive = state.incentives[index];
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: Responsive.h(12)),
-                            child: _IncentiveCard(
-                              incentive: incentive,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => IncentiveDetailScreen(id: incentive.id),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                        childCount:
-                        state.incentives.length + (state.status == FieldStaffIncentiveStatus.loadingMore ? 1 : 0),
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as Estimates) ----------
+        appBar: AppBar(
+          title: Text('Field Staff Incentives', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+
+        body: SafeArea(
+          child: BlocConsumer<FieldStaffIncentiveBloc, FieldStaffIncentiveState>(
+            listener: (context, state) {
+              if (state.errorMessage != null) {
+                AppSnackbar.error(state.errorMessage!);
+                context
+                    .read<FieldStaffIncentiveBloc>()
+                    .add(const ClearIncentiveListFeedback());
+              }
+            },
+            builder: (context, state) {
+              final listPadding = EdgeInsets.fromLTRB(
+                  Responsive.w(20), 0, Responsive.w(20), Responsive.h(24));
+
+              // ---- loading skeleton ----
+              if (state.status == FieldStaffIncentiveStatus.loading &&
+                  state.incentives.isEmpty) {
+                return Column(
+                  children: [
+                    _buildFilters(context, state),
+                    SizedBox(height: Responsive.h(14)),
+                    Expanded(
+                      child: ShimmerListPlaceholder(
+                        itemCount: 6,
+                        padding: listPadding,
+                        separatorHeight: Responsive.h(10),
+                        itemBuilder: (context, i) =>
+                        const _IncentiveCardSkeleton(),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          );
-        },
+                  ],
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async => context
+                    .read<FieldStaffIncentiveBloc>()
+                    .add(const RefreshFieldStaffIncentives()),
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildFilters(context, state)),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                            Responsive.h(14), Responsive.w(20), 0),
+                        child: _SummaryCard(state: state),
+                      ),
+                    ),
+                    SliverToBoxAdapter(child: _StatusTabs(state: state)),
+                    if (state.incentives.isEmpty)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyIncentiveState(),
+                      )
+                    else
+                      SliverPadding(
+                        padding: listPadding,
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                              if (index == state.incentives.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                  ),
+                                );
+                              }
+                              final incentive = state.incentives[index];
+                              return Padding(
+                                padding:
+                                EdgeInsets.only(bottom: Responsive.h(10)),
+                                child: _IncentiveCard(
+                                  key: ValueKey(incentive.id),
+                                  incentive: incentive,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => IncentiveDetailScreen(
+                                            id: incentive.id),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                            childCount: state.incentives.length +
+                                (state.status ==
+                                    FieldStaffIncentiveStatus.loadingMore
+                                    ? 1
+                                    : 0),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Maroon header: back + title, staff dropdown, date range picker, overlapping stats card.
-class _Header extends StatelessWidget {
-  const _Header({required this.state, required this.onPickStaff, required this.onPickDateRange});
+// =====================================================================
+// SMALL REUSABLE PIECES (private to this file)
+// =====================================================================
 
-  final FieldStaffIncentiveState state;
-  final VoidCallback onPickStaff;
-  final VoidCallback onPickDateRange;
-
-  String get _dateRangeLabel {
-    if (state.dateFrom.isEmpty || state.dateTo.isEmpty) return 'Select Date Range';
-    return '${state.dateFrom}  to  ${state.dateTo}';
-  }
+class _ListCard extends StatelessWidget {
+  const _ListCard({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
           width: double.infinity,
-          padding: EdgeInsets.fromLTRB(
-            Responsive.w(16),
-            Responsive.h(8),
-            Responsive.w(16),
-            Responsive.h(40),
+          padding: EdgeInsets.all(Responsive.w(14)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: AppColors.primary, size: 20),
+    );
+  }
+}
+
+class _FilterTile extends StatelessWidget {
+  const _FilterTile({
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(14),
+            vertical: Responsive.h(12),
           ),
           decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(Responsive.w(28)),
-              bottomRight: Radius.circular(Responsive.w(28)),
-            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.maybePop(context),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Field Staff Incentives',
-                        style: AppTextStyles.h6().copyWith(color: Colors.white),
-                      ),
-                    ),
-                  ],
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 18),
+              SizedBox(width: Responsive.w(8)),
+              Expanded(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(),
                 ),
-                SizedBox(height: Responsive.h(8)),
-                InkWell(
-                  onTap: onPickStaff,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Responsive.w(14),
-                      vertical: Responsive.h(12),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.groups_outlined, color: Colors.white, size: 18),
-                        SizedBox(width: Responsive.w(8)),
-                        Expanded(
-                          child: Text(
-                            state.selectedFieldStaffName,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: Responsive.sp(13.5),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: Responsive.h(10)),
-                InkWell(
-                  onTap: onPickDateRange,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Responsive.w(14),
-                      vertical: Responsive.h(12),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.date_range_outlined, color: Colors.white, size: 18),
-                        SizedBox(width: Responsive.w(8)),
-                        Expanded(
-                          child: Text(
-                            _dateRangeLabel,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: Responsive.sp(13.5),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              Icon(Icons.keyboard_arrow_down,
+                  color: AppColors.textSecondary, size: 20),
+            ],
           ),
         ),
-        Transform.translate(
-          offset: Offset(0, -Responsive.h(26)),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-            child: _SummaryCard(state: state),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -369,19 +409,13 @@ class _SummaryCard extends StatelessWidget {
     final summary = state.summary;
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: Responsive.w(16),
-        vertical: Responsive.h(16),
+        horizontal: Responsive.w(14),
+        vertical: Responsive.h(14),
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -389,23 +423,23 @@ class _SummaryCard extends StatelessWidget {
             child: _StatColumn(
               value: '₹${summary.totalIncentive.toStringAsFixed(0)}',
               label: 'Total Incentive',
-              valueColor: AppColors.black,
+              valueColor: AppColors.primary,
             ),
           ),
-          _VerticalDivider(),
+          const _StatDivider(),
           Expanded(
             child: _StatColumn(
               value: '${summary.statusBreakdown.pending}',
               label: 'Pending',
-              valueColor: const Color(0xFFC9862B),
+              valueColor: const Color(0xFFF59E0B),
             ),
           ),
-          _VerticalDivider(),
+          const _StatDivider(),
           Expanded(
             child: _StatColumn(
               value: '${summary.statusBreakdown.paid}',
               label: 'Paid',
-              valueColor: Colors.green.shade700,
+              valueColor: AppColors.success,
             ),
           ),
         ],
@@ -414,19 +448,25 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _VerticalDivider extends StatelessWidget {
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: Responsive.h(36),
-      color: AppColors.textSecondary.withOpacity(0.15),
+      height: Responsive.h(34),
+      color: AppColors.border,
     );
   }
 }
 
 class _StatColumn extends StatelessWidget {
-  const _StatColumn({required this.value, required this.label, required this.valueColor});
+  const _StatColumn({
+    required this.value,
+    required this.label,
+    required this.valueColor,
+  });
 
   final String value;
   final String label;
@@ -439,7 +479,8 @@ class _StatColumn extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: Responsive.sp(17),
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: Responsive.sp(16),
             fontWeight: FontWeight.w700,
             color: valueColor,
           ),
@@ -447,10 +488,7 @@ class _StatColumn extends StatelessWidget {
         SizedBox(height: Responsive.h(2)),
         Text(
           label,
-          style: TextStyle(
-            fontSize: Responsive.sp(11),
-            color: AppColors.textSecondary,
-          ),
+          style: AppTextStyles.caption(color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
       ],
@@ -466,9 +504,10 @@ class _StatusTabs extends StatelessWidget {
   /// Reads the label straight off an already-loaded record's `status_label`
   /// (comes from the API, e.g. "Paid") instead of hardcoding it here.
   /// Only falls back to a plain word if no loaded record currently has
-  /// this status — there's no dedicated "list of statuses" endpoint to
+  /// this status - there's no dedicated "list of statuses" endpoint to
   /// source a label from in that case.
-  static String? _apiLabelFor(List<FieldStaffIncentiveModel> incentives, String status) {
+  static String? _apiLabelFor(
+      List<FieldStaffIncentiveModel> incentives, String status) {
     for (final incentive in incentives) {
       if (incentive.status == status && incentive.statusLabel.isNotEmpty) {
         return incentive.statusLabel;
@@ -482,58 +521,41 @@ class _StatusTabs extends StatelessWidget {
     final breakdown = state.summary.statusBreakdown;
     final incentives = state.incentives;
     final tabs = <_StatusTab>[
-      _StatusTab('all', 'All', breakdown.pending + breakdown.approved + breakdown.paid),
+      _StatusTab('all', 'All',
+          breakdown.pending + breakdown.approved + breakdown.paid),
       if (breakdown.pending > 0)
-        _StatusTab('pending', _apiLabelFor(incentives, 'pending') ?? 'Pending', breakdown.pending),
+        _StatusTab('pending', _apiLabelFor(incentives, 'pending') ?? 'Pending',
+            breakdown.pending),
       if (breakdown.approved > 0)
-        _StatusTab('approved', _apiLabelFor(incentives, 'approved') ?? 'Approved', breakdown.approved),
+        _StatusTab('approved',
+            _apiLabelFor(incentives, 'approved') ?? 'Approved',
+            breakdown.approved),
       if (breakdown.paid > 0)
-        _StatusTab('paid', _apiLabelFor(incentives, 'paid') ?? 'Paid', breakdown.paid),
+        _StatusTab(
+            'paid', _apiLabelFor(incentives, 'paid') ?? 'Paid', breakdown.paid),
     ];
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        Responsive.w(20),
-        Responsive.h(10),
-        Responsive.w(20),
-        Responsive.h(10),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: tabs.map((tab) {
-            final isSelected = tab.value == state.selectedStatus;
-            return Padding(
-              padding: EdgeInsets.only(right: Responsive.w(8)),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
+    return SizedBox(
+      height: 34 + Responsive.h(28),
+      child: Center(
+        child: SizedBox(
+          height: 34,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+            itemCount: tabs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final tab = tabs[i];
+              return _FilterChip(
+                label: '${tab.label} (${tab.count})',
+                selected: tab.value == state.selectedStatus,
                 onTap: () => context
                     .read<FieldStaffIncentiveBloc>()
                     .add(FilterByStatus(tab.value)),
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: Responsive.w(14),
-                    vertical: Responsive.h(8),
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.textSecondary.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Text(
-                    '${tab.label} (${tab.count})',
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.textSecondary,
-                      fontSize: Responsive.sp(12.5),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -547,83 +569,40 @@ class _StatusTab {
   final int count;
 }
 
-class _IncentiveCard extends StatelessWidget {
-  const _IncentiveCard({required this.incentive, required this.onTap});
-
-  final FieldStaffIncentiveModel incentive;
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
+    return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(Responsive.w(14)),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(12), vertical: Responsive.h(6)),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          incentive.fieldStaffName,
-                          style: AppTextStyles.bodyBold(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      SizedBox(width: Responsive.w(6)),
-                      _StatusPill(status: incentive.status, label: incentive.statusLabel),
-                    ],
-                  ),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(
-                    'Visited: ${incentive.siteVisit.customerName}',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: Responsive.sp(11.5),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: Responsive.h(8)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Est: ${incentive.estimateNumber}',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: Responsive.sp(11),
-                        ),
-                      ),
-                      Text(
-                        '₹${incentive.incentiveAmountFormatted}',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.w700,
-                          fontSize: Responsive.sp(14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontFamily,
+                fontSize: Responsive.sp(11.5),
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppColors.textPrimary,
               ),
             ),
           ],
@@ -639,33 +618,150 @@ class _StatusPill extends StatelessWidget {
   final String status;
   final String label;
 
-  Color get _color {
-    switch (status) {
-      case 'paid':
-        return Colors.green.shade700;
-      case 'approved':
-        return Colors.blue.shade700;
-      case 'pending':
-      default:
-        return const Color(0xFFC9862B);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final color = _incentiveStatusColor(status);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(9), vertical: Responsive.h(3)),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.1),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: _color,
+          fontFamily: AppTextStyles.fontFamily,
           fontSize: Responsive.sp(10.5),
           fontWeight: FontWeight.w600,
+          color: color,
         ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// INCENTIVE CARD
+// =====================================================================
+
+class _IncentiveCard extends StatelessWidget {
+  const _IncentiveCard({super.key, required this.incentive, required this.onTap});
+
+  final FieldStaffIncentiveModel incentive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ListCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- top: icon, staff + visited customer, status ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _IconTile(icon: Icons.payments_outlined),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      incentive.fieldStaffName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyBold(),
+                    ),
+                    SizedBox(height: Responsive.h(2)),
+                    Text(
+                      'Visited: ${incentive.siteVisit.customerName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                      AppTextStyles.caption(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: Responsive.w(8)),
+              _StatusPill(
+                  status: incentive.status, label: incentive.statusLabel),
+            ],
+          ),
+
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+
+          // ---- bottom: estimate number, amount ----
+          Row(
+            children: [
+              Icon(Icons.description_outlined,
+                  size: 13, color: AppColors.textSecondary),
+              SizedBox(width: Responsive.w(6)),
+              Expanded(
+                child: Text(
+                  'Est: ${incentive.estimateNumber}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                ),
+              ),
+              SizedBox(width: Responsive.w(6)),
+              Text(
+                '₹${incentive.incentiveAmountFormatted}',
+                style: AppTextStyles.amount(color: AppColors.success),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// SKELETON / EMPTY
+// =====================================================================
+
+class _IncentiveCardSkeleton extends StatelessWidget {
+  const _IncentiveCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return _ListCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const ShimmerBox(width: 42, height: 42, borderRadius: 12),
+              SizedBox(width: Responsive.w(12)),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 120, height: 13),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 160, height: 11),
+                  ],
+                ),
+              ),
+              const ShimmerBox(width: 60, height: 20, borderRadius: 20),
+            ],
+          ),
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ShimmerBox(width: 80, height: 12),
+              ShimmerBox(width: 90, height: 16),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -682,11 +778,13 @@ class _EmptyIncentiveState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.bar_chart_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(
+              Icons.bar_chart_rounded,
+              size: 44,
+              color: AppColors.textSecondary.withOpacity(0.4),
+            ),
             SizedBox(height: Responsive.h(10)),
-            Text(
-              'No incentives found',
-                style: AppTextStyles.subtitle()),
+            Text('No incentives found', style: AppTextStyles.subtitle()),
           ],
         ),
       ),

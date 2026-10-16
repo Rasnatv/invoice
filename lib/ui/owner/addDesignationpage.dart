@@ -11,7 +11,6 @@ import '../../bloc/ownerbloc/designation/designationbloc.dart';
 import '../../bloc/ownerbloc/designation/designationevent.dart';
 import '../../bloc/ownerbloc/designation/designationstate.dart';
 
-
 class AddDesignationPage extends StatefulWidget {
   final DesignationModel? designation;
 
@@ -24,17 +23,15 @@ class AddDesignationPage extends StatefulWidget {
 }
 
 class _AddDesignationPageState extends State<AddDesignationPage> {
-  static const Color _primary = Color(0xFF2F5D50);
-  static const Color _accent = Color(0xFFE8A33D);
-
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
 
-  // ---------------- UNCHANGED: logic ----------------
+  // ---------------- logic (unchanged) ----------------
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.designation?.name ?? '');
+    _nameController =
+        TextEditingController(text: widget.designation?.name ?? '');
   }
 
   @override
@@ -56,24 +53,32 @@ class _AddDesignationPageState extends State<AddDesignationPage> {
     }
   }
 
-  // ---------------- RESTYLED: UI ----------------
+  // ---------------- UI ----------------
   InputDecoration _fieldDecoration() {
-    OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: color, width: width),
-    );
+    OutlineInputBorder border(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: color, width: width),
+        );
 
     return InputDecoration(
       labelText: 'Designation name',
+      labelStyle: AppTextStyles.body(color: AppColors.textHint),
       hintText: 'e.g. Regional Sales Manager',
-      hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
-      prefixIcon: const Icon(Icons.badge_outlined, color: _primary, size: 20),
+      hintStyle: AppTextStyles.body(color: AppColors.textHint),
+      errorStyle: AppTextStyles.caption(color: AppColors.error),
+      prefixIcon:
+      Icon(Icons.badge_outlined, color: AppColors.textSecondary, size: 20),
       filled: true,
-      fillColor: const Color(0xFFFAFAF8),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      border: border(const Color(0xFFE7E5E0)),
-      enabledBorder: border(const Color(0xFFE7E5E0)),
-      focusedBorder: border(_primary, 1.5),
+      isDense: true,
+      fillColor: Colors.white,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: Responsive.w(14),
+        vertical: Responsive.h(14),
+      ),
+      border: border(AppColors.border),
+      enabledBorder: border(AppColors.border),
+      focusedBorder: border(AppColors.primary, 1.5),
       errorBorder: border(AppColors.error),
       focusedErrorBorder: border(AppColors.error, 1.5),
     );
@@ -81,190 +86,192 @@ class _AddDesignationPageState extends State<AddDesignationPage> {
 
   @override
   Widget build(BuildContext context) {
-    return NetworkAwareWrapper(child:Scaffold(
-      backgroundColor: const Color(0xFFF7F7F5),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          widget.isEditing ? 'Edit Designation' : 'Add Designation',
-          style: AppTextStyles.h6(),
+    Responsive.init(context);
+
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as Estimates) ----------
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          title: Text(
+            widget.isEditing ? 'Edit Designation' : 'Add Designation',
+            style: AppTextStyles.h6(),
+          ),
         ),
-      ),
-      body: BlocListener<DesignationBloc, DesignationState>(
-        listener: (context, state) {
-          if (state is DesignationActionSuccess) {
-            if (state.message != null) AppSnackbar.success(state.message!);
-            Navigator.pop(context);
-          } else if (state is DesignationActionFailure) {
-            if (state.message != null) AppSnackbar.error(state.message!);
-          }
-        },
-        child: BlocBuilder<DesignationBloc, DesignationState>(
-          builder: (context, state) {
-            final isSubmitting = state is DesignationActionLoading;
 
-            return SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // NEW: header section
-                      Row(
-                        children: [
-                          Container(
-                            height: 48,
-                            width: 48,
-                            decoration: BoxDecoration(
-                              color: _primary.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.work_outline_rounded,
-                                color: _primary, size: 24),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.isEditing
-                                      ? 'Update designation'
-                                      : 'New designation',
-                                  style: AppTextStyles.bodyBold(),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  widget.isEditing
-                                      ? 'Update the designation name'
-                                      : 'Create a new salesman designation',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+        body: BlocListener<DesignationBloc, DesignationState>(
+          listener: (context, state) {
+            if (state is DesignationActionSuccess) {
+              if (state.message != null) AppSnackbar.success(state.message!);
+              Navigator.pop(context);
+            } else if (state is DesignationActionFailure) {
+              if (state.message != null) AppSnackbar.error(state.message!);
+            }
+          },
+          child: BlocBuilder<DesignationBloc, DesignationState>(
+            builder: (context, state) {
+              final isSubmitting = state is DesignationActionLoading;
 
-                      // NEW: form card section
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE7E5E0)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+              return SafeArea(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(Responsive.w(20)),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // ---- header: icon tile + title/subtitle ----
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: _primary,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text('Designation Details',
-                                    style: AppTextStyles.bodyBold()),
-                              ],
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.work_outline_rounded,
+                                  color: AppColors.primary, size: 20),
                             ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _nameController,
-                              autofocus: true,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => isSubmitting ? null : _submit(),
-                              inputFormatters: DValidator.lettersOnly,
-                              decoration: _fieldDecoration(),
-                              validator: (value) {
-                                // Use DValidator for validation
-                                final nameValidator =
-                                DValidator.validateName('Designation', value);
-                                if (nameValidator != null) return nameValidator;
-
-                                // Additional validation for minimum length
-                                if (value != null && value.trim().length < 2) {
-                                  return 'Designation name must be at least 2 characters';
-                                }
-                                return null;
-                              },
+                            SizedBox(width: Responsive.w(12)),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.isEditing
+                                        ? 'Update designation'
+                                        : 'New designation',
+                                    style: AppTextStyles.bodyBold(),
+                                  ),
+                                  SizedBox(height: Responsive.h(2)),
+                                  Text(
+                                    widget.isEditing
+                                        ? 'Update the designation name'
+                                        : 'Create a new salesman designation',
+                                    style: AppTextStyles.caption(
+                                        color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        SizedBox(height: Responsive.h(20)),
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: Responsive.h(48),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+                        // ---- form card ----
+                        Container(
+                          padding: EdgeInsets.all(Responsive.w(16)),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
                           ),
-                          onPressed: isSubmitting ? null : _submit,
-                          child: isSubmitting
-                              ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: Colors.white,
-                            ),
-                          )
-                              : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                widget.isEditing
-                                    ? Icons.check_circle_outline
-                                    : Icons.add_circle_outline,
-                                color: Colors.white,
-                                size: 20,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                  SizedBox(width: Responsive.w(8)),
+                                  Text('Designation Details',
+                                      style: AppTextStyles.bodyBold()),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                widget.isEditing ? 'Save Changes' : 'Add Designation',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15.5,
-                                  color: Colors.white,
-                                ),
+                              SizedBox(height: Responsive.h(16)),
+                              TextFormField(
+                                controller: _nameController,
+                                autofocus: true,
+                                style: AppTextStyles.body(),
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) =>
+                                isSubmitting ? null : _submit(),
+                                inputFormatters: DValidator.lettersOnly,
+                                decoration: _fieldDecoration(),
+                                validator: (value) {
+                                  final nameValidator =
+                                  DValidator.validateName(
+                                      'Designation', value);
+                                  if (nameValidator != null) {
+                                    return nameValidator;
+                                  }
+
+                                  if (value != null &&
+                                      value.trim().length < 2) {
+                                    return 'Designation name must be at least 2 characters';
+                                  }
+                                  return null;
+                                },
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
+                        SizedBox(height: Responsive.h(24)),
+
+                        // ---- submit ----
+                        SizedBox(
+                          width: double.infinity,
+                          height: Responsive.h(48),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: isSubmitting ? null : _submit,
+                            child: isSubmitting
+                                ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            )
+                                : Row(
+                              mainAxisAlignment:
+                              MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  widget.isEditing
+                                      ? Icons.check_circle_outline
+                                      : Icons.add_circle_outline,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: Responsive.w(8)),
+                                Text(
+                                  widget.isEditing
+                                      ? 'Save Changes'
+                                      : 'Add Designation',
+                                  style: AppTextStyles.bodyBold(
+                                      color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
-    ));
+    );
   }
 }

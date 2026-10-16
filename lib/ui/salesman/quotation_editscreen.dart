@@ -725,136 +725,175 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                     key: _formKey,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: ListView(
-                      padding: EdgeInsets.all(Responsive.w(18)),
+                      padding: EdgeInsets.fromLTRB(
+                          Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24)),
                       children: [
-                        Text('Customer Details', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(12)),
-                        QeCustomerSection(
-                          phone: _customerPhone,
-                          name: _customerName,
-                          address: _customerAddress,
-                          email: _customerEmail,
-                          phoneValidator: _validateCustomerPhone,
-                          nameValidator: _validatePartyName,
-                          addressValidator: _validateCustomerAddress,
-                          emailValidator: _validateOptionalEmail,
-                        ),
-                        SizedBox(height: Responsive.h(16)),
-
-                        Text('Contractor Details', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(12)),
-                        QeContractorSection(
-                          name: _contractorName,
-                          phone: _contractorPhone,
-                          email: _contractorEmail,
-                          nameValidator: (v) => _validateOptionalName('Contractor name', v),
-                          phoneValidator: _validateOptionalPhone,
-                          emailValidator: _validateOptionalEmail,
-                          // Re-validate so name/phone cross-check updates live.
-                          onNamePhoneChanged: (_) => _formKey.currentState?.validate(),
-                        ),
-                        SizedBox(height: Responsive.h(20)),
-
-                        Text('Add / Edit Item', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(10)),
-                        QeItemFormFields(
-                          formKey: _itemFormKey,
-                          productField: QeProductDropdown(
-                            searchCtrl: _productSearchCtrl,
-                            focusNode: _productSearchFocus,
-                            selectedProduct: _selectedProduct,
-                            editingProductId: _editingItemIndex != null
-                                ? _items[_editingItemIndex!].productId
-                                : null,
-                            showSuggestions: _showProductSuggestions,
-                            onFieldTap: () => setState(() => _showProductSuggestions = true),
-                            onTextChanged: (text) {
-                              if (_selectedProduct != null &&
-                                  text != qeProductDisplayString(_selectedProduct!)) {
-                                _onProductSelected(null);
-                              }
-                              setState(() => _showProductSuggestions = true);
-                            },
-                            onClear: _clearProductSelection,
-                            onSelected: (p) {
-                              _onProductSelected(p);
-                              setState(() => _showProductSuggestions = false);
-                              _productSearchFocus.unfocus();
-                            },
+                        // ---- Customer ----
+                        QeSectionCard(
+                          title: 'Customer Details',
+                          icon: Icons.groups_2_outlined,
+                          child: QeCustomerSection(
+                            phone: _customerPhone,
+                            name: _customerName,
+                            address: _customerAddress,
+                            email: _customerEmail,
+                            phoneValidator: _validateCustomerPhone,
+                            nameValidator: _validatePartyName,
+                            addressValidator: _validateCustomerAddress,
+                            emailValidator: _validateOptionalEmail,
                           ),
-                          companyCtrl: _itemCompanyCtrl,
-                          sizeCtrl: _itemSizeCtrl,
-                          unitCtrl: _itemUnitCtrl,
-                          mrpCtrl: _itemMrpCtrl,
-                          rateCtrl: _itemRateCtrl,
-                          qtyCtrl: _itemQtyCtrl,
-                          boxQtyCtrl: _itemBoxQtyCtrl,
-                          pieceQtyCtrl: _itemPieceQtyCtrl,
-                          isBoxUnit: _isBoxUnitProduct,
-                          onMrpChanged: (_) => setState(() {}),
-                          onRateChanged: (_) {
-                            setState(() {});
-                            _scheduleIncentiveFetch();
-                          },
-                          onQtyChanged: (_) {
-                            setState(_recomputeBoxQtyIfNeeded);
-                            _scheduleIncentiveFetch();
-                          },
-                          onPieceChanged: (_) => setState(() {}),
                         ),
-                        SizedBox(height: Responsive.h(6)),
-
-                        if (_selectedProduct != null || _editingItemIndex != null) ...[
-                          SizedBox(height: Responsive.h(8)),
-                          const IncentivePreviewCard(),
-                        ],
-
                         SizedBox(height: Responsive.h(14)),
 
-                        if (_editingItemIndex != null)
-                          QeEditingBanner(
-                            itemNumber: _editingItemIndex! + 1,
-                            onCancel: _cancelEditItem,
-                          ),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _isAddingItem ? null : _saveItemFromForm,
-                            icon: _isAddingItem
-                                ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                                : Icon(
-                              _editingItemIndex != null ? Icons.save_outlined : Icons.add,
-                              color: Colors.white,
-                            ),
-                            label: Text(
-                              _isAddingItem
-                                  ? (_editingItemIndex != null ? 'Updating…' : 'Calculating…')
-                                  : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
+                        // ---- Contractor ----
+                        QeSectionCard(
+                          title: 'Contractor Details',
+                          icon: Icons.engineering_outlined,
+                          child: QeContractorSection(
+                            name: _contractorName,
+                            phone: _contractorPhone,
+                            email: _contractorEmail,
+                            nameValidator: (v) => _validateOptionalName('Contractor name', v),
+                            phoneValidator: _validateOptionalPhone,
+                            emailValidator: _validateOptionalEmail,
+                            // Re-validate so name/phone cross-check updates live.
+                            onNamePhoneChanged: (_) => _formKey.currentState?.validate(),
                           ),
                         ),
-                        SizedBox(height: Responsive.h(20)),
+                        SizedBox(height: Responsive.h(14)),
 
-                        Text('Items (${_items.length})', style: AppTextStyles.h3()),
+                        // ---- Add / Edit item ----
+                        QeSectionCard(
+                          title: _editingItemIndex != null ? 'Edit Item' : 'Add Item',
+                          icon: _editingItemIndex != null
+                              ? Icons.edit_outlined
+                              : Icons.add_box_outlined,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              QeItemFormFields(
+                                formKey: _itemFormKey,
+                                productField: QeProductDropdown(
+                                  searchCtrl: _productSearchCtrl,
+                                  focusNode: _productSearchFocus,
+                                  selectedProduct: _selectedProduct,
+                                  editingProductId: _editingItemIndex != null
+                                      ? _items[_editingItemIndex!].productId
+                                      : null,
+                                  showSuggestions: _showProductSuggestions,
+                                  onFieldTap: () =>
+                                      setState(() => _showProductSuggestions = true),
+                                  onTextChanged: (text) {
+                                    if (_selectedProduct != null &&
+                                        text != qeProductDisplayString(_selectedProduct!)) {
+                                      _onProductSelected(null);
+                                    }
+                                    setState(() => _showProductSuggestions = true);
+                                  },
+                                  onClear: _clearProductSelection,
+                                  onSelected: (p) {
+                                    _onProductSelected(p);
+                                    setState(() => _showProductSuggestions = false);
+                                    _productSearchFocus.unfocus();
+                                  },
+                                ),
+                                companyCtrl: _itemCompanyCtrl,
+                                sizeCtrl: _itemSizeCtrl,
+                                unitCtrl: _itemUnitCtrl,
+                                mrpCtrl: _itemMrpCtrl,
+                                rateCtrl: _itemRateCtrl,
+                                qtyCtrl: _itemQtyCtrl,
+                                boxQtyCtrl: _itemBoxQtyCtrl,
+                                pieceQtyCtrl: _itemPieceQtyCtrl,
+                                isBoxUnit: _isBoxUnitProduct,
+                                onMrpChanged: (_) => setState(() {}),
+                                onRateChanged: (_) {
+                                  setState(() {});
+                                  _scheduleIncentiveFetch();
+                                },
+                                onQtyChanged: (_) {
+                                  setState(_recomputeBoxQtyIfNeeded);
+                                  _scheduleIncentiveFetch();
+                                },
+                                onPieceChanged: (_) => setState(() {}),
+                              ),
+
+                              if (_selectedProduct != null || _editingItemIndex != null) ...[
+                                SizedBox(height: Responsive.h(2)),
+                                const IncentivePreviewCard(),
+                                SizedBox(height: Responsive.h(10)),
+                              ] else
+                                SizedBox(height: Responsive.h(2)),
+
+                              if (_editingItemIndex != null)
+                                QeEditingBanner(
+                                  itemNumber: _editingItemIndex! + 1,
+                                  onCancel: _cancelEditItem,
+                                ),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: Responsive.h(48),
+                                child: ElevatedButton.icon(
+                                  onPressed: _isAddingItem ? null : _saveItemFromForm,
+                                  icon: _isAddingItem
+                                      ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                      : Icon(
+                                    _editingItemIndex != null
+                                        ? Icons.save_outlined
+                                        : Icons.add,
+                                    color: Colors.white,
+                                  ),
+                                  label: Text(
+                                    _isAddingItem
+                                        ? (_editingItemIndex != null
+                                        ? 'Updating…'
+                                        : 'Calculating…')
+                                        : (_editingItemIndex != null
+                                        ? 'Update Item'
+                                        : 'Add Item'),
+                                    style: AppTextStyles.bodyBold(color: Colors.white),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: Responsive.h(8)),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: Responsive.h(18)),
+
+                        // ---- Items list ----
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const QeSectionHeader('Items'),
+                            QePill(
+                              label:
+                              '${_items.length} ${_items.length == 1 ? 'item' : 'items'}',
+                              color: AppColors.primary,
+                            ),
+                          ],
+                        ),
                         SizedBox(height: Responsive.h(10)),
                         if (_items.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
-                            child: Center(
-                              child: Text('No items added yet',
-                                  style: AppTextStyles.body(color: AppColors.textHint)),
-                            ),
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(Responsive.w(18)),
+                            decoration: qeCardDecoration(),
+                            child: Text('No items added yet',
+                                style: AppTextStyles.caption(color: AppColors.textSecondary)),
                           )
                         else
                           BlocBuilder<QuotationItemRemoveBloc, QuotationItemRemoveState>(
@@ -883,18 +922,22 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                               );
                             },
                           ),
-                        SizedBox(height: Responsive.h(20)),
+                        SizedBox(height: Responsive.h(8)),
 
-                        Text('Other Details', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(12)),
-                        QeOtherDetailsSection(
-                          handlingCharge: _handlingCharge,
-                          notes: _notes,
-                          handlingValidator: _validateHandlingCharge,
-                          onHandlingChanged: (_) => setState(() {}),
+                        // ---- Other details ----
+                        QeSectionCard(
+                          title: 'Other Details',
+                          icon: Icons.tune_rounded,
+                          child: QeOtherDetailsSection(
+                            handlingCharge: _handlingCharge,
+                            notes: _notes,
+                            handlingValidator: _validateHandlingCharge,
+                            onHandlingChanged: (_) => setState(() {}),
+                          ),
                         ),
-                        SizedBox(height: Responsive.h(10)),
+                        SizedBox(height: Responsive.h(14)),
 
+                        // ---- Summary ----
                         QeTotalsCard(
                           totalSqft: _totalSqft,
                           mrpTotal: _mrpTotal,
@@ -904,10 +947,11 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           currency: currency,
                           number: number,
                         ),
-                        SizedBox(height: Responsive.h(12)),
 
-                        if (_incentiveTotal > 0)
+                        if (_incentiveTotal > 0) ...[
+                          SizedBox(height: Responsive.h(14)),
                           QeIncentiveTotalCard(total: _incentiveTotal, currency: currency),
+                        ],
                       ],
                     ),
                   ),
@@ -918,8 +962,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                     final saving = state.submitStatus == QuotationActionStatus.inProgress;
                     return Container(
                       padding: EdgeInsets.fromLTRB(
-                          Responsive.w(18), Responsive.h(10), Responsive.w(18), Responsive.h(14)),
-                      decoration: BoxDecoration(
+                          Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(14)),
+                      decoration: const BoxDecoration(
                         color: AppColors.background,
                         border: Border(top: BorderSide(color: AppColors.border)),
                       ),

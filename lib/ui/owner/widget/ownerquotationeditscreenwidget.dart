@@ -12,7 +12,161 @@ import '../../../core/validator/validationfile.dart';
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../widgets/custom_text_field.dart'; // CustomTextField (+ LabeledField if defined there)
 
+const Color _redColor = Color(0xFFDC2626);
+
 String ownerProductDisplayString(ActiveProductModel p) => '${p.name} — ${p.company}';
+
+// ---------------------------------------------------------------------------
+// Shared look (same as the Estimate / Quotation detail screens)
+// ---------------------------------------------------------------------------
+
+/// White card, radius 16, 1px border, no shadow.
+BoxDecoration ownerCardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+/// Small rounded icon badge used in card titles.
+class OwnerIconBadge extends StatelessWidget {
+  const OwnerIconBadge(this.icon, {super.key, this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+/// Small pill (e.g. "3 items").
+class OwnerPill extends StatelessWidget {
+  const OwnerPill({super.key, required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Blue-bar section heading.
+class OwnerSectionHeader extends StatelessWidget {
+  const OwnerSectionHeader(this.title, {super.key});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+/// White card header row (icon badge + title) with a divider underneath.
+class OwnerCardTitle extends StatelessWidget {
+  const OwnerCardTitle({super.key, required this.title, this.icon, this.trailing});
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            OwnerIconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Card with a title bar and a padded body — wraps every form block.
+class OwnerSectionCard extends StatelessWidget {
+  const OwnerSectionCard({
+    super.key,
+    required this.title,
+    required this.child,
+    this.icon,
+    this.trailing,
+  });
+  final String title;
+  final Widget child;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: ownerCardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OwnerCardTitle(title: title, icon: icon, trailing: trailing),
+          Padding(
+            padding: EdgeInsets.fromLTRB(Responsive.w(14), Responsive.h(14),
+                Responsive.w(14), Responsive.h(6)),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
 
 class OwnerEditItem {
   const OwnerEditItem({
@@ -80,8 +234,8 @@ class TotalRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.body()),
-        Text(value, style: AppTextStyles.body()),
+        Text(label, style: AppTextStyles.body(color: AppColors.textSecondary)),
+        Text(value, style: AppTextStyles.bodyBold()),
       ],
     );
   }
@@ -114,48 +268,52 @@ class OwnerCustomerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        LabeledField(
-          label: 'Contact No.',
-          field: CustomTextField(
-            hint: 'Enter phone number',
-            icon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-            controller: phone,
-            inputFormatters: DValidator.phoneNumber,
-            validator: phoneValidator,
+    return OwnerSectionCard(
+      title: 'Customer Details',
+      icon: Icons.groups_2_outlined,
+      child: Column(
+        children: [
+          LabeledField(
+            label: 'Contact No.',
+            field: CustomTextField(
+              hint: 'Enter phone number',
+              icon: Icons.phone_outlined,
+              keyboardType: TextInputType.phone,
+              controller: phone,
+              inputFormatters: DValidator.phoneNumber,
+              validator: phoneValidator,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Customer Name',
-          field: CustomTextField(
-            hint: 'Enter customer name',
-            icon: Icons.groups_2_outlined,
-            controller: name,
-            validator: nameValidator,
+          LabeledField(
+            label: 'Customer Name',
+            field: CustomTextField(
+              hint: 'Enter customer name',
+              icon: Icons.groups_2_outlined,
+              controller: name,
+              validator: nameValidator,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Address',
-          field: CustomTextField(
-            hint: 'Enter site address',
-            icon: Icons.location_on_outlined,
-            controller: address,
-            validator: addressValidator,
+          LabeledField(
+            label: 'Address',
+            field: CustomTextField(
+              hint: 'Enter site address',
+              icon: Icons.location_on_outlined,
+              controller: address,
+              validator: addressValidator,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Email',
-          field: CustomTextField(
-            hint: 'Enter customer email',
-            icon: Icons.alternate_email,
-            keyboardType: TextInputType.emailAddress,
-            controller: email,
-            validator: emailValidator,
+          LabeledField(
+            label: 'Email',
+            field: CustomTextField(
+              hint: 'Enter customer email',
+              icon: Icons.alternate_email,
+              keyboardType: TextInputType.emailAddress,
+              controller: email,
+              validator: emailValidator,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -185,53 +343,57 @@ class OwnerContractorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Form(
-          key: formKey,
-          child: Column(
-            children: [
-              LabeledField(
-                label: 'Contractor Name',
-                field: CustomTextField(
-                  hint: 'Enter contractor name',
-                  icon: Icons.engineering_outlined,
-                  controller: name,
-                  inputFormatters: DValidator.lettersOnly,
-                  validator: nameValidator,
+    return OwnerSectionCard(
+      title: 'Contractor Details',
+      icon: Icons.engineering_outlined,
+      child: Column(
+        children: [
+          Form(
+            key: formKey,
+            child: Column(
+              children: [
+                LabeledField(
+                  label: 'Contractor Name',
+                  field: CustomTextField(
+                    hint: 'Enter contractor name',
+                    icon: Icons.engineering_outlined,
+                    controller: name,
+                    inputFormatters: DValidator.lettersOnly,
+                    validator: nameValidator,
+                  ),
                 ),
-              ),
-              LabeledField(
-                label: 'Contact No.',
-                field: CustomTextField(
-                  hint: 'Enter contractor phone number',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  controller: phone,
-                  inputFormatters: DValidator.phoneNumber,
-                  validator: phoneValidator,
+                LabeledField(
+                  label: 'Contact No.',
+                  field: CustomTextField(
+                    hint: 'Enter contractor phone number',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    controller: phone,
+                    inputFormatters: DValidator.phoneNumber,
+                    validator: phoneValidator,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Email (optional)',
-          field: CustomTextField(
-            hint: 'Enter contractor email',
-            icon: Icons.alternate_email,
-            keyboardType: TextInputType.emailAddress,
-            controller: email,
-            validator: emailValidator,
+          LabeledField(
+            label: 'Email (optional)',
+            field: CustomTextField(
+              hint: 'Enter contractor email',
+              icon: Icons.alternate_email,
+              keyboardType: TextInputType.emailAddress,
+              controller: email,
+              validator: emailValidator,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Add / Edit item form fields
+// Add / Edit item form fields (fields only — the screen wraps them in a card)
 // ---------------------------------------------------------------------------
 class OwnerItemFormFields extends StatelessWidget {
   const OwnerItemFormFields({
@@ -294,7 +456,8 @@ class OwnerItemFormFields extends StatelessWidget {
         children: [
           productField,
           SizedBox(height: Responsive.h(10)),
-          autoField('Company (auto)', 'Select a product first', Icons.factory_outlined, companyCtrl),
+          autoField('Company (auto)', 'Select a product first', Icons.factory_outlined,
+              companyCtrl),
           Row(
             children: [
               Expanded(
@@ -363,8 +526,8 @@ class OwnerItemFormFields extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                    child: autoField('Box Quantity (auto)', '0', Icons.inventory_2_outlined,
-                        boxQtyCtrl,
+                    child: autoField('Box Quantity (auto)', '0',
+                        Icons.inventory_2_outlined, boxQtyCtrl,
                         keyboardType: TextInputType.number)),
                 gap,
                 Expanded(
@@ -436,22 +599,23 @@ class OwnerProductDropdown extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
+              color: _redColor.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _redColor.withOpacity(0.25)),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     state.productsError ?? 'Failed to load products.',
-                    style: AppTextStyles.caption(color: AppColors.error),
+                    style: AppTextStyles.caption(color: _redColor),
                   ),
                 ),
                 TextButton(
                   onPressed: () => context
                       .read<OwnerQuotationEditBloc>()
                       .add(const OwnerEditActiveProductsRequested()),
-                  child: const Text('Retry'),
+                  child: Text('Retry', style: AppTextStyles.bodyBold()),
                 ),
               ],
             ),
@@ -483,8 +647,10 @@ class OwnerProductDropdown extends StatelessWidget {
               TextFormField(
                 controller: searchCtrl,
                 focusNode: focusNode,
+                style: AppTextStyles.body(),
                 decoration: InputDecoration(
                   hintText: 'Search product by name',
+                  hintStyle: AppTextStyles.body(color: AppColors.textHint),
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: searchCtrl.text.isEmpty
                       ? null
@@ -494,15 +660,14 @@ class OwnerProductDropdown extends StatelessWidget {
                     onPressed: onClear,
                   ),
                   filled: true,
-                  fillColor: AppColors.surface,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.border),
+                  fillColor: AppColors.background,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: Responsive.w(14),
+                    vertical: Responsive.h(14),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.border),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
                   ),
                 ),
                 validator: (v) => DValidator.validateDropdown('product', selectedProduct?.id),
@@ -513,30 +678,32 @@ class OwnerProductDropdown extends StatelessWidget {
                 SizedBox(height: Responsive.h(6)),
                 Container(
                   constraints: BoxConstraints(maxHeight: Responsive.h(220)),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
+                  decoration: ownerCardDecoration(radius: 14),
+                  clipBehavior: Clip.antiAlias,
                   child: filtered.isEmpty
                       ? Padding(
                     padding: EdgeInsets.all(Responsive.w(14)),
-                    child: Text('No matching products', style: AppTextStyles.caption()),
+                    child: Text('No matching products',
+                        style: AppTextStyles.caption(color: AppColors.textSecondary)),
                   )
                       : ListView.separated(
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AppColors.border),
                     itemBuilder: (context, index) {
                       final p = filtered[index];
                       return ListTile(
                         dense: true,
-                        leading: const Icon(Icons.inventory_2_outlined, size: 18),
-                        title: Text(p.name, overflow: TextOverflow.ellipsis),
+                        leading: const OwnerIconBadge(Icons.inventory_2_outlined, size: 14),
+                        title: Text(p.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyBold()),
                         subtitle: Text(
                           '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
                           overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption(color: AppColors.textSecondary),
                         ),
                         onTap: () => onSelected(p),
                       );
@@ -565,20 +732,23 @@ class OwnerEditingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(10)),
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
       ),
       child: Row(
         children: [
           const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
           SizedBox(width: Responsive.w(6)),
-          Expanded(child: Text('Editing item #$itemNumber', style: AppTextStyles.caption())),
+          Expanded(
+              child: Text('Editing item #$itemNumber',
+                  style: AppTextStyles.caption(color: AppColors.textSecondary))),
           InkWell(
             onTap: onCancel,
-            child: Text('Cancel', style: AppTextStyles.bodyBold(color: AppColors.error)),
+            child: Text('Cancel', style: AppTextStyles.bodyBold(color: _redColor)),
           ),
         ],
       ),
@@ -605,36 +775,40 @@ class OwnerOtherDetailsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        LabeledField(
-          label: 'Handling Charge',
-          field: CustomTextField(
-            hint: 'Enter handling charge',
-            icon: Icons.currency_rupee,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            controller: handlingCharge,
-            inputFormatters: DValidator.priceNumber,
-            validator: handlingValidator,
-            onChanged: onHandlingChanged,
+    return OwnerSectionCard(
+      title: 'Other Details',
+      icon: Icons.tune_rounded,
+      child: Column(
+        children: [
+          LabeledField(
+            label: 'Handling Charge',
+            field: CustomTextField(
+              hint: 'Enter handling charge',
+              icon: Icons.currency_rupee,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              controller: handlingCharge,
+              inputFormatters: DValidator.priceNumber,
+              validator: handlingValidator,
+              onChanged: onHandlingChanged,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Notes (optional)',
-          field: CustomTextField(
-            hint: 'e.g. Customer enquiry for new project',
-            icon: Icons.notes_outlined,
-            controller: notes,
-            inputFormatters: DValidator.textWithLimit,
+          LabeledField(
+            label: 'Notes (optional)',
+            field: CustomTextField(
+              hint: 'e.g. Customer enquiry for new project',
+              icon: Icons.notes_outlined,
+              controller: notes,
+              inputFormatters: DValidator.textWithLimit,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Totals card
+// Totals card (Summary)
 // ---------------------------------------------------------------------------
 class OwnerTotalsCard extends StatelessWidget {
   const OwnerTotalsCard({
@@ -658,29 +832,38 @@ class OwnerTotalsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gap = SizedBox(height: Responsive.h(6));
+    final gap = SizedBox(height: Responsive.h(10));
     return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      width: double.infinity,
+      decoration: ownerCardDecoration(),
+      clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          gap,
-          TotalRow('Total Sq.Ft', number.format(totalSqft)),
-          gap,
-          TotalRow('Items Total', currency.format(itemsTotal)),
-          gap,
-          TotalRow('Handling Charge', currency.format(handling)),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Grand Total', style: AppTextStyles.h3()),
-              Text(currency.format(grandTotal),
-                  style: AppTextStyles.h2(color: AppColors.primary)),
-            ],
+          const OwnerCardTitle(title: 'Summary', icon: Icons.calculate_outlined),
+          Padding(
+            padding: EdgeInsets.all(Responsive.w(14)),
+            child: Column(
+              children: [
+                TotalRow('Total Sq.Ft', number.format(totalSqft)),
+                gap,
+                TotalRow('Items Total', currency.format(itemsTotal)),
+                gap,
+                TotalRow('Handling Charge', currency.format(handling)),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+                  child: const Divider(height: 1, color: AppColors.border),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Grand Total', style: AppTextStyles.bodyBold()),
+                    Text(currency.format(grandTotal),
+                        style: AppTextStyles.amount(color: AppColors.primary)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -700,7 +883,8 @@ class OwnerIncentiveTotalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(14)),
       decoration: BoxDecoration(
         color: AppColors.success.withOpacity(0.08),
         borderRadius: BorderRadius.circular(14),
@@ -711,12 +895,14 @@ class OwnerIncentiveTotalCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.percent, size: 18, color: AppColors.success),
-              SizedBox(width: Responsive.w(8)),
-              Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
+              OwnerIconBadge(Icons.percent_rounded, color: AppColors.success),
+              SizedBox(width: Responsive.w(10)),
+              Text('Incentive Total',
+                  style: AppTextStyles.bodyBold(color: AppColors.success)),
             ],
           ),
-          Text(currency.format(total), style: AppTextStyles.h3(color: AppColors.success)),
+          Text(currency.format(total),
+              style: AppTextStyles.amount(color: AppColors.success)),
         ],
       ),
     );
@@ -743,13 +929,12 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
+        BoxDecoration neutral() => ownerCardDecoration(radius: 14);
+
         if (state.incentiveStatus == OwnerEditLoadStatus.loading) {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: neutral(),
             child: Row(
               children: [
                 const SizedBox(
@@ -758,7 +943,8 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 SizedBox(width: Responsive.w(10)),
-                Text('Checking incentive…', style: AppTextStyles.caption()),
+                Text('Checking incentive…',
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ],
             ),
           );
@@ -768,12 +954,13 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
+              color: _redColor.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _redColor.withOpacity(0.25)),
             ),
             child: Text(
               state.incentiveError ?? 'Couldn\'t fetch incentive for this item.',
-              style: AppTextStyles.caption(color: AppColors.error),
+              style: AppTextStyles.caption(color: _redColor),
             ),
           );
         }
@@ -784,20 +971,17 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
         if (!incentive.isEligible) {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: neutral(),
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: AppColors.textHint),
+                Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
                 SizedBox(width: Responsive.w(8)),
                 Expanded(
                   child: Text(
                     incentive.eligibilityReason.isNotEmpty
                         ? incentive.eligibilityReason
                         : 'Not eligible for incentive on this quantity/rate.',
-                    style: AppTextStyles.caption(),
+                    style: AppTextStyles.caption(color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -809,7 +993,7 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
           padding: EdgeInsets.all(Responsive.w(12)),
           decoration: BoxDecoration(
             color: AppColors.success.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.success.withOpacity(0.3)),
           ),
           child: Column(
@@ -832,7 +1016,8 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
               ),
               if (incentive.eligibilityReason.isNotEmpty) ...[
                 SizedBox(height: Responsive.h(4)),
-                Text(incentive.eligibilityReason, style: AppTextStyles.caption()),
+                Text(incentive.eligibilityReason,
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ],
             ],
           ),
@@ -871,19 +1056,25 @@ class OwnerEditItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
-      padding: EdgeInsets.all(Responsive.w(12)),
+      padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: isEditing ? AppColors.primary.withOpacity(0.06) : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: isEditing ? AppColors.primary.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: AppColors.surfaceAlt,
-            child: Text('$serialNo', style: AppTextStyles.caption()),
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('$serialNo',
+                style: AppTextStyles.caption(color: AppColors.primary)),
           ),
           SizedBox(width: Responsive.w(10)),
           Expanded(
@@ -895,14 +1086,14 @@ class OwnerEditItemTile extends StatelessWidget {
                 if (item.size.isNotEmpty || item.company.isNotEmpty)
                   Text(
                     '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}',
-                    style: AppTextStyles.caption(),
+                    style: AppTextStyles.caption(color: AppColors.textSecondary),
                   ),
                 SizedBox(height: Responsive.h(2)),
                 Text(
                   'Qty: ${item.quantity.toStringAsFixed(0)} ${item.unit}'
                       '${item.mrp > 0 ? '   MRP: ${item.mrp.toStringAsFixed(0)}' : ''}'
                       '   Rate: ${item.rate.toStringAsFixed(0)}',
-                  style: AppTextStyles.caption(),
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
                 if (showIncentive && item.incentiveEligible && item.incentiveAmount > 0) ...[
                   SizedBox(height: Responsive.h(2)),
@@ -947,7 +1138,7 @@ class OwnerEditItemTile extends StatelessWidget {
                   else
                     InkWell(
                       onTap: onDelete,
-                      child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                      child: const Icon(Icons.delete_outline, size: 20, color: _redColor),
                     ),
                 ],
               ),

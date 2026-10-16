@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../Apiprovider/ownerreportprovider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -9,7 +9,6 @@ import '../../../models/owner_reportmodel/activecontractormodel.dart';
 import '../../../models/salesmanmodels/activeslaesman_model.dart';
 import 'ownerestimatereportscreen.dart';
 import 'ownerquotation_reportfilterscreen.dart'; // ReportEntityType
-import 'ownerreportwidget.dart';
 
 class OwnerEstimateReportFilterScreen extends StatefulWidget {
   const OwnerEstimateReportFilterScreen({
@@ -28,10 +27,12 @@ class OwnerEstimateReportFilterScreen extends StatefulWidget {
   final DateTime? initialEnd;
 
   @override
-  State<OwnerEstimateReportFilterScreen> createState() => _OwnerEstimateReportFilterScreenState();
+  State<OwnerEstimateReportFilterScreen> createState() =>
+      _OwnerEstimateReportFilterScreenState();
 }
 
-class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFilterScreen> {
+class _OwnerEstimateReportFilterScreenState
+    extends State<OwnerEstimateReportFilterScreen> {
   // Type chips: All | Salesman | Contractor.
   static const String _chipAll = 'All';
   static const String _chipSalesman = 'Salesman';
@@ -87,9 +88,9 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
       if (!mounted) return;
       if (result.success) {
         setState(() {
-          // Drop any salesman with a blank/whitespace-only name — a
-          // nameless record should never appear as a selectable row.
-          _salesmen = result.salesmen.where((s) => s.name.trim().isNotEmpty).toList();
+          // Drop blank-name records so they never show as selectable rows.
+          _salesmen =
+              result.salesmen.where((s) => s.name.trim().isNotEmpty).toList();
           _loadingPeople = false;
           _syncSelection();
         });
@@ -104,8 +105,9 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
       if (!mounted) return;
       if (result.success) {
         setState(() {
-          // Same guard for contractors — no blank-name rows in the dropdown.
-          _contractors = result.contractors.where((c) => c.name.trim().isNotEmpty).toList();
+          _contractors = result.contractors
+              .where((c) => c.name.trim().isNotEmpty)
+              .toList();
           _loadingPeople = false;
           _syncSelection();
         });
@@ -118,24 +120,17 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     }
   }
 
-  /// Makes sure the selected person actually exists in the freshly loaded
-  /// list. If the preselected id is missing (inactive, wrong type, blank
-  /// name that got filtered out, etc.) — or nothing was preselected at all
-  /// — the selection is cleared so the dropdown falls back to showing its
-  /// "Select Salesman" / "Select Contractor" hint rather than silently
-  /// defaulting to the first person. Call inside setState.
+  /// Makes sure the selected person exists in the freshly loaded list;
+  /// otherwise clears it so the dropdown shows its hint. Call inside setState.
   void _syncSelection() {
     final ids = _peopleIds;
     final names = _rawNames;
 
     final index = ids.indexOf(_selectedPersonId ?? '');
     if (index != -1) {
-      // Keep the name in sync with the real record.
       _selectedPersonName = names[index];
       return;
     }
-
-    // No match (or nothing was preselected) — leave unselected.
     _selectedPersonId = null;
     _selectedPersonName = null;
   }
@@ -144,8 +139,6 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
   // Dropdown helpers
   // ---------------------------------------------------------------------------
 
-  // _salesmen / _contractors are already filtered to exclude blank names
-  // in _loadPeople, so these stay simple and always in sync by index.
   List<String> get _rawNames => _type == ReportEntityType.salesman
       ? _salesmen.map((s) => s.name.trim()).toList()
       : _contractors.map((c) => c.name.trim()).toList();
@@ -166,9 +159,6 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     }).toList();
   }
 
-  /// Label for the currently selected id, or null if nothing is selected
-  /// or the id isn't in the list. Feeds ReportDropdownField's nullable
-  /// [value] directly — null shows the placeholder hint.
   String? get _selectedLabel {
     final i = _peopleIds.indexOf(_selectedPersonId ?? '');
     return i == -1 ? null : _peopleNames[i];
@@ -199,7 +189,9 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
 
     setState(() {
       _isAll = false;
-      _type = chip == _chipSalesman ? ReportEntityType.salesman : ReportEntityType.contractor;
+      _type = chip == _chipSalesman
+          ? ReportEntityType.salesman
+          : ReportEntityType.contractor;
       _selectedPersonId = null;
       _selectedPersonName = null;
     });
@@ -263,105 +255,345 @@ class _OwnerEstimateReportFilterScreenState extends State<OwnerEstimateReportFil
     Responsive.init(context);
 
     final names = _peopleNames;
+    final isSalesman = _type == ReportEntityType.salesman;
 
     return NetworkAwareWrapper(
       child: Scaffold(
-        appBar: AppBar(title: Text('Estimate Report', style: AppTextStyles.h6())),
         backgroundColor: AppColors.background,
-        body: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(Responsive.w(20)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const ReportFieldLabel('SELECT TYPE'),
-                    SizedBox(height: Responsive.h(10)),
-                    ReportStatusChips(
-                      options: _typeChips,
-                      selected: _selectedChip,
-                      onChanged: _onTypeChipChanged,
-                    ),
 
-                    // Person dropdown only for Salesman / Contractor.
-                    if (!_isAll) ...[
-                      SizedBox(height: Responsive.h(20)),
-                      ReportFieldLabel(_type == ReportEntityType.salesman
-                          ? 'SELECT SALESMAN'
-                          : 'SELECT CONTRACTOR'),
-                      SizedBox(height: Responsive.h(8)),
-                      if (_loadingPeople)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: LinearProgressIndicator(),
-                        )
-                      else if (_peopleError != null)
-                        Text(_peopleError!, style: AppTextStyles.caption(color: AppColors.error))
-                      else if (names.isEmpty)
-                          Text(
-                            _type == ReportEntityType.salesman
-                                ? 'No active salesmen found.'
-                                : 'No active contractors found.',
-                            style: AppTextStyles.caption(),
-                          )
-                        else
-                          ReportDropdownField(
-                            options: names,
-                            // null until the user actually picks someone — shows
-                            // the "Select Salesman" / "Select Contractor" hint.
-                            value: _selectedLabel,
-                            hint: _type == ReportEntityType.salesman
-                                ? 'Select Salesman'
-                                : 'Select Contractor',
-                            onChanged: _onPersonChanged,
-                          ),
-                    ],
+        // ---------- APPBAR (same as Estimates / Drivers) ----------
+        appBar: AppBar(
+          title: Text('Estimate Report', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
 
-                    SizedBox(height: Responsive.h(20)),
-                    Row(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                      Responsive.h(14), Responsive.w(20), Responsive.h(24)),
+                  child: _FilterCard(
+                    title: 'Filters',
+                    icon: Icons.tune_rounded,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const ReportFieldLabel('START DATE'),
-                              SizedBox(height: Responsive.h(8)),
-                              ReportDateField(
-                                date: _startDate,
-                                hint: 'Select date',
-                                onTap: () => _pickDate(isStart: true),
+                        const _FieldLabel('Select Type'),
+                        SizedBox(height: Responsive.h(8)),
+                        Wrap(
+                          spacing: Responsive.w(8),
+                          runSpacing: Responsive.h(8),
+                          children: [
+                            for (final c in _typeChips)
+                              _OptionChip(
+                                label: c,
+                                selected: c == _selectedChip,
+                                onTap: () => _onTypeChipChanged(c),
                               ),
-                            ],
-                          ),
+                          ],
                         ),
-                        SizedBox(width: Responsive.w(12)),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const ReportFieldLabel('END DATE'),
-                              SizedBox(height: Responsive.h(8)),
-                              ReportDateField(
-                                date: _endDate,
-                                hint: 'Select date',
-                                onTap: () => _pickDate(isStart: false),
+
+                        // Person dropdown only for Salesman / Contractor.
+                        if (!_isAll) ...[
+                          SizedBox(height: Responsive.h(16)),
+                          _FieldLabel(isSalesman
+                              ? 'Select Salesman'
+                              : 'Select Contractor'),
+                          SizedBox(height: Responsive.h(8)),
+                          if (_loadingPeople)
+                            Padding(
+                              padding:
+                              const EdgeInsets.symmetric(vertical: 8),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: const LinearProgressIndicator(),
                               ),
-                            ],
-                          ),
+                            )
+                          else if (_peopleError != null)
+                            Text(_peopleError!,
+                                style: AppTextStyles.caption(
+                                    color: AppColors.error))
+                          else if (names.isEmpty)
+                              Text(
+                                isSalesman
+                                    ? 'No active salesmen found.'
+                                    : 'No active contractors found.',
+                                style: AppTextStyles.caption(
+                                    color: AppColors.textSecondary),
+                              )
+                            else
+                              _DropdownField(
+                                options: names,
+                                value: _selectedLabel,
+                                hint: isSalesman
+                                    ? 'Select Salesman'
+                                    : 'Select Contractor',
+                                onChanged: _onPersonChanged,
+                              ),
+                        ],
+
+                        SizedBox(height: Responsive.h(16)),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _FieldLabel('Start Date'),
+                                  SizedBox(height: Responsive.h(8)),
+                                  _DateField(
+                                    date: _startDate,
+                                    onTap: () => _pickDate(isStart: true),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: Responsive.w(12)),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _FieldLabel('End Date'),
+                                  SizedBox(height: Responsive.h(8)),
+                                  _DateField(
+                                    date: _endDate,
+                                    onTap: () => _pickDate(isStart: false),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    SizedBox(height: Responsive.h(28)),
-                    GenerateReportButton(
-                      onPressed: _canGenerate ? _generate : null,
-                    ),
-                    SizedBox(height: Responsive.h(20)),
-                  ],
+                  ),
                 ),
               ),
+
+              // ---------- BOTTOM BAR (same as Estimate Details) ----------
+              Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.background,
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                    Responsive.h(10), Responsive.w(20), Responsive.h(14)),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: Responsive.h(48),
+                  child: ElevatedButton(
+                    onPressed: _canGenerate ? _generate : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor:
+                      AppColors.primary.withOpacity(0.4),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text('Generate Report',
+                        style: AppTextStyles.bodyBold(color: Colors.white)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// SMALL REUSABLE PIECES (private to this file)
+// =====================================================================
+
+class _FilterCard extends StatelessWidget {
+  const _FilterCard({required this.title, required this.child, this.icon});
+  final String title;
+  final IconData? icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 16, color: AppColors.primary),
+                  ),
+                  SizedBox(width: Responsive.w(10)),
+                ],
+                Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(Responsive.w(14)),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(text,
+        style: AppTextStyles.caption(color: AppColors.textSecondary));
+  }
+}
+
+/// Same pill look as the filter chips on the Estimates list.
+class _OptionChip extends StatelessWidget {
+  const _OptionChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(16), vertical: Responsive.h(8)),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: Responsive.sp(11.5),
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Field look from the dialogs: filled, no border, radius 14.
+BoxDecoration _fieldDecoration() => BoxDecoration(
+  color: AppColors.background,
+  borderRadius: BorderRadius.circular(14),
+);
+
+class _DropdownField extends StatelessWidget {
+  const _DropdownField({
+    required this.options,
+    required this.value,
+    required this.hint,
+    required this.onChanged,
+  });
+  final List<String> options;
+  final String? value;
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeValue = options.contains(value) ? value : null;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14)),
+      decoration: _fieldDecoration(),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: safeValue,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          hint: Text(hint,
+              style: AppTextStyles.body(color: AppColors.textHint)),
+          icon: Icon(Icons.keyboard_arrow_down_rounded,
+              color: AppColors.textSecondary),
+          style: AppTextStyles.body(),
+          items: options
+              .map((o) => DropdownMenuItem(
+            value: o,
+            child: Text(o, style: AppTextStyles.body()),
+          ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  const _DateField({required this.date, required this.onTap});
+  final DateTime date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(12), vertical: Responsive.h(14)),
+        decoration: _fieldDecoration(),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                DateFormat('dd MMM yyyy').format(date),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body(),
+              ),
+            ),
+            SizedBox(width: Responsive.w(6)),
+            Icon(Icons.calendar_today_rounded,
+                size: 16, color: AppColors.primary),
           ],
         ),
       ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -21,6 +20,190 @@ bool _parseBool(dynamic v) {
 
 String estimateProductDisplayString(EstimateActiveProduct p) =>
     p.company.isEmpty ? p.name : '${p.name} — ${p.company}';
+
+// ---------------------------------------------------------------------------
+// Shared styles
+// ---------------------------------------------------------------------------
+TextStyle get _inputStyle => AppTextStyles.body();
+TextStyle get _captionStyle => AppTextStyles.caption(color: AppColors.textSecondary);
+TextStyle get _hintStyle => AppTextStyles.body(color: AppColors.textHint);
+TextStyle get _errorStyle => AppTextStyles.caption(color: AppColors.error);
+
+ThemeData _fieldTheme(BuildContext context) {
+  final base = Theme.of(context);
+  return base.copyWith(
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      labelStyle: _hintStyle,
+      floatingLabelStyle: _hintStyle,
+      hintStyle: _hintStyle,
+      prefixStyle: _inputStyle,
+      suffixStyle: _inputStyle,
+      errorStyle: _errorStyle,
+      filled: true,
+      fillColor: AppColors.background,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: Responsive.w(14),
+        vertical: Responsive.h(14),
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+    ),
+    textTheme: base.textTheme.copyWith(
+      titleMedium: _inputStyle,
+      bodyLarge: _inputStyle,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared look (same as the Owner Quotation Edit screen)
+// ---------------------------------------------------------------------------
+
+/// White card, radius 16, 1px border, no shadow.
+BoxDecoration estimateCardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+/// Small rounded icon badge used in card titles.
+class EstimateIconBadge extends StatelessWidget {
+  const EstimateIconBadge(this.icon, {super.key, this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+/// Small pill (e.g. "3 items").
+class EstimatePill extends StatelessWidget {
+  const EstimatePill({super.key, required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Blue-bar section heading.
+class EstimateSectionHeader extends StatelessWidget {
+  const EstimateSectionHeader(this.title, {super.key});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+/// Card header row (icon badge + title) with a divider underneath.
+class EstimateCardTitle extends StatelessWidget {
+  const EstimateCardTitle({super.key, required this.title, this.icon, this.trailing});
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            EstimateIconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Card with a title bar and a padded body — wraps every form block.
+class EstimateSectionCard extends StatelessWidget {
+  const EstimateSectionCard({
+    super.key,
+    required this.title,
+    required this.child,
+    this.icon,
+    this.trailing,
+  });
+  final String title;
+  final Widget child;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: estimateCardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          EstimateCardTitle(title: title, icon: icon, trailing: trailing),
+          Padding(
+            padding: EdgeInsets.fromLTRB(Responsive.w(14), Responsive.h(14),
+                Responsive.w(14), Responsive.h(6)),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Models
@@ -163,47 +346,51 @@ class EstimateCustomerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        LabeledField(
-          label: 'Contact No.',
-          field: CustomTextField(
-            hint: 'Enter phone number',
-            icon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-            controller: phone,
-            inputFormatters: DValidator.phoneNumber,
-            validator: phoneValidator,
+    return EstimateSectionCard(
+      title: 'Customer Details',
+      icon: Icons.groups_2_outlined,
+      child: Column(
+        children: [
+          LabeledField(
+            label: 'Contact No.',
+            field: CustomTextField(
+              hint: 'Enter phone number',
+              icon: Icons.phone_outlined,
+              keyboardType: TextInputType.phone,
+              controller: phone,
+              inputFormatters: DValidator.phoneNumber,
+              validator: phoneValidator,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Customer Name',
-          field: CustomTextField(
-            hint: 'Enter customer name',
-            icon: Icons.groups_2_outlined,
-            controller: name,
-            validator: nameValidator,
+          LabeledField(
+            label: 'Customer Name',
+            field: CustomTextField(
+              hint: 'Enter customer name',
+              icon: Icons.groups_2_outlined,
+              controller: name,
+              validator: nameValidator,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Address',
-          field: CustomTextField(
-            hint: 'Enter site address',
-            icon: Icons.location_on_outlined,
-            controller: address,
+          LabeledField(
+            label: 'Address',
+            field: CustomTextField(
+              hint: 'Enter site address',
+              icon: Icons.location_on_outlined,
+              controller: address,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Email',
-          field: CustomTextField(
-            hint: 'Enter customer email',
-            icon: Icons.alternate_email,
-            keyboardType: TextInputType.emailAddress,
-            controller: email,
-            validator: emailValidator,
+          LabeledField(
+            label: 'Email',
+            field: CustomTextField(
+              hint: 'Enter customer email',
+              icon: Icons.alternate_email,
+              keyboardType: TextInputType.emailAddress,
+              controller: email,
+              validator: emailValidator,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -233,42 +420,46 @@ class EstimateContractorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        LabeledField(
-          label: 'Contractor Name',
-          field: CustomTextField(
-            hint: 'Enter contractor name',
-            icon: Icons.person_outline,
-            controller: name,
-            validator: nameValidator,
-            onChanged: onChanged,
+    return EstimateSectionCard(
+      title: 'Contractor Details',
+      icon: Icons.engineering_outlined,
+      child: Column(
+        children: [
+          LabeledField(
+            label: 'Contractor Name',
+            field: CustomTextField(
+              hint: 'Enter contractor name',
+              icon: Icons.engineering_outlined,
+              controller: name,
+              validator: nameValidator,
+              onChanged: onChanged,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Contractor Phone',
-          field: CustomTextField(
-            hint: 'Enter contractor phone',
-            icon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-            controller: phone,
-            inputFormatters: DValidator.phoneNumber,
-            validator: phoneValidator,
-            onChanged: onChanged,
+          LabeledField(
+            label: 'Contact No.',
+            field: CustomTextField(
+              hint: 'Enter contractor phone number',
+              icon: Icons.phone_outlined,
+              keyboardType: TextInputType.phone,
+              controller: phone,
+              inputFormatters: DValidator.phoneNumber,
+              validator: phoneValidator,
+              onChanged: onChanged,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Contractor Email',
-          field: CustomTextField(
-            hint: 'Enter contractor email',
-            icon: Icons.alternate_email,
-            keyboardType: TextInputType.emailAddress,
-            controller: email,
-            validator: emailValidator,
-            onChanged: onChanged,
+          LabeledField(
+            label: 'Email (optional)',
+            field: CustomTextField(
+              hint: 'Enter contractor email',
+              icon: Icons.alternate_email,
+              keyboardType: TextInputType.emailAddress,
+              controller: email,
+              validator: emailValidator,
+              onChanged: onChanged,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -282,43 +473,50 @@ class EstimateOtherDetailsSection extends StatelessWidget {
     required this.handlingCharge,
     required this.notes,
     required this.handlingValidator,
+    this.onHandlingChanged,
   });
 
   final TextEditingController handlingCharge;
   final TextEditingController notes;
   final String? Function(String?) handlingValidator;
+  final ValueChanged<String>? onHandlingChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        LabeledField(
-          label: 'Handling Charge',
-          field: CustomTextField(
-            hint: '0',
-            icon: Icons.currency_rupee,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            controller: handlingCharge,
-            inputFormatters: DValidator.priceNumber,
-            validator: handlingValidator,
+    return EstimateSectionCard(
+      title: 'Other Details',
+      icon: Icons.tune_rounded,
+      child: Column(
+        children: [
+          LabeledField(
+            label: 'Handling Charge',
+            field: CustomTextField(
+              hint: 'Enter handling charge',
+              icon: Icons.currency_rupee,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              controller: handlingCharge,
+              inputFormatters: DValidator.priceNumber,
+              validator: handlingValidator,
+              onChanged: onHandlingChanged,
+            ),
           ),
-        ),
-        LabeledField(
-          label: 'Notes (optional)',
-          field: CustomTextField(
-            hint: 'e.g. Customer enquiry for new project',
-            icon: Icons.notes_outlined,
-            controller: notes,
-            inputFormatters: DValidator.textWithLimit,
+          LabeledField(
+            label: 'Notes (optional)',
+            field: CustomTextField(
+              hint: 'e.g. Customer enquiry for new project',
+              icon: Icons.notes_outlined,
+              controller: notes,
+              inputFormatters: DValidator.textWithLimit,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Add / Edit item form fields
+// Add / Edit item form fields (fields only — the screen wraps them in a card)
 // ---------------------------------------------------------------------------
 class EstimateItemFormFields extends StatelessWidget {
   const EstimateItemFormFields({
@@ -394,7 +592,6 @@ class EstimateItemFormFields extends StatelessWidget {
                       Icons.square_foot_outlined, unitCtrl)),
             ],
           ),
-          // MRP and Rate share one row.
           Row(
             children: [
               Expanded(
@@ -521,8 +718,6 @@ class EstimateProductSearch extends StatelessWidget {
       );
     }
 
-    // When a product is already chosen the box shows its full text; treat
-    // that as "no search" so tapping lists every product.
     final typed = searchCtrl.text.trim();
     final showingChosenText =
         selectedProduct != null && typed == estimateProductDisplayString(selectedProduct!);
@@ -544,26 +739,28 @@ class EstimateProductSearch extends StatelessWidget {
           TextFormField(
             controller: searchCtrl,
             focusNode: focusNode,
+            style: _inputStyle,
             decoration: InputDecoration(
               hintText: 'Search product by name',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: _hintStyle,
+              errorStyle: _errorStyle,
+              prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
               suffixIcon: searchCtrl.text.isEmpty
                   ? null
                   : IconButton(
-                icon: const Icon(Icons.clear, size: 18),
+                icon: Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
                 tooltip: 'Clear',
                 onPressed: onClear,
               ),
               filled: true,
-              fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+              fillColor: AppColors.background,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14),
+                vertical: Responsive.h(14),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.border),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
               ),
             ),
             validator: (v) => DValidator.validateDropdown('product', selectedProduct?.id),
@@ -574,29 +771,35 @@ class EstimateProductSearch extends StatelessWidget {
             SizedBox(height: Responsive.h(6)),
             Container(
               constraints: BoxConstraints(maxHeight: Responsive.h(220)),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
+              decoration: estimateCardDecoration(radius: 14),
+              clipBehavior: Clip.antiAlias,
               child: filtered.isEmpty
                   ? Padding(
                 padding: EdgeInsets.all(Responsive.w(14)),
-                child: Text('No matching products', style: AppTextStyles.caption()),
+                child: Text('No matching products', style: _captionStyle),
               )
                   : ListView.separated(
                 padding: EdgeInsets.zero,
                 shrinkWrap: true,
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: AppColors.border),
                 itemBuilder: (context, index) {
                   final p = filtered[index];
                   return ListTile(
                     dense: true,
-                    leading: const Icon(Icons.inventory_2_outlined, size: 18),
-                    title: Text(p.name, overflow: TextOverflow.ellipsis),
+                    leading: const EstimateIconBadge(Icons.inventory_2_outlined,
+                        size: 14),
+                    title: Text(
+                      p.name,
+                      style: AppTextStyles.bodyBold(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text(
                       '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
+                      style: _captionStyle,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     onTap: () => onSelected(p),
@@ -624,20 +827,100 @@ class EstimateEditingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(10)),
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
       ),
       child: Row(
         children: [
           const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
           SizedBox(width: Responsive.w(6)),
-          Expanded(child: Text('Editing item #$itemNumber', style: AppTextStyles.caption())),
+          Expanded(child: Text('Editing item #$itemNumber', style: _captionStyle)),
           InkWell(
             onTap: onCancel,
             child: Text('Cancel', style: AppTextStyles.bodyBold(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Totals card (Summary)
+// ---------------------------------------------------------------------------
+class EstimateTotalRow extends StatelessWidget {
+  const EstimateTotalRow(this.label, this.value, {super.key});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTextStyles.body(color: AppColors.textSecondary)),
+        Text(value, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+class EstimateTotalsCard extends StatelessWidget {
+  const EstimateTotalsCard({
+    super.key,
+    required this.totalSqft,
+    required this.itemsTotal,
+    required this.handling,
+    required this.grandTotal,
+    required this.currency,
+    required this.number,
+  });
+
+  final double totalSqft;
+  final double itemsTotal;
+  final double handling;
+  final double grandTotal;
+  final NumberFormat currency;
+  final NumberFormat number;
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = SizedBox(height: Responsive.h(10));
+    return Container(
+      width: double.infinity,
+      decoration: estimateCardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const EstimateCardTitle(title: 'Summary', icon: Icons.calculate_outlined),
+          Padding(
+            padding: EdgeInsets.all(Responsive.w(14)),
+            child: Column(
+              children: [
+                EstimateTotalRow('Total Sq.Ft', number.format(totalSqft)),
+                gap,
+                EstimateTotalRow('Items Total', currency.format(itemsTotal)),
+                gap,
+                EstimateTotalRow('Handling Charge', currency.format(handling)),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+                  child: const Divider(height: 1, color: AppColors.border),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Grand Total', style: AppTextStyles.bodyBold()),
+                    Text(currency.format(grandTotal),
+                        style: AppTextStyles.amount(color: AppColors.primary)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -670,49 +953,61 @@ class EstimateItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
-      padding: EdgeInsets.all(Responsive.w(12)),
+      padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: isEditing ? AppColors.primary.withOpacity(0.06) : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: isEditing ? AppColors.primary.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: AppColors.surfaceAlt,
-            child: Text('$serialNo', style: AppTextStyles.caption()),
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('$serialNo',
+                style: AppTextStyles.caption(color: AppColors.primary)),
           ),
           SizedBox(width: Responsive.w(10)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.name, style: AppTextStyles.bodyBold()),
+                Text(item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyBold()),
                 SizedBox(height: Responsive.h(2)),
                 if (item.size.isNotEmpty || item.company.isNotEmpty)
                   Text(
                     '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}',
-                    style: AppTextStyles.caption(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _captionStyle,
                   ),
                 SizedBox(height: Responsive.h(2)),
                 Text(
                   'Qty: ${estimateFormatQty(item.quantity)}${item.unit.isNotEmpty ? ' ${item.unit}' : ''}'
                       '${item.mrp > 0 ? '   MRP: ${estimateFormatQty(item.mrp)}' : ''}'
                       '   Rate: ${estimateFormatQty(item.rate)}',
-                  style: AppTextStyles.caption(),
+                  style: _captionStyle,
                 ),
                 if (item.isBoxUnit) ...[
                   SizedBox(height: Responsive.h(2)),
                   Text(
                     'Box: ${estimateFormatQty(item.boxQuantity)}   Piece: ${estimateFormatQty(item.pieceQuantity)}',
-                    style: AppTextStyles.caption(),
+                    style: _captionStyle,
                   ),
                 ],
               ],
             ),
           ),
+          SizedBox(width: Responsive.w(8)),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -726,7 +1021,7 @@ class EstimateItemTile extends StatelessWidget {
                     onTap: onEdit,
                     child: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
                   ),
-                  SizedBox(width: Responsive.w(12)),
+                  SizedBox(width: Responsive.w(14)),
                   InkWell(
                     onTap: onDelete,
                     child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
@@ -756,9 +1051,9 @@ class LabeledField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTextStyles.caption()),
+          Text(label, style: _captionStyle),
           SizedBox(height: Responsive.h(4)),
-          field,
+          Theme(data: _fieldTheme(context), child: field),
         ],
       ),
     );

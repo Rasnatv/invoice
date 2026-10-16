@@ -11,6 +11,7 @@ import '../../Apiprovider/driverdespatchprovider.dart';
 import '../../bloc/driverbloc/driverdespatchdetail/driverdespatchdetail_bloc.dart';
 import '../../bloc/driverbloc/driverdespatchdetail/driverdespatchdetail_event.dart';
 import '../../bloc/driverbloc/driverdespatchdetail/driverdespatchdetail_state.dart';
+import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/drivermodels/driverdashboarddespatchdetailscreenmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
@@ -38,7 +39,7 @@ class _DriverBillDetailView extends StatefulWidget {
 }
 
 class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
-  // Signature capture is upload-only now (no draw pad) and optional — the
+  // Signature capture is upload-only (no draw pad) and optional — the
   // driver can mark a bill delivered with either, both, or neither
   // signature attached.
   File? _customerSigFile;
@@ -49,46 +50,57 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child:Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Despatch Details', style: AppTextStyles.h6()),
-      ),
-      body: BlocConsumer<DriverDespatchDetailBloc, DriverDespatchDetailState>(
-        listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
-        listener: (context, state) {
-          if (state.actionStatus == DriverDespatchActionStatus.success) {
-            AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
-            setState(() {
-              _customerSigFile = null;
-              _driverSigFile = null;
-            });
-            context.read<DriverDespatchDetailBloc>().add(const ClearDriverDespatchActionStatus());
-          } else if (state.actionStatus == DriverDespatchActionStatus.failure) {
-            AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
-            context.read<DriverDespatchDetailBloc>().add(const ClearDriverDespatchActionStatus());
-          }
-        },
-        builder: (context, state) {
-          if (state.status == DriverDespatchDetailStatus.initial ||
-              (state.status == DriverDespatchDetailStatus.loading && state.dispatch == null)) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
 
-          if (state.status == DriverDespatchDetailStatus.failure && state.dispatch == null) {
-            return _ErrorView(
-              message: state.errorMessage ?? 'Failed to load despatch bill',
-              onRetry: () => context
+        // ---------- APPBAR (same as Owner dispatch detail) ----------
+        appBar: AppBar(
+          title: Text('Despatch Details', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: BlocConsumer<DriverDespatchDetailBloc, DriverDespatchDetailState>(
+          listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
+          listener: (context, state) {
+            if (state.actionStatus == DriverDespatchActionStatus.success) {
+              AppSnackbar.success(state.actionMessage ?? 'Updated successfully');
+              setState(() {
+                _customerSigFile = null;
+                _driverSigFile = null;
+              });
+              context
                   .read<DriverDespatchDetailBloc>()
-                  .add(FetchDriverDespatchDetail(widget.billId)),
-            );
-          }
+                  .add(const ClearDriverDespatchActionStatus());
+            } else if (state.actionStatus == DriverDespatchActionStatus.failure) {
+              AppSnackbar.error(state.actionMessage ?? 'Something went wrong');
+              context
+                  .read<DriverDespatchDetailBloc>()
+                  .add(const ClearDriverDespatchActionStatus());
+            }
+          },
+          builder: (context, state) {
+            if (state.status == DriverDespatchDetailStatus.initial ||
+                (state.status == DriverDespatchDetailStatus.loading &&
+                    state.dispatch == null)) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final bill = state.dispatch!;
-          final isActing = state.actionStatus == DriverDespatchActionStatus.inProgress;
+            if (state.status == DriverDespatchDetailStatus.failure &&
+                state.dispatch == null) {
+              return _ErrorView(
+                message: state.errorMessage ?? 'Failed to load despatch bill',
+                onRetry: () => context
+                    .read<DriverDespatchDetailBloc>()
+                    .add(FetchDriverDespatchDetail(widget.billId)),
+              );
+            }
 
-          return SafeArea(
-            child: RefreshIndicator(
+            final bill = state.dispatch!;
+            final isActing = state.actionStatus == DriverDespatchActionStatus.inProgress;
+
+            return RefreshIndicator(
+              color: AppColors.primary,
               onRefresh: () async {
                 final bloc = context.read<DriverDespatchDetailBloc>();
                 bloc.add(RefreshDriverDespatchDetail(widget.billId));
@@ -97,137 +109,224 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
                     s.status == DriverDespatchDetailStatus.failure);
               },
               child: ListView(
-                padding: EdgeInsets.all(Responsive.w(18)),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  Responsive.w(20),
+                  Responsive.h(14),
+                  Responsive.w(20),
+                  Responsive.h(24) + MediaQuery.of(context).padding.bottom,
+                ),
                 children: [
                   _StatusBanner(bill: bill),
-                  SizedBox(height: Responsive.h(16)),
-                  Container(
-                    padding: EdgeInsets.all(Responsive.w(14)),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      children: [
-                        _infoRow('DS Number', bill.dsNumber),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Ref. No.', bill.refNo),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('P Name', bill.partyName),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Contact Number', bill.contactNumber),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Delivery Address', bill.deliveryAddress),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Salesman', bill.salesmanName),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Despatched At', bill.despatchedAtDisplay),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Driver Name', bill.driverName),
-                        SizedBox(height: Responsive.h(6)),
-                        _infoRow('Driver Contact No', bill.driverContact),
-                      ],
-                    ),
-                  ),
+                  SizedBox(height: Responsive.h(14)),
+                  _infoCard(bill),
                   SizedBox(height: Responsive.h(18)),
-                  Text('Items', style: AppTextStyles.h3()),
+                  const _SectionHeader('Items'),
                   SizedBox(height: Responsive.h(10)),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        Container(
-                          color: AppColors.surfaceAlt,
-                          padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
-                          child: Row(
-                            children: [
-                              SizedBox(width: 24, child: Text('#', style: AppTextStyles.captionnew())),
-                              Expanded(flex: 3, child: Text('Item', style: AppTextStyles.captionnew())),
-                              Expanded(flex: 2, child: Text('Company', style: AppTextStyles.captionnew())),
-                              Expanded(flex: 2, child: Text('Size', style: AppTextStyles.captionnew())),
-                              SizedBox(width: 44, child: Text('Box', style: AppTextStyles.captionnew())),
-                              SizedBox(width: 44, child: Text('Pcs', style: AppTextStyles.captionnew())),
-                            ],
-                          ),
-                        ),
-                        for (var i = 0; i < bill.items.length; i++)
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(8)),
-                            decoration: const BoxDecoration(
-                              border: Border(top: BorderSide(color: AppColors.border)),
-                            ),
-                            child: Row(
-                              children: [
-                                SizedBox(width: 24, child: Text(bill.items[i].slNo, style: AppTextStyles.body())),
-                                Expanded(
-                                  flex: 3,
-                                  child: Text(bill.items[i].itemName,
-                                      style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(bill.items[i].company,
-                                      style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(bill.items[i].size,
-                                      style: AppTextStyles.body(), overflow: TextOverflow.ellipsis),
-                                ),
-                                SizedBox(width: 44, child: Text(bill.items[i].boxes, style: AppTextStyles.body())),
-                                SizedBox(width: 44, child: Text(bill.items[i].pieces, style: AppTextStyles.body())),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: Responsive.h(16)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Grand Total', style: AppTextStyles.h3()),
-                      Text(
-                        bill.grandTotalFormatted.isNotEmpty
-                            ? bill.grandTotalFormatted
-                            : bill.grandTotal.toStringAsFixed(2),
-                        style: AppTextStyles.bodyBold(color: AppColors.primary)
-                            .copyWith(fontSize: Responsive.sp(16)),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: Responsive.h(22)),
+                  _itemsTable(bill),
+                  SizedBox(height: Responsive.h(14)),
+                  _grandTotalCard(bill),
+                  SizedBox(height: Responsive.h(20)),
                   _actionSection(context, bill, isActing),
                 ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 
-  Widget _infoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(width: 130, child: Text(label, style: AppTextStyles.caption())),
-        Expanded(child: Text(value.isEmpty ? '-' : value, style: AppTextStyles.bodyBold())),
-      ],
+  // ---------- sections ----------
+
+  Widget _infoCard(DriverDespatchDetail b) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          _infoRow('DS Number', b.dsNumber),
+          _infoRow('Ref. No.', b.refNo),
+          _infoRow('Customer Name', b.partyName),
+          _infoRow('Contact Number', b.contactNumber),
+          _infoRow('Delivery Address', b.deliveryAddress),
+          _infoRow('Salesman', b.salesmanName),
+          _infoRow('Despatched At', b.despatchedAtDisplay),
+          _infoRow('Driver Name', b.driverName),
+          _infoRow('Driver Contact No', b.driverContact, isLast: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value, {bool isLast = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : Responsive.h(8)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(label,
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
+          ),
+          Expanded(
+            child: Text(value.isEmpty ? '-' : value, style: AppTextStyles.bodyBold()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemsTable(DriverDespatchDetail b) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          border: TableBorder(
+            horizontalInside: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+            verticalInside: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
+          ),
+          // Fixed widths (not Flex) — the table can be wider than the
+          // screen and scroll horizontally.
+          columnWidths: const {
+            0: FixedColumnWidth(32), // #
+            1: FixedColumnWidth(170), // Item
+            2: FixedColumnWidth(140), // Company
+            3: FixedColumnWidth(110), // Size
+            4: FixedColumnWidth(55), // Box
+            5: FixedColumnWidth(55), // Pcs
+          },
+          children: [
+            TableRow(
+              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08)),
+              children: [
+                _headerCell('#'),
+                _headerCell('Item'),
+                _headerCell('Company'),
+                _headerCell('Size'),
+                _headerCell('Box', align: TextAlign.right),
+                _headerCell('Pcs', align: TextAlign.right),
+              ],
+            ),
+            for (var i = 0; i < b.items.length; i++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: i.isEven ? Colors.white : AppColors.background,
+                ),
+                children: [
+                  _dataCell(b.items[i].slNo.isEmpty ? '${i + 1}' : b.items[i].slNo),
+                  _dataCell(b.items[i].itemName.isEmpty ? '-' : b.items[i].itemName),
+                  _dataCell(b.items[i].company.isEmpty ? '-' : b.items[i].company),
+                  _dataCell(b.items[i].size.isEmpty ? '-' : b.items[i].size),
+                  _dataCell(b.items[i].boxes, align: TextAlign.right, bold: true),
+                  _dataCell(b.items[i].pieces, align: TextAlign.right, bold: true),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 3,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.caption(color: AppColors.textPrimary)
+            .copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _dataCell(String text, {TextAlign align = TextAlign.left, bool bold = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(8)),
+      child: Text(
+        text,
+        textAlign: align,
+        maxLines: 3, // wraps up to 3 lines instead of overflowing
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body(),
+      ),
+    );
+  }
+
+  Widget _grandTotalCard(DriverDespatchDetail b) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Grand Total', style: AppTextStyles.bodyBold()),
+          Text(
+            b.grandTotalFormatted.isNotEmpty
+                ? b.grandTotalFormatted
+                : b.grandTotal.toStringAsFixed(2),
+            style: AppTextStyles.amount(color: AppColors.primary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Full-width primary button, same as the Owner dispatch detail screen.
+  Widget _primaryButton({
+    required String label,
+    required bool loading,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: Responsive.h(48),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: loading
+            ? const SizedBox(
+          height: 22,
+          width: 22,
+          child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+        )
+            : Text(label, style: AppTextStyles.bodyBold(color: Colors.white)),
+      ),
     );
   }
 
   /// Pending    -> single "Mark as In Transit" button.
   /// In transit -> two OPTIONAL signature upload blocks + "Mark as Delivered".
-  /// Delivered  -> read-only signatures (server-hosted image URLs), captured at delivery time.
+  /// Delivered  -> read-only signatures (server-hosted image URLs).
   /// Cancelled  -> nothing to do.
-  Widget _actionSection(BuildContext context, DriverDespatchDetail bill, bool isActing) {
+  Widget _actionSection(
+      BuildContext context, DriverDespatchDetail bill, bool isActing) {
     if (bill.isCancelled) {
       return const SizedBox.shrink();
     }
@@ -236,7 +335,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Signatures', style: AppTextStyles.h3()),
+          const _SectionHeader('Signatures'),
           SizedBox(height: Responsive.h(10)),
           _signatureImage('Customer Signature', bill.customerSignatureBase64),
           SizedBox(height: Responsive.h(14)),
@@ -249,10 +348,10 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Capture Signatures', style: AppTextStyles.h3()),
+          const _SectionHeader('Capture Signatures'),
           SizedBox(height: Responsive.h(4)),
           Text('Optional — you can mark as delivered without these.',
-              style: AppTextStyles.caption()),
+              style: AppTextStyles.caption(color: AppColors.textSecondary)),
           SizedBox(height: Responsive.h(10)),
           _signatureUploadBlock(
             label: 'Customer Signature (optional)',
@@ -268,50 +367,20 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
             onClearFile: () => setState(() => _driverSigFile = null),
           ),
           SizedBox(height: Responsive.h(18)),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: isActing ? null : () => _confirmMarkDelivered(context, widget.billId),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              icon: isActing
-                  ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              )
-                  : const Icon(Icons.check_circle_rounded, size: 18),
-              label: const Text('Mark as Delivered'),
-            ),
+          _primaryButton(
+            label: 'Mark as Delivered',
+            loading: isActing,
+            onPressed: isActing ? null : () => _confirmMarkDelivered(context, widget.billId),
           ),
         ],
       );
     }
 
     // pending
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: isActing ? null : () => _confirmMarkInTransit(context, widget.billId),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-        icon: isActing
-            ? const SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-        )
-            : const Icon(Icons.local_shipping_rounded, size: 18),
-        label: const Text('Mark as In Transit'),
-      ),
+    return _primaryButton(
+      label: 'Mark as In Transit',
+      loading: isActing,
+      onPressed: isActing ? null : () => _confirmMarkInTransit(context, widget.billId),
     );
   }
 
@@ -326,7 +395,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.caption()),
+        Text(label, style: AppTextStyles.caption(color: AppColors.textSecondary)),
         SizedBox(height: Responsive.h(6)),
         if (file != null)
           _pickedImagePreview(file, onClear: onClearFile)
@@ -336,24 +405,28 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
     );
   }
 
+  BoxDecoration get _signatureBoxDecoration => BoxDecoration(
+    color: AppColors.background,
+    border: Border.all(color: AppColors.border),
+    borderRadius: BorderRadius.circular(14),
+  );
+
   Widget _uploadPlaceholder({required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         height: 100,
         width: double.infinity,
         alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: _signatureBoxDecoration,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.upload_file_rounded, size: 22),
+            Icon(Icons.upload_file_rounded, size: 22, color: AppColors.primary),
             SizedBox(height: Responsive.h(4)),
-            Text('Tap to upload signature image', style: AppTextStyles.caption()),
+            Text('Tap to upload signature image',
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -366,10 +439,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
         Container(
           height: 100,
           width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          decoration: _signatureBoxDecoration,
           clipBehavior: Clip.antiAlias,
           child: Image.file(file, fit: BoxFit.contain),
         ),
@@ -390,22 +460,19 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
   }
 
   /// Read-only render of a signature captured at delivery time. The
-  /// mark-delivered API now returns these as plain hosted image URLs
-  /// (e.g. "https://.../storage/signatures/xxx.png") rather than base64
-  /// data URIs, so we branch on that; base64 handling stays as a fallback
-  /// for any older records that still carry a data URI.
+  /// mark-delivered API returns plain hosted image URLs; base64 handling
+  /// stays as a fallback for older records that still carry a data URI.
   Widget _signatureImage(String label, String? sigData) {
     Widget content;
+
     if (sigData == null || sigData.isEmpty) {
       content = _placeholderBox('Not captured');
     } else if (sigData.startsWith('http://') || sigData.startsWith('https://')) {
       content = Container(
         height: 100,
         width: double.infinity,
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: _signatureBoxDecoration,
+        clipBehavior: Clip.antiAlias,
         child: Image.network(
           sigData,
           fit: BoxFit.contain,
@@ -428,10 +495,8 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
         content = Container(
           height: 100,
           width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          decoration: _signatureBoxDecoration,
+          clipBehavior: Clip.antiAlias,
           child: Image.memory(base64Decode(raw), fit: BoxFit.contain),
         );
       } catch (_) {
@@ -442,7 +507,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.caption()),
+        Text(label, style: AppTextStyles.caption(color: AppColors.textSecondary)),
         SizedBox(height: Responsive.h(6)),
         content,
       ],
@@ -452,12 +517,10 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
   Widget _placeholderBox(String text) {
     return Container(
       height: 100,
+      width: double.infinity,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(text, style: AppTextStyles.caption()),
+      decoration: _signatureBoxDecoration,
+      child: Text(text, style: AppTextStyles.caption(color: AppColors.textSecondary)),
     );
   }
 
@@ -479,16 +542,9 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
     });
   }
 
-  /// Reads the picked file and returns it as a base64 data URI matching
-  /// what the API expects (data:<mime>;base64,...).
-  ///
-  /// FIX: previously this always hardcoded `image/png` regardless of the
-  /// file actually picked from the gallery. Most gallery images are JPEG,
-  /// so the server received JPEG bytes mislabeled as PNG — the bytes
-  /// decoded fine locally (Image.file sniffs real content) but broke once
-  /// stored/served back as a URL (Image.network), which is why signatures
-  /// appeared to "not show" after upload. We now detect the mime type from
-  /// the file's actual extension.
+  /// Reads the picked file and returns it as a base64 data URI with the
+  /// mime type detected from the file's real extension (not hardcoded PNG),
+  /// so JPEG gallery picks are stored/served correctly.
   Future<String?> _fileToBase64(File? file) async {
     if (file == null) return null;
     final bytes = await file.readAsBytes();
@@ -501,35 +557,26 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
       'png' => 'image/png',
       'heic' => 'image/heic',
       'heif' => 'image/heif',
-      _ => 'image/jpeg', // gallery picks default to jpeg if extension is unclear
+      _ => 'image/jpeg',
     };
 
     return 'data:$mime;base64,$base64Str';
   }
 
-  void _confirmMarkInTransit(BuildContext context, String id) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Mark as In Transit?'),
-        content: const Text('This confirms you have picked up this despatch for delivery.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogCtx);
-              context.read<DriverDespatchDetailBloc>().add(MarkInTransitRequested(id));
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
+  Future<void> _confirmMarkInTransit(BuildContext context, String id) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Mark as In Transit?',
+      message: 'This confirms you have picked up this despatch for delivery.',
+      confirmText: 'Confirm',
     );
+    if (confirmed && context.mounted) {
+      context.read<DriverDespatchDetailBloc>().add(MarkInTransitRequested(id));
+    }
   }
 
   /// Signatures are optional — whatever was (or wasn't) uploaded just gets
-  /// sent straight through. No blocking validation here anymore.
+  /// sent straight through. No blocking validation here.
   Future<void> _confirmMarkDelivered(BuildContext context, String id) async {
     final customerSig = await _fileToBase64(_customerSigFile);
     final driverSig = await _fileToBase64(_driverSigFile);
@@ -540,6 +587,33 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
       customerSignatureBase64: customerSig,
       driverSignatureBase64: driverSig,
     ));
+  }
+}
+
+// =====================================================================
+// SMALL REUSABLE PIECES (private to this file)
+// =====================================================================
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
   }
 }
 
@@ -558,7 +632,7 @@ class _StatusBanner extends StatelessWidget {
       icon = Icons.check_circle_rounded;
       text = 'Delivered';
     } else if (bill.isCancelled) {
-      color = Colors.redAccent;
+      color = AppColors.error;
       icon = Icons.cancel_rounded;
       text = 'Cancelled';
     } else if (bill.isInTransit) {
@@ -574,27 +648,28 @@ class _StatusBanner extends StatelessWidget {
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(10)),
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
       decoration: BoxDecoration(
-        // withOpacity() is deprecated (precision loss) -> withValues(alpha: ...)
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 20),
           SizedBox(width: Responsive.w(8)),
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: Responsive.sp(12.5)),
-            ),
+            child: Text(text, style: AppTextStyles.bodyBold(color: color)),
           ),
         ],
       ),
     );
   }
 }
+
+// =====================================================================
+// ERROR VIEW
+// =====================================================================
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
@@ -609,11 +684,15 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 40, color: Colors.redAccent),
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withValues(alpha: 0.5), size: 38),
             SizedBox(height: Responsive.h(10)),
-            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
-            SizedBox(height: Responsive.h(14)),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            Text(message, textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
+            ),
           ],
         ),
       ),

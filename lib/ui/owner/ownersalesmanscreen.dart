@@ -11,10 +11,13 @@ import '../../Apiprovider/salesmanprovider.dart';
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/salesmanmodel.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_bloc.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_event.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_state.dart';
+import 'owner_designationlist.dart';
 import 'owneraddsalesmanscreen.dart';
+
 
 class OwnerSalesmenScreen extends StatelessWidget {
   const OwnerSalesmenScreen({super.key});
@@ -41,9 +44,8 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
   final _searchCtrl = TextEditingController();
 
   // Keeps the last successfully loaded list around so that a transient
-  // state — e.g. SalesmanActionLoading while a delete request is in
-  // flight — doesn't fall through to an empty list and flash
-  // "No salesmen found" before the real result comes back.
+  // state (e.g. SalesmanActionLoading while a delete is in flight)
+  // doesn't flash "No salesmen found" before the real result arrives.
   List<HSalesmanModel> _lastKnownSalesmen = [];
 
   @override
@@ -73,6 +75,16 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
         ),
       ),
     );
+  }
+
+  /// Add Designation button -> opens the Designation list page.
+  Future<void> _openDesignations() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DesignationListPage()),
+    );
+    if (!mounted) return;
+    // Refresh in case designation names changed.
+    context.read<SalesmanBloc>().add(FetchSalesmen());
   }
 
   Future<void> _openEditSalesman(HSalesmanModel salesman) async {
@@ -126,31 +138,49 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
+
         appBar: AppBar(
           title: Text('Salesmen', style: AppTextStyles.h6()),
-        ),
-        floatingActionButton: FloatingActionButton.extended(
           backgroundColor: AppColors.primary,
-          onPressed: _openAddSalesman,
-          icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
-          label: const Text(
-            'Add Salesman',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
+          foregroundColor: Colors.white,
         ),
+
+        // No floating action button — both actions are in the top row.
         body: SafeArea(
           child: Column(
             children: [
+              // ---------- Top row: Add Salesman | Add Designation ----------
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                    Responsive.w(16), Responsive.h(14), Responsive.w(16), 0),
-                child: TextField(
+                    Responsive.w(20), Responsive.h(14), Responsive.w(20), 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _TopActionButton(
+                        icon: Icons.person_add_alt_1,
+                        label: 'Add Salesman',
+                        onPressed: _openAddSalesman,
+                      ),
+                    ),
+                    SizedBox(width: Responsive.w(10)),
+                    Expanded(
+                      child: _TopActionButton(
+                        icon: Icons.badge_outlined,
+                        label: 'Add Designation',
+                        onPressed: _openDesignations,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: Responsive.h(12)),
+
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                child: _SearchField(
                   controller: _searchCtrl,
+                  hint: 'Search salesman by name, phone or email',
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    hintText: 'Search salesman by name, phone or email',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
                 ),
               ),
               SizedBox(height: Responsive.h(12)),
@@ -167,7 +197,13 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
                   },
                   builder: (context, state) {
                     if (state is SalesmanLoading || state is SalesmanInitial) {
-                      return const Center(child: CircularProgressIndicator());
+                      return ShimmerListPlaceholder(
+                        itemCount: 6,
+                        padding: EdgeInsets.fromLTRB(Responsive.w(20), 0,
+                            Responsive.w(20), Responsive.h(24)),
+                        separatorHeight: Responsive.h(10),
+                        itemBuilder: (_, __) => const _SalesmanCardSkeleton(),
+                      );
                     }
 
                     if (state is SalesmanError) {
@@ -178,19 +214,14 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
                       );
                     }
 
-                    // Default to whatever we last had (e.g. while a delete
-                    // is in flight as SalesmanActionLoading), only replacing
-                    // it once a fresh list actually arrives.
                     List<HSalesmanModel> all = _lastKnownSalesmen;
                     if (state is SalesmanLoaded) all = state.salesmen;
                     if (state is SalesmanActionSuccess) all = state.salesmen;
                     _lastKnownSalesmen = all;
 
-                    // 1) No salesmen exist at all -> empty state
+                    // 1) No salesmen exist at all
                     if (all.isEmpty) {
-                      return _scrollableCenter(
-                        _EmptyStaffState(onAdd: _openAddSalesman),
-                      );
+                      return _scrollableCenter(const _EmptyStaffState());
                     }
 
                     final items = _apply(all);
@@ -207,8 +238,9 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
                       },
                       child: ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(Responsive.w(16), 0,
-                            Responsive.w(16), Responsive.h(80)),
+                        // FAB is gone, so no extra bottom space needed.
+                        padding: EdgeInsets.fromLTRB(Responsive.w(20), 0,
+                            Responsive.w(20), Responsive.h(24)),
                         itemCount: items.length,
                         separatorBuilder: (_, __) =>
                             SizedBox(height: Responsive.h(10)),
@@ -230,11 +262,83 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
   }
 }
 
-/// Shown when there are no salesmen at all.
-class _EmptyStaffState extends StatelessWidget {
-  const _EmptyStaffState({required this.onAdd});
+// ---------------- TOP ACTION BUTTON (outlined) ----------------
 
-  final VoidCallback onAdd;
+class _TopActionButton extends StatelessWidget {
+  const _TopActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18, color: AppColors.primary),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.bodyBold(color: AppColors.primary),
+      ),
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size.fromHeight(Responsive.h(48)),
+        padding: EdgeInsets.symmetric(horizontal: Responsive.w(8)),
+        side: const BorderSide(color: AppColors.primary),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+}
+
+// ---------------- SEARCH FIELD ----------------
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.hint,
+    required this.onChanged,
+  });
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  OutlineInputBorder _border(Color c) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: c),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: AppTextStyles.body(),
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        hintText: hint,
+        hintStyle: AppTextStyles.body(color: AppColors.textHint),
+        prefixIcon: Icon(Icons.search_rounded,
+            size: 20, color: AppColors.textSecondary),
+        contentPadding: EdgeInsets.symmetric(vertical: Responsive.h(13)),
+        border: _border(AppColors.border),
+        enabledBorder: _border(AppColors.border),
+        focusedBorder: _border(AppColors.primary),
+      ),
+    );
+  }
+}
+
+// ---------------- EMPTY / ERROR STATES ----------------
+
+class _EmptyStaffState extends StatelessWidget {
+  const _EmptyStaffState();
 
   @override
   Widget build(BuildContext context) {
@@ -244,11 +348,13 @@ class _EmptyStaffState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.person_add_alt_1_sharp, size: 40, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(Icons.groups_2_outlined,
+                size: 44, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(10)),
             Text(
               'Add your first salesman to get started',
-                style: AppTextStyles.subtitle()
+              textAlign: TextAlign.center,
+              style: AppTextStyles.subtitle(),
             ),
           ],
         ),
@@ -257,7 +363,6 @@ class _EmptyStaffState extends StatelessWidget {
   }
 }
 
-/// Shown when the search box matches nothing.
 class _NoSearchResults extends StatelessWidget {
   const _NoSearchResults();
 
@@ -269,16 +374,13 @@ class _NoSearchResults extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: AppColors.textSecondary.withOpacity(0.4),
-            ),
-            SizedBox(height: Responsive.h(12)),
+            Icon(Icons.search_off_rounded,
+                size: 44, color: AppColors.textSecondary.withOpacity(0.4)),
+            SizedBox(height: Responsive.h(10)),
             Text(
               'No salesmen match your search',
-              style: AppTextStyles.subtitle(),
               textAlign: TextAlign.center,
+              style: AppTextStyles.subtitle(),
             ),
           ],
         ),
@@ -287,7 +389,6 @@ class _NoSearchResults extends StatelessWidget {
   }
 }
 
-/// Error state shown when the salesmen list fails to load.
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
   final String message;
@@ -302,12 +403,12 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.error_outline_rounded,
-                color: AppColors.error, size: Responsive.w(40)),
-            SizedBox(height: Responsive.h(12)),
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
             Text(message,
-                textAlign: TextAlign.center, style: AppTextStyles.body()),
-            SizedBox(height: Responsive.h(16)),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(onPressed: onRetry, child: const Text('Try again')),
           ],
         ),
       ),
@@ -315,148 +416,210 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-class _OwnerSalesmanCard extends StatelessWidget {
-  const _OwnerSalesmanCard(
-      {required this.salesman, required this.onEdit, required this.onDelete});
-  final HSalesmanModel salesman;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+// ---------------- SKELETON ----------------
+
+class _SalesmanCardSkeleton extends StatelessWidget {
+  const _SalesmanCardSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    // Format salary with Indian Rupee symbol
-    final formattedSalary = NumberFormat.currency(
-      symbol: '₹',
-      decimalDigits: 0,
-    ).format(salesman.salary);
-
     return Container(
+      width: double.infinity,
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  salesman.name,
-                  style: AppTextStyles.bodyBold(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              const ShimmerBox(width: 42, height: 42, borderRadius: 12),
+              SizedBox(width: Responsive.w(12)),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 120, height: 13),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 90, height: 11),
+                  ],
                 ),
               ),
-              // Salary badge
-              Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  formattedSalary,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              SizedBox(width: Responsive.w(4)),
-              PopupMenuButton<String>(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.more_vert,
-                    size: 18, color: AppColors.textSecondary),
-                onSelected: (value) {
-                  if (value == 'edit') onEdit();
-                  if (value == 'delete') onDelete();
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit_outlined,
-                            size: 18, color: AppColors.textPrimary),
-                        SizedBox(width: 8),
-                        Text('Edit'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline,
-                            size: 18, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text('Delete',
-                            style: TextStyle(color: AppColors.error)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              const ShimmerBox(width: 56, height: 20, borderRadius: 20),
             ],
           ),
+          SizedBox(height: Responsive.h(10)),
+          const ShimmerBox(width: 110, height: 11),
           SizedBox(height: Responsive.h(6)),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
+          const ShimmerBox(width: 170, height: 11),
+          SizedBox(height: Responsive.h(12)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(10)),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              if (salesman.designationName.isNotEmpty)
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    salesman.designationName,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary),
-                  ),
-                ),
-              // Active / Inactive status badge
+              ShimmerBox(width: 100, height: 12),
+              ShimmerBox(width: 70, height: 16),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------- SALESMAN CARD ----------------
+
+class _OwnerSalesmanCard extends StatelessWidget {
+  const _OwnerSalesmanCard({
+    required this.salesman,
+    required this.onEdit,
+    required this.onDelete,
+  });
+  final HSalesmanModel salesman;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  Widget _infoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.textSecondary),
+        SizedBox(width: Responsive.w(6)),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              fontSize: Responsive.sp(11),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final salary = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    ).format(salesman.salary);
+
+    final statusColor =
+    salesman.isActive ? AppColors.success : const Color(0xFFDC2626);
+    final initial =
+    salesman.name.isNotEmpty ? salesman.name[0].toUpperCase() : '?';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- top: avatar, name + designation, status, menu ----
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                width: 42,
+                height: 42,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: salesman.isActive
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
+                  color: AppColors.primary.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Text(
+                  initial,
+                  style: AppTextStyles.h2(color: AppColors.primary),
+                ),
+              ),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: salesman.isActive ? Colors.green : Colors.red,
+                    Text(
+                      salesman.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodyBold(),
+                    ),
+                    if (salesman.designationName.isNotEmpty) ...[
+                      SizedBox(height: Responsive.h(2)),
+                      Text(
+                        salesman.designationName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption(
+                            color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(width: Responsive.w(8)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  salesman.isActive ? 'Active' : 'Inactive',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: Responsive.sp(10.5),
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 28,
+                height: 24,
+                child: PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_vert,
+                      size: 18, color: AppColors.textSecondary),
+                  onSelected: (value) {
+                    if (value == 'edit') onEdit();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_outlined,
+                              size: 18, color: AppColors.textPrimary),
+                          const SizedBox(width: 8),
+                          Text('Edit', style: AppTextStyles.body()),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      salesman.isActive ? 'Active' : 'Inactive',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: salesman.isActive ? Colors.green : Colors.red,
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete_outline,
+                              size: 18, color: AppColors.error),
+                          const SizedBox(width: 8),
+                          Text('Delete',
+                              style:
+                              AppTextStyles.body(color: AppColors.error)),
+                        ],
                       ),
                     ),
                   ],
@@ -464,68 +627,41 @@ class _OwnerSalesmanCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: Responsive.h(4)),
-          Row(
-            children: [
-              const Icon(Icons.phone_outlined,
-                  size: 14, color: AppColors.textSecondary),
-              SizedBox(width: Responsive.w(4)),
-              Expanded(
-                child: Text(salesman.mobile,
-                    style: AppTextStyles.caption(),
-                    overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-          SizedBox(height: Responsive.h(2)),
-          Row(
-            children: [
-              const Icon(Icons.email_outlined,
-                  size: 14, color: AppColors.textSecondary),
-              SizedBox(width: Responsive.w(4)),
-              Expanded(
-                child: Text(salesman.email,
-                    style: AppTextStyles.caption(),
-                    overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-          SizedBox(height: Responsive.h(8)),
+
+          // ---- contact info ----
+          SizedBox(height: Responsive.h(10)),
+          _infoRow(Icons.phone_outlined, salesman.mobile),
+          SizedBox(height: Responsive.h(6)),
+          _infoRow(Icons.email_outlined, salesman.email),
+          if (salesman.employeeCode.isNotEmpty) ...[
+            SizedBox(height: Responsive.h(6)),
+            _infoRow(Icons.badge_outlined, 'ID: ${salesman.employeeCode}'),
+          ],
+
+          SizedBox(height: Responsive.h(12)),
           const Divider(height: 1, color: AppColors.border),
-          SizedBox(height: Responsive.h(8)),
+          SizedBox(height: Responsive.h(10)),
+
+          // ---- bottom: joined date, salary ----
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today_outlined,
-                      size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: Responsive.w(4)),
-                  Text(
-                    salesman.joiningDate != null
-                        ? 'Joined ${DateFormat('dd-MM-yyyy').format(salesman.joiningDate!)}'
-                        : 'Joining date unavailable',
-                    style: AppTextStyles.caption(),
-                  ),
-                ],
-              ),
-              // Employee Code if available
-              if (salesman.employeeCode.isNotEmpty)
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'ID: ${salesman.employeeCode}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[600],
-                    ),
-                  ),
+              Icon(Icons.calendar_today_rounded,
+                  size: 13, color: AppColors.textSecondary),
+              SizedBox(width: Responsive.w(6)),
+              Expanded(
+                child: Text(
+                  salesman.joiningDate != null
+                      ? 'Joined ${DateFormat('dd-MM-yyyy').format(salesman.joiningDate!)}'
+                      : 'Joining date unavailable',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
+              ),
+              Text(
+                salary,
+                style: AppTextStyles.amount(color: AppColors.primary),
+              ),
             ],
           ),
         ],

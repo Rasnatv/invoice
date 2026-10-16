@@ -1,4 +1,3 @@
-
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -20,11 +19,6 @@ class CurrencyFmt {
 }
 
 const currencyFmt = CurrencyFmt();
-
-// ---------------------------------------------------------------------
-// Standard column widths for the items grid.
-// Every row uses the same widths so the table looks uniform.
-// ---------------------------------------------------------------------
 
 class EstCol {
   static const double sl = 60; // Sl.No
@@ -70,11 +64,11 @@ Color statusColor(String status) {
     case 'delivered':
       return AppColors.success;
     case 'rejected':
-      return Colors.red;
+      return const Color(0xFFDC2626);
     case 'despatched':
       return AppColors.primary;
     default:
-      return Colors.orange;
+      return const Color(0xFFF59E0B);
   }
 }
 
@@ -83,18 +77,12 @@ String statusLabel(String status) {
   return status[0].toUpperCase() + status.substring(1).replaceAll('_', ' ');
 }
 
-/// Shared card decoration so every block on the page looks consistent.
-BoxDecoration cardDecoration({double radius = 14}) => BoxDecoration(
-  color: AppColors.surface,
+/// Shared card decoration (same as the list cards on Drivers / Estimates):
+/// white, radius 16, 1px border, no shadow.
+BoxDecoration cardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
   borderRadius: BorderRadius.circular(radius),
-  border: Border.all(color: AppColors.border.withOpacity(0.8)),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.04),
-      blurRadius: 10,
-      offset: const Offset(0, 3),
-    ),
-  ],
+  border: Border.all(color: AppColors.border),
 );
 
 /// Small rounded icon badge used in section titles.
@@ -111,9 +99,90 @@ class IconBadge extends StatelessWidget {
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
         color: c.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+/// Status pill — identical to the one on the Estimates list.
+class StatusPill extends StatelessWidget {
+  const StatusPill({super.key, required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Blue-bar section heading used across the app's reference screens.
+class EstimateSectionHeader extends StatelessWidget {
+  const EstimateSectionHeader(this.title, {super.key});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+/// White card header row (icon badge + title) with a divider underneath.
+class _CardTitleBar extends StatelessWidget {
+  const _CardTitleBar({required this.title, this.icon, this.trailing});
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            IconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+          if (trailing != null) trailing!,
+        ],
+      ),
     );
   }
 }
@@ -131,16 +200,16 @@ class RoundIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final button = Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          width: 48,
-          height: 48,
+          width: Responsive.h(48),
+          height: Responsive.h(48),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border),
           ),
           child: Icon(icon, size: 20, color: AppColors.primary),
@@ -174,34 +243,7 @@ class DetailSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title bar
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
-              border: Border(
-                bottom: BorderSide(color: AppColors.border.withOpacity(0.7)),
-              ),
-            ),
-            child: Row(
-              children: [
-                if (icon != null) ...[
-                  IconBadge(icon!),
-                  SizedBox(width: Responsive.w(10)),
-                ],
-                Expanded(
-                  child: Text(
-                    title,
-                    style: AppTextStyles.bodyBold(color: AppColors.primary)
-                        .copyWith(fontSize: Responsive.sp(14)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Rows
+          _CardTitleBar(title: title, icon: icon),
           Padding(
             padding: EdgeInsets.symmetric(
                 horizontal: Responsive.w(14), vertical: Responsive.h(4)),
@@ -214,12 +256,13 @@ class DetailSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (rows[i].icon != null) ...[
-                          Icon(rows[i].icon, size: 16, color: AppColors.textHint),
+                          Icon(rows[i].icon, size: 16, color: AppColors.textSecondary),
                           SizedBox(width: Responsive.w(10)),
                         ],
                         SizedBox(
                           width: 92,
-                          child: Text(rows[i].label, style: AppTextStyles.caption()),
+                          child: Text(rows[i].label,
+                              style: AppTextStyles.caption(color: AppColors.textSecondary)),
                         ),
                         SizedBox(width: Responsive.w(8)),
                         Expanded(
@@ -232,7 +275,7 @@ class DetailSection extends StatelessWidget {
                     ),
                   ),
                   if (i != rows.length - 1)
-                    Divider(height: 1, color: AppColors.border.withOpacity(0.5)),
+                    const Divider(height: 1, color: AppColors.border),
                 ],
               ],
             ),
@@ -255,10 +298,13 @@ class SummaryRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: bold ? AppTextStyles.bodyBold() : AppTextStyles.body()),
+        Text(label,
+            style: bold
+                ? AppTextStyles.bodyBold()
+                : AppTextStyles.body(color: AppColors.textSecondary)),
         Text(
           value,
-          style: AppTextStyles.body(color: valueColor ?? Colors.black).copyWith(
+          style: AppTextStyles.bodyBold(color: valueColor ?? AppColors.textPrimary).copyWith(
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
@@ -268,7 +314,7 @@ class SummaryRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------
-// Header
+// Header (same look as an Estimates list card)
 // ---------------------------------------------------------------------
 
 class EstimateHeader extends StatelessWidget {
@@ -279,80 +325,53 @@ class EstimateHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = statusColor(detail.status);
     return Container(
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withOpacity(0.10),
-            AppColors.primary.withOpacity(0.02),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.16)),
-      ),
-      child: Column(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: cardDecoration(),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const IconBadge(Icons.receipt_long_rounded, size: 20),
-              // Status pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withOpacity(0.35)),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
+          ),
+          SizedBox(width: Responsive.w(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  detail.estimateNumber,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold(),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                SizedBox(height: Responsive.h(2)),
+                Row(
                   children: [
-                    Icon(statusIcon(detail.status), size: 14, color: color),
-                    SizedBox(width: Responsive.w(6)),
-                    Text(
-                      statusLabel(detail.status),
-                      style: AppTextStyles.bodyBold(color: color)
-                          .copyWith(fontSize: Responsive.sp(12)),
+                    Icon(Icons.calendar_today_rounded,
+                        size: 12, color: AppColors.textSecondary),
+                    SizedBox(width: Responsive.w(5)),
+                    Expanded(
+                      child: Text(
+                        detail.dateRaw,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption(color: AppColors.textSecondary),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          SizedBox(height: Responsive.h(14)),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('REFERENCE NO.',
-                        style: AppTextStyles.caption().copyWith(letterSpacing: 0.8)),
-                    SizedBox(height: Responsive.h(4)),
-                    Text(
-                      detail.estimateNumber,
-                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(16)),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: Responsive.w(12)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('DATE', style: AppTextStyles.caption().copyWith(letterSpacing: 0.8)),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(detail.dateRaw, style: AppTextStyles.bodyBold()),
-                ],
-              ),
-            ],
-          ),
+          SizedBox(width: Responsive.w(8)),
+          StatusPill(label: statusLabel(detail.status), color: color),
         ],
       ),
     );
@@ -392,35 +411,22 @@ class EstimateItemsTable extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                const IconBadge(Icons.list_alt_rounded),
-                SizedBox(width: Responsive.w(10)),
-                Text('Items', style: AppTextStyles.h3()),
-              ],
-            ),
-            Container(
-              padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(12), vertical: Responsive.h(5)),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${detail.items.length} ${detail.items.length == 1 ? 'item' : 'items'}',
-                style: AppTextStyles.bodyBold(color: AppColors.primary)
-                    .copyWith(fontSize: Responsive.sp(12)),
-              ),
+            const EstimateSectionHeader('Items'),
+            StatusPill(
+              label:
+              '${detail.items.length} ${detail.items.length == 1 ? 'item' : 'items'}',
+              color: AppColors.primary,
             ),
           ],
         ),
-        SizedBox(height: Responsive.h(12)),
+        SizedBox(height: Responsive.h(10)),
         if (detail.items.isEmpty)
           Container(
             width: double.infinity,
             padding: EdgeInsets.all(Responsive.w(18)),
             decoration: cardDecoration(),
-            child: Text('No items on this estimate.', style: AppTextStyles.caption()),
+            child: Text('No items on this estimate.',
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
           )
         else
           Container(
@@ -431,8 +437,8 @@ class EstimateItemsTable extends StatelessWidget {
               child: Table(
                 defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                 border: TableBorder(
-                  horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.45)),
-                  verticalInside: BorderSide(color: AppColors.border.withOpacity(0.30)),
+                  horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+                  verticalInside: BorderSide(color: AppColors.border.withOpacity(0.4)),
                 ),
                 // Keyed by index, so built dynamically — every column after
                 // Qty shifts depending on which optional columns are shown.
@@ -457,11 +463,7 @@ class EstimateItemsTable extends StatelessWidget {
                   // ---- Header row ----
                   TableRow(
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.09),
-                      border: Border(
-                        bottom: BorderSide(
-                            color: AppColors.primary.withOpacity(0.35), width: 1.4),
-                      ),
+                      color: AppColors.primary.withOpacity(0.08),
                     ),
                     children: [
                       estHeaderCell('Sl.No', align: TextAlign.center),
@@ -482,9 +484,7 @@ class EstimateItemsTable extends StatelessWidget {
                   for (var i = 0; i < detail.items.length; i++)
                     TableRow(
                       decoration: BoxDecoration(
-                        color: i.isEven
-                            ? AppColors.surface
-                            : AppColors.surfaceAlt.withOpacity(0.45),
+                        color: i.isEven ? Colors.white : AppColors.background,
                       ),
                       children: [
                         estDataCell('${i + 1}', align: TextAlign.center),
@@ -537,11 +537,7 @@ class EstimateItemsTable extends StatelessWidget {
                   // ---- Totals footer row ----
                   TableRow(
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.07),
-                      border: Border(
-                        top: BorderSide(
-                            color: AppColors.primary.withOpacity(0.35), width: 1.2),
-                      ),
+                      color: AppColors.primary.withOpacity(0.06),
                     ),
                     children: [
                       estDataCell(''),
@@ -574,7 +570,8 @@ class EstimateItemsTable extends StatelessWidget {
               Icon(Icons.swipe_rounded, size: 14, color: AppColors.textHint),
               SizedBox(width: Responsive.w(4)),
               Text('Swipe sideways to see all columns',
-                  style: AppTextStyles.caption().copyWith(fontSize: Responsive.sp(11))),
+                  style: AppTextStyles.caption(color: AppColors.textSecondary)
+                      .copyWith(fontSize: Responsive.sp(11))),
             ],
           ),
         ],
@@ -596,7 +593,6 @@ class EstimateItemsTable extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(
           fontSize: cellFontSize,
-          letterSpacing: 0.2,
         ),
       ),
     );
@@ -625,6 +621,9 @@ class EstimateItemsTable extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------
+// Summary
+// ---------------------------------------------------------------------
 
 class EstimateSummary extends StatelessWidget {
   const EstimateSummary({super.key, required this.detail, required this.number});
@@ -634,37 +633,19 @@ class EstimateSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasBalance = detail.balanceAmount > 0;
-    final balanceColor = hasBalance ? Colors.red : AppColors.success;
+    final balanceColor = hasBalance ? const Color(0xFFDC2626) : AppColors.success;
     final discountLabel =
     detail.discountTypeLabel.isEmpty ? detail.discountType : detail.discountTypeLabel;
 
     return Container(
-      decoration: cardDecoration(radius: 16),
+      decoration: cardDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title bar
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-                horizontal: Responsive.w(16), vertical: Responsive.h(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
-              border: Border(bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
-            ),
-            child: Row(
-              children: [
-                const IconBadge(Icons.calculate_outlined),
-                SizedBox(width: Responsive.w(10)),
-                Text('Summary',
-                    style: AppTextStyles.bodyBold(color: AppColors.primary)
-                        .copyWith(fontSize: Responsive.sp(14))),
-              ],
-            ),
-          ),
+          const _CardTitleBar(title: 'Summary', icon: Icons.calculate_outlined),
           Padding(
-            padding: EdgeInsets.all(Responsive.w(16)),
+            padding: EdgeInsets.all(Responsive.w(14)),
             child: Column(
               children: [
                 SummaryRow('Total Sqrft', number.format(detail.totalSquareFeet)),
@@ -681,11 +662,12 @@ class EstimateSummary extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text('Discount ($discountLabel)',
-                            style: AppTextStyles.body()),
+                            style: AppTextStyles.body(color: AppColors.textSecondary)),
                       ),
                       Text(
                         '- ${currencyFmt.f(detail.discountAmount)}',
-                        style: AppTextStyles.bodyBold(color: Colors.red).copyWith(
+                        style: AppTextStyles.bodyBold(color: const Color(0xFFDC2626))
+                            .copyWith(
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
@@ -694,17 +676,17 @@ class EstimateSummary extends StatelessWidget {
                 ],
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
-                  child: Divider(height: 1, color: AppColors.border),
+                  child: const Divider(height: 1, color: AppColors.border),
                 ),
                 // Grand total highlighted
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Grand Total', style: AppTextStyles.h3()),
+                    Text('Grand Total', style: AppTextStyles.bodyBold()),
                     Text(
                       currencyFmt.f(
                           detail.hasDiscount ? detail.amountAfterDiscount : detail.grandTotal),
-                      style: AppTextStyles.balanceamount(),
+                      style: AppTextStyles.amount(color: AppColors.primary),
                     ),
                   ],
                 ),
@@ -718,9 +700,9 @@ class EstimateSummary extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(
-                horizontal: Responsive.w(16), vertical: Responsive.h(14)),
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
             decoration: BoxDecoration(
-              color: balanceColor.withOpacity(0.08),
+              color: balanceColor.withOpacity(0.06),
               border: Border(top: BorderSide(color: balanceColor.withOpacity(0.25))),
             ),
             child: Row(
@@ -736,11 +718,11 @@ class EstimateSummary extends StatelessWidget {
                       color: balanceColor,
                     ),
                     SizedBox(width: Responsive.w(8)),
-                    Text('Balance Amount', style: AppTextStyles.h3()),
+                    Text('Balance Amount', style: AppTextStyles.bodyBold()),
                   ],
                 ),
                 Text(currencyFmt.f(detail.balanceAmount),
-                    style: AppTextStyles.balanceamount(color: balanceColor)),
+                    style: AppTextStyles.amount(color: balanceColor)),
               ],
             ),
           ),
@@ -769,28 +751,12 @@ class EstimatePayments extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
-              border: Border(bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
-            ),
-            child: Row(
-              children: [
-                const IconBadge(Icons.payments_outlined),
-                SizedBox(width: Responsive.w(10)),
-                Expanded(
-                  child: Text('Payments',
-                      style: AppTextStyles.bodyBold(color: AppColors.primary)
-                          .copyWith(fontSize: Responsive.sp(14))),
-                ),
-                Text(
-                  '${detail.payments.length} ${detail.payments.length == 1 ? 'entry' : 'entries'}',
-                  style: AppTextStyles.caption(),
-                ),
-              ],
+          _CardTitleBar(
+            title: 'Payments',
+            icon: Icons.payments_outlined,
+            trailing: Text(
+              '${detail.payments.length} ${detail.payments.length == 1 ? 'entry' : 'entries'}',
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
             ),
           ),
           for (var i = 0; i < detail.payments.length; i++) ...[
@@ -800,14 +766,14 @@ class EstimatePayments extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: AppColors.success.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(Icons.receipt_long_outlined,
-                        size: 18, color: AppColors.success),
+                        size: 20, color: AppColors.success),
                   ),
                   SizedBox(width: Responsive.w(12)),
                   Expanded(
@@ -821,7 +787,7 @@ class EstimatePayments extends StatelessWidget {
                           paymentDateText(detail.payments[i]).isEmpty
                               ? '-'
                               : paymentDateText(detail.payments[i]),
-                          style: AppTextStyles.caption(),
+                          style: AppTextStyles.caption(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -836,7 +802,7 @@ class EstimatePayments extends StatelessWidget {
               ),
             ),
             if (i != detail.payments.length - 1)
-              Divider(height: 1, color: AppColors.border.withOpacity(0.5)),
+              const Divider(height: 1, color: AppColors.border),
           ],
           // Footer total
           Container(
@@ -845,7 +811,7 @@ class EstimatePayments extends StatelessWidget {
                 horizontal: Responsive.w(14), vertical: Responsive.h(12)),
             decoration: BoxDecoration(
               color: AppColors.success.withOpacity(0.06),
-              border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.7))),
+              border: const Border(top: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -863,7 +829,7 @@ class EstimatePayments extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------
-// PDF builders
+// PDF builders (unchanged)
 // ---------------------------------------------------------------------
 
 const _pdfPrimary = PdfColors.blueGrey800;
@@ -936,7 +902,6 @@ pw.Widget pdfInfoSection(EstimateDetailModel d) {
     ),
   );
 }
-
 
 pw.Widget pdfItemsTable(EstimateDetailModel d, bool isOwner) {
   // Same "only if at least one item has it" rule as the Excel export.

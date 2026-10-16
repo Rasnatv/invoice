@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -34,10 +33,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   late final TabController _tabController;
   final _searchCtrl = TextEditingController();
 
-  // The whole dashboard is ONE CustomScrollView (header + search + tabs +
-  // list), so this single controller drives the page scroll AND the
-  // pagination of the "All" tab. No nested scrollables → the header can
-  // never get stuck off-screen.
+  // One CustomScrollView drives page scroll AND "All" tab pagination.
   final _scrollCtrl = ScrollController();
   String _query = '';
 
@@ -45,8 +41,6 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // The list is now a sliver (not a TabBarView), so rebuild whenever the
-    // selected tab changes.
     _tabController.addListener(_onTabChanged);
 
     context.read<SiteVisitBloc>().add(const FetchMySiteVisits());
@@ -62,11 +56,8 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
 
   void _onScroll() {
     if (!_scrollCtrl.hasClients) return;
-    // Only the "All" tab (index 1) is paginated.
     if (_tabController.index != 1) return;
 
-    // Fire the next page a bit before hitting the true bottom so the
-    // next page is ready before the user runs out of items.
     final nearBottom =
         _scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200;
     if (!nearBottom) return;
@@ -146,8 +137,6 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         },
         onLogout: () {
           Navigator.of(ctx).pop();
-          // Shared helper already confirms, clears the token, and
-          // navigates back to LoginScreen — nothing else needed here.
           logout(context);
         },
       ),
@@ -156,9 +145,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
 
   void _openIncentiveList() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const IncentiveListScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const IncentiveListScreen()),
     );
   }
 
@@ -177,7 +164,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final today = DateFormat('dd MMM yyyy, EEEE').format(DateTime.now());
+    final today = DateFormat('EEEE, dd MMM yyyy').format(DateTime.now());
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good Morning'
@@ -191,20 +178,23 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _openAddVisit,
           backgroundColor: AppColors.primary,
-          icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
-          label: const Text('Add Visit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white, size: 20),
+          label: Text(
+            'Add Visit',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: Responsive.sp(12.5),
+            ),
+          ),
         ),
         body: BlocBuilder<SiteVisitBloc, SiteVisitState>(
           builder: (context, state) {
             final todayVisits = state.todayVisits;
             final allVisits = state.allVisits;
             final isInitialLoading = state.isListLoading && state.totalVisitsCount == 0;
-            // Pull-to-refresh or manual refresh while data already exists —
-            // shimmer the whole dashboard again, same as first load.
             final isRefreshing = state.isListLoading && state.totalVisitsCount > 0;
 
-            // Full-screen shimmer on any load — header, stats, search,
-            // tabs, and list all skeleton together instead of real content.
             if (isInitialLoading || isRefreshing) {
               return const FieldStaffFullShimmer();
             }
@@ -213,7 +203,8 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
 
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
+              onRefresh: () async =>
+                  context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
               child: CustomScrollView(
                 controller: _scrollCtrl,
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -241,31 +232,30 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                     padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        SizedBox(height: Responsive.h(16)),
+                        SizedBox(height: Responsive.h(14)),
                         _SearchField(
                           controller: _searchCtrl,
                           onChanged: (v) => setState(() => _query = v),
                         ),
-                        SizedBox(height: Responsive.h(16)),
+                        SizedBox(height: Responsive.h(12)),
                         _FieldStaffTabBar(
                           controller: _tabController,
                           todayCount: state.todayVisitsCount,
                           totalCount: state.totalVisitsCount,
                         ),
-                        SizedBox(height: Responsive.h(14)),
+                        SizedBox(height: Responsive.h(12)),
                         if (state.listError != null)
                           Padding(
-                            padding: EdgeInsets.only(top: Responsive.h(6), bottom: Responsive.h(10)),
-                            child: _ListErrorBanner(
+                            padding: EdgeInsets.only(bottom: Responsive.h(10)),
+                            child: _ErrorState(
                               message: state.listError!,
-                              onRetry: () => context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
+                              onRetry: () =>
+                                  context.read<SiteVisitBloc>().add(const FetchMySiteVisits()),
                             ),
                           ),
                       ]),
                     ),
                   ),
-                  // The list lives in the SAME scroll view as the header,
-                  // so scrolling up always brings the header back.
                   if (isTodayTab)
                     _VisitSliver(
                       visits: _filtered(todayVisits),
@@ -284,9 +274,6 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
                       onTapVisit: _openDetail,
                       onCallTap: _callNumber,
                       isLoadingMore: state.isLoadingMore,
-                      // Only show the "no more" footer once there's
-                      // something loaded and the search box isn't
-                      // filtering the list down.
                       showEndReached: !state.hasMoreAll &&
                           allVisits.isNotEmpty &&
                           _query.trim().isEmpty,
@@ -301,36 +288,55 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
   }
 }
 
+// ---------------- SHARED CARD WRAPPER ----------------
 
-class _ListErrorBanner extends StatelessWidget {
-  const _ListErrorBanner({required this.message, required this.onRetry});
+class _CardWrapper extends StatelessWidget {
+  const _CardWrapper({required this.child, this.padding});
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
 
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: padding ?? EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ---------------- ERROR STATE ----------------
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return _CardWrapper(
       child: Padding(
-        padding: EdgeInsets.all(Responsive.w(24)),
+        padding: EdgeInsets.symmetric(vertical: Responsive.h(14)),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.error,
-              size: Responsive.w(40),
-            ),
-            SizedBox(height: Responsive.h(12)),
+            Icon(Icons.error_outline_rounded,
+                size: 30, color: AppColors.textSecondary.withOpacity(0.5)),
+            SizedBox(height: Responsive.h(8)),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTextStyles.body(),
+              style: AppTextStyles.subtitle().copyWith(fontSize: Responsive.sp(12)),
             ),
-            SizedBox(height: Responsive.h(16)),
-            OutlinedButton(
+            SizedBox(height: Responsive.h(8)),
+            TextButton(
               onPressed: onRetry,
-              child: const Text('Retry'),
+              child: Text('Try again',
+                  style: AppTextStyles.link().copyWith(fontSize: Responsive.sp(12))),
             ),
           ],
         ),
@@ -338,6 +344,8 @@ class _ListErrorBanner extends StatelessWidget {
     );
   }
 }
+
+// ---------------- HEADER ----------------
 
 class _FieldStaffHeader extends StatelessWidget {
   const _FieldStaffHeader({
@@ -370,139 +378,98 @@ class _FieldStaffHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    // The floating stats card used to hang 50px BELOW the Stack's bounds
-    // (bottom: -50). Flutter ignores touches outside a widget's bounds, so
-    // that part of the card (incl. the Incentive button) was not tappable.
-    // The extra bottom padding below makes the card sit INSIDE the Stack.
+
+    // The stats card sits INSIDE the Stack's bounds (bottom padding below)
+    // so the Incentive stat stays tappable.
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Padding(
-          padding: EdgeInsets.only(bottom: Responsive.h(50)),
+          padding: EdgeInsets.only(bottom: Responsive.h(46)),
           child: Container(
+            width: double.infinity,
             padding: EdgeInsets.fromLTRB(
               Responsive.w(20),
-              Responsive.h(20),
+              Responsive.h(14),
               Responsive.w(20),
-              Responsive.h(52),
+              Responsive.h(48),
             ),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primary.withOpacity(0.86)],
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
               ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(28),
-                bottomRight: Radius.circular(28),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.22),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
             ),
             child: SafeArea(
               bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Material(
-                        color: Colors.transparent,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: onAccountTap,
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.18),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.4),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              _initials,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: Responsive.sp(16),
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: Responsive.w(12)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              greeting,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.78),
-                                fontSize: Responsive.sp(11.5),
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            SizedBox(height: Responsive.h(2)),
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.bodyBold(color: Colors.white)
-                                  .copyWith(fontSize: Responsive.sp(18), letterSpacing: 0.2),
-                            ),
-                            SizedBox(height: Responsive.h(4)),
-                          ],
-                        ),
-                      ),
-                      Material(
+                  InkWell(
+                    onTap: onAccountTap,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.16),
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: onAccountTap,
-                          child: const Padding(
-                            padding: EdgeInsets.all(10),
-                            child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 19),
-                          ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _initials,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: Responsive.sp(13.5),
+                          letterSpacing: 0.3,
                         ),
                       ),
-                    ],
-                  ),
-                  SizedBox(height: Responsive.h(16)),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(6)),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  ),
+                  SizedBox(width: Responsive.w(10)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.calendar_today_rounded, size: 12.5, color: Colors.white.withOpacity(0.9)),
-                        SizedBox(width: Responsive.w(6)),
                         Text(
-                          dateLabel,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: Responsive.sp(11.5),
-                            fontWeight: FontWeight.w500,
-                          ),
+                          greeting,
+                          style: AppTextStyles.caption(color: Colors.white.withOpacity(0.8))
+                              .copyWith(fontSize: Responsive.sp(10.5)),
+                        ),
+                        SizedBox(height: Responsive.h(1)),
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.bodyBold(color: Colors.white)
+                              .copyWith(fontSize: Responsive.sp(15)),
                         ),
                       ],
                     ),
                   ),
-                  // Extra breathing room below the date pill.
-                  SizedBox(height: Responsive.h(15)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Icon(Icons.calendar_today_rounded,
+                          size: 12, color: Colors.white.withOpacity(0.8)),
+                      SizedBox(height: Responsive.h(3)),
+                      Text(
+                        dateLabel,
+                        style: AppTextStyles.captionnew(color: Colors.white.withOpacity(0.8))
+                            .copyWith(fontSize: Responsive.sp(9.5)),
+                      ),
+                    ],
+                  ),
+                  SizedBox(width: Responsive.w(4)),
+                  InkWell(
+                    onTap: onAccountTap,
+                    customBorder: const CircleBorder(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 18),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -513,16 +480,17 @@ class _FieldStaffHeader extends StatelessWidget {
           right: Responsive.w(20),
           bottom: 0,
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(8)),
+            padding: EdgeInsets.symmetric(
+                vertical: Responsive.h(11), horizontal: Responsive.w(6)),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.textSecondary.withOpacity(0.06)),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -542,7 +510,7 @@ class _FieldStaffHeader extends StatelessWidget {
                     icon: Icons.today_rounded,
                     value: '$today',
                     label: 'Today',
-                    color: AppColors.warning,
+                    color: const Color(0xFFF59E0B),
                   ),
                 ),
                 _statDivider(),
@@ -562,8 +530,8 @@ class _FieldStaffHeader extends StatelessWidget {
 
   Widget _statDivider() => Container(
     width: 1,
-    height: 37,
-    color: AppColors.textSecondary.withOpacity(0.12),
+    height: 28,
+    color: AppColors.textSecondary.withOpacity(0.14),
   );
 }
 
@@ -584,35 +552,27 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Icon(icon, size: 15, color: color),
-        ),
-        SizedBox(height: Responsive.h(6)),
+        Icon(icon, size: 16, color: color),
+        SizedBox(height: Responsive.h(4)),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.bodyBold(color: color).copyWith(fontSize: Responsive.sp(15)),
+          style: AppTextStyles.bodyBold(color: AppColors.black)
+              .copyWith(fontSize: Responsive.sp(14)),
         ),
         SizedBox(height: Responsive.h(1)),
         Text(
           label,
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: Responsive.sp(10.5),
-            fontWeight: FontWeight.w500,
-          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.captionnew(color: AppColors.textSecondary)
+              .copyWith(fontSize: Responsive.sp(9.5)),
         ),
       ],
     );
   }
 }
-
-// ---------------- INCENTIVE STAT (highlighted gold/orange chip) ----------------
 
 class _IncentiveStat extends StatelessWidget {
   const _IncentiveStat({required this.value, required this.onTap});
@@ -623,63 +583,34 @@ class _IncentiveStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: Responsive.h(2)),
-          child: Column(
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Column(
+        children: [
+          const Icon(Icons.currency_rupee_rounded, size: 16, color: _incentiveColor),
+          SizedBox(height: Responsive.h(4)),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodyBold(color: AppColors.black)
+                .copyWith(fontSize: Responsive.sp(14)),
+          ),
+          SizedBox(height: Responsive.h(1)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFFFB020), Color(0xFFFF8A00)],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _incentiveColor.withOpacity(0.35),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: const Icon(Icons.currency_rupee_rounded, size: 16, color: Colors.white),
-              ),
-              SizedBox(height: Responsive.h(6)),
               Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.bodyBold(color: _incentiveColor).copyWith(fontSize: Responsive.sp(15)),
+                'Incentive',
+                style: AppTextStyles.captionnew(color: AppColors.textSecondary)
+                    .copyWith(fontSize: Responsive.sp(9.5)),
               ),
-              SizedBox(height: Responsive.h(1)),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Incentive',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: Responsive.sp(10.5),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(width: Responsive.w(2)),
-                  Icon(Icons.chevron_right_rounded, size: 12, color: AppColors.textSecondary.withOpacity(0.6)),
-                ],
-              ),
+              Icon(Icons.chevron_right_rounded,
+                  size: 12, color: AppColors.textSecondary.withOpacity(0.7)),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -698,13 +629,6 @@ class _AccountSheet extends StatelessWidget {
   final VoidCallback onChangePassword;
   final VoidCallback onLogout;
 
-  String get _initials {
-    final parts = staffName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -713,14 +637,8 @@ class _AccountSheet extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 30,
-              offset: const Offset(0, -6),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -728,14 +646,13 @@ class _AccountSheet extends StatelessWidget {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 14),
+              margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: AppColors.textSecondary.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
+            const Divider(height: 1, color: AppColors.border),
             _AccountTile(
               icon: Icons.lock_outline_rounded,
               iconColor: AppColors.primary,
@@ -778,30 +695,31 @@ class _AccountTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: iconColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 alignment: Alignment.center,
-                child: Icon(icon, size: 17, color: iconColor),
+                child: Icon(icon, size: 16, color: iconColor),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Text(
                 label,
                 style: TextStyle(
                   color: labelColor ?? AppColors.textPrimary,
-                  fontSize: Responsive.sp(13.5),
+                  fontSize: Responsive.sp(12.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const Spacer(),
-              Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary.withOpacity(0.5)),
+              Icon(Icons.chevron_right_rounded,
+                  size: 18, color: AppColors.textSecondary.withOpacity(0.5)),
             ],
           ),
         ),
@@ -819,41 +737,38 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: TextStyle(fontSize: Responsive.sp(13.5)),
-        decoration: InputDecoration(
-          hintText: 'Search by party, address or phone',
-          hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-          prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 21),
-          suffixIcon: controller.text.isEmpty
-              ? null
-              : IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18),
-            onPressed: () {
-              controller.clear();
-              onChanged('');
-            },
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(vertical: Responsive.h(13)),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: TextStyle(fontSize: Responsive.sp(12.5)),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'Search by party, address or phone',
+        hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+        prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 19),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+          icon: const Icon(Icons.close_rounded, size: 16),
+          onPressed: () {
+            controller.clear();
+            onChanged('');
+          },
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: EdgeInsets.symmetric(vertical: Responsive.h(11)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary),
         ),
       ),
     );
@@ -876,40 +791,28 @@ class _FieldStaffTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
       ),
       child: TabBar(
         controller: controller,
         indicator: BoxDecoration(
           color: AppColors.primary,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(11),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
         unselectedLabelColor: AppColors.textSecondary,
-        labelStyle: TextStyle(fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w700),
-        unselectedLabelStyle: TextStyle(fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w600),
+        labelStyle: TextStyle(fontSize: Responsive.sp(11), fontWeight: FontWeight.w700),
+        unselectedLabelStyle:
+        TextStyle(fontSize: Responsive.sp(11), fontWeight: FontWeight.w600),
         dividerColor: Colors.transparent,
         tabs: [
-          Tab(text: 'Today ($todayCount)'),
-          Tab(text: 'All ($totalCount)'),
+          Tab(height: Responsive.h(30), text: 'Today ($todayCount)'),
+          Tab(height: Responsive.h(30), text: 'All ($totalCount)'),
         ],
       ),
     );
@@ -918,9 +821,6 @@ class _FieldStaffTabBar extends StatelessWidget {
 
 // ---------------- VISIT LIST (sliver) ----------------
 
-/// Sliver version of the visit list. It scrolls together with the header,
-/// search and tabs inside one CustomScrollView, so there is no inner
-/// scrollable that can swallow drags and leave the header unreachable.
 class _VisitSliver extends StatelessWidget {
   const _VisitSliver({
     required this.visits,
@@ -939,94 +839,81 @@ class _VisitSliver extends StatelessWidget {
   final String emptySubLabel;
   final ValueChanged<SiteVisitListItemModel> onTapVisit;
   final ValueChanged<String> onCallTap;
-
-  /// Shows a small spinner row below the last item while the next page
-  /// is being fetched.
   final bool isLoadingMore;
-
-  /// Shows a "You're all caught up" footer once every page has been
-  /// loaded — only meaningful on the paginated "All" tab.
   final bool showEndReached;
 
   @override
   Widget build(BuildContext context) {
     if (visits.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(32)),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 74,
-                  height: 74,
-                  decoration: BoxDecoration(
-                    color: AppColors.textSecondary.withOpacity(0.08),
-                    shape: BoxShape.circle,
+      return SliverPadding(
+        padding: EdgeInsets.fromLTRB(
+          Responsive.w(20),
+          0,
+          Responsive.w(20),
+          Responsive.h(90),
+        ),
+        sliver: SliverToBoxAdapter(
+          child: _CardWrapper(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: Responsive.h(18)),
+              child: Column(
+                children: [
+                  Icon(emptyIcon,
+                      size: 32, color: AppColors.textSecondary.withOpacity(0.4)),
+                  SizedBox(height: Responsive.h(8)),
+                  Text(
+                    emptyLabel,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(12.5)),
                   ),
-                  alignment: Alignment.center,
-                  child: Icon(emptyIcon, size: 32, color: AppColors.textSecondary.withOpacity(0.5)),
-                ),
-                SizedBox(height: Responsive.h(14)),
-                Text(
-                  emptyLabel,
-                  style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
-                ),
-                SizedBox(height: Responsive.h(4)),
-                Text(
-                  emptySubLabel,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
-                ),
-              ],
+                  SizedBox(height: Responsive.h(3)),
+                  Text(
+                    emptySubLabel,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.subtitle().copyWith(fontSize: Responsive.sp(11)),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       );
     }
 
-    // +1 trailing row for the loading spinner / "end reached" footer,
-    // shown only when relevant.
     final showFooter = isLoadingMore || showEndReached;
     final itemCount = visits.length + (showFooter ? 1 : 0);
 
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(
         Responsive.w(20),
-        Responsive.h(4),
+        0,
         Responsive.w(20),
         Responsive.h(90),
       ),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
               (context, index) {
-            // Odd indexes are the gaps between items.
-            if (index.isOdd) return SizedBox(height: Responsive.h(12));
+            if (index.isOdd) return SizedBox(height: Responsive.h(10));
 
             final i = index ~/ 2;
 
             if (i >= visits.length) {
               return Padding(
-                padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                padding: EdgeInsets.symmetric(vertical: Responsive.h(14)),
                 child: Center(
                   child: isLoadingMore
-                      ? SizedBox(
-                    width: 22,
-                    height: 22,
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
+                      strokeWidth: 2.2,
                       color: AppColors.primary,
                     ),
                   )
                       : Text(
                     "You're all caught up",
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: Responsive.sp(11.5),
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: AppTextStyles.captionnew(color: AppColors.textSecondary)
+                        .copyWith(fontSize: Responsive.sp(10.5)),
                   ),
                 ),
               );
@@ -1065,24 +952,19 @@ class _VisitTile extends StatelessWidget {
         : visit.visitDate;
     final incentive = double.tryParse(visit.incentiveEarned) ?? 0;
 
+    final captionStyle = AppTextStyles.caption().copyWith(fontSize: Responsive.sp(10.5));
+
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: EdgeInsets.all(Responsive.w(13)),
+          padding: EdgeInsets.all(Responsive.w(12)),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.textSecondary.withOpacity(0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1098,87 +980,74 @@ class _VisitTile extends StatelessWidget {
                       children: [
                         Text(
                           visit.customerName,
-                          style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(12.5)),
                         ),
                         SizedBox(height: Responsive.h(2)),
-                        Row(
-                          children: [
-                            Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.textSecondary),
-                            SizedBox(width: Responsive.w(4)),
-                            Text(
-                              dateLabel,
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: Responsive.sp(11),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
+                        Text(dateLabel, style: captionStyle),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(9), vertical: Responsive.h(4)),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      currency.format(incentive),
-                      style: TextStyle(color: AppColors.primary, fontSize: Responsive.sp(11.5), fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: Responsive.h(10)),
-              Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.08)),
-              SizedBox(height: Responsive.h(10)),
-              Row(
-                children: [
-                  Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: Responsive.w(4)),
-                  Expanded(
-                    child: Text(
-                      visit.siteAddress,
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  SizedBox(width: Responsive.w(8)),
+                  Text(
+                    currency.format(incentive),
+                    style: AppTextStyles.bodyBold(color: AppColors.primary)
+                        .copyWith(fontSize: Responsive.sp(12.5)),
                   ),
                 ],
               ),
               SizedBox(height: Responsive.h(8)),
+              const Divider(height: 1, color: AppColors.border),
+              SizedBox(height: Responsive.h(8)),
+              Row(
+                children: [
+                  Icon(Icons.location_on_outlined, size: 13, color: AppColors.textSecondary),
+                  SizedBox(width: Responsive.w(4)),
+                  Expanded(
+                    child: Text(
+                      visit.siteAddress,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: captionStyle,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: Responsive.h(6)),
               Row(
                 children: [
                   Expanded(
                     child: Row(
                       children: [
-                        Icon(Icons.phone_outlined, size: 13, color: AppColors.textSecondary),
+                        Icon(Icons.phone_outlined, size: 12, color: AppColors.textSecondary),
                         SizedBox(width: Responsive.w(4)),
-                        Text(
-                          visit.customerPhone,
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12), fontWeight: FontWeight.w500),
-                        ),
+                        Text(visit.customerPhone, style: captionStyle),
                       ],
                     ),
                   ),
                   Material(
-                    color: AppColors.info.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(9),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(9),
                       onTap: onCallTap,
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(6)),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.w(9), vertical: Responsive.h(5)),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.call_rounded, size: 13, color: AppColors.info),
+                            const Icon(Icons.call_rounded, size: 12, color: AppColors.primary),
                             SizedBox(width: Responsive.w(4)),
-                            Text('Call', style: TextStyle(color: AppColors.info, fontSize: Responsive.sp(11), fontWeight: FontWeight.w700)),
+                            Text(
+                              'Call',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: Responsive.sp(10.5),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1197,11 +1066,11 @@ class _VisitTile extends StatelessWidget {
     final thumbUrl = visit.thumbnailUrl;
     if (thumbUrl.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Image.network(
           thumbUrl,
-          width: 46,
-          height: 46,
+          width: 38,
+          height: 38,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _initialsAvatar(),
         ),
@@ -1212,16 +1081,17 @@ class _VisitTile extends StatelessWidget {
 
   Widget _initialsAvatar() {
     return Container(
-      width: 46,
-      height: 46,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
       ),
       alignment: Alignment.center,
       child: Text(
         _initial,
-        style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(fontSize: Responsive.sp(15)),
+        style: AppTextStyles.bodyBold(color: AppColors.primary)
+            .copyWith(fontSize: Responsive.sp(13)),
       ),
     );
   }

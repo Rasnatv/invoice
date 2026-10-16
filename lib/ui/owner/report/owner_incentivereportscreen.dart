@@ -10,7 +10,8 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../models/owner_reportmodel/incentivereportmodel.dart';
 import 'ownerincentive_reportfilterscreen.dart';
-import 'ownerreportwidget.dart';
+
+const Color _amberColor = Color(0xFFF59E0B);
 
 /// Shows the result of POST /reports/incentives for the filters chosen on
 /// [OwnerIncentiveReportFilterScreen].
@@ -75,12 +76,14 @@ class _OwnerIncentiveReportScreenState
       toDate: _apiDate(widget.endDate),
       status: widget.status.toLowerCase() == 'all'
           ? null
-          : widget.status.toLowerCase(),   // <-- lowercase it here too
+          : widget.status.toLowerCase(),
     ));
   }
+
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
       _bloc.add(const LoadMoreIncentiveReport());
     }
   }
@@ -89,66 +92,215 @@ class _OwnerIncentiveReportScreenState
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      appBar: AppBar(title: Text('Incentive Report', style: AppTextStyles.h6())),
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          Expanded(
-            child: BlocBuilder<IncentiveReportBloc, IncentiveReportState>(
-              bloc: _bloc,
-              builder: (context, state) {
-                if (state is IncentiveReportLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
 
-                if (state is IncentiveReportError) {
-                  return _ErrorView(
-                    message: state.message,
-                    onRetry: _fetch,
-                  );
-                }
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
 
-                if (state is IncentiveReportLoaded) {
-                  if (state.items.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No incentives found for this period.',
-                        style: AppTextStyles.caption(),
-                      ),
-                    );
-                  }
+        // ---------- APPBAR (same as Estimates / Drivers) ----------
+        appBar: AppBar(
+          title: Text('Incentive Report', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+
+        body: SafeArea(
+          child: BlocBuilder<IncentiveReportBloc, IncentiveReportState>(
+            bloc: _bloc,
+            builder: (context, state) {
+              if (state is IncentiveReportLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (state is IncentiveReportError) {
+                return _ErrorView(message: state.message, onRetry: _fetch);
+              }
+
+              if (state is IncentiveReportLoaded) {
+                if (state.items.isEmpty) {
                   return RefreshIndicator(
                     onRefresh: () async => _fetch(),
-                    child: ListView(
-                      controller: _scrollController,
-                      padding: EdgeInsets.all(Responsive.w(20)),
-                      children: [
-                        _SummaryCard(summary: state.summary),
-                        SizedBox(height: Responsive.h(16)),
-                        ...state.items.map((IncentiveListItemModel item) => Padding(
-                          padding: EdgeInsets.only(bottom: Responsive.h(12)),
-                          child: _IncentiveTile(item: item),
-                        )),
-                        if (state.isLoadingMore)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator()),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints:
+                          BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.savings_outlined,
+                                  size: 44,
+                                  color:
+                                  AppColors.textSecondary.withOpacity(0.4),
+                                ),
+                                SizedBox(height: Responsive.h(10)),
+                                Text('No incentives found for this period.',
+                                    style: AppTextStyles.subtitle()),
+                              ],
+                            ),
                           ),
-                      ],
+                        ),
+                      ),
                     ),
                   );
                 }
 
-                return const SizedBox.shrink();
-              },
-            ),
+                return RefreshIndicator(
+                  onRefresh: () async => _fetch(),
+                  child: ListView(
+                    controller: _scrollController,
+                    // Needed so pull-to-refresh works even when content is short
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: listPadding,
+                    children: [
+                      _SummaryCard(summary: state.summary),
+                      SizedBox(height: Responsive.h(18)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const _SectionHeader('Incentives'),
+                          _StatusPill(
+                            label:
+                            '${state.items.length} ${state.items.length == 1 ? 'entry' : 'entries'}',
+                            color: AppColors.primary,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: Responsive.h(10)),
+                      for (var i = 0; i < state.items.length; i++) ...[
+                        _IncentiveTile(item: state.items[i]),
+                        if (i != state.items.length - 1)
+                          SizedBox(height: Responsive.h(10)),
+                      ],
+                      if (state.isLoadingMore)
+                        Padding(
+                          padding:
+                          EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                          child: const Center(
+                              child: CircularProgressIndicator()),
+                        ),
+                    ],
+                  ),
+                );
+              }
+
+              return const SizedBox.shrink();
+            },
           ),
-        ],
+        ),
       ),
-    ));
+    );
   }
 }
+
+// ---------------------------------------------------------------------
+// Shared look (same as the Estimate Details / Estimates list)
+// ---------------------------------------------------------------------
+
+/// White, radius 16, 1px border, no shadow.
+BoxDecoration _cardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+class _IconBadge extends StatelessWidget {
+  const _IconBadge(this.icon, {this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+/// Square icon tile used on list cards (same as the Estimates list).
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: AppColors.primary, size: 20),
+    );
+  }
+}
+
+/// Blue-bar section heading.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------
+// Summary
+// ---------------------------------------------------------------------
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.summary});
@@ -158,43 +310,104 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      width: double.infinity,
+      decoration: _cardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SummaryStat(label: 'Total Incentive', value: '₹${summary.totalIncentive}'),
-          _SummaryStat(label: 'Paid', value: summary.paidCount),
-          _SummaryStat(label: 'Pending', value: summary.pendingCount),
+          // Title bar: icon badge + title, divider underneath
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              children: [
+                const _IconBadge(Icons.calculate_outlined),
+                SizedBox(width: Responsive.w(10)),
+                Expanded(
+                  child: Text('Summary', style: AppTextStyles.bodyBold()),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(Responsive.w(14)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SummaryStat(
+                  label: 'Total Incentive',
+                  value: '₹${summary.totalIncentive}',
+                  color: AppColors.primary,
+                ),
+                const _StatDivider(),
+                _SummaryStat(
+                  label: 'Paid',
+                  value: summary.paidCount,
+                  color: AppColors.success,
+                ),
+                const _StatDivider(),
+                _SummaryStat(
+                  label: 'Pending',
+                  value: summary.pendingCount,
+                  color: _amberColor,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 32, color: AppColors.border);
 }
 
 class _SummaryStat extends StatelessWidget {
-  const _SummaryStat({required this.label, required this.value});
+  const _SummaryStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   final String label;
   final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value, style: AppTextStyles.h3()),
-        const SizedBox(height: 4),
-        Text(label, style: AppTextStyles.caption()),
-      ],
+    return Expanded(
+      child: Column(
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: AppTextStyles.amount(color: color)),
+          ),
+          SizedBox(height: Responsive.h(4)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.caption(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }
+
+// ---------------------------------------------------------------------
+// Incentive row
+// ---------------------------------------------------------------------
 
 class _IncentiveTile extends StatelessWidget {
   const _IncentiveTile({required this.item});
@@ -204,55 +417,92 @@ class _IncentiveTile extends StatelessWidget {
   Color _statusColor() {
     switch (item.status.toLowerCase()) {
       case 'paid':
-        return Colors.green;
+        return AppColors.success;
       case 'pending':
-        return Colors.orange;
+        return _amberColor;
       default:
-        return Colors.grey;
+        return AppColors.textSecondary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final color = _statusColor();
+
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black12),
-      ),
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('₹${item.incentiveAmount}', style: AppTextStyles.bodyBold()),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _statusColor().withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  item.statusLabel,
-                  style: AppTextStyles.caption(color: _statusColor())
-                      .copyWith(fontWeight: FontWeight.w600),
+              const _IconTile(icon: Icons.savings_rounded),
+              SizedBox(width: Responsive.w(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '₹${item.incentiveAmount}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.amount(color: AppColors.primary),
+                    ),
+                    SizedBox(height: Responsive.h(2)),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 12, color: AppColors.textSecondary),
+                        SizedBox(width: Responsive.w(5)),
+                        Expanded(
+                          child: Text(
+                            item.createdAt,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption(
+                                color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              SizedBox(width: Responsive.w(8)),
+              _StatusPill(label: item.statusLabel, color: color),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(item.createdAt, style: AppTextStyles.caption()),
           if (item.notes.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(item.notes, style: AppTextStyles.caption(color: AppColors.textPrimary)),
+            SizedBox(height: Responsive.h(12)),
+            const Divider(height: 1, color: AppColors.border),
+            SizedBox(height: Responsive.h(10)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.sticky_note_2_outlined,
+                    size: 14, color: AppColors.textSecondary),
+                SizedBox(width: Responsive.w(6)),
+                Expanded(
+                  child: Text(
+                    item.notes,
+                    style: AppTextStyles.caption(color: AppColors.textPrimary),
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
       ),
     );
   }
 }
+
+// ---------------------------------------------------------------------
+// Error
+// ---------------------------------------------------------------------
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
@@ -263,13 +513,28 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message ?? '', textAlign: TextAlign.center, style: AppTextStyles.caption()),
-          const SizedBox(height: 12),
-          ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
+            Text(
+              (message == null || message!.isEmpty)
+                  ? 'Failed to load incentives.'
+                  : message!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.subtitle(),
+            ),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
+            ),
+          ],
+        ),
       ),
     );
   }

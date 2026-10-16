@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/responsive.dart';
@@ -97,10 +96,11 @@ class _SlidingGradientTransform extends GradientTransform {
   }
 }
 
-// ---------------- SCREEN-SPECIFIC SKELETONS (Owner Dashboard) ----------------
+// ---------------- OWNER DASHBOARD SKELETONS ----------------
+// Every skeleton mirrors the dimensions, radii, borders and spacing of the
+// real widget in owner_dashboard_screen.dart so there is no layout jump.
 
-/// Skeleton for the 4 mini-stat columns in the owner header
-/// (Total / Dispatched / Quotations / Pending).
+/// Mirrors the 4 `_MiniStat` columns (icon 18, value, label).
 class HeaderStatsShimmer extends StatelessWidget {
   const HeaderStatsShimmer({super.key});
 
@@ -108,11 +108,11 @@ class HeaderStatsShimmer extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget stat() => Column(
       children: [
-        ShimmerWidget.circular(size: 26),
+        ShimmerWidget.circular(size: 18),
         SizedBox(height: Responsive.h(6)),
-        ShimmerWidget.rectangular(width: 28, height: 14, borderRadius: 4),
-        SizedBox(height: Responsive.h(4)),
-        ShimmerWidget.rectangular(width: 42, height: 9, borderRadius: 4),
+        ShimmerWidget.rectangular(width: 26, height: Responsive.sp(17), borderRadius: 4),
+        SizedBox(height: Responsive.h(2)),
+        ShimmerWidget.rectangular(width: 46, height: Responsive.sp(10.5), borderRadius: 4),
       ],
     );
 
@@ -130,14 +130,11 @@ class HeaderStatsShimmer extends StatelessWidget {
   }
 
   Widget _divider() =>
-      Container(width: 1, height: 30, color: AppColors.textSecondary.withOpacity(0.08));
+      Container(width: 1, height: 34, color: AppColors.textSecondary.withOpacity(0.14));
 }
 
-/// Skeleton for the whole owner header — avatar, greeting/name lines,
-/// notification icon, date line, and the floating stats card. Used in
-/// place of the real `_OwnerHeader` for first load and pull-to-refresh,
-/// so nothing in the header (not just the numbers) reads as "live" while
-/// data is still in flight.
+/// Mirrors `_OwnerHeader`: icon box + greeting/name on the left,
+/// calendar icon + date on the right, and the floating stats card.
 class OwnerDashboardHeaderShimmer extends StatelessWidget {
   const OwnerDashboardHeaderShimmer({super.key});
 
@@ -147,42 +144,47 @@ class OwnerDashboardHeaderShimmer extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Container(
+          width: double.infinity,
           padding: EdgeInsets.fromLTRB(
             Responsive.w(20),
-            Responsive.h(20),
+            Responsive.h(18),
             Responsive.w(20),
-            Responsive.h(46),
+            Responsive.h(54),
           ),
           decoration: const BoxDecoration(
             color: Color(0xFFE6E8EB),
             borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(32),
-              bottomRight: Radius.circular(32),
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
             ),
           ),
           child: SafeArea(
             bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
+                ShimmerWidget.rectangular(width: 46, height: 46, borderRadius: 14),
+                SizedBox(width: Responsive.w(12)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ShimmerWidget.rectangular(
+                          width: 70, height: Responsive.sp(12), borderRadius: 4),
+                      SizedBox(height: Responsive.h(2) + 4),
+                      ShimmerWidget.rectangular(
+                          width: 130, height: Responsive.sp(18), borderRadius: 4),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    ShimmerWidget.circular(size: 48),
-                    SizedBox(width: Responsive.w(12)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ShimmerWidget.rectangular(width: 90, height: Responsive.sp(12), borderRadius: 4),
-                          SizedBox(height: Responsive.h(6)),
-                          ShimmerWidget.rectangular(width: 140, height: Responsive.sp(17), borderRadius: 4),
-                        ],
-                      ),
-                    ),
+                    ShimmerWidget.circular(size: 14),
+                    SizedBox(height: Responsive.h(4)),
+                    ShimmerWidget.rectangular(
+                        width: 96, height: Responsive.sp(10.5), borderRadius: 4),
                   ],
                 ),
-                SizedBox(height: Responsive.h(14)),
-               ShimmerWidget.rectangular(width: 150, height: Responsive.sp(12), borderRadius: 4),
               ],
             ),
           ),
@@ -190,17 +192,19 @@ class OwnerDashboardHeaderShimmer extends StatelessWidget {
         Positioned(
           left: Responsive.w(20),
           right: Responsive.w(20),
-          bottom: -Responsive.h(60),
+          bottom: -Responsive.h(52),
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(8)),
+            padding: EdgeInsets.symmetric(
+                vertical: Responsive.h(14), horizontal: Responsive.w(6)),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -212,22 +216,26 @@ class OwnerDashboardHeaderShimmer extends StatelessWidget {
   }
 }
 
-/// Shimmer stand-in for a `_SectionTitle` label ("Quick Actions", "Sales
-/// Overview", "Recent Estimates"), so section headings shimmer too instead
-/// of sitting there as static real text while everything below them loads.
+/// Stand-in for `_SectionTitle`. Pass [withAction] for the "View all" link.
 class SectionTitleShimmer extends StatelessWidget {
-  const SectionTitleShimmer({super.key, this.width = 120});
+  const SectionTitleShimmer({super.key, this.width = 120, this.withAction = false});
   final double width;
+  final bool withAction;
 
   @override
   Widget build(BuildContext context) {
-    return ShimmerWidget.rectangular(width: width, height: Responsive.sp(16), borderRadius: 4);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        ShimmerWidget.rectangular(width: width, height: Responsive.sp(16), borderRadius: 4),
+        if (withAction)
+          ShimmerWidget.rectangular(width: 50, height: Responsive.sp(12.5), borderRadius: 4),
+      ],
+    );
   }
 }
 
-/// Plain white rounded card, matching the screen's private `_CardWrapper`
-/// styling, for wrapping shimmer content (e.g. `SalesOverviewShimmer`)
-/// without depending on that private widget.
+/// Matches the screen's private `_CardWrapper` (radius 18, border).
 class ShimmerCardWrapper extends StatelessWidget {
   const ShimmerCardWrapper({super.key, required this.child});
   final Widget child;
@@ -239,99 +247,67 @@ class ShimmerCardWrapper extends StatelessWidget {
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
       ),
       child: child,
     );
   }
 }
 
-/// Skeleton for the horizontal "Quick Actions" row — mimics N icon+label tiles.
-// class QuickActionsShimmer extends StatelessWidget {
-//   const QuickActionsShimmer({super.key, this.count = 6});
-//   final int count;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return SizedBox(
-//       height: Responsive.h(100),
-//       child: ListView.separated(
-//         scrollDirection: Axis.horizontal,
-//         physics: const NeverScrollableScrollPhysics(),
-//         itemCount: count,
-//         separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
-//         itemBuilder: (context, i) => SizedBox(
-//           width: Responsive.w(84),
-//           child: Container(
-//             padding: EdgeInsets.symmetric(vertical: Responsive.h(10), horizontal: Responsive.w(4)),
-//             decoration: BoxDecoration(
-//               color: Colors.white,
-//               borderRadius: BorderRadius.circular(18),
-//               border: Border.all(color: AppColors.textSecondary.withOpacity(0.10)),
-//             ),
-//             child: Column(
-//               mainAxisSize: MainAxisSize.min,
-//               mainAxisAlignment: MainAxisAlignment.center,
-//               children: [
-//                 ShimmerWidget.circular(size: 36),
-//                 SizedBox(height: Responsive.h(8)),
-//                 ShimmerWidget.rectangular(width: 52, height: 9, borderRadius: 4),
-//                 SizedBox(height: Responsive.h(4)),
-//                 ShimmerWidget.rectangular(width: 36, height: 9, borderRadius: 4),
-//               ],
-//             ),
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
+/// Mirrors `_QuickAccessPanel` (collapsed): white bordered card with a
+/// 4-column grid of 44x44 icon tiles + 2-line labels, divider and "More" row.
 class QuickActionsShimmer extends StatelessWidget {
-  const QuickActionsShimmer({super.key, this.count = 6});
+  const QuickActionsShimmer({super.key, this.count = 4});
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 100, // fixed height, does not shrink in landscape
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: count,
-        separatorBuilder: (_, __) => SizedBox(width: Responsive.w(12)),
-        itemBuilder: (context, i) => SizedBox(
-          width: 84,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.textSecondary.withOpacity(0.10)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ShimmerWidget.circular(size: 36),
-                const SizedBox(height: 8),
-                ShimmerWidget.rectangular(width: 52, height: 9, borderRadius: 4),
-                const SizedBox(height: 4),
-                ShimmerWidget.rectangular(width: 36, height: 9, borderRadius: 4),
-              ],
-            ),
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(6), vertical: Responsive.h(8)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: 0.9,
+            children: [
+              for (int i = 0; i < count; i++)
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.w(2), vertical: Responsive.h(6)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ShimmerWidget.rectangular(width: 44, height: 44, borderRadius: 14),
+                      SizedBox(height: Responsive.h(5)),
+                      ShimmerWidget.rectangular(width: 44, height: 8, borderRadius: 4),
+                      const SizedBox(height: 3),
+                      ShimmerWidget.rectangular(width: 30, height: 8, borderRadius: 4),
+                    ],
+                  ),
+                ),
+            ],
           ),
-        ),
+          const Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: Responsive.h(6) + 3),
+            child: ShimmerWidget.rectangular(width: 56, height: 14, borderRadius: 4),
+          ),
+        ],
       ),
     );
   }
 }
+
 /// Skeleton for the Sales Overview card content (bar-chart style).
 class SalesOverviewShimmer extends StatelessWidget {
   const SalesOverviewShimmer({super.key});
@@ -353,7 +329,8 @@ class SalesOverviewShimmer extends StatelessWidget {
   }
 }
 
-/// Skeleton mimicking a single _RecentEstimateCard.
+/// Mirrors `_RecentEstimateCard`: 42x42 icon box, three text lines,
+/// and total + status badge on the right.
 class RecentEstimateShimmerCard extends StatelessWidget {
   const RecentEstimateShimmerCard({super.key});
 
@@ -362,30 +339,33 @@ class RecentEstimateShimmerCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ShimmerWidget.rectangular(width: 120, height: 14, borderRadius: 4),
-              ShimmerWidget.rectangular(width: 60, height: 18, borderRadius: 9),
-            ],
+          ShimmerWidget.rectangular(width: 42, height: 42, borderRadius: 12),
+          SizedBox(width: Responsive.w(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ShimmerWidget.rectangular(width: 110, height: 14, borderRadius: 4),
+                SizedBox(height: Responsive.h(4)),
+                ShimmerWidget.rectangular(width: 80, height: 11, borderRadius: 4),
+                SizedBox(height: Responsive.h(4)),
+                ShimmerWidget.rectangular(width: 70, height: 11, borderRadius: 4),
+              ],
+            ),
           ),
-          SizedBox(height: Responsive.h(8)),
-          ShimmerWidget.rectangular(width: 90, height: 10, borderRadius: 4),
-          SizedBox(height: Responsive.h(8)),
-          const Divider(height: 1, color: AppColors.border),
-          SizedBox(height: Responsive.h(8)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          SizedBox(width: Responsive.w(8)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              ShimmerWidget.rectangular(width: 70, height: 10, borderRadius: 4),
-              ShimmerWidget.rectangular(width: 60, height: 14, borderRadius: 4),
+              ShimmerWidget.rectangular(width: 64, height: 14, borderRadius: 4),
+              SizedBox(height: Responsive.h(6)),
+              ShimmerWidget.rectangular(width: 58, height: 20, borderRadius: 10),
             ],
           ),
         ],
@@ -394,8 +374,7 @@ class RecentEstimateShimmerCard extends StatelessWidget {
   }
 }
 
-/// Convenience list of N shimmer estimate cards with spacing already applied.
-/// Use this in place of the loading branch for the "Recent Estimates" section.
+/// N shimmer estimate cards with the same 10px spacing as the real list.
 class RecentEstimateListShimmer extends StatelessWidget {
   const RecentEstimateListShimmer({super.key, this.count = 3});
   final int count;
@@ -413,6 +392,24 @@ class RecentEstimateListShimmer extends StatelessWidget {
   }
 }
 
+/// Body shimmer mirroring the real screen's section order and spacing:
+/// Quick Actions -> Sales Overview -> Recent Estimates.
+List<Widget> _ownerDashboardBodyShimmer() {
+  return [
+    const SectionTitleShimmer(width: 110),
+    SizedBox(height: Responsive.h(10)),
+    const QuickActionsShimmer(count: 4),
+    SizedBox(height: Responsive.h(14) + Responsive.h(12)),
+    const SectionTitleShimmer(width: 130),
+    SizedBox(height: Responsive.h(12)),
+    const ShimmerCardWrapper(child: SalesOverviewShimmer()),
+    SizedBox(height: Responsive.h(26)),
+    const SectionTitleShimmer(width: 140, withAction: true),
+    SizedBox(height: Responsive.h(12)),
+    const RecentEstimateListShimmer(count: 3),
+  ];
+}
+
 class OwnerDashboardShimmer extends StatelessWidget {
   const OwnerDashboardShimmer({super.key});
 
@@ -421,50 +418,12 @@ class OwnerDashboardShimmer extends StatelessWidget {
     Responsive.init(context);
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        physics: const NeverScrollableScrollPhysics(),
-        slivers: [
-          const SliverToBoxAdapter(child: OwnerDashboardHeaderShimmer()),
-          SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                SizedBox(height: Responsive.h(70)),
-                ..._ownerDashboardBodyShimmer(),
-                SizedBox(height: Responsive.h(30)),
-              ]),
-            ),
-          ),
-        ],
-      ),
+      body: const OwnerDashboardFullShimmer(),
     );
   }
 }
 
-/// Body content shared by first load and pull-to-refresh: header, quick
-/// actions, sales overview, and recent estimates, all as shimmer. Kept as
-/// a plain list of widgets (not a Column) so it can be reused inside
-/// either a `SingleChildScrollView` (first load) or a `SliverList`
-/// (refresh, inside a `CustomScrollView`/`RefreshIndicator`).
-List<Widget> _ownerDashboardBodyShimmer() {
-  return [
-    const SectionTitleShimmer(width: 110),
-    SizedBox(height: Responsive.h(14)),
-    const QuickActionsShimmer(count: 6),
-    SizedBox(height: Responsive.h(28)),
-    const SectionTitleShimmer(width: 130),
-    SizedBox(height: Responsive.h(14)),
-    const ShimmerCardWrapper(child: SalesOverviewShimmer()),
-    SizedBox(height: Responsive.h(28)),
-    const SectionTitleShimmer(width: 140),
-    SizedBox(height: Responsive.h(14)),
-    const RecentEstimateListShimmer(count: 3),
-  ];
-}
-
-/// Full-screen skeleton for the owner dashboard's first load — header,
-/// quick actions, sales overview, and recent estimates, all shimmering
-/// together so the whole page reads as loading, not just a few numbers.
+/// Full-screen skeleton for the first load.
 class OwnerDashboardFullShimmer extends StatelessWidget {
   const OwnerDashboardFullShimmer({super.key});
 
@@ -493,10 +452,8 @@ class OwnerDashboardFullShimmer extends StatelessWidget {
   }
 }
 
-/// Full-screen shimmer for pull-to-refresh: same header + sections as
-/// [OwnerDashboardFullShimmer], but built as slivers so it can sit inside
-/// the same `CustomScrollView`/`RefreshIndicator` the real content uses
-/// (needs `AlwaysScrollableScrollPhysics` for the pull gesture to work).
+/// Pull-to-refresh skeleton: same layout, built as slivers so it can sit
+/// inside the `RefreshIndicator` (needs `AlwaysScrollableScrollPhysics`).
 class OwnerDashboardRefreshShimmer extends StatelessWidget {
   const OwnerDashboardRefreshShimmer({super.key});
 

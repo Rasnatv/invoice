@@ -1,4 +1,3 @@
-
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,36 +8,30 @@ import '../../../core/utils/responsive.dart';
 import '../../../models/owner_models/owner_quotationapprovemodel.dart';
 import '../../../models/salesmanmodels/quotationlistdetailmodel.dart';
 
+const Color _redColor = Color(0xFFDC2626);
+
 // ---------------------------------------------------------------------
 // Standard column widths for the items grid.
-// Every row uses the same widths so the table looks uniform.
 // ---------------------------------------------------------------------
 
 class QCol {
   static const double sl = 60; // Sl.No
-  static const double text = 180; // Item / Company
+  static const double text = 250; // Item / Company
   static const double size = 120; // Size
-  static const double unit = 120; // Unit
-  static const double num = 120; // Qty, Box Qty, Piece Qty, MRP, Rate
-  static const double money = 170; // Amount, Incentive
+  static const double unit = 150; // Unit
+  static const double num = 150; // Qty, Box Qty, Piece Qty, MRP, Rate
+  static const double money = 200; // Amount, Incentive
 }
 
 // ---------------------------------------------------------------------
-// Shared look
+// Shared look (same as the Estimate detail screen)
 // ---------------------------------------------------------------------
 
-/// One card style for every block on the page.
-BoxDecoration qCardDecoration({double radius = 14}) => BoxDecoration(
-  color: AppColors.surface,
+/// White card, radius 16, 1px border, no shadow.
+BoxDecoration qCardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
   borderRadius: BorderRadius.circular(radius),
-  border: Border.all(color: AppColors.border.withOpacity(0.8)),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.04),
-      blurRadius: 10,
-      offset: const Offset(0, 3),
-    ),
-  ],
+  border: Border.all(color: AppColors.border),
 );
 
 /// Small rounded icon badge used in section titles.
@@ -55,14 +48,65 @@ class QIconBadge extends StatelessWidget {
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
         color: c.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: size, color: c),
     );
   }
 }
 
-/// Tinted title bar used at the top of cards.
+/// Status pill — identical to the Estimates one.
+class QStatusPill extends StatelessWidget {
+  const QStatusPill({super.key, required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Blue-bar section heading.
+class QSectionHeader extends StatelessWidget {
+  const QSectionHeader(this.title, {super.key});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+/// White card header row (icon badge + title) with a divider underneath.
 class QCardTitle extends StatelessWidget {
   const QCardTitle({super.key, required this.title, this.icon, this.trailing});
   final String title;
@@ -75,9 +119,8 @@ class QCardTitle extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.symmetric(
           horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
-        border: Border(bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
@@ -85,13 +128,7 @@ class QCardTitle extends StatelessWidget {
             QIconBadge(icon!),
             SizedBox(width: Responsive.w(10)),
           ],
-          Expanded(
-            child: Text(
-              title,
-              style: AppTextStyles.bodyBold(color: AppColors.primary)
-                  .copyWith(fontSize: Responsive.sp(14)),
-            ),
-          ),
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
           if (trailing != null) trailing!,
         ],
       ),
@@ -105,6 +142,7 @@ class QCardTitle extends StatelessWidget {
 
 class RoundIconButton extends StatelessWidget {
   const RoundIconButton({
+    super.key,
     required this.icon,
     required this.onPressed,
     this.tooltip,
@@ -117,14 +155,14 @@ class RoundIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final button = Material(
-      color: AppColors.surface,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          width: 48,
-          height: 48,
+          width: Responsive.h(48),
+          height: Responsive.h(48),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border),
@@ -145,10 +183,8 @@ class DetailRow {
   DetailRow(this.label, this.value, {this.icon});
 }
 
-/// `icon` is optional, so existing calls `DetailSection(title:, rows:)`
-/// keep working. Pass an icon to get the badge in the title bar.
 class DetailSection extends StatelessWidget {
-  const DetailSection({required this.title, required this.rows, this.icon});
+  const DetailSection({super.key, required this.title, required this.rows, this.icon});
   final String title;
   final List<DetailRow> rows;
   final IconData? icon;
@@ -175,12 +211,13 @@ class DetailSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (rows[i].icon != null) ...[
-                          Icon(rows[i].icon, size: 16, color: AppColors.textHint),
+                          Icon(rows[i].icon, size: 16, color: AppColors.textSecondary),
                           SizedBox(width: Responsive.w(10)),
                         ],
                         SizedBox(
                           width: 92,
-                          child: Text(rows[i].label, style: AppTextStyles.caption()),
+                          child: Text(rows[i].label,
+                              style: AppTextStyles.caption(color: AppColors.textSecondary)),
                         ),
                         SizedBox(width: Responsive.w(8)),
                         Expanded(
@@ -193,7 +230,7 @@ class DetailSection extends StatelessWidget {
                     ),
                   ),
                   if (i != rows.length - 1)
-                    Divider(height: 1, color: AppColors.border.withOpacity(0.5)),
+                    const Divider(height: 1, color: AppColors.border),
                 ],
               ],
             ),
@@ -205,10 +242,9 @@ class DetailSection extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------
-// Header + incentive (new — use these in the screen file)
+// Header (same look as the Estimate header)
 // ---------------------------------------------------------------------
 
-/// Quotation number, date and status pill in one card.
 class QuotationHeader extends StatelessWidget {
   const QuotationHeader({super.key, required this.q});
   final QuotationDetailModel q;
@@ -221,96 +257,58 @@ class QuotationHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withOpacity(0.10),
-            AppColors.primary.withOpacity(0.02),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.16)),
-      ),
-      child: Column(
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: qCardDecoration(),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const QIconBadge(Icons.description_outlined, size: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withOpacity(0.35)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_quotationStatusIcon(q.status), size: 14, color: color),
-                    SizedBox(width: Responsive.w(6)),
-                    Text(
-                      q.status.isEmpty ? '-' : capitalize(q.status),
-                      style: AppTextStyles.bodyBold(color: color)
-                          .copyWith(fontSize: Responsive.sp(12)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
           ),
-          SizedBox(height: Responsive.h(14)),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          SizedBox(width: Responsive.w(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  q.quotationNumber,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold(),
+                ),
+                SizedBox(height: Responsive.h(2)),
+                Row(
                   children: [
-                    Text('QUOTATION NO.',
-                        style: AppTextStyles.caption().copyWith(letterSpacing: 0.8)),
-                    SizedBox(height: Responsive.h(4)),
-                    Text(
-                      q.quotationNumber,
-                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(16)),
-                      overflow: TextOverflow.ellipsis,
+                    Icon(Icons.calendar_today_rounded,
+                        size: 12, color: AppColors.textSecondary),
+                    SizedBox(width: Responsive.w(5)),
+                    Expanded(
+                      child: Text(
+                        dateText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption(color: AppColors.textSecondary),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              SizedBox(width: Responsive.w(12)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('DATE',
-                      style: AppTextStyles.caption().copyWith(letterSpacing: 0.8)),
-                  SizedBox(height: Responsive.h(4)),
-                  Text(dateText, style: AppTextStyles.bodyBold()),
-                ],
-              ),
-            ],
+              ],
+            ),
+          ),
+          SizedBox(width: Responsive.w(8)),
+          QStatusPill(
+            label: q.status.isEmpty ? '-' : capitalize(q.status),
+            color: color,
           ),
         ],
       ),
     );
-  }
-}
-
-IconData _quotationStatusIcon(String status) {
-  switch (status.toLowerCase()) {
-    case 'approved':
-      return Icons.check_circle_rounded;
-    case 'rejected':
-    case 'cancelled':
-      return Icons.cancel_rounded;
-    case 'draft':
-      return Icons.edit_note_rounded;
-    default:
-      return Icons.hourglass_top_rounded;
   }
 }
 
@@ -341,7 +339,7 @@ class IncentiveCard extends StatelessWidget {
                   style: AppTextStyles.bodyBold(color: AppColors.success)),
             ],
           ),
-          Text(amountText, style: AppTextStyles.h3(color: AppColors.success)),
+          Text(amountText, style: AppTextStyles.amount(color: AppColors.success)),
         ],
       ),
     );
@@ -354,6 +352,7 @@ class IncentiveCard extends StatelessWidget {
 
 class InvoiceTable extends StatelessWidget {
   const InvoiceTable({
+    super.key,
     required this.items,
     required this.showCompany,
     required this.showMrp,
@@ -376,7 +375,8 @@ class InvoiceTable extends StatelessWidget {
         width: double.infinity,
         padding: EdgeInsets.all(Responsive.w(18)),
         decoration: qCardDecoration(),
-        child: Text('No items on this quotation.', style: AppTextStyles.caption()),
+        child: Text('No items on this quotation.',
+            style: AppTextStyles.caption(color: AppColors.textSecondary)),
       );
     }
 
@@ -384,8 +384,6 @@ class InvoiceTable extends StatelessWidget {
     final totalAmount = items.fold<double>(0, (s, i) => s + i.amount);
     final totalIncentive = items.fold<double>(0, (s, i) => s + i.incentiveAmount);
 
-    // Keyed by index, so built dynamically — every column after Size
-    // shifts depending on which optional columns are shown.
     final widths = <int, TableColumnWidth>{};
     var col = 0;
     widths[col++] = const FixedColumnWidth(QCol.sl); // Sl.No
@@ -394,12 +392,12 @@ class InvoiceTable extends StatelessWidget {
     widths[col++] = const FixedColumnWidth(QCol.size); // Size
     widths[col++] = const FixedColumnWidth(QCol.num); // Qty
     widths[col++] = const FixedColumnWidth(QCol.unit); // Unit
-    if (showBox) widths[col++] = const FixedColumnWidth(QCol.num); // Box Qty
-    if (showPiece) widths[col++] = const FixedColumnWidth(QCol.num); // Piece Qty
-    if (showMrp) widths[col++] = const FixedColumnWidth(QCol.num); // MRP
+    if (showBox) widths[col++] = const FixedColumnWidth(QCol.num);
+    if (showPiece) widths[col++] = const FixedColumnWidth(QCol.num);
+    if (showMrp) widths[col++] = const FixedColumnWidth(QCol.num);
     widths[col++] = const FixedColumnWidth(QCol.num); // Rate
     widths[col++] = const FixedColumnWidth(QCol.money); // Amount
-    if (showIncentive) widths[col++] = const FixedColumnWidth(QCol.money); // Incentive
+    if (showIncentive) widths[col++] = const FixedColumnWidth(QCol.money);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,20 +410,14 @@ class InvoiceTable extends StatelessWidget {
             child: Table(
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               border: TableBorder(
-                horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.45)),
-                verticalInside: BorderSide(color: AppColors.border.withOpacity(0.30)),
+                horizontalInside: BorderSide(color: AppColors.border.withOpacity(0.6)),
+                verticalInside: BorderSide(color: AppColors.border.withOpacity(0.4)),
               ),
               columnWidths: widths,
               children: [
                 // ---- Header row ----
                 TableRow(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.09),
-                    border: Border(
-                      bottom: BorderSide(
-                          color: AppColors.primary.withOpacity(0.35), width: 1.4),
-                    ),
-                  ),
+                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.08)),
                   children: [
                     headerCell('Sl.No', align: TextAlign.center),
                     headerCell('Item'),
@@ -446,9 +438,7 @@ class InvoiceTable extends StatelessWidget {
                 for (var i = 0; i < items.length; i++)
                   TableRow(
                     decoration: BoxDecoration(
-                      color: i.isEven
-                          ? AppColors.surface
-                          : AppColors.surfaceAlt.withOpacity(0.45),
+                      color: i.isEven ? Colors.white : AppColors.background,
                     ),
                     children: [
                       dataCell('${i + 1}', align: TextAlign.center),
@@ -499,13 +489,7 @@ class InvoiceTable extends StatelessWidget {
 
                 // ---- Totals footer row ----
                 TableRow(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.07),
-                    border: Border(
-                      top: BorderSide(
-                          color: AppColors.primary.withOpacity(0.35), width: 1.2),
-                    ),
-                  ),
+                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.06)),
                   children: [
                     dataCell(''),
                     dataCell('Total', bold: true),
@@ -536,14 +520,14 @@ class InvoiceTable extends StatelessWidget {
             Icon(Icons.swipe_rounded, size: 14, color: AppColors.textHint),
             SizedBox(width: Responsive.w(4)),
             Text('Swipe sideways to see all columns',
-                style: AppTextStyles.caption().copyWith(fontSize: Responsive.sp(11))),
+                style: AppTextStyles.caption(color: AppColors.textSecondary)
+                    .copyWith(fontSize: Responsive.sp(11))),
           ],
         ),
       ],
     );
   }
 
-  // One font size shared by the header and every data cell
   static double get cellFontSize => Responsive.sp(12.5);
 
   Widget headerCell(String text, {TextAlign align = TextAlign.left}) {
@@ -555,10 +539,8 @@ class InvoiceTable extends StatelessWidget {
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(
-          fontSize: cellFontSize,
-          letterSpacing: 0.2,
-        ),
+        style: AppTextStyles.bodyBold(color: AppColors.primary)
+            .copyWith(fontSize: cellFontSize),
       ),
     );
   }
@@ -579,7 +561,7 @@ class InvoiceTable extends StatelessWidget {
         style: (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(
           color: color,
           fontSize: cellFontSize,
-          fontFeatures: const [FontFeature.tabularFigures()], // digits line up
+          fontFeatures: const [FontFeature.tabularFigures()],
         ),
       ),
     );
@@ -593,15 +575,14 @@ class InvoiceTable extends StatelessWidget {
 Color statusColor(String status) {
   switch (status.toLowerCase()) {
     case 'approved':
-      return Colors.green;
+      return AppColors.success;
     case 'send':
     case 'submitted':
     case 'pending':
-      return Colors.orange;
+      return const Color(0xFFF59E0B);
     case 'rejected':
-      return Colors.red;
     case 'cancelled':
-      return Colors.red;
+      return _redColor;
     case 'draft':
       return Colors.blueGrey;
     default:
@@ -615,9 +596,9 @@ Color balanceStatusColor(String status) {
     case 'paid':
       return AppColors.success;
     case 'partial':
-      return Colors.orange;
+      return const Color(0xFFF59E0B);
     case 'unpaid':
-      return Colors.red;
+      return _redColor;
     default:
       return AppColors.primary;
   }
@@ -670,84 +651,37 @@ String buildShareText(
 // Row widgets
 // ---------------------------------------------------------------------
 
-class PreviewRow extends StatelessWidget {
-  const PreviewRow(
-      this.label,
-      this.value, {
-        super.key,
-        this.bold = false,
-        this.color,
-        this.size = 0,
-      });
-
+class SummaryRow extends StatelessWidget {
+  const SummaryRow(this.label, this.value,
+      {super.key, this.valueColor, this.bold = false});
   final String label;
   final String value;
-  final bool bold;
-  final Color? color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final base = bold ? AppTextStyles.bodyBold() : AppTextStyles.body();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: AppTextStyles.body()),
-          Text(
-            value,
-            style: base.copyWith(
-              color: color,
-              fontSize: size > 0 ? size : null,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class TotalRow extends StatelessWidget {
-  const TotalRow(
-      this.label,
-      this.value, {
-        super.key,
-        this.bold = false,
-        this.valueColor,
-      });
-
-  final String label;
-  final String value;
-  final bool bold;
   final Color? valueColor;
+  final bool bold;
 
   @override
   Widget build(BuildContext context) {
-    final valueStyle = (bold ? AppTextStyles.bodyBold() : AppTextStyles.body()).copyWith(
-      color: valueColor,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.body()),
-        Text(value, style: valueStyle),
+        Text(label,
+            style: bold
+                ? AppTextStyles.bodyBold()
+                : AppTextStyles.body(color: AppColors.textSecondary)),
+        Text(
+          value,
+          style: AppTextStyles.bodyBold(color: valueColor ?? AppColors.textPrimary)
+              .copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+        ),
       ],
     );
   }
 }
 
 // ---------------------------------------------------------------------
-// Totals card
+// Totals card (Summary)
 // ---------------------------------------------------------------------
 
-/// Totals card:
-///   Total Sqft / Subtotal / Handling Charge
-///   [Total Before Discount / Discount]   (only if a discount exists)
-///   Grand Total
-///   [Total Paid + Balance band]          (only once payments are tracked)
 class TotalsCard extends StatelessWidget {
   const TotalsCard({
     super.key,
@@ -763,70 +697,67 @@ class TotalsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gap = SizedBox(height: Responsive.h(10));
-    final balanceColor = q.balanceAmount > 0 ? Colors.red : AppColors.success;
+    final hasBalance = q.balanceAmount > 0;
+    final balanceColor = hasBalance ? _redColor : AppColors.success;
 
     return Container(
       width: double.infinity,
-      decoration: qCardDecoration(radius: 16),
+      decoration: qCardDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const QCardTitle(title: 'Summary', icon: Icons.calculate_outlined),
           Padding(
-            padding: EdgeInsets.all(Responsive.w(16)),
+            padding: EdgeInsets.all(Responsive.w(14)),
             child: Column(
               children: [
-                TotalRow('Total Sqft', number.format(q.totalSquareFeet)),
+                SummaryRow('Total Sqrft', number.format(q.totalSquareFeet)),
                 gap,
-                TotalRow('Subtotal', money.format(q.subtotal)),
+                SummaryRow('Subtotal', money.format(q.subtotal)),
                 gap,
-                TotalRow('Handling Charge', money.format(q.handlingCharge)),
+                SummaryRow('Handling Charge', money.format(q.handlingCharge)),
                 if (q.hasDiscount) ...[
                   gap,
-                  TotalRow('Total Before Discount', money.format(q.grandTotal)),
+                  SummaryRow('Total Before Discount', money.format(q.grandTotal)),
                   gap,
-                  TotalRow(
+                  SummaryRow(
                     q.discountLabel,
                     '- ${money.format(q.discountAmount)}',
-                    bold: true,
-                    valueColor: Colors.red,
+                    valueColor: _redColor,
                   ),
                 ],
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
-                  child: Divider(height: 1, color: AppColors.border),
+                  child: const Divider(height: 1, color: AppColors.border),
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Grand Total', style: AppTextStyles.h3()),
-                    Text(money.format(q.amountAfterDiscount), style: AppTextStyles.h3()),
+                    Text('Grand Total', style: AppTextStyles.bodyBold()),
+                    Text(money.format(q.amountAfterDiscount),
+                        style: AppTextStyles.amount(color: AppColors.primary)),
                   ],
                 ),
                 if (q.showPaymentSummary) ...[
                   gap,
-                  TotalRow(
-                    'Total Paid',
-                    money.format(q.totalPaid),
-                    bold: true,
-                    valueColor: AppColors.success,
-                  ),
+                  SummaryRow('Total Paid', money.format(q.totalPaid),
+                      valueColor: AppColors.success),
                 ],
               ],
             ),
           ),
 
-          // Balance band — red while money is due, green when fully paid.
+          // Balance strip — red while money is due, green when fully paid.
           if (q.showPaymentSummary)
             Container(
               width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.w(14), vertical: Responsive.h(12)),
               decoration: BoxDecoration(
-                color: balanceColor.withOpacity(0.08),
+                color: balanceColor.withOpacity(0.06),
                 border: Border(top: BorderSide(color: balanceColor.withOpacity(0.25))),
               ),
-              padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(16), vertical: Responsive.h(14)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -835,7 +766,7 @@ class TotalsCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          q.balanceAmount > 0
+                          hasBalance
                               ? Icons.account_balance_wallet_outlined
                               : Icons.verified_rounded,
                           size: 18,
@@ -844,31 +775,22 @@ class TotalsCard extends StatelessWidget {
                         SizedBox(width: Responsive.w(8)),
                         Flexible(
                           child: Text('Balance Amount',
-                              style: AppTextStyles.h3(), overflow: TextOverflow.ellipsis),
+                              style: AppTextStyles.bodyBold(),
+                              overflow: TextOverflow.ellipsis),
                         ),
                         if (q.balanceStatus.isNotEmpty) ...[
                           SizedBox(width: Responsive.w(8)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: balanceStatusColor(q.balanceStatus).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              capitalize(q.balanceStatus),
-                              style: AppTextStyles.caption(
-                                  color: balanceStatusColor(q.balanceStatus)),
-                            ),
+                          QStatusPill(
+                            label: capitalize(q.balanceStatus),
+                            color: balanceStatusColor(q.balanceStatus),
                           ),
                         ],
                       ],
                     ),
                   ),
                   SizedBox(width: Responsive.w(8)),
-                  Text(
-                    money.format(q.balanceAmount),
-                    style: AppTextStyles.h2(color: balanceColor),
-                  ),
+                  Text(money.format(q.balanceAmount),
+                      style: AppTextStyles.amount(color: balanceColor)),
                 ],
               ),
             ),
@@ -882,13 +804,8 @@ class TotalsCard extends StatelessWidget {
 // Payments card
 // ---------------------------------------------------------------------
 
-/// "Payments" card: one line per payment — method, date (+ reference), amount.
 class PaymentsCard extends StatelessWidget {
-  const PaymentsCard({
-    super.key,
-    required this.q,
-    required this.money,
-  });
+  const PaymentsCard({super.key, required this.q, required this.money});
 
   final QuotationDetailModel q;
   final NumberFormat money;
@@ -909,7 +826,7 @@ class PaymentsCard extends StatelessWidget {
             icon: Icons.payments_outlined,
             trailing: Text(
               '${q.payments.length} ${q.payments.length == 1 ? 'entry' : 'entries'}',
-              style: AppTextStyles.caption(),
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
             ),
           ),
           for (var i = 0; i < q.payments.length; i++) ...[
@@ -925,14 +842,14 @@ class PaymentsCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
                         color: AppColors.success.withOpacity(0.10),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(Icons.receipt_long_outlined,
-                          size: 18, color: AppColors.success),
+                          size: 20, color: AppColors.success),
                     ),
                     SizedBox(width: Responsive.w(12)),
                     Expanded(
@@ -945,9 +862,10 @@ class PaymentsCard extends StatelessWidget {
                           ),
                           SizedBox(height: Responsive.h(2)),
                           Text(dateText.isEmpty ? '-' : dateText,
-                              style: AppTextStyles.caption()),
+                              style: AppTextStyles.caption(color: AppColors.textSecondary)),
                           if (p.reference.isNotEmpty)
-                            Text('Ref: ${p.reference}', style: AppTextStyles.caption()),
+                            Text('Ref: ${p.reference}',
+                                style: AppTextStyles.caption(color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
@@ -962,7 +880,7 @@ class PaymentsCard extends StatelessWidget {
               );
             }),
             if (i != q.payments.length - 1)
-              Divider(height: 1, color: AppColors.border.withOpacity(0.5)),
+              const Divider(height: 1, color: AppColors.border),
           ],
           // Footer total
           Container(
@@ -971,7 +889,7 @@ class PaymentsCard extends StatelessWidget {
                 horizontal: Responsive.w(14), vertical: Responsive.h(12)),
             decoration: BoxDecoration(
               color: AppColors.success.withOpacity(0.06),
-              border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.7))),
+              border: const Border(top: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -989,41 +907,8 @@ class PaymentsCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------
-// Approve dialog
+// Approve dialog (same look as the Estimate approve dialog)
 // ---------------------------------------------------------------------
-
-InputDecoration _fieldDecoration({
-  String? label,
-  String? prefix,
-  String? suffix,
-}) {
-  return InputDecoration(
-    labelText: label,
-    prefixText: prefix,
-    suffixText: suffix,
-    isDense: true,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: AppColors.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: AppColors.primary, width: 1.6),
-    ),
-  );
-}
-
-Widget _dialogSectionLabel(String text, IconData icon) {
-  return Row(
-    children: [
-      Icon(icon, size: 16, color: AppColors.primary),
-      const SizedBox(width: 6),
-      Text(text, style: AppTextStyles.bodyBold(color: AppColors.primary)),
-    ],
-  );
-}
 
 /// Shows the approve dialog. Returns the request to send, or null if the
 /// owner cancelled.
@@ -1033,6 +918,12 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
     String quotationId,
     ) async {
   final formKey = GlobalKey<FormState>();
+
+  // One set of styles for the whole dialog.
+  final headingStyle = AppTextStyles.bodyBold();
+  final inputStyle = AppTextStyles.body();
+  final labelStyle = AppTextStyles.body(color: AppColors.textSecondary);
+  final errorStyle = AppTextStyles.caption(color: AppColors.error);
 
   final handlingCtrl = TextEditingController(
     text: q.handlingCharge > 0 ? q.handlingCharge.toStringAsFixed(0) : '',
@@ -1049,11 +940,10 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
 
   final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-  // Pure frontend calculation — no API call. Re-run on every keystroke.
+  // Pure frontend calculation — no API call.
   // subtotal + handling - discount = payable; payable - received = balance.
   ({double handling, double discount, double payable, double received, double balance})
   calcPreview() {
-    // Empty handling field falls back to the quotation's current charge.
     final handling = double.tryParse(handlingCtrl.text.trim()) ?? q.handlingCharge;
     final discountValue = double.tryParse(discountValueCtrl.text.trim()) ?? 0;
     final beforeDiscount = q.subtotal + handling;
@@ -1079,6 +969,34 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
     );
   }
 
+  Widget previewRow(String label, String value, {bool bold = false, Color? color}) {
+    final valueStyle = bold
+        ? AppTextStyles.bodyBold(color: color ?? AppColors.textPrimary)
+        : AppTextStyles.body(color: color ?? AppColors.textPrimary);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text(label,
+              style: bold
+                  ? AppTextStyles.bodyBold()
+                  : AppTextStyles.body(color: AppColors.textSecondary)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(value, maxLines: 1, softWrap: false, style: valueStyle),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) {
@@ -1086,238 +1004,284 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
         builder: (dialogContext, setDialogState) {
           final preview = calcPreview();
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            title: Row(
-              children: [
-                const QIconBadge(Icons.verified_outlined),
-                const SizedBox(width: 10),
-                Text('Approve Quotation', style: AppTextStyles.h3()),
-              ],
+          return Theme(
+            data: Theme.of(dialogContext).copyWith(
+              inputDecorationTheme: InputDecorationTheme(
+                labelStyle: labelStyle,
+                floatingLabelStyle: labelStyle,
+                hintStyle: labelStyle,
+                prefixStyle: inputStyle,
+                suffixStyle: inputStyle,
+                errorStyle: errorStyle,
+                filled: true,
+                fillColor: AppColors.background,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: Responsive.w(14),
+                  vertical: Responsive.h(14),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              textTheme: Theme.of(dialogContext).textTheme.copyWith(
+                titleMedium: inputStyle,
+                bodyLarge: inputStyle,
+              ),
             ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ---- Handling charge ----
-                      TextFormField(
-                        controller: handlingCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                        ],
-                        decoration: _fieldDecoration(
-                          label: 'Handling Charge (optional)',
-                          prefix: '₹ ',
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                      ),
-
-                      // ---- Discount ----
-                      const SizedBox(height: 18),
-                      _dialogSectionLabel('Discount', Icons.sell_outlined),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: discountType,
-                        decoration: _fieldDecoration(),
-                        items: const [
-                          DropdownMenuItem(value: 'none', child: Text('No discount')),
-                          DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
-                          DropdownMenuItem(value: 'fixed', child: Text('Fixed')),
-                        ],
-                        onChanged: (v) => setDialogState(() => discountType = v ?? 'none'),
-                      ),
-                      if (discountType != 'none') ...[
-                        const SizedBox(height: 12),
+            child: AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text('Approve Quotation', style: headingStyle),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ---- Handling charge ----
                         TextFormField(
-                          controller: discountValueCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          controller: handlingCtrl,
+                          style: inputStyle,
+                          keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                           ],
-                          decoration: _fieldDecoration(
-                            label: discountType == 'percentage'
-                                ? 'Discount %'
-                                : 'Discount Amount',
-                            prefix: discountType == 'fixed' ? '₹ ' : null,
-                            suffix: discountType == 'percentage' ? '%' : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Handling Charge (optional)',
+                            prefixText: '₹ ',
+                          ),
+                          onChanged: (_) => setDialogState(() {}),
+                        ),
+
+                        // ---- Discount ----
+                        const SizedBox(height: 16),
+                        Text('Discount', style: headingStyle),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: discountType,
+                          style: inputStyle,
+                          items: [
+                            DropdownMenuItem(
+                                value: 'none',
+                                child: Text('No discount', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'percentage',
+                                child: Text('Percentage', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'fixed', child: Text('Fixed', style: inputStyle)),
+                          ],
+                          onChanged: (v) =>
+                              setDialogState(() => discountType = v ?? 'none'),
+                        ),
+                        if (discountType != 'none') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: discountValueCtrl,
+                            style: inputStyle,
+                            keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
+                            decoration: InputDecoration(
+                              labelText: discountType == 'percentage'
+                                  ? 'Discount %'
+                                  : 'Discount Amount',
+                              prefixText: discountType == 'fixed' ? '₹ ' : null,
+                              suffixText: discountType == 'percentage' ? '%' : null,
+                            ),
+                            onChanged: (_) => setDialogState(() {}),
+                            validator: (v) {
+                              if (discountType == 'none') return null;
+                              if (v == null || v.trim().isEmpty) return 'Required';
+                              final parsed = double.tryParse(v.trim());
+                              if (parsed == null || parsed < 0) {
+                                return 'Enter a valid value';
+                              }
+                              if (discountType == 'percentage' && parsed > 100) {
+                                return 'Cannot exceed 100%';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+
+                        // ---- Payable amount preview ----
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              previewRow('Subtotal', currency.format(q.subtotal)),
+                              previewRow('Handling Charge',
+                                  '+ ${currency.format(preview.handling)}'),
+                              if (discountType != 'none')
+                                previewRow(
+                                  discountType == 'percentage'
+                                      ? 'Discount (${discountValueCtrl.text.trim().isEmpty ? '0' : discountValueCtrl.text.trim()}%)'
+                                      : 'Discount',
+                                  '- ${currency.format(preview.discount)}',
+                                  color: _redColor,
+                                ),
+                              const Divider(height: 14, color: AppColors.border),
+                              previewRow(
+                                'Payable Amount',
+                                currency.format(preview.payable),
+                                bold: true,
+                                color: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // ---- Initial Payment ----
+                        const SizedBox(height: 16),
+                        Text('Initial Payment (optional)', style: headingStyle),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: paymentAmountCtrl,
+                          style: inputStyle,
+                          keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Amount Received',
+                            prefixText: '₹ ',
                           ),
                           onChanged: (_) => setDialogState(() {}),
                           validator: (v) {
-                            if (discountType == 'none') return null;
-                            if (v == null || v.trim().isEmpty) return 'Required';
+                            if (v == null || v.trim().isEmpty) return null; // optional
                             final parsed = double.tryParse(v.trim());
-                            if (parsed == null || parsed < 0) return 'Enter a valid value';
-                            if (discountType == 'percentage' && parsed > 100) {
-                              return 'Cannot exceed 100%';
+                            if (parsed == null || parsed <= 0) {
+                              return 'Enter a valid amount';
+                            }
+                            final payable = calcPreview().payable;
+                            if (parsed > payable + 0.009) {
+                              return 'Cannot exceed payable amount (${currency.format(payable)})';
                             }
                             return null;
                           },
                         ),
-                      ],
+                        const SizedBox(height: 8),
 
-                      // ---- PAYABLE AMOUNT PREVIEW (right before Initial Payment) ----
-                      const SizedBox(height: 18),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.18)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            PreviewRow('Subtotal', currency.format(q.subtotal)),
-                            PreviewRow('Handling Charge',
-                                '+ ${currency.format(preview.handling)}'),
-                            if (discountType != 'none')
-                              PreviewRow(
-                                discountType == 'percentage'
-                                    ? 'Discount (${discountValueCtrl.text.trim().isEmpty ? '0' : discountValueCtrl.text.trim()}%)'
-                                    : 'Discount',
-                                '- ${currency.format(preview.discount)}',
-                                color: Colors.red,
+                        // Live balance after the amount received.
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Balance Due', style: AppTextStyles.bodyBold()),
+                              Text(
+                                currency.format(preview.balance),
+                                style: AppTextStyles.bodyBold(
+                                  color: preview.balance > 0
+                                      ? _redColor
+                                      : AppColors.success,
+                                ),
                               ),
-                            const Divider(height: 18),
-                            PreviewRow(
-                              'Payable Amount',
-                              currency.format(preview.payable),
-                              bold: true,
-                              color: AppColors.primary,
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ---- Initial Payment ----
-                      const SizedBox(height: 18),
-                      _dialogSectionLabel(
-                          'Initial Payment (optional)', Icons.payments_outlined),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: paymentAmountCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                        ],
-                        decoration: _fieldDecoration(
-                          label: 'Amount Received',
-                          prefix: '₹ ',
-                        ),
-                        onChanged: (_) => setDialogState(() {}),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return null; // optional
-                          final parsed = double.tryParse(v.trim());
-                          if (parsed == null || parsed <= 0) return 'Enter a valid amount';
-                          final payable = calcPreview().payable;
-                          if (parsed > payable + 0.009) {
-                            return 'Cannot exceed payable amount (${currency.format(payable)})';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Live balance after the amount received.
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: (preview.balance > 0 ? Colors.red : AppColors.success)
-                              .withOpacity(0.07),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Balance Due', style: AppTextStyles.balanceamount()),
-                            Text(
-                              currency.format(preview.balance),
-                              style: AppTextStyles.balanceamount(
-                                color: preview.balance > 0 ? Colors.red : AppColors.success,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: paymentMethod,
-                        decoration: _fieldDecoration(label: 'Payment Method'),
-                        items: const [
-                          DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                          DropdownMenuItem(value: 'online', child: Text('Online')),
-                          DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
-                          DropdownMenuItem(value: 'credit', child: Text('Credit')),
-                          DropdownMenuItem(
-                              value: 'bank_transfer', child: Text('Bank Transfer')),
-                        ],
-                        onChanged: (v) => setDialogState(() => paymentMethod = v ?? 'cash'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: paymentReferenceCtrl,
-                        decoration: _fieldDecoration(label: 'Payment Reference (optional)'),
-                      ),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: dialogContext,
-                            initialDate: paymentDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) setDialogState(() => paymentDate = picked);
-                        },
-                        child: InputDecorator(
-                          decoration: _fieldDecoration(label: 'Payment Date (optional)')
-                              .copyWith(
-                            suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+                            ],
                           ),
-                          child: Text(paymentDate == null
-                              ? 'Select date'
-                              : DateFormat('yyyy-MM-dd').format(paymentDate!)),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: paymentNotesCtrl,
-                        decoration: _fieldDecoration(label: 'Payment Notes (optional)'),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: paymentMethod,
+                          style: inputStyle,
+                          decoration: const InputDecoration(labelText: 'Payment Method'),
+                          items: [
+                            DropdownMenuItem(
+                                value: 'cash', child: Text('Cash', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'online', child: Text('Online', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'cheque', child: Text('Cheque', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'credit', child: Text('Credit', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'bank_transfer',
+                                child: Text('Bank Transfer', style: inputStyle)),
+                          ],
+                          onChanged: (v) =>
+                              setDialogState(() => paymentMethod = v ?? 'cash'),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: paymentReferenceCtrl,
+                          style: inputStyle,
+                          decoration: const InputDecoration(
+                              labelText: 'Payment Reference (optional)'),
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: dialogContext,
+                              initialDate: paymentDate ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => paymentDate = picked);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                                labelText: 'Payment Date (optional)'),
+                            child: Text(
+                              paymentDate == null
+                                  ? 'Select date'
+                                  : DateFormat('yyyy-MM-dd').format(paymentDate!),
+                              style: inputStyle,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: paymentNotesCtrl,
+                          style: inputStyle,
+                          decoration: const InputDecoration(
+                              labelText: 'Payment Notes (optional)'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text('Cancel',
+                      style: AppTextStyles.bodyBold(color: AppColors.textSecondary)),
                 ),
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) return;
-                  Navigator.of(dialogContext).pop(true);
-                },
-                child: const Text('Approve'),
-              ),
-            ],
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: Text('Approve',
+                      style: AppTextStyles.bodyBold(color: Colors.white)),
+                ),
+              ],
+            ),
           );
         },
       );
@@ -1331,7 +1295,7 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
   final paymentAmount = double.tryParse(paymentAmountCtrl.text.trim());
   final hasDiscount = discountType != 'none';
 
-  final request = QuotationApproveRequest(
+  return QuotationApproveRequest(
     id: quotationId,
     handlingCharge: handlingCharge,
     discountType: hasDiscount ? discountType : null,
@@ -1351,6 +1315,4 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
         ? paymentNotesCtrl.text.trim()
         : null,
   );
-
-  return request;
 }

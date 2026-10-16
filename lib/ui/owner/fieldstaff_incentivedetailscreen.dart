@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../Apiprovider/ownerfieldsstaffincentiveprovider.dart';
 import '../../bloc/ownerbloc/fieldstaffincentivedetail/fieldstaffincentivedetail_bloc.dart';
 import '../../bloc/ownerbloc/fieldstaffincentivedetail/fieldstaffincentivedetail_event.dart';
@@ -10,7 +11,20 @@ import '../../core/utils/responsive.dart';
 import '../../models/owner_models/fieldstaffincentivemodel.dart';
 import '../../widgets/appsnackbar.dart';
 
-/// Public entry point — provide id of the incentive to view.
+/// Status colours (same palette as the list screen / Estimates).
+Color _statusColor(String status) {
+  switch (status) {
+    case 'paid':
+      return AppColors.success;
+    case 'approved':
+      return Colors.blue.shade700;
+    case 'pending':
+    default:
+      return const Color(0xFFF59E0B);
+  }
+}
+
+/// Public entry point - provide id of the incentive to view.
 class IncentiveDetailScreen extends StatelessWidget {
   const IncentiveDetailScreen({super.key, required this.id});
 
@@ -19,7 +33,8 @@ class IncentiveDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => IncentiveDetailBloc(provider: IncentiveProvider(), incentiveId: id)
+      create: (_) =>
+      IncentiveDetailBloc(provider: IncentiveProvider(), incentiveId: id)
         ..add(LoadIncentiveDetail(id)),
       child: const _IncentiveDetailView(),
     );
@@ -29,7 +44,8 @@ class IncentiveDetailScreen extends StatelessWidget {
 class _IncentiveDetailView extends StatelessWidget {
   const _IncentiveDetailView();
 
-  void _openMarkPaidSheet(BuildContext context, FieldStaffIncentiveModel incentive) {
+  void _openMarkPaidSheet(
+      BuildContext context, FieldStaffIncentiveModel incentive) {
     final bloc = context.read<IncentiveDetailBloc>();
     final referenceController = TextEditingController();
     final notesController = TextEditingController();
@@ -44,7 +60,8 @@ class _IncentiveDetailView extends StatelessWidget {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
               child: Container(
                 padding: EdgeInsets.fromLTRB(
                   Responsive.w(20),
@@ -77,22 +94,22 @@ class _IncentiveDetailView extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: Responsive.h(16)),
-                        Text(
-                          'Mark as Paid',
-                          style: AppTextStyles.bodyBold(color: AppColors.black)
-                              .copyWith(fontSize: Responsive.sp(17)),
-                        ),
+                        Text('Mark as Paid', style: AppTextStyles.h6()),
                         SizedBox(height: Responsive.h(4)),
                         Text(
                           '₹${incentive.incentiveAmountFormatted} to ${incentive.fieldStaffName}',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5)),
+                          style: AppTextStyles.caption(
+                              color: AppColors.textSecondary),
                         ),
                         SizedBox(height: Responsive.h(18)),
                         TextFormField(
                           controller: referenceController,
-                          decoration: _inputDecoration('Payment Reference', Icons.tag_outlined),
-                          validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Enter a payment reference' : null,
+                          style: AppTextStyles.body(),
+                          decoration: _inputDecoration(
+                              'Payment Reference', Icons.tag_outlined),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Enter a payment reference'
+                              : null,
                         ),
                         SizedBox(height: Responsive.h(14)),
                         InkWell(
@@ -104,13 +121,19 @@ class _IncentiveDetailView extends StatelessWidget {
                               firstDate: DateTime(2000),
                               lastDate: DateTime(2100),
                             );
-                            if (picked != null) setSheetState(() => paymentDate = picked);
+                            if (picked != null) {
+                              setSheetState(() => paymentDate = picked);
+                            }
                           },
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: 'Payment Date',
-                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                              prefixIcon: Icon(Icons.event_outlined, color: AppColors.textSecondary, size: 20),
+                              labelStyle: AppTextStyles.body(
+                                  color: AppColors.textHint),
+                              floatingLabelBehavior:
+                              FloatingLabelBehavior.always,
+                              prefixIcon: Icon(Icons.event_outlined,
+                                  color: AppColors.textSecondary, size: 20),
                               filled: true,
                               fillColor: AppColors.background,
                               contentPadding: EdgeInsets.symmetric(
@@ -124,7 +147,7 @@ class _IncentiveDetailView extends StatelessWidget {
                             ),
                             child: Text(
                               _formatDate(paymentDate),
-                              style: TextStyle(fontSize: Responsive.sp(14), color: AppColors.black),
+                              style: AppTextStyles.body(),
                             ),
                           ),
                         ),
@@ -132,7 +155,9 @@ class _IncentiveDetailView extends StatelessWidget {
                         TextFormField(
                           controller: notesController,
                           maxLines: 2,
-                          decoration: _inputDecoration('Notes (optional)', Icons.notes_outlined),
+                          style: AppTextStyles.body(),
+                          decoration: _inputDecoration(
+                              'Notes (optional)', Icons.notes_outlined),
                         ),
                         SizedBox(height: Responsive.h(20)),
                         SizedBox(
@@ -140,13 +165,15 @@ class _IncentiveDetailView extends StatelessWidget {
                           height: Responsive.h(48),
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade700,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              backgroundColor: AppColors.success,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
                             ),
                             onPressed: () {
                               if (!formKey.currentState!.validate()) return;
                               bloc.add(MarkIncentivePaid(
-                                paymentReference: referenceController.text.trim(),
+                                paymentReference:
+                                referenceController.text.trim(),
                                 paymentDate: _formatDate(paymentDate),
                                 notes: notesController.text.trim().isEmpty
                                     ? null
@@ -156,8 +183,8 @@ class _IncentiveDetailView extends StatelessWidget {
                             },
                             child: Text(
                               'Confirm Payment',
-                              style: AppTextStyles.bodyBold(color: Colors.white)
-                                  .copyWith(fontSize: Responsive.sp(14)),
+                              style:
+                              AppTextStyles.bodyBold(color: Colors.white),
                             ),
                           ),
                         ),
@@ -182,198 +209,207 @@ class _IncentiveDetailView extends StatelessWidget {
   static InputDecoration _inputDecoration(String hint, IconData icon) {
     return InputDecoration(
       hintText: hint,
+      hintStyle: AppTextStyles.body(color: AppColors.textHint),
+      errorStyle: AppTextStyles.caption(color: AppColors.error),
       prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
       filled: true,
       fillColor: AppColors.background,
-      contentPadding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(14)),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      contentPadding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(14)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: BlocConsumer<IncentiveDetailBloc, IncentiveDetailState>(
-        listener: (context, state) {
-          if (state.successMessage != null) {
-            AppSnackbar.success(state.successMessage!);
-            context.read<IncentiveDetailBloc>().add(const ClearIncentiveDetailFeedback());
-          } else if (state.errorMessage != null) {
-            AppSnackbar.error(state.errorMessage!);
-            context.read<IncentiveDetailBloc>().add(const ClearIncentiveDetailFeedback());
-          }
-        },
-        builder: (context, state) {
-          if (state.incentive == null) {
-            if (state.status == IncentiveDetailStatus.error) {
-              return _ErrorState(
-                onRetry: () => context
+
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as Estimates) ----------
+        appBar: AppBar(
+          title: Text('Incentive Detail', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+
+        body: SafeArea(
+          child: BlocConsumer<IncentiveDetailBloc, IncentiveDetailState>(
+            listener: (context, state) {
+              if (state.successMessage != null) {
+                AppSnackbar.success(state.successMessage!);
+                context
                     .read<IncentiveDetailBloc>()
-                    .add(LoadIncentiveDetail(context.read<IncentiveDetailBloc>().incentiveId)),
-              );
-            }
-            // Covers both `initial` (first frame, before the async load
-            // handler has run) and `loading`.
-            return const Center(child: CircularProgressIndicator());
-          }
+                    .add(const ClearIncentiveDetailFeedback());
+              } else if (state.errorMessage != null) {
+                AppSnackbar.error(state.errorMessage!);
+                context
+                    .read<IncentiveDetailBloc>()
+                    .add(const ClearIncentiveDetailFeedback());
+              }
+            },
+            builder: (context, state) {
+              if (state.incentive == null) {
+                if (state.status == IncentiveDetailStatus.error) {
+                  return _ErrorState(
+                    onRetry: () => context.read<IncentiveDetailBloc>().add(
+                        LoadIncentiveDetail(
+                            context.read<IncentiveDetailBloc>().incentiveId)),
+                  );
+                }
+                // Covers both `initial` (first frame, before the async load
+                // handler has run) and `loading`.
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          final incentive = state.incentive!;
+              final incentive = state.incentive!;
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                _AmountHeader(incentive: incentive),
-                Transform.translate(
-                  offset: Offset(0, -Responsive.h(22)),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-                    child: Column(
-                      children: [
-                        _DetailCard(incentive: incentive),
-                        if (incentive.notes.isNotEmpty) ...[
-                          SizedBox(height: Responsive.h(14)),
-                          _NotesBox(notes: incentive.notes),
-                        ],
-                        SizedBox(height: Responsive.h(20)),
-                        if (incentive.status != 'paid')
-                          SizedBox(
-                            width: double.infinity,
-                            height: Responsive.h(50),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade700,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                              onPressed: state.isSubmitting
-                                  ? null
-                                  : () => _openMarkPaidSheet(context, incentive),
-                              child: state.isSubmitting
-                                  ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation(Colors.white),
-                                ),
-                              )
-                                  : Text(
-                                'Mark as Paid',
-                                style: AppTextStyles.bodyBold(color: Colors.white)
-                                    .copyWith(fontSize: Responsive.sp(15)),
-                              ),
-                            ),
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                    Responsive.h(14), Responsive.w(20), Responsive.h(24)),
+                child: Column(
+                  children: [
+                    _AmountCard(incentive: incentive),
+                    SizedBox(height: Responsive.h(12)),
+                    _DetailCard(incentive: incentive),
+                    if (incentive.notes.isNotEmpty) ...[
+                      SizedBox(height: Responsive.h(12)),
+                      _NotesBox(notes: incentive.notes),
+                    ],
+                    SizedBox(height: Responsive.h(20)),
+                    if (incentive.status != 'paid')
+                      SizedBox(
+                        width: double.infinity,
+                        height: Responsive.h(50),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
                           ),
-                        SizedBox(height: Responsive.h(24)),
-                      ],
-                    ),
-                  ),
+                          onPressed: state.isSubmitting
+                              ? null
+                              : () => _openMarkPaidSheet(context, incentive),
+                          child: state.isSubmitting
+                              ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                              AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                              : Text(
+                            'Mark as Paid',
+                            style: AppTextStyles.bodyBold(
+                                color: Colors.white),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 }
 
-class _AmountHeader extends StatelessWidget {
-  const _AmountHeader({required this.incentive});
+// =====================================================================
+// PIECES
+// =====================================================================
 
-  final FieldStaffIncentiveModel incentive;
+class _CardShell extends StatelessWidget {
+  const _CardShell({required this.child});
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        Responsive.w(16),
-        Responsive.h(8),
-        Responsive.w(16),
-        Responsive.h(50),
-      ),
+      padding: EdgeInsets.all(Responsive.w(16)),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(Responsive.w(28)),
-          bottomRight: Radius.circular(Responsive.w(28)),
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.maybePop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                ),
-                Expanded(
-                  child: Text(
-                    'Incentive Detail',
-                    style: AppTextStyles.h6().copyWith(color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 48),
-              ],
-            ),
-            SizedBox(height: Responsive.h(12)),
-            Text(
-              '₹${incentive.incentiveAmountFormatted}',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: Responsive.sp(32),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            SizedBox(height: Responsive.h(4)),
-            Text(
-              'Incentive for site visit',
-              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: Responsive.sp(12.5)),
-            ),
-            SizedBox(height: Responsive.h(10)),
-            _StatusPillLarge(status: incentive.status, label: incentive.statusLabel),
-          ],
-        ),
-      ),
+      child: child,
     );
   }
 }
 
-class _StatusPillLarge extends StatelessWidget {
-  const _StatusPillLarge({required this.status, required this.label});
+class _AmountCard extends StatelessWidget {
+  const _AmountCard({required this.incentive});
 
-  final String status;
-  final String label;
+  final FieldStaffIncentiveModel incentive;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(6)),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    final color = _statusColor(incentive.status);
+    final icon = incentive.status == 'paid'
+        ? Icons.check_circle_outline
+        : incentive.status == 'approved'
+        ? Icons.verified_outlined
+        : Icons.hourglass_top_outlined;
+
+    return _CardShell(
+      child: Column(
         children: [
-          Icon(
-            status == 'paid'
-                ? Icons.check_circle_outline
-                : status == 'approved'
-                ? Icons.verified_outlined
-                : Icons.hourglass_top_outlined,
-            size: 15,
-            color: Colors.white,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child:
+            Icon(Icons.payments_outlined, color: AppColors.primary, size: 24),
           ),
-          SizedBox(width: Responsive.w(6)),
+          SizedBox(height: Responsive.h(10)),
           Text(
-            label,
-            style: TextStyle(color: Colors.white, fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w600),
+            '₹${incentive.incentiveAmountFormatted}',
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
+              color: AppColors.primary,
+              fontSize: Responsive.sp(28),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: Responsive.h(2)),
+          Text(
+            'Incentive for site visit',
+            style: AppTextStyles.caption(color: AppColors.textSecondary),
+          ),
+          SizedBox(height: Responsive.h(10)),
+          Container(
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(12), vertical: Responsive.h(5)),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 15, color: color),
+                SizedBox(width: Responsive.w(6)),
+                Text(
+                  incentive.statusLabel,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    color: color,
+                    fontSize: Responsive.sp(11.5),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -388,25 +424,24 @@ class _DetailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(18)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 8)),
-        ],
-      ),
+    final showPaidOn = incentive.status == 'paid' && incentive.paidAt.isNotEmpty;
+
+    return _CardShell(
       child: Column(
         children: [
           _DetailRow(label: 'Field Staff', value: incentive.fieldStaffName),
-          _DetailRow(label: 'Customer', value: incentive.siteVisit.customerName),
-          _DetailRow(label: 'Site Address', value: incentive.siteVisit.siteAddress),
+          _DetailRow(
+              label: 'Customer', value: incentive.siteVisit.customerName),
+          _DetailRow(
+              label: 'Site Address', value: incentive.siteVisit.siteAddress),
           _DetailRow(label: 'Visit Date', value: incentive.siteVisit.visitDate),
           _DetailRow(label: 'Linked Estimate', value: incentive.estimateNumber),
-          _DetailRow(label: 'Created', value: incentive.createdAt, isLast: true),
-          if (incentive.status == 'paid' && incentive.paidAt.isNotEmpty)
+          _DetailRow(
+            label: 'Created',
+            value: incentive.createdAt,
+            isLast: !showPaidOn,
+          ),
+          if (showPaidOn)
             _DetailRow(label: 'Paid On', value: incentive.paidAt, isLast: true),
         ],
       ),
@@ -415,7 +450,11 @@ class _DetailCard extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value, this.isLast = false});
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
 
   final String label;
   final String value;
@@ -432,7 +471,7 @@ class _DetailRow extends StatelessWidget {
             flex: 4,
             child: Text(
               label,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5)),
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
             ),
           ),
           Expanded(
@@ -441,8 +480,9 @@ class _DetailRow extends StatelessWidget {
               value.isEmpty ? '—' : value,
               textAlign: TextAlign.right,
               style: TextStyle(
-                color: AppColors.black,
-                fontSize: Responsive.sp(13),
+                fontFamily: AppTextStyles.fontFamily,
+                color: AppColors.textPrimary,
+                fontSize: Responsive.sp(12.5),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -460,13 +500,14 @@ class _NotesBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const amber = Color(0xFFF59E0B);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3D6),
+        color: amber.withOpacity(0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF0D999)),
+        border: Border.all(color: amber.withOpacity(0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,8 +515,9 @@ class _NotesBox extends StatelessWidget {
           Text(
             'NOTES',
             style: TextStyle(
+              fontFamily: AppTextStyles.fontFamily,
               color: const Color(0xFF9A7115),
-              fontSize: Responsive.sp(11),
+              fontSize: Responsive.sp(10.5),
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
             ),
@@ -483,7 +525,7 @@ class _NotesBox extends StatelessWidget {
           SizedBox(height: Responsive.h(6)),
           Text(
             notes,
-            style: TextStyle(color: const Color(0xFF6B5316), fontSize: Responsive.sp(12.5)),
+            style: AppTextStyles.body(color: const Color(0xFF6B5316)),
           ),
         ],
       ),
@@ -503,20 +545,15 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: AppColors.textSecondary.withOpacity(0.4)),
-            SizedBox(height: Responsive.h(12)),
-            Text(
-              'Could not load incentive',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(13)),
-            ),
-            SizedBox(height: Responsive.h(16)),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
+            Icon(Icons.error_outline_rounded,
+                size: 38,
+                color: AppColors.textSecondary.withOpacity(0.5)),
+            SizedBox(height: Responsive.h(10)),
+            Text('Could not load incentive', style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
               onPressed: onRetry,
-              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
             ),
           ],
         ),

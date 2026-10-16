@@ -16,7 +16,6 @@ import '../../core/utils/delete_helper.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/validator/validationfile.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../widgets/primary_button.dart';
 import '../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../models/salesmanmodels/quotationupdatemodel.dart';
@@ -668,16 +667,31 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
     context.read<OwnerQuotationEditBloc>().add(OwnerQuotationUpdateSubmitted(request));
   }
 
+  // ---------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
 
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
+    final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+    final sectionGap = SizedBox(height: Responsive.h(14));
+
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text('Edit Quotation', style: AppTextStyles.h6())),
+
+        // ---------- APPBAR (same as Estimate details) ----------
+        appBar: AppBar(
+          title: Text('Edit Quotation', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
         body: SafeArea(
           child: MultiBlocListener(
             listeners: [
@@ -738,10 +752,9 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                     key: formKey,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: ListView(
-                      padding: EdgeInsets.all(Responsive.w(18)),
+                      padding: listPadding,
                       children: [
-                        Text('Customer Details', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(12)),
+                        // ---- Customer ----
                         OwnerCustomerSection(
                           phone: customerPhone,
                           name: customerName,
@@ -752,10 +765,9 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                           addressValidator: validateCustomerAddress,
                           emailValidator: validateOptionalEmail,
                         ),
-                        SizedBox(height: Responsive.h(16)),
+                        sectionGap,
 
-                        Text('Contractor Details', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(12)),
+                        // ---- Contractor ----
                         OwnerContractorSection(
                           formKey: contractorFormKey,
                           name: contractorName,
@@ -765,111 +777,146 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                           phoneValidator: validateOptionalPhone,
                           emailValidator: validateOptionalEmail,
                         ),
-                        SizedBox(height: Responsive.h(20)),
+                        sectionGap,
 
-                        Text('Add / Edit Item', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(10)),
-                        OwnerItemFormFields(
-                          formKey: itemFormKey,
-                          productField: OwnerProductDropdown(
-                            searchCtrl: productSearchCtrl,
-                            focusNode: productSearchFocus,
-                            selectedProduct: selectedProduct,
-                            showSuggestions: showProductSuggestions,
-                            onFieldTap: () => setState(() => showProductSuggestions = true),
-                            onTextChanged: (text) {
-                              if (selectedProduct != null &&
-                                  text != productDisplayString(selectedProduct!)) {
-                                onProductSelected(null);
-                              }
-                              setState(() => showProductSuggestions = true);
-                            },
-                            onClear: clearProductSelection,
-                            onSelected: (p) {
-                              onProductSelected(p);
-                              setState(() => showProductSuggestions = false);
-                              productSearchFocus.unfocus();
-                            },
+                        // ---- Add / Edit item ----
+                        OwnerSectionCard(
+                          title: editingItemIndex != null ? 'Edit Item' : 'Add Item',
+                          icon: editingItemIndex != null
+                              ? Icons.edit_outlined
+                              : Icons.add_box_outlined,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              OwnerItemFormFields(
+                                formKey: itemFormKey,
+                                productField: OwnerProductDropdown(
+                                  searchCtrl: productSearchCtrl,
+                                  focusNode: productSearchFocus,
+                                  selectedProduct: selectedProduct,
+                                  showSuggestions: showProductSuggestions,
+                                  onFieldTap: () =>
+                                      setState(() => showProductSuggestions = true),
+                                  onTextChanged: (text) {
+                                    if (selectedProduct != null &&
+                                        text != productDisplayString(selectedProduct!)) {
+                                      onProductSelected(null);
+                                    }
+                                    setState(() => showProductSuggestions = true);
+                                  },
+                                  onClear: clearProductSelection,
+                                  onSelected: (p) {
+                                    onProductSelected(p);
+                                    setState(() => showProductSuggestions = false);
+                                    productSearchFocus.unfocus();
+                                  },
+                                ),
+                                companyCtrl: itemCompanyCtrl,
+                                sizeCtrl: itemSizeCtrl,
+                                unitCtrl: itemUnitCtrl,
+                                mrpCtrl: itemMrpCtrl,
+                                rateCtrl: itemRateCtrl,
+                                qtyCtrl: itemQtyCtrl,
+                                boxQtyCtrl: itemBoxQtyCtrl,
+                                pieceQtyCtrl: itemPieceQtyCtrl,
+                                isBoxUnit: isBoxUnitProduct,
+                                onRateChanged: (_) {
+                                  setState(() {});
+                                  scheduleIncentiveFetch();
+                                },
+                                onQtyChanged: (_) {
+                                  setState(recomputeBoxQtyIfNeeded);
+                                  scheduleIncentiveFetch();
+                                },
+                                onPieceChanged: (_) => setState(() {}),
+                              ),
+
+                              // Incentive preview hidden for owner-created quotations.
+                              if (!isOwner &&
+                                  (selectedProduct != null || editingItemIndex != null)) ...[
+                                SizedBox(height: Responsive.h(8)),
+                                const OwnerIncentivePreviewCard(),
+                              ],
+                              SizedBox(height: Responsive.h(14)),
+
+                              if (editingItemIndex != null)
+                                OwnerEditingBanner(
+                                  itemNumber: editingItemIndex! + 1,
+                                  onCancel: cancelEditItem,
+                                ),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: Responsive.h(48),
+                                child: ElevatedButton.icon(
+                                  onPressed: isAddingItem ? null : saveItemFromForm,
+                                  icon: isAddingItem
+                                      ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                      : Icon(
+                                    editingItemIndex != null
+                                        ? Icons.save_outlined
+                                        : Icons.add,
+                                    color: Colors.white,
+                                  ),
+                                  label: Text(
+                                    isAddingItem
+                                        ? (editingItemIndex != null
+                                        ? 'Updating…'
+                                        : 'Calculating…')
+                                        : (editingItemIndex != null
+                                        ? 'Update Item'
+                                        : 'Add Item'),
+                                    style: AppTextStyles.bodyBold(color: Colors.white),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: buttonShape,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: Responsive.h(8)),
+                            ],
                           ),
-                          companyCtrl: itemCompanyCtrl,
-                          sizeCtrl: itemSizeCtrl,
-                          unitCtrl: itemUnitCtrl,
-                          mrpCtrl: itemMrpCtrl,
-                          rateCtrl: itemRateCtrl,
-                          qtyCtrl: itemQtyCtrl,
-                          boxQtyCtrl: itemBoxQtyCtrl,
-                          pieceQtyCtrl: itemPieceQtyCtrl,
-                          isBoxUnit: isBoxUnitProduct,
-                          onRateChanged: (_) {
-                            setState(() {});
-                            scheduleIncentiveFetch();
-                          },
-                          onQtyChanged: (_) {
-                            setState(recomputeBoxQtyIfNeeded);
-                            scheduleIncentiveFetch();
-                          },
-                          onPieceChanged: (_) => setState(() {}),
                         ),
-                        SizedBox(height: Responsive.h(6)),
+                        SizedBox(height: Responsive.h(18)),
 
-                        // Incentive preview hidden for owner-created quotations.
-                        if (!isOwner && (selectedProduct != null || editingItemIndex != null)) ...[
-                          SizedBox(height: Responsive.h(8)),
-                          const OwnerIncentivePreviewCard(),
-                        ],
-
-                        SizedBox(height: Responsive.h(14)),
-
-                        if (editingItemIndex != null)
-                          OwnerEditingBanner(
-                            itemNumber: editingItemIndex! + 1,
-                            onCancel: cancelEditItem,
-                          ),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: isAddingItem ? null : saveItemFromForm,
-                            icon: isAddingItem
-                                ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                                : Icon(
-                              editingItemIndex != null ? Icons.save_outlined : Icons.add,
-                              color: Colors.white,
+                        // ---- Items list ----
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const OwnerSectionHeader('Items'),
+                            OwnerPill(
+                              label:
+                              '${items.length} ${items.length == 1 ? 'item' : 'items'}',
+                              color: AppColors.primary,
                             ),
-                            label: Text(
-                              isAddingItem
-                                  ? (editingItemIndex != null ? 'Updating…' : 'Calculating…')
-                                  : (editingItemIndex != null ? 'Update Item' : 'Add Item'),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                          ),
+                          ],
                         ),
-                        SizedBox(height: Responsive.h(20)),
-
-                        Text('Items (${items.length})', style: AppTextStyles.h3()),
                         SizedBox(height: Responsive.h(10)),
                         if (items.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
-                            child: Center(
-                              child: Text('No items added yet',
-                                  style: AppTextStyles.body(color: AppColors.textHint)),
-                            ),
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(Responsive.w(18)),
+                            decoration: ownerCardDecoration(),
+                            child: Text('No items added yet',
+                                style: AppTextStyles.caption(
+                                    color: AppColors.textSecondary)),
                           )
                         else
                           BlocBuilder<QuotationItemRemoveBloc, QuotationItemRemoveState>(
                             buildWhen: (prev, curr) =>
-                            prev.status != curr.status || prev.removedItemId != curr.removedItemId,
+                            prev.status != curr.status ||
+                                prev.removedItemId != curr.removedItemId,
                             builder: (context, removeState) {
-                              final removingId = removeState.status == QuotationItemRemoveStatus.inProgress
+                              final removingId =
+                              removeState.status == QuotationItemRemoveStatus.inProgress
                                   ? removeState.removedItemId
                                   : null;
                               return Column(
@@ -890,18 +937,18 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                               );
                             },
                           ),
-                        SizedBox(height: Responsive.h(20)),
+                        SizedBox(height: Responsive.h(8)),
 
-                        Text('Other Details', style: AppTextStyles.h3()),
-                        SizedBox(height: Responsive.h(12)),
+                        // ---- Other details ----
                         OwnerOtherDetailsSection(
                           handlingCharge: handlingCharge,
                           notes: notes,
                           handlingValidator: validateHandlingCharge,
                           onHandlingChanged: (_) => setState(() {}),
                         ),
-                        SizedBox(height: Responsive.h(10)),
+                        sectionGap,
 
+                        // ---- Summary ----
                         OwnerTotalsCard(
                           totalSqft: totalSqft,
                           mrpTotal: mrpTotal,
@@ -911,30 +958,45 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                           currency: currency,
                           number: number,
                         ),
-                        SizedBox(height: Responsive.h(12)),
 
                         // Incentive total hidden for owner-created quotations.
-                        if (!isOwner && incentiveTotal > 0)
+                        if (!isOwner && incentiveTotal > 0) ...[
+                          sectionGap,
                           OwnerIncentiveTotalCard(total: incentiveTotal, currency: currency),
+                        ],
                       ],
                     ),
                   ),
                 ),
+
+                // ---- Bottom bar ----
                 BlocBuilder<OwnerQuotationEditBloc, OwnerQuotationEditState>(
                   buildWhen: (prev, curr) => prev.updateStatus != curr.updateStatus,
                   builder: (context, state) {
                     final saving = state.updateStatus == OwnerQuotationUpdateStatus.submitting;
                     return Container(
-                      padding: EdgeInsets.fromLTRB(
-                          Responsive.w(18), Responsive.h(10), Responsive.w(18), Responsive.h(14)),
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: AppColors.background,
                         border: Border(top: BorderSide(color: AppColors.border)),
                       ),
-                      child: PrimaryButton(
-                        label: saving ? 'Saving…' : 'Save Changes',
-                        height: 48,
-                        onPressed: saving ? null : submit,
+                      padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10),
+                          Responsive.w(20), Responsive.h(14)),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: Responsive.h(48),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: buttonShape,
+                          ),
+                          onPressed: saving ? null : submit,
+                          child: Text(
+                            saving ? 'Saving…' : 'Save Changes',
+                            style: AppTextStyles.bodyBold(color: Colors.white),
+                          ),
+                        ),
                       ),
                     );
                   },

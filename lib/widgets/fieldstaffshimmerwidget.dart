@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
 
+/// List-only shimmer (just the visit tiles). Spacing matches the real list
+/// (10px gap, 90px bottom padding).
 class FieldStaffShimmerDashboard extends StatelessWidget {
   const FieldStaffShimmerDashboard({super.key, this.itemCount = 6});
 
@@ -21,22 +23,18 @@ class FieldStaffShimmerDashboard extends StatelessWidget {
           Responsive.h(90),
         ),
         itemCount: itemCount,
-        separatorBuilder: (_, __) => SizedBox(height: Responsive.h(12)),
+        separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
         itemBuilder: (_, __) => const _ShimmerVisitTile(),
       ),
     );
   }
 }
 
-/// Full-page shimmer skeleton for [FieldStaffDashboardScreen] — mimics the
-/// header, stats card, search bar, tab bar, and visit list all at once.
-///
-/// Use this instead of [FieldStaffShimmerDashboard] when you want the whole
-/// screen to shimmer on first load, not just the list area:
-///
-/// ```dart
-/// body: isInitialLoading ? const FieldStaffFullShimmer() : <real screen content>,
-/// ```
+/// Full-page shimmer skeleton for [FieldStaffDashboardScreen].
+/// Mirrors the real layout 1:1:
+/// header (40px avatar, greeting/name, date, more icon) + floating 3-stat
+/// card, 14px gap, search field, 12px gap, tab bar, 12px gap, visit tiles
+/// (10px apart), 90px bottom padding.
 class FieldStaffFullShimmer extends StatelessWidget {
   const FieldStaffFullShimmer({super.key, this.tileCount = 5});
 
@@ -51,22 +49,22 @@ class FieldStaffFullShimmer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _ShimmerHeader(),
-            SizedBox(height: Responsive.h(55)),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Search bar
-                  _ShimmerBox(width: double.infinity, height: 46, borderRadius: 16),
-                  SizedBox(height: Responsive.h(16)),
-                  // Tab bar
-                  _ShimmerBox(width: double.infinity, height: 44, borderRadius: 16),
                   SizedBox(height: Responsive.h(14)),
+                  // Search field
+                  const _ShimmerSearch(),
+                  SizedBox(height: Responsive.h(12)),
+                  // Tab bar
+                  const _ShimmerTabBar(),
+                  SizedBox(height: Responsive.h(12)),
                   // Visit tiles
                   for (int i = 0; i < tileCount; i++) ...[
                     const _ShimmerVisitTile(),
-                    if (i != tileCount - 1) SizedBox(height: Responsive.h(12)),
+                    if (i != tileCount - 1) SizedBox(height: Responsive.h(10)),
                   ],
                   SizedBox(height: Responsive.h(90)),
                 ],
@@ -79,6 +77,8 @@ class FieldStaffFullShimmer extends StatelessWidget {
   }
 }
 
+// ---------------- HEADER ----------------
+
 class _ShimmerHeader extends StatelessWidget {
   const _ShimmerHeader();
 
@@ -87,68 +87,86 @@ class _ShimmerHeader extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          padding: EdgeInsets.fromLTRB(
-            Responsive.w(20),
-            Responsive.h(20),
-            Responsive.w(20),
-            Responsive.h(52),
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.textSecondary.withOpacity(0.10),
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(28),
-              bottomRight: Radius.circular(28),
+        Padding(
+          padding: EdgeInsets.only(bottom: Responsive.h(46)),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+              Responsive.w(20),
+              Responsive.h(14),
+              Responsive.w(20),
+              Responsive.h(48),
             ),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const _ShimmerBox(width: 50, height: 50, borderRadius: 25),
-                    SizedBox(width: Responsive.w(12)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _ShimmerBox(width: 90, height: 11),
-                          SizedBox(height: Responsive.h(8)),
-                          _ShimmerBox(width: 140, height: 16),
-                        ],
-                      ),
+            decoration: BoxDecoration(
+              color: AppColors.textSecondary.withOpacity(0.10),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  // avatar 40x40, radius 12
+                  const _ShimmerBox(width: 40, height: 40, borderRadius: 12),
+                  SizedBox(width: Responsive.w(10)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _ShimmerBox(width: 80, height: 10, borderRadius: 4),
+                        SizedBox(height: Responsive.h(4)),
+                        const _ShimmerBox(width: 130, height: 15, borderRadius: 4),
+                      ],
                     ),
-                    SizedBox(width: Responsive.w(12)),
-                    const _ShimmerBox(width: 38, height: 38, borderRadius: 19),
-                  ],
-                ),
-                SizedBox(height: Responsive.h(16)),
-                _ShimmerBox(width: 150, height: 26, borderRadius: 20),
-                SizedBox(height: Responsive.h(10)),
-              ],
+                  ),
+                  // calendar icon + date
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const _ShimmerBox(width: 12, height: 12, borderRadius: 4),
+                      SizedBox(height: Responsive.h(3)),
+                      const _ShimmerBox(width: 78, height: 9, borderRadius: 4),
+                    ],
+                  ),
+                  SizedBox(width: Responsive.w(4)),
+                  // more_vert icon (18px + 6px padding)
+                  const Padding(
+                    padding: EdgeInsets.all(6),
+                    child: _ShimmerBox(width: 18, height: 18, borderRadius: 9),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         Positioned(
           left: Responsive.w(20),
           right: Responsive.w(20),
-          bottom: -Responsive.h(50),
+          bottom: 0,
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(16), horizontal: Responsive.w(16)),
+            padding: EdgeInsets.symmetric(
+                vertical: Responsive.h(11), horizontal: Responsive.w(6)),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.textSecondary.withOpacity(0.06)),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Row(
               children: [
-                Expanded(child: _ShimmerStatColumn()),
+                const Expanded(child: _ShimmerStatColumn()),
                 _statDivider(),
-                Expanded(child: _ShimmerStatColumn()),
+                const Expanded(child: _ShimmerStatColumn()),
                 _statDivider(),
-                Expanded(child: _ShimmerStatColumn()),
+                const Expanded(child: _ShimmerStatColumn()),
               ],
             ),
           ),
@@ -159,8 +177,8 @@ class _ShimmerHeader extends StatelessWidget {
 
   Widget _statDivider() => Container(
     width: 1,
-    height: 37,
-    color: AppColors.textSecondary.withOpacity(0.10),
+    height: 28,
+    color: AppColors.textSecondary.withOpacity(0.14),
   );
 }
 
@@ -171,12 +189,77 @@ class _ShimmerStatColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const _ShimmerBox(width: 30, height: 30, borderRadius: 15),
-        SizedBox(height: Responsive.h(6)),
-        const _ShimmerBox(width: 40, height: 13),
+        const _ShimmerBox(width: 16, height: 16, borderRadius: 5),
         SizedBox(height: Responsive.h(4)),
-        const _ShimmerBox(width: 55, height: 9),
+        const _ShimmerBox(width: 40, height: 14, borderRadius: 4),
+        SizedBox(height: Responsive.h(2)),
+        const _ShimmerBox(width: 52, height: 9, borderRadius: 4),
       ],
+    );
+  }
+}
+
+// ---------------- SEARCH + TABS ----------------
+
+class _ShimmerSearch extends StatelessWidget {
+  const _ShimmerSearch();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const _ShimmerBox(width: 18, height: 18, borderRadius: 9),
+          const SizedBox(width: 10),
+          const _ShimmerBox(width: 160, height: 10, borderRadius: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShimmerTabBar extends StatelessWidget {
+  const _ShimmerTabBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          // selected tab (filled pill)
+          Expanded(
+            child: _ShimmerBox(
+              width: double.infinity,
+              height: Responsive.h(30),
+              borderRadius: 11,
+            ),
+          ),
+          // unselected tab (just a label)
+          Expanded(
+            child: SizedBox(
+              height: Responsive.h(30),
+              child: const Center(
+                child: _ShimmerBox(width: 56, height: 10, borderRadius: 4),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -263,17 +346,20 @@ class _ShimmerBox extends StatelessWidget {
   }
 }
 
+/// Mirrors _VisitTile: thumbnail + name/date + incentive, divider,
+/// address row, phone row with Call button.
 class _ShimmerVisitTile extends StatelessWidget {
   const _ShimmerVisitTile();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(Responsive.w(13)),
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(12)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.textSecondary.withOpacity(0.08)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,32 +367,47 @@ class _ShimmerVisitTile extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ShimmerBox(width: 46, height: 46, borderRadius: 12),
+              // thumbnail 38x38, radius 10
+              const _ShimmerBox(width: 38, height: 38, borderRadius: 10),
               SizedBox(width: Responsive.w(10)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ShimmerBox(width: 130, height: 13),
-                    SizedBox(height: Responsive.h(8)),
-                    _ShimmerBox(width: 90, height: 10),
+                    const _ShimmerBox(width: 130, height: 12, borderRadius: 4),
+                    SizedBox(height: Responsive.h(6)),
+                    const _ShimmerBox(width: 90, height: 10, borderRadius: 4),
                   ],
                 ),
               ),
               SizedBox(width: Responsive.w(8)),
-              _ShimmerBox(width: 54, height: 20, borderRadius: 20),
+              // incentive amount
+              const _ShimmerBox(width: 52, height: 13, borderRadius: 4),
             ],
           ),
-          SizedBox(height: Responsive.h(12)),
-          Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.08)),
-          SizedBox(height: Responsive.h(12)),
-          _ShimmerBox(width: double.infinity, height: 11),
-          SizedBox(height: Responsive.h(10)),
+          SizedBox(height: Responsive.h(8)),
+          const Divider(height: 1, color: AppColors.border),
+          SizedBox(height: Responsive.h(8)),
+          // address row
           Row(
             children: [
-              _ShimmerBox(width: 100, height: 11),
+              const _ShimmerBox(width: 13, height: 13, borderRadius: 4),
+              SizedBox(width: Responsive.w(4)),
+              const Expanded(
+                child: _ShimmerBox(
+                    width: double.infinity, height: 10, borderRadius: 4),
+              ),
+            ],
+          ),
+          SizedBox(height: Responsive.h(6)),
+          // phone row + Call button
+          Row(
+            children: [
+              const _ShimmerBox(width: 12, height: 12, borderRadius: 4),
+              SizedBox(width: Responsive.w(4)),
+              const _ShimmerBox(width: 90, height: 10, borderRadius: 4),
               const Spacer(),
-              _ShimmerBox(width: 64, height: 24, borderRadius: 10),
+              const _ShimmerBox(width: 58, height: 24, borderRadius: 9),
             ],
           ),
         ],

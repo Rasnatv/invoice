@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +14,147 @@ import '../../models/fieldstaffmodels/sitevisitdeletemodel.dart';
 import '../../models/fieldstaffmodels/fieldstaffshowsitevisitmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import 'addsite.dart';
+
+// =====================================================================
+// SHARED LOOK (same as Create Estimate / Add Visit screens)
+// =====================================================================
+
+BoxDecoration _cardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+class _IconBadge extends StatelessWidget {
+  const _IconBadge(this.icon, {this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child, this.icon});
+  final String title;
+  final Widget child;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: _cardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  _IconBadge(icon!),
+                  SizedBox(width: Responsive.w(10)),
+                ],
+                Expanded(
+                  child: Text(title,
+                      style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(13))),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                Responsive.w(14), Responsive.h(14), Responsive.w(14), Responsive.h(4)),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Label + value row used inside the section cards.
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: Responsive.h(12)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: AppColors.textSecondary),
+          SizedBox(width: Responsive.w(8)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)
+                        .copyWith(fontSize: Responsive.sp(10))),
+                SizedBox(height: Responsive.h(2)),
+                Text(value,
+                    style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(12))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// SCREEN
+// =====================================================================
 
 class FieldStaffVisitDetailScreen extends StatefulWidget {
   const FieldStaffVisitDetailScreen({super.key, required this.visitId});
@@ -43,9 +183,7 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
     }
   }
 
-  // ---------------- EDIT (this IS your "update" screen — it reuses
-  // AddFieldVisitScreen with `existing` set) ----------------
-
+  // Edit reuses AddFieldVisitScreen with `existing` set.
   void _openEdit(BuildContext context, SiteVisitDetailModel visit) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -57,7 +195,6 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
     );
   }
 
-  // ---------------- DELETE ----------------
   Future<void> _confirmDelete(BuildContext context, String customerName) async {
     final confirmed = await showConfirmDialog(
       context,
@@ -74,7 +211,6 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
 
   @override
   Widget build(BuildContext context) {
-    // Must run before any Responsive.w/h/sp call below.
     Responsive.init(context);
 
     return NetworkAwareWrapper(
@@ -84,17 +220,17 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          title: Text('Visit Details', style: TextStyle(fontSize: Responsive.sp(17))),
+          title: Text('Visit Details', style: AppTextStyles.h6()),
           actions: [
             BlocBuilder<SiteVisitBloc, SiteVisitState>(
               buildWhen: (prev, curr) => prev.detail != curr.detail,
               builder: (context, state) {
                 final visit = state.detail;
-                final isPending = visit != null &&
-                    visit.statusLabel.trim().toLowerCase() == 'pending';
+                final isPending =
+                    visit != null && visit.statusLabel.trim().toLowerCase() == 'pending';
                 if (!isPending) return const SizedBox.shrink();
                 return IconButton(
-                  icon: Icon(Icons.edit_rounded, size: Responsive.w(22)),
+                  icon: const Icon(Icons.edit_rounded, size: 20),
                   onPressed: () => _openEdit(context, visit),
                 );
               },
@@ -104,19 +240,19 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
               prev.detail != curr.detail || prev.actionStatus != curr.actionStatus,
               builder: (context, state) {
                 final visit = state.detail;
-                final isPending = visit != null &&
-                    visit.statusLabel.trim().toLowerCase() == 'pending';
+                final isPending =
+                    visit != null && visit.statusLabel.trim().toLowerCase() == 'pending';
                 if (!isPending) return const SizedBox.shrink();
                 final busy = state.actionStatus == SiteVisitActionStatus.inProgress;
                 return IconButton(
                   icon: busy
-                      ? SizedBox(
-                    width: Responsive.w(18),
-                    height: Responsive.w(18),
-                    child: const CircularProgressIndicator(
+                      ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
                         strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
                   )
-                      : Icon(Icons.delete_outline_rounded, size: Responsive.w(22)),
+                      : const Icon(Icons.delete_outline_rounded, size: 20),
                   onPressed: busy ? null : () => _confirmDelete(context, visit.customerName),
                 );
               },
@@ -153,19 +289,20 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.error_outline_rounded,
-                          size: Responsive.w(34), color: AppColors.textSecondary.withOpacity(0.5)),
+                          size: 32, color: AppColors.textSecondary.withOpacity(0.5)),
                       SizedBox(height: Responsive.h(10)),
                       Text(
                         state.detailError!,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5)),
+                        style: AppTextStyles.subtitle().copyWith(fontSize: Responsive.sp(12)),
                       ),
-                      SizedBox(height: Responsive.h(14)),
+                      SizedBox(height: Responsive.h(10)),
                       TextButton(
                         onPressed: () => context.read<SiteVisitBloc>().add(
                           ShowSiteVisitDetail(SiteVisitShowRequestModel(id: widget.visitId)),
                         ),
-                        child: Text('Retry', style: TextStyle(fontSize: Responsive.sp(13))),
+                        child: Text('Retry',
+                            style: AppTextStyles.link().copyWith(fontSize: Responsive.sp(12))),
                       ),
                     ],
                   ),
@@ -183,6 +320,7 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
                 : visit.visitDate;
             final incentive = double.tryParse(visit.incentiveEarned) ?? 0;
             final budget = double.tryParse(visit.estimatedBudget) ?? 0;
+            final sectionGap = SizedBox(height: Responsive.h(14));
 
             return RefreshIndicator(
               color: AppColors.primary,
@@ -193,19 +331,24 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
                 child: ResponsiveCenter(
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.all(Responsive.w(20)),
+                    padding: EdgeInsets.fromLTRB(
+                        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24)),
                     children: [
-                      _photoGallery(visit.images),
-                      SizedBox(height: Responsive.h(18)),
-                      _infoCard(context, visit: visit, dateLabel: dateLabel, currency: currency, incentive: incentive),
+                      _headerCard(visit, dateLabel),
+                      sectionGap,
+                      _PhotoGallery(images: visit.images),
+                      sectionGap,
+                      _customerCard(context, visit),
+                      sectionGap,
+                      _incentiveCard(visit, currency, incentive),
                       if (visit.areaSqft.isNotEmpty ||
                           visit.estimatedBudget.isNotEmpty ||
                           visit.preferredProducts.isNotEmpty) ...[
-                        SizedBox(height: Responsive.h(14)),
-                        _projectCard(visit: visit, currency: currency, budget: budget),
+                        sectionGap,
+                        _projectCard(visit, currency, budget),
                       ],
                       if (visit.notes.isNotEmpty) ...[
-                        SizedBox(height: Responsive.h(14)),
+                        sectionGap,
                         _notesCard(visit.notes),
                       ],
                     ],
@@ -219,270 +362,289 @@ class _FieldStaffVisitDetailScreenState extends State<FieldStaffVisitDetailScree
     );
   }
 
-  Widget _photoGallery(List<SiteVisitImageModel> images) {
-    final galleryHeight = Responsive.h(220);
+  // ---------------- header (name + date + status) ----------------
+  Widget _headerCard(SiteVisitDetailModel visit, String dateLabel) {
+    final initial = visit.customerName.trim().isEmpty
+        ? '?'
+        : visit.customerName.trim().substring(0, 1).toUpperCase();
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              initial,
+              style: AppTextStyles.bodyBold(color: AppColors.primary)
+                  .copyWith(fontSize: Responsive.sp(14)),
+            ),
+          ),
+          SizedBox(width: Responsive.w(10)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  visit.customerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(14)),
+                ),
+                SizedBox(height: Responsive.h(2)),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_outlined,
+                        size: 11, color: AppColors.textSecondary),
+                    SizedBox(width: Responsive.w(4)),
+                    Flexible(
+                      child: Text(
+                        dateLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption(color: AppColors.textSecondary)
+                            .copyWith(fontSize: Responsive.sp(10.5)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (visit.statusLabel.isNotEmpty) ...[
+            SizedBox(width: Responsive.w(8)),
+            _Pill(label: visit.statusLabel, color: AppColors.warning),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------- customer details ----------------
+  Widget _customerCard(BuildContext context, SiteVisitDetailModel visit) {
+    return _SectionCard(
+      title: 'Customer Details',
+      icon: Icons.groups_2_outlined,
+      child: Column(
+        children: [
+          _DetailRow(
+              icon: Icons.location_on_outlined, label: 'Address', value: visit.siteAddress),
+          if (visit.customerEmail.isNotEmpty)
+            _DetailRow(icon: Icons.alternate_email, label: 'Email', value: visit.customerEmail),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _DetailRow(
+                    icon: Icons.phone_outlined, label: 'Phone', value: visit.customerPhone),
+              ),
+              Padding(
+                padding: EdgeInsets.only(bottom: Responsive.h(12)),
+                child: Material(
+                  color: AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => _callNumber(context, visit.customerPhone),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Responsive.w(10), vertical: Responsive.h(7)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.call_rounded, size: 13, color: AppColors.primary),
+                          SizedBox(width: Responsive.w(4)),
+                          Text(
+                            'Call',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: Responsive.sp(10.5),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- incentive ----------------
+  Widget _incentiveCard(SiteVisitDetailModel visit, NumberFormat currency, double incentive) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          const _IconBadge(Icons.workspace_premium_rounded),
+          SizedBox(width: Responsive.w(10)),
+          Expanded(
+            child: Text(
+              visit.incentiveStatusLabel.isEmpty ? 'Incentive Earned' : visit.incentiveStatusLabel,
+              style: AppTextStyles.caption(color: AppColors.textSecondary)
+                  .copyWith(fontSize: Responsive.sp(11.5)),
+            ),
+          ),
+          Text(
+            currency.format(incentive),
+            style: AppTextStyles.bodyBold(color: AppColors.primary)
+                .copyWith(fontSize: Responsive.sp(14)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- project details ----------------
+  Widget _projectCard(SiteVisitDetailModel visit, NumberFormat currency, double budget) {
+    return _SectionCard(
+      title: 'Project Details',
+      icon: Icons.construction_rounded,
+      child: Column(
+        children: [
+          if (visit.areaSqft.isNotEmpty)
+            _DetailRow(
+                icon: Icons.square_foot_rounded,
+                label: 'Area',
+                value: '${visit.areaSqft} sq.ft'),
+          if (visit.estimatedBudget.isNotEmpty)
+            _DetailRow(
+                icon: Icons.currency_rupee_rounded,
+                label: 'Estimated Budget',
+                value: currency.format(budget)),
+          if (visit.preferredProducts.isNotEmpty)
+            _DetailRow(
+                icon: Icons.inventory_2_outlined,
+                label: 'Preferred Products',
+                value: visit.preferredProducts),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- notes ----------------
+  Widget _notesCard(String notes) {
+    return _SectionCard(
+      title: 'Notes',
+      icon: Icons.notes_rounded,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: Responsive.h(10)),
+        child: SizedBox(
+          width: double.infinity,
+          child: Text(notes, style: AppTextStyles.body().copyWith(fontSize: Responsive.sp(12))),
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// PHOTO GALLERY (card with page counter)
+// =====================================================================
+
+class _PhotoGallery extends StatefulWidget {
+  const _PhotoGallery({required this.images});
+  final List<SiteVisitImageModel> images;
+
+  @override
+  State<_PhotoGallery> createState() => _PhotoGalleryState();
+}
+
+class _PhotoGalleryState extends State<_PhotoGallery> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.images;
+    final height = Responsive.h(200);
 
     if (images.isEmpty) {
       return Container(
-        height: galleryHeight,
+        height: height,
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(Responsive.w(20)),
-        ),
+        decoration: _cardDecoration(),
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.image_not_supported_outlined,
-                size: Responsive.w(34), color: AppColors.textSecondary.withOpacity(0.5)),
+            const _IconBadge(Icons.image_not_supported_outlined, size: 22),
             SizedBox(height: Responsive.h(8)),
-            Text('No photo attached', style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12))),
+            Text('No photo attached',
+                style: AppTextStyles.caption(color: AppColors.textSecondary)
+                    .copyWith(fontSize: Responsive.sp(11))),
           ],
         ),
       );
     }
 
-    return Column(
-      children: [
-        SizedBox(
-          height: galleryHeight,
-          child: PageView.builder(
+    return Container(
+      height: height,
+      width: double.infinity,
+      decoration: _cardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          PageView.builder(
             itemCount: images.length,
+            onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, i) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(Responsive.w(20)),
-                child: Image.network(
-                  images[i].imageUrl,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: AppColors.surfaceAlt,
-                    alignment: Alignment.center,
-                    child: Icon(Icons.broken_image_outlined,
-                        size: Responsive.w(30), color: AppColors.textSecondary.withOpacity(0.5)),
-                  ),
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Container(
-                      color: AppColors.surfaceAlt,
-                      alignment: Alignment.center,
-                      child: const CircularProgressIndicator(strokeWidth: 2),
-                    );
-                  },
+              return Image.network(
+                images[i].imageUrl,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.background,
+                  alignment: Alignment.center,
+                  child: Icon(Icons.broken_image_outlined,
+                      size: 28, color: AppColors.textSecondary.withOpacity(0.5)),
                 ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    color: AppColors.background,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  );
+                },
               );
             },
           ),
-        ),
-        if (images.length > 1) ...[
-          SizedBox(height: Responsive.h(8)),
-          Text(
-            '${images.length} photos • swipe to view',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(11)),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _infoCard(
-      BuildContext context, {
-        required SiteVisitDetailModel visit,
-        required String dateLabel,
-        required NumberFormat currency,
-        required double incentive,
-      }) {
-    return Container(
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Responsive.w(18)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(visit.customerName, style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(17))),
-              ),
-              if (visit.statusLabel.isNotEmpty)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: Responsive.w(9), vertical: Responsive.h(4)),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(Responsive.w(20)),
-                  ),
-                  child: Text(
-                    visit.statusLabel,
-                    style: TextStyle(color: AppColors.warning, fontSize: Responsive.sp(11), fontWeight: FontWeight.w700),
-                  ),
+          if (images.length > 1)
+            Positioned(
+              right: 10,
+              bottom: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-            ],
-          ),
-          SizedBox(height: Responsive.h(4)),
-          Row(
-            children: [
-              Icon(Icons.calendar_today_rounded, size: Responsive.w(13), color: AppColors.textSecondary),
-              SizedBox(width: Responsive.w(6)),
-              Text(dateLabel, style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12))),
-            ],
-          ),
-          SizedBox(height: Responsive.h(14)),
-          Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.08)),
-          SizedBox(height: Responsive.h(14)),
-          _detailRow(icon: Icons.location_on_outlined, label: 'Address', value: visit.siteAddress),
-          SizedBox(height: Responsive.h(12)),
-          if (visit.customerEmail.isNotEmpty) ...[
-            _detailRow(icon: Icons.email_outlined, label: 'Email', value: visit.customerEmail),
-            SizedBox(height: Responsive.h(12)),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: _detailRow(icon: Icons.phone_outlined, label: 'Phone', value: visit.customerPhone),
-              ),
-              Material(
-                color: AppColors.info.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(Responsive.w(12)),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(Responsive.w(12)),
-                  onTap: () => _callNumber(context, visit.customerPhone),
-                  child: Padding(
-                    padding: EdgeInsets.all(Responsive.w(10)),
-                    child: Icon(Icons.call_rounded, color: AppColors.info, size: Responsive.w(19)),
+                child: Text(
+                  '${_page + 1} / ${images.length}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: Responsive.sp(10.5),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: Responsive.h(16)),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(Responsive.w(14)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.workspace_premium_rounded, color: AppColors.primary, size: Responsive.w(20)),
-                SizedBox(width: Responsive.w(8)),
-                Expanded(
-                  child: Text(
-                    visit.incentiveStatusLabel.isEmpty ? 'Incentive Earned' : visit.incentiveStatusLabel,
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(12.5), fontWeight: FontWeight.w500),
-                  ),
-                ),
-                Text(
-                  currency.format(incentive),
-                  style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(fontSize: Responsive.sp(16)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------- NEW: project details (area, budget, preferred products) ----------------
-  Widget _projectCard({
-    required SiteVisitDetailModel visit,
-    required NumberFormat currency,
-    required double budget,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Responsive.w(18)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.construction_rounded, size: Responsive.w(16), color: AppColors.primary),
-              SizedBox(width: Responsive.w(6)),
-              Text('Project Details', style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(13))),
-            ],
-          ),
-          SizedBox(height: Responsive.h(12)),
-          if (visit.areaSqft.isNotEmpty) ...[
-            _detailRow(
-              icon: Icons.square_foot_rounded,
-              label: 'Area',
-              value: '${visit.areaSqft} sq.ft',
-            ),
-            SizedBox(height: Responsive.h(12)),
-          ],
-          if (visit.estimatedBudget.isNotEmpty) ...[
-            _detailRow(
-              icon: Icons.currency_rupee_rounded,
-              label: 'Estimated Budget',
-              value: currency.format(budget),
-            ),
-            SizedBox(height: Responsive.h(12)),
-          ],
-          if (visit.preferredProducts.isNotEmpty)
-            _detailRow(
-              icon: Icons.inventory_2_outlined,
-              label: 'Preferred Products',
-              value: visit.preferredProducts,
             ),
         ],
       ),
-    );
-  }
-
-  Widget _notesCard(String notes) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Responsive.w(18)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.notes_rounded, size: Responsive.w(16), color: AppColors.primary),
-              SizedBox(width: Responsive.w(6)),
-              Text('Notes', style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(13))),
-            ],
-          ),
-          SizedBox(height: Responsive.h(8)),
-          Text(notes, style: TextStyle(fontSize: Responsive.sp(12.5), color: AppColors.textPrimary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow({required IconData icon, required String label, required String value}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: Responsive.w(16), color: AppColors.textSecondary),
-        SizedBox(width: Responsive.w(8)),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(color: AppColors.textSecondary, fontSize: Responsive.sp(10.5))),
-              SizedBox(height: Responsive.h(2)),
-              Text(value, style: TextStyle(fontSize: Responsive.sp(13), fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

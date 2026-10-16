@@ -1,29 +1,21 @@
-
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
+import 'package:tileshop/ui/owner/widget/ownerestimatedetailscreenwidget.dart';
 import 'package:tileshop/ui/salesman/quotation_editscreen.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
-import '../../../widgets/primary_button.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_event.dart';
 import '../../bloc/salemanbloc/quatation/qtn_listdetail_state.dart';
 import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../widgets/appsnackbar.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 
-// UI only: standard column widths for the items grid.
-class _Col {
-  static const double sl = 60; // Sl.No
-  static const double text = 180; // Item / Company
-  static const double size = 120; // Size
-  static const double unit = 120; // Unit
-  static const double num = 120; // Qty, Box Qty, Piece Qty, MRP, Rate
-  static const double money = 180; // Amount, Incentive
-}
+const Color _redColor = Color(0xFFDC2626);
 
 class QuotationPreviewScreen extends StatefulWidget {
   const QuotationPreviewScreen({super.key, required this.id});
@@ -64,8 +56,8 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     }
   }
 
-  /// Pull-to-refresh / app bar button. Waits until loading finishes so the
-  /// RefreshIndicator spinner stays visible for the right duration.
+  /// Pull-to-refresh. Waits until loading finishes so the RefreshIndicator
+  /// spinner stays visible for the right duration.
   Future<void> _refresh() async {
     _bloc.add(QuotationDetailRequested(widget.id));
     await _bloc.stream
@@ -74,8 +66,8 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
   }
 
   /// Whether the quotation's `created_by` is an Owner, derived straight
-  /// from the response (`created_by.role_label` / `role`). Incentive
-  /// figures are salesman-facing, so they're hidden for Owner-created ones.
+  /// from the response. Incentive figures are salesman-facing, so they're
+  /// hidden for Owner-created ones.
   bool _isOwner(QuotationDetailModel q) {
     final label = q.createdBy.roleLabel.trim().toLowerCase();
     if (label.isNotEmpty) return label == 'owner';
@@ -85,40 +77,21 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
   bool _isApproved(QuotationDetailModel q) =>
       q.status.trim().toLowerCase() == 'approved';
 
-  Color _statusColor(String status) {
+  Color _quotationStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
         return AppColors.success;
       case 'rejected':
       case 'cancelled':
-        return Colors.red;
+        return _redColor;
       case 'draft':
-        return Colors.blueGrey;
+        return AppColors.textSecondary;
       default:
-        return Colors.orange; // send / submitted / pending
+        return const Color(0xFFF59E0B); // send / submitted / pending
     }
   }
 
-  /// paid -> green, partial -> orange, unpaid -> red.
-  Color _balanceStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return AppColors.success;
-      case 'partial':
-        return Colors.orange;
-      case 'unpaid':
-        return Colors.red;
-      default:
-        return AppColors.primary;
-    }
-  }
-
-  String _capitalize(String s) =>
-      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
-
-  void _showError(String msg) {
-    AppSnackbar.error(msg);
-  }
+  void _showError(String msg) => AppSnackbar.error(msg);
 
   void _editQuotation(QuotationDetailModel estimate) {
     Navigator.of(context).push(
@@ -135,18 +108,29 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete quotation?'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Delete quotation?', style: AppTextStyles.bodyBold()),
         content: Text(
           'This will permanently delete ${estimate.quotationNumber.isNotEmpty ? estimate.quotationNumber : 'this quotation'}. This action cannot be undone.',
+          style: AppTextStyles.body(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel',
+                style: AppTextStyles.bodyBold(color: AppColors.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _redColor,
+              elevation: 0,
+              shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text('Delete', style: TextStyle(color: AppColors.error)),
+            child: Text('Delete',
+                style: AppTextStyles.bodyBold(color: Colors.white)),
           ),
         ],
       ),
@@ -160,11 +144,6 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     _bloc.add(QuotationSubmitForApprovalRequested(estimate.id));
   }
 
-  /// Sum of (mrp × quantity) across every item.
-  double _mrpTotal(List<QuotationDetailItem> items) {
-    return items.fold(0.0, (sum, item) => sum + (item.mrp * item.quantity));
-  }
-
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -175,11 +154,18 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
     final number = NumberFormat.decimalPattern('en_IN');
 
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
+
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
+
+        // ---------- APPBAR (same as owner) ----------
         appBar: AppBar(
           title: Text('Quotation Preview', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
         ),
         body: SafeArea(
           child: BlocListener<SalesmanQuotationBloc, SalesmanQuotationState>(
@@ -213,263 +199,118 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
               prev.detailStatus != curr.detailStatus ||
                   prev.detail != curr.detail,
               builder: (context, state) {
-                // Full-screen loader only when there is nothing to show yet.
-                // During a refresh the old data stays on screen.
-                if (state.detailStatus == QuotationLoadStatus.loading &&
-                    state.detail == null) {
-                  return const Center(child: CircularProgressIndicator());
+                // ---- loading skeleton ----
+                // Only when there is nothing to show yet. During a refresh
+                // the old data stays on screen.
+                if (state.detail == null &&
+                    state.detailStatus != QuotationLoadStatus.failure) {
+                  return ShimmerListPlaceholder(
+                    itemCount: 5,
+                    padding: listPadding,
+                    separatorHeight: Responsive.h(10),
+                    itemBuilder: (context, i) => const _DetailCardSkeleton(),
+                  );
                 }
 
-                if (state.detailStatus == QuotationLoadStatus.failure &&
-                    state.detail == null) {
+                // ---- error ----
+                if (state.detail == null) {
                   return RefreshIndicator(
+                    color: AppColors.primary,
                     onRefresh: _refresh,
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        SizedBox(height: Responsive.h(180)),
-                        Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.error_outline,
-                                  size: 40, color: AppColors.error),
-                              SizedBox(height: Responsive.h(10)),
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: Responsive.w(24)),
-                                child: Text(
-                                  state.detailError ??
-                                      'Failed to load quotation.',
-                                  textAlign: TextAlign.center,
-                                  style: AppTextStyles.body(
-                                      color: AppColors.error),
-                                ),
-                              ),
-                              SizedBox(height: Responsive.h(10)),
-                              TextButton(
-                                onPressed: () => _bloc
-                                    .add(QuotationDetailRequested(widget.id)),
-                                child: const Text('Retry'),
-                              ),
-                            ],
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints:
+                          BoxConstraints(minHeight: constraints.maxHeight),
+                          child: _ErrorView(
+                            message:
+                            state.detailError ?? 'Failed to load quotation.',
+                            onRetry: () =>
+                                _bloc.add(QuotationDetailRequested(widget.id)),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   );
                 }
 
-                final estimate = state.detail;
-                if (estimate == null) {
-                  return RefreshIndicator(
-                    onRefresh: _refresh,
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [SizedBox(height: 300)],
-                    ),
-                  );
-                }
-
-                final mrpTotal = _mrpTotal(estimate.items);
+                final estimate = state.detail!;
                 final isOwner = _isOwner(estimate);
                 final isApproved = _isApproved(estimate);
-                final statusColor = _statusColor(estimate.status);
                 // Only show these columns if at least one item has a value.
                 final hasBoxQty = estimate.items.any((i) => i.boxQuantity > 0);
                 final hasPieceQty =
                 estimate.items.any((i) => i.pieceQuantity > 0);
+                final totalIncentive = estimate.items
+                    .fold<double>(0, (s, r) => s + r.incentiveAmount);
 
                 return Column(
                   children: [
                     Expanded(
                       child: RefreshIndicator(
+                        color: AppColors.primary,
                         onRefresh: _refresh,
                         child: ListView(
                           // Needed so pull-to-refresh works on short content.
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: EdgeInsets.all(Responsive.w(18)),
+                          padding: listPadding,
                           children: [
-                            // ---- Header card ----
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(Responsive.w(16)),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.primary.withOpacity(0.10),
-                                    AppColors.primary.withOpacity(0.02),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                    color: AppColors.primary.withOpacity(0.16)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const _IconBadge(
-                                          Icons.description_outlined,
-                                          size: 20),
-                                      // Status pill
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.14),
-                                          borderRadius:
-                                          BorderRadius.circular(20),
-                                          border: Border.all(
-                                              color:
-                                              statusColor.withOpacity(0.35)),
-                                        ),
-                                        child: Text(
-                                          estimate.status.isEmpty
-                                              ? '-'
-                                              : estimate.status,
-                                          style: AppTextStyles.bodyBold(
-                                              color: statusColor)
-                                              .copyWith(
-                                              fontSize: Responsive.sp(12)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: Responsive.h(14)),
-                                  Row(
-                                    mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                          children: [
-                                            Text('QUOTATION NO.',
-                                                style: AppTextStyles.caption()
-                                                    .copyWith(
-                                                    letterSpacing: 0.8)),
-                                            SizedBox(height: Responsive.h(4)),
-                                            Text(
-                                              estimate.quotationNumber.isEmpty
-                                                  ? '#${estimate.id}'
-                                                  : estimate.quotationNumber,
-                                              style: AppTextStyles.bodyBold()
-                                                  .copyWith(
-                                                  fontSize:
-                                                  Responsive.sp(16)),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      SizedBox(width: Responsive.w(12)),
-                                      Column(
-                                        crossAxisAlignment:
-                                        CrossAxisAlignment.end,
-                                        children: [
-                                          Text('DATE',
-                                              style: AppTextStyles.caption()
-                                                  .copyWith(letterSpacing: 0.8)),
-                                          SizedBox(height: Responsive.h(4)),
-                                          Text(
-                                            estimate.date != null
-                                                ? DateFormat('dd-MM-yyyy')
-                                                .format(estimate.date!)
-                                                : estimate.dateRaw,
-                                            style: AppTextStyles.bodyBold(),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                            _QuotationHeader(
+                              estimate: estimate,
+                              statusColor:
+                              _quotationStatusColor(estimate.status),
+                            ),
+                            SizedBox(height: Responsive.h(14)),
+                            if (estimate.notes.isNotEmpty) ...[
+                              DetailSection(
+                                title: 'Notes',
+                                icon: Icons.sticky_note_2_outlined,
+                                rows: [
+                                  DetailRow('Notes', estimate.notes,
+                                      icon: Icons.sticky_note_2_outlined),
                                 ],
                               ),
-                            ),
-                            SizedBox(height: Responsive.h(16)),
-
-                            _PreviewSection(
+                              SizedBox(height: Responsive.h(14)),
+                            ],
+                            DetailSection(
                               title: 'Customer Details',
                               icon: Icons.groups_2_outlined,
                               rows: [
-                                _PreviewRow('Name', estimate.customer.name,
+                                DetailRow('Name', estimate.customer.name,
                                     icon: Icons.groups_2_outlined),
-                                _PreviewRow(
-                                    'Address', estimate.customer.address,
-                                    icon: Icons.location_on_outlined),
-                                _PreviewRow(
-                                    'Contact No.', estimate.customer.phone,
+                                DetailRow('Phone', estimate.customer.phone,
                                     icon: Icons.phone_outlined),
-                                _PreviewRow('Email', estimate.customer.email,
-                                    icon: Icons.alternate_email),
+                                DetailRow('Email', estimate.customer.email,
+                                    icon: Icons.email_outlined),
+                                DetailRow('Address', estimate.customer.address,
+                                    icon: Icons.location_on_outlined),
                               ],
                             ),
                             SizedBox(height: Responsive.h(14)),
-
-                            _PreviewSection(
+                            DetailSection(
                               title: 'Contractor Details',
                               icon: Icons.person_outline,
                               rows: [
-                                _PreviewRow('Name', estimate.contractor.name,
-                                    icon: Icons.engineering_outlined),
-                                _PreviewRow('Contact No.',
-                                    estimate.contractor.mobile,
+                                DetailRow('Name', estimate.contractor.name,
+                                    icon: Icons.person_outline),
+                                DetailRow('Phone', estimate.contractor.mobile,
                                     icon: Icons.phone_outlined),
-                                _PreviewRow(
-                                    'Email', estimate.contractor.email,
-                                    icon: Icons.alternate_email),
+                                DetailRow('Email', estimate.contractor.email,
+                                    icon: Icons.email_outlined),
                               ],
                             ),
                             SizedBox(height: Responsive.h(14)),
-
-                            _PreviewSection(
+                            DetailSection(
                               title: 'Salesman',
                               icon: Icons.badge_outlined,
                               rows: [
-                                _PreviewRow('Name', estimate.salesman.name,
+                                DetailRow('Name', estimate.salesman.name,
                                     icon: Icons.badge_outlined),
                               ],
                             ),
-                            SizedBox(height: Responsive.h(20)),
+                            SizedBox(height: Responsive.h(18)),
 
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    const _IconBadge(Icons.list_alt_rounded),
-                                    SizedBox(width: Responsive.w(10)),
-                                    Text('Items', style: AppTextStyles.h3()),
-                                  ],
-                                ),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: Responsive.w(12),
-                                      vertical: Responsive.h(5)),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    'Total Items: ${estimate.itemsCount}',
-                                    style: AppTextStyles.bodyBold(
-                                        color: AppColors.primary)
-                                        .copyWith(fontSize: Responsive.sp(12)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: Responsive.h(12)),
-
-                            // ---- Bordered items table ----
                             _InvoiceTable(
                               items: estimate.items,
                               showBox: hasBoxQty,
@@ -478,61 +319,24 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                               currency: currency,
                               number: number,
                             ),
-                            SizedBox(height: Responsive.h(16)),
-
-                            if (estimate.notes.isNotEmpty) ...[
-                              _PreviewSection(
-                                title: 'Notes',
-                                icon: Icons.sticky_note_2_outlined,
-                                rows: [_PreviewRow('', estimate.notes)],
-                              ),
-                              SizedBox(height: Responsive.h(14)),
-                            ],
+                            SizedBox(height: Responsive.h(14)),
 
                             // Totals. For approved quotations this also shows
                             // discount, total paid and balance.
-                            _buildTotalsCard(
-                              estimate,
-                              isApproved ? money : currency,
-                              number,
-                              mrpTotal,
-                              isApproved,
+                            _SummaryCard(
+                              q: estimate,
+                              fmt: isApproved ? money : currency,
+                              number: number,
+                              isApproved: isApproved,
                             ),
-                            SizedBox(height: Responsive.h(12)),
 
-                            // Payment status banner + payments list — approved only.
-                            if (isApproved && estimate.showPaymentSummary) ...[
-                              _buildPaymentStatus(estimate),
-                              SizedBox(height: Responsive.h(12)),
-                            ],
                             if (isApproved && estimate.payments.isNotEmpty) ...[
-                              _PreviewSection(
-                                title: 'Payments',
-                                icon: Icons.payments_outlined,
-                                rows: estimate.payments.map((p) {
-                                  final parsed = DateTime.tryParse(p.date);
-                                  final dateText = parsed != null
-                                      ? DateFormat('yyyy-MM-dd').format(parsed)
-                                      : p.date;
-                                  final parts = <String>[
-                                    money.format(p.amount),
-                                    if (dateText.isNotEmpty) dateText,
-                                    if (p.reference.isNotEmpty)
-                                      'Ref: ${p.reference}',
-                                  ];
-                                  return _PreviewRow(
-                                    p.methodLabel,
-                                    parts.join(' · '),
-                                    icon: Icons.receipt_long_outlined,
-                                  );
-                                }).toList(),
-                              ),
-                              SizedBox(height: Responsive.h(12)),
+                              SizedBox(height: Responsive.h(14)),
+                              _PaymentsCard(payments: estimate.payments, money: money),
                             ],
 
-                            if (!isOwner &&
-                                estimate.items
-                                    .any((i) => i.incentiveAmount > 0))
+                            if (!isOwner && totalIncentive > 0) ...[
+                              SizedBox(height: Responsive.h(14)),
                               Container(
                                 width: double.infinity,
                                 padding: EdgeInsets.symmetric(
@@ -540,10 +344,9 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                     vertical: Responsive.h(14)),
                                 decoration: BoxDecoration(
                                   color: AppColors.success.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                      color:
-                                      AppColors.success.withOpacity(0.3)),
+                                      color: AppColors.success.withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   mainAxisAlignment:
@@ -551,7 +354,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                   children: [
                                     Row(
                                       children: [
-                                        _IconBadge(Icons.percent_rounded,
+                                        IconBadge(Icons.percent_rounded,
                                             color: AppColors.success),
                                         SizedBox(width: Responsive.w(10)),
                                         Text('Incentive Total',
@@ -560,39 +363,27 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                       ],
                                     ),
                                     Text(
-                                      currency.format(
-                                        estimate.items.fold(0.0,
-                                                (s, r) => s + r.incentiveAmount),
-                                      ),
-                                      style: AppTextStyles.h3(
+                                      currency.format(totalIncentive),
+                                      style: AppTextStyles.amount(
                                           color: AppColors.success),
                                     ),
                                   ],
                                 ),
                               ),
-                            SizedBox(height: Responsive.h(12)),
+                            ],
                           ],
                         ),
                       ),
                     ),
 
-                    // ---- Bottom action bar ----
+                    // ---- Bottom action bar (same container as owner) ----
                     Container(
-                      padding: EdgeInsets.fromLTRB(
-                          Responsive.w(18),
-                          Responsive.h(12),
-                          Responsive.w(18),
-                          Responsive.h(16)),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 12,
-                            offset: const Offset(0, -3),
-                          ),
-                        ],
+                      decoration: const BoxDecoration(
+                        color: AppColors.background,
+                        border: Border(top: BorderSide(color: AppColors.border)),
                       ),
+                      padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                          Responsive.h(10), Responsive.w(20), Responsive.h(14)),
                       child: BlocBuilder<SalesmanQuotationBloc,
                           SalesmanQuotationState>(
                         buildWhen: (prev, curr) =>
@@ -604,105 +395,116 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                           final submitting = state.submitStatus ==
                               QuotationActionStatus.inProgress;
                           final busy = deleting || submitting;
+                          final buttonShape = RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14));
+                          final buttonHeight = Responsive.h(48);
 
-                          return Row(
-                            children: [
-                              if (estimate.isDraft) ...[
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: busy
-                                        ? null
-                                        : () => _editQuotation(estimate),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 14),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                          BorderRadius.circular(14)),
-                                    ),
-                                    icon: const Icon(Icons.edit_outlined,
-                                        size: 18),
-                                    label: const Text('Edit'),
-                                  ),
+                          if (estimate.isDraft) {
+                            return Row(
+                              children: [
+                                RoundIconButton(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: 'Edit',
+                                  onPressed:
+                                  busy ? null : () => _editQuotation(estimate),
                                 ),
                                 SizedBox(width: Responsive.w(10)),
-                                IconButton(
-                                  onPressed: busy
-                                      ? null
-                                      : () => _confirmDelete(estimate),
-                                  icon: deleting
-                                      ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  )
-                                      : Icon(Icons.delete_outline,
-                                      color: AppColors.error),
-                                  tooltip: 'Delete',
+                                Expanded(
+                                  child: SizedBox(
+                                    height: buttonHeight,
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: _redColor,
+                                        side: const BorderSide(color: _redColor),
+                                        shape: buttonShape,
+                                      ),
+                                      onPressed: busy
+                                          ? null
+                                          : () => _confirmDelete(estimate),
+                                      child: deleting
+                                          ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: _redColor),
+                                      )
+                                          : Text('Delete',
+                                          style: AppTextStyles.bodyBold(
+                                              color: _redColor)),
+                                    ),
+                                  ),
                                 ),
                                 SizedBox(width: Responsive.w(10)),
                                 Expanded(
                                   flex: 2,
-                                  child: PrimaryButton(
-                                    label: submitting
-                                        ? 'Submitting…'
-                                        : 'Submit for Approval',
-                                    height: 48,
-                                    onPressed: busy
-                                        ? null
-                                        : () => _sendForApproval(estimate),
-                                  ),
-                                ),
-                              ] else
-                              // Not a draft anymore — informational pill only.
-                                Expanded(
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                        vertical: Responsive.h(12),
-                                        horizontal: Responsive.w(14)),
-                                    decoration: BoxDecoration(
-                                      color: isApproved
-                                          ? AppColors.success.withOpacity(0.08)
-                                          : AppColors.surfaceAlt,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: isApproved
-                                            ? AppColors.success.withOpacity(0.3)
-                                            : AppColors.border,
+                                  child: SizedBox(
+                                    height: buttonHeight,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: buttonShape,
+                                      ),
+                                      onPressed: busy
+                                          ? null
+                                          : () => _sendForApproval(estimate),
+                                      child: Text(
+                                        submitting
+                                            ? 'Submitting…'
+                                            : 'Submit for Approval',
+                                        style: AppTextStyles.bodyBold(
+                                            color: Colors.white),
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                      MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          isApproved
-                                              ? Icons.check_circle_outline
-                                              : Icons.lock_outline,
-                                          size: 16,
-                                          color: isApproved
-                                              ? AppColors.success
-                                              : AppColors.textHint,
-                                        ),
-                                        SizedBox(width: Responsive.w(8)),
-                                        Expanded(
-                                          child: Text(
-                                            isApproved
-                                                ? 'This quotation has been approved.'
-                                                : 'This quotation has already been submitted and can no longer be edited or deleted.',
-                                            textAlign: TextAlign.center,
-                                            style: isApproved
-                                                ? AppTextStyles.bodyBold(
-                                                color: AppColors.success)
-                                                : AppTextStyles.caption(),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
                                   ),
                                 ),
-                            ],
+                              ],
+                            );
+                          }
+
+                          // Not a draft anymore: informational pill only.
+                          final pillColor =
+                          isApproved ? AppColors.success : AppColors.textSecondary;
+                          return Container(
+                            width: double.infinity,
+                            constraints: BoxConstraints(minHeight: buttonHeight),
+                            padding: EdgeInsets.symmetric(
+                                vertical: Responsive.h(10),
+                                horizontal: Responsive.w(14)),
+                            decoration: BoxDecoration(
+                              color: pillColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(14),
+                              border:
+                              Border.all(color: pillColor.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  isApproved
+                                      ? Icons.check_circle_outline
+                                      : Icons.lock_outline,
+                                  size: 16,
+                                  color: pillColor,
+                                ),
+                                SizedBox(width: Responsive.w(8)),
+                                Expanded(
+                                  child: Text(
+                                    isApproved
+                                        ? 'This quotation has been approved.'
+                                        : 'This quotation has already been submitted and can no longer be edited or deleted.',
+                                    textAlign: TextAlign.center,
+                                    style: isApproved
+                                        ? AppTextStyles.bodyBold(
+                                        color: AppColors.success)
+                                        : AppTextStyles.caption(
+                                        color: AppColors.textSecondary),
+                                  ),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
@@ -716,88 +518,185 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
       ),
     );
   }
+}
 
-  // ---------------------------------------------------------------------
-  // Totals card
-  // ---------------------------------------------------------------------
+// =====================================================================
+// HEADER (same look as the owner estimate header)
+// =====================================================================
 
-  /// Not approved: Sq.Ft / Sub Total / Handling Charge / Grand Total.
-  /// Approved: additionally Total Before Discount + Discount (if any),
-  /// Grand Total (= amount after discount), Total Paid and a Balance strip.
-  Widget _buildTotalsCard(
-      QuotationDetailModel q,
-      NumberFormat fmt,
-      NumberFormat number,
-      double mrpTotal,
-      bool isApproved,
-      ) {
+class _QuotationHeader extends StatelessWidget {
+  const _QuotationHeader({required this.estimate, required this.statusColor});
+  final QuotationDetailModel estimate;
+  final Color statusColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = estimate.date != null
+        ? DateFormat('dd-MM-yyyy').format(estimate.date!)
+        : estimate.dateRaw;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: cardDecoration(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.request_quote_outlined,
+                color: AppColors.primary, size: 20),
+          ),
+          SizedBox(width: Responsive.w(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  estimate.quotationNumber.isEmpty
+                      ? '#${estimate.id}'
+                      : estimate.quotationNumber,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold(),
+                ),
+                SizedBox(height: Responsive.h(2)),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded,
+                        size: 12, color: AppColors.textSecondary),
+                    SizedBox(width: Responsive.w(5)),
+                    Expanded(
+                      child: Text(
+                        dateText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                        AppTextStyles.caption(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: Responsive.w(8)),
+          StatusPill(
+            label: estimate.status.isEmpty ? '-' : statusLabel(estimate.status),
+            color: statusColor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// SUMMARY CARD
+// =====================================================================
+
+/// Not approved: Sq.Ft / Sub Total / Handling Charge / Grand Total.
+/// Approved: additionally Total Before Discount + Discount (if any),
+/// Grand Total (= amount after discount), Total Paid and a Balance strip.
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.q,
+    required this.fmt,
+    required this.number,
+    required this.isApproved,
+  });
+
+  final QuotationDetailModel q;
+  final NumberFormat fmt;
+  final NumberFormat number;
+  final bool isApproved;
+
+  @override
+  Widget build(BuildContext context) {
     final gap = SizedBox(height: Responsive.h(10));
     final showDiscount = isApproved && q.hasDiscount;
     final showPayment = isApproved && q.showPaymentSummary;
     final payable = isApproved ? q.amountAfterDiscount : q.grandTotal;
-    final balanceColor = q.balanceAmount > 0 ? Colors.red : AppColors.success;
+    final hasBalance = q.balanceAmount > 0;
+    final balanceColor = hasBalance ? _redColor : AppColors.success;
 
     return Container(
-      width: double.infinity,
-      decoration: _cardDecoration(radius: 16),
+      decoration: cardDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(title: 'Summary', icon: Icons.calculate_outlined),
+          const _CardTitleBar(title: 'Summary', icon: Icons.calculate_outlined),
           Padding(
-            padding: EdgeInsets.all(Responsive.w(16)),
+            padding: EdgeInsets.all(Responsive.w(14)),
             child: Column(
               children: [
-                _totalRow('Total Sq.Ft', number.format(q.totalSquareFeet)),
+                _SummaryLine('Total Sq.Ft', number.format(q.totalSquareFeet)),
                 gap,
-                _totalRow('Sub Total', fmt.format(q.subtotal)),
+                _SummaryLine('Sub Total', fmt.format(q.subtotal)),
                 gap,
-                _totalRow('Handling Charge', fmt.format(q.handlingCharge)),
+                _SummaryLine('Handling Charge', fmt.format(q.handlingCharge)),
                 if (showDiscount) ...[
                   gap,
-                  _totalRow('Total Before Discount', fmt.format(q.grandTotal)),
+                  _SummaryLine('Total Before Discount', fmt.format(q.grandTotal)),
                   gap,
-                  _totalRow(
+                  _SummaryLine(
                     q.discountLabel,
                     '- ${fmt.format(q.discountAmount)}',
-                    bold: true,
-                    valueColor: Colors.red,
+                    valueColor: _redColor,
                   ),
                 ],
-                const Divider(height: 24),
-                _totalRow('Grand Total', fmt.format(payable), large: true),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+                  child: const Divider(height: 1, color: AppColors.border),
+                ),
+                _SummaryLine(
+                  'Grand Total',
+                  fmt.format(payable),
+                  valueColor: AppColors.primary,
+                  large: true,
+                ),
                 if (showPayment) ...[
                   gap,
-                  _totalRow(
-                    'Total Paid',
-                    fmt.format(q.totalPaid),
-                    bold: true,
-                    valueColor: AppColors.success,
-                  ),
+                  _SummaryLine('Total Paid', fmt.format(q.totalPaid),
+                      valueColor: AppColors.success),
                 ],
               ],
             ),
           ),
-          // Balance strip — red while money is due, green once fully paid.
+          // Balance strip: red while money is due, green once fully paid.
           if (showPayment)
             Container(
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: balanceColor.withOpacity(0.08),
-                border: Border(
-                    top: BorderSide(color: balanceColor.withOpacity(0.25))),
-              ),
               padding: EdgeInsets.symmetric(
-                  horizontal: Responsive.w(16), vertical: Responsive.h(14)),
+                  horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+              decoration: BoxDecoration(
+                color: balanceColor.withOpacity(0.06),
+                border: Border(top: BorderSide(color: balanceColor.withOpacity(0.25))),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Balance Due', style: AppTextStyles.h3()),
-                  Text(
-                    fmt.format(q.balanceAmount),
-                    style: AppTextStyles.h3(color: balanceColor),
+                  Row(
+                    children: [
+                      Icon(
+                        hasBalance
+                            ? Icons.account_balance_wallet_outlined
+                            : Icons.verified_rounded,
+                        size: 18,
+                        color: balanceColor,
+                      ),
+                      SizedBox(width: Responsive.w(8)),
+                      Text('Balance Due', style: AppTextStyles.bodyBold()),
+                    ],
                   ),
+                  Text(fmt.format(q.balanceAmount),
+                      style: AppTextStyles.amount(color: balanceColor)),
                 ],
               ),
             ),
@@ -805,69 +704,27 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
       ),
     );
   }
+}
 
-  Widget _buildPaymentStatus(QuotationDetailModel q) {
-    final color = _balanceStatusColor(q.balanceStatus);
-    final isPaid = q.balanceStatus == 'paid';
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(14), vertical: Responsive.h(14)),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              _IconBadge(
-                isPaid
-                    ? Icons.check_circle_outline
-                    : Icons.hourglass_bottom_outlined,
-                color: color,
-              ),
-              SizedBox(width: Responsive.w(10)),
-              Text('Payment Status',
-                  style: AppTextStyles.bodyBold(color: color)),
-            ],
-          ),
-          Text(
-            q.balanceStatus.isEmpty ? '-' : _capitalize(q.balanceStatus),
-            style: AppTextStyles.h3(color: color),
-          ),
-        ],
-      ),
-    );
-  }
+/// Label + value row. The value scales down instead of overflowing when
+/// the amount is very large.
+class _SummaryLine extends StatelessWidget {
+  const _SummaryLine(this.label, this.value, {this.valueColor, this.large = false});
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool large;
 
-  Widget _totalRow(
-      String label,
-      String value, {
-        Color? valueColor,
-        bool bold = false,
-        bool large = false,
-      }) {
+  @override
+  Widget build(BuildContext context) {
     final labelStyle = large
-        ? AppTextStyles.h3().copyWith(fontWeight: FontWeight.w700)
-        : AppTextStyles.body();
-
+        ? AppTextStyles.bodyBold()
+        : AppTextStyles.body(color: AppColors.textSecondary);
     final valueStyle = (large
-        ? AppTextStyles.h3(color: valueColor ?? AppColors.primary)
-        .copyWith(fontWeight: FontWeight.w800)
-        : (bold ? AppTextStyles.bodyBold() : AppTextStyles.body())
-        .copyWith(color: valueColor))
+        ? AppTextStyles.amount(color: valueColor ?? AppColors.primary)
+        : AppTextStyles.bodyBold(color: valueColor ?? AppColors.textPrimary))
         .copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
 
-    // return Row(
-    //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    //   children: [
-    //     Text(label, style: labelStyle),
-    //     Text(value, style: valueStyle),
-    //   ],
-    // );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -879,12 +736,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,
-              child: Text(
-                value,
-                style: valueStyle,
-                maxLines: 1,
-                softWrap: false,
-              ),
+              child: Text(value, style: valueStyle, maxLines: 1, softWrap: false),
             ),
           ),
         ),
@@ -893,138 +745,95 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
   }
 }
 
-// ---------------------------------------------------------------------
-// Shared look (UI only)
-// ---------------------------------------------------------------------
+// =====================================================================
+// PAYMENTS CARD
+// =====================================================================
 
-BoxDecoration _cardDecoration({double radius = 14}) => BoxDecoration(
-  color: AppColors.surface,
-  borderRadius: BorderRadius.circular(radius),
-  border: Border.all(color: AppColors.border.withOpacity(0.8)),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.04),
-      blurRadius: 10,
-      offset: const Offset(0, 3),
-    ),
-  ],
-);
-
-class _IconBadge extends StatelessWidget {
-  const _IconBadge(this.icon, {this.color, this.size = 16});
-  final IconData icon;
-  final Color? color;
-  final double size;
+class _PaymentsCard extends StatelessWidget {
+  const _PaymentsCard({required this.payments, required this.money});
+  final List<dynamic> payments;
+  final NumberFormat money;
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.primary;
-    return Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: c.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Icon(icon, size: size, color: c),
-    );
-  }
-}
+    final total = payments.fold<double>(0, (s, p) => s + (p.amount as num));
 
-class _CardTitle extends StatelessWidget {
-  const _CardTitle({required this.title, this.icon});
-  final String title;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
-        border: Border(
-            bottom: BorderSide(color: AppColors.border.withOpacity(0.7))),
-      ),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            _IconBadge(icon!),
-            SizedBox(width: Responsive.w(10)),
-          ],
-          Expanded(
-            child: Text(
-              title,
-              style: AppTextStyles.bodyBold(color: AppColors.primary)
-                  .copyWith(fontSize: Responsive.sp(14)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PreviewRow {
-  final String label;
-  final String value;
-  final IconData? icon;
-  _PreviewRow(this.label, this.value, {this.icon});
-}
-
-class _PreviewSection extends StatelessWidget {
-  const _PreviewSection({required this.title, required this.rows, this.icon});
-  final String title;
-  final List<_PreviewRow> rows;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: _cardDecoration(),
+      decoration: cardDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CardTitle(title: title, icon: icon),
-          Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal: Responsive.w(14), vertical: Responsive.h(4)),
-            child: Column(
-              children: [
-                for (var i = 0; i < rows.length; i++) ...[
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: Responsive.h(10)),
-                    child: Row(
+          _CardTitleBar(
+            title: 'Payments',
+            icon: Icons.payments_outlined,
+            trailing: Text(
+              '${payments.length} ${payments.length == 1 ? 'entry' : 'entries'}',
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
+            ),
+          ),
+          for (var i = 0; i < payments.length; i++) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.receipt_long_outlined,
+                        size: 20, color: AppColors.success),
+                  ),
+                  SizedBox(width: Responsive.w(12)),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (rows[i].icon != null) ...[
-                          Icon(rows[i].icon,
-                              size: 16, color: AppColors.textHint),
-                          SizedBox(width: Responsive.w(10)),
-                        ],
-                        if (rows[i].label.isNotEmpty) ...[
-                          SizedBox(
-                            width: 92,
-                            child: Text(rows[i].label,
-                                style: AppTextStyles.caption()),
-                          ),
-                          SizedBox(width: Responsive.w(8)),
-                        ],
-                        Expanded(
-                          child: Text(
-                            rows[i].value.isEmpty ? '-' : rows[i].value,
-                            style: AppTextStyles.bodyBold(),
-                          ),
+                        Text(
+                          payments[i].methodLabel.toString().isEmpty
+                              ? 'Payment'
+                              : payments[i].methodLabel.toString(),
+                          style: AppTextStyles.bodyBold(),
+                        ),
+                        SizedBox(height: Responsive.h(2)),
+                        Text(
+                          _subtitle(payments[i]),
+                          style: AppTextStyles.caption(color: AppColors.textSecondary),
                         ),
                       ],
                     ),
                   ),
-                  if (i != rows.length - 1)
-                    Divider(
-                        height: 1, color: AppColors.border.withOpacity(0.5)),
+                  Text(
+                    money.format(payments[i].amount),
+                    style: AppTextStyles.bodyBold(color: AppColors.success).copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
                 ],
+              ),
+            ),
+            if (i != payments.length - 1)
+              const Divider(height: 1, color: AppColors.border),
+          ],
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+                horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.06),
+              border: const Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total Received', style: AppTextStyles.bodyBold()),
+                Text(money.format(total),
+                    style: AppTextStyles.bodyBold(color: AppColors.success)),
               ],
             ),
           ),
@@ -1032,11 +841,55 @@ class _PreviewSection extends StatelessWidget {
       ),
     );
   }
+
+  /// "2026-10-05 · Ref: ABC" (date and reference are both optional).
+  String _subtitle(dynamic p) {
+    final raw = p.date.toString();
+    final parsed = DateTime.tryParse(raw);
+    final dateText = parsed != null ? DateFormat('yyyy-MM-dd').format(parsed) : raw;
+    final ref = p.reference.toString();
+    final parts = <String>[
+      if (dateText.isNotEmpty) dateText,
+      if (ref.isNotEmpty) 'Ref: $ref',
+    ];
+    return parts.isEmpty ? '-' : parts.join(' · ');
+  }
 }
 
-// =======================================================================
-// Bordered items table with a Total row — standard column widths
-// =======================================================================
+/// White card header row (icon badge + title) with a divider underneath.
+class _CardTitleBar extends StatelessWidget {
+  const _CardTitleBar({required this.title, this.icon, this.trailing});
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+          horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            IconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// ITEMS TABLE (same look as the owner items table)
+// =====================================================================
+
 class _InvoiceTable extends StatelessWidget {
   const _InvoiceTable({
     required this.items,
@@ -1054,30 +907,20 @@ class _InvoiceTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(Responsive.w(18)),
-        decoration: _cardDecoration(),
-        child: Text('No items on this quotation.',
-            style: AppTextStyles.caption()),
-      );
-    }
-
-    // label, width, alignment
+    // label, width, alignment (same column order as the owner table)
     final cols = <(String, double, TextAlign)>[
-      ('Sl.No', _Col.sl, TextAlign.center),
-      ('Item', _Col.text, TextAlign.left),
-      ('Company', _Col.text, TextAlign.left),
-      ('Size', _Col.size, TextAlign.left),
-      ('Qty', _Col.num, TextAlign.right),
-      ('Unit', _Col.unit, TextAlign.left),
-      if (showBox) ('Box Qty', _Col.num, TextAlign.right),
-      if (showPiece) ('Piece Qty', _Col.num, TextAlign.right),
-      ('MRP', _Col.num, TextAlign.right),
-      ('Rate', _Col.num, TextAlign.right),
-      ('Amount', _Col.money, TextAlign.right),
-      if (showIncentive) ('Incentive', _Col.money, TextAlign.right),
+      ('Sl.No', EstCol.sl, TextAlign.center),
+      ('Item', EstCol.text, TextAlign.left),
+      ('Company', EstCol.text, TextAlign.left),
+      ('Size', EstCol.size, TextAlign.left),
+      ('Unit', EstCol.unit, TextAlign.left),
+      ('Qty', EstCol.num, TextAlign.right),
+      if (showBox) ('Box Qty', EstCol.num, TextAlign.right),
+      if (showPiece) ('Piece Qty', EstCol.num, TextAlign.right),
+      ('MRP', EstCol.num, TextAlign.right),
+      ('Rate', EstCol.num, TextAlign.right),
+      ('Amount', EstCol.money, TextAlign.right),
+      if (showIncentive) ('Incentive', EstCol.money, TextAlign.right),
     ];
 
     final amountCol = cols.indexWhere((c) => c.$1 == 'Amount');
@@ -1108,10 +951,8 @@ class _InvoiceTable extends StatelessWidget {
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.bodyBold(color: AppColors.primary).copyWith(
-          fontSize: cellFont,
-          letterSpacing: 0.2,
-        ),
+        style: AppTextStyles.bodyBold(color: AppColors.primary)
+            .copyWith(fontSize: cellFont),
       ),
     );
 
@@ -1141,8 +982,8 @@ class _InvoiceTable extends StatelessWidget {
         it.productName.isEmpty ? '-' : it.productName,
         it.companyName.isNotEmpty ? it.companyName : '-',
         it.productSize.isEmpty ? '-' : it.productSize,
-        number.format(it.quantity),
         it.productUnit.isEmpty ? '-' : it.productUnit,
+        number.format(it.quantity),
         if (showBox) it.boxQuantity > 0 ? number.format(it.boxQuantity) : '-',
         if (showPiece)
           it.pieceQuantity > 0 ? number.format(it.pieceQuantity) : '-',
@@ -1154,9 +995,7 @@ class _InvoiceTable extends StatelessWidget {
       ];
       return TableRow(
         decoration: BoxDecoration(
-          color: i.isEven
-              ? AppColors.surface
-              : AppColors.surfaceAlt.withOpacity(0.45),
+          color: i.isEven ? Colors.white : AppColors.background,
         ),
         children: [
           for (var c = 0; c < values.length; c++)
@@ -1181,13 +1020,7 @@ class _InvoiceTable extends StatelessWidget {
       values[amountCol] = currency.format(totalAmount);
       if (showIncentive) values[incentiveCol] = currency.format(totalIncentive);
       return TableRow(
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.07),
-          border: Border(
-            top: BorderSide(
-                color: AppColors.primary.withOpacity(0.35), width: 1.2),
-          ),
-        ),
+        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.06)),
         children: [
           for (var c = 0; c < values.length; c++)
             dataCell(
@@ -1207,55 +1040,131 @@ class _InvoiceTable extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          decoration: _cardDecoration(),
-          clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Table(
-              border: TableBorder(
-                horizontalInside:
-                BorderSide(color: AppColors.border.withOpacity(0.45)),
-                verticalInside:
-                BorderSide(color: AppColors.border.withOpacity(0.30)),
-              ),
-              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-              columnWidths: {
-                for (var c = 0; c < cols.length; c++)
-                  c: FixedColumnWidth(cols[c].$2),
-              },
-              children: [
-                TableRow(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.09),
-                    border: Border(
-                      bottom: BorderSide(
-                          color: AppColors.primary.withOpacity(0.35),
-                          width: 1.4),
-                    ),
-                  ),
-                  children: [
-                    for (var c = 0; c < cols.length; c++) headerCell(c)
-                  ],
-                ),
-                for (var i = 0; i < items.length; i++) itemRow(i, items[i]),
-                totalRow(),
-              ],
-            ),
-          ),
-        ),
-        SizedBox(height: Responsive.h(6)),
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(Icons.swipe_rounded, size: 14, color: AppColors.textHint),
-            SizedBox(width: Responsive.w(4)),
-            Text('Swipe sideways to see all columns',
-                style: AppTextStyles.caption()
-                    .copyWith(fontSize: Responsive.sp(11))),
+            const EstimateSectionHeader('Items'),
+            StatusPill(
+              label: '${items.length} ${items.length == 1 ? 'item' : 'items'}',
+              color: AppColors.primary,
+            ),
           ],
         ),
+        SizedBox(height: Responsive.h(10)),
+        if (items.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(Responsive.w(18)),
+            decoration: cardDecoration(),
+            child: Text('No items on this quotation.',
+                style: AppTextStyles.caption(color: AppColors.textSecondary)),
+          )
+        else ...[
+          Container(
+            decoration: cardDecoration(),
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Table(
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                border: TableBorder(
+                  horizontalInside:
+                  BorderSide(color: AppColors.border.withOpacity(0.6)),
+                  verticalInside:
+                  BorderSide(color: AppColors.border.withOpacity(0.4)),
+                ),
+                columnWidths: {
+                  for (var c = 0; c < cols.length; c++)
+                    c: FixedColumnWidth(cols[c].$2),
+                },
+                children: [
+                  TableRow(
+                    decoration:
+                    BoxDecoration(color: AppColors.primary.withOpacity(0.08)),
+                    children: [
+                      for (var c = 0; c < cols.length; c++) headerCell(c)
+                    ],
+                  ),
+                  for (var i = 0; i < items.length; i++) itemRow(i, items[i]),
+                  totalRow(),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: Responsive.h(6)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.swipe_rounded, size: 14, color: AppColors.textHint),
+              SizedBox(width: Responsive.w(4)),
+              Text('Swipe sideways to see all columns',
+                  style: AppTextStyles.caption(color: AppColors.textSecondary)
+                      .copyWith(fontSize: Responsive.sp(11))),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+}
+
+// =====================================================================
+// ERROR / SKELETON (same as owner screen)
+// =====================================================================
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailCardSkeleton extends StatelessWidget {
+  const _DetailCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ShimmerBox(width: 120, height: 13),
+          SizedBox(height: 10),
+          ShimmerBox(width: 200, height: 11),
+          SizedBox(height: 10),
+          ShimmerBox(width: 160, height: 11),
+        ],
+      ),
     );
   }
 }

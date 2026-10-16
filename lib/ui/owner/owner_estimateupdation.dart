@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -88,6 +87,29 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     if (!_isBoxUnitProduct) return;
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
   }
+
+  // ---- Derived totals (for the Summary card) ----
+  double get _itemsTotal => _items.fold(0.0, (s, i) => s + i.amount);
+  double get _handling => double.tryParse(_handlingChargeCtrl.text.trim()) ?? 0;
+  double get _grandTotal => _itemsTotal + _handling;
+
+  double get _totalSqft => _items.fold(0.0, (s, i) {
+    final u = i.unit
+        .toLowerCase()
+        .replaceAll('.', '')
+        .replaceAll(' ', '')
+        .replaceAll('²', '2');
+    final isSqft = u == 'sqft' ||
+        u == 'sqfeet' ||
+        u == 'squarefeet' ||
+        u == 'squareft' ||
+        u == 'sft' ||
+        u == 'ft2' ||
+        u.contains('sqft') ||
+        u.contains('squareft') ||
+        u.contains('squarefeet');
+    return s + (isSqft ? i.quantity : 0);
+  });
 
   @override
   void initState() {
@@ -416,8 +438,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     setState(() => _isAddingItem = false);
 
     if (!result.success || result.incentive == null) {
-      AppSnackbar.error(
-          result.errorMessage ?? 'Could not calculate the amount for this item. Please try again.');
+      AppSnackbar.error(result.errorMessage ??
+          'Could not calculate the amount for this item. Please try again.');
       return;
     }
 
@@ -455,8 +477,9 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
         _items.add(newItem);
       }
     });
-    debugPrint('OwnerEstimateUpdateScreen: item ${editingIndex != null ? 'updated' : 'added'} locally. '
-        'Total items now = ${_items.length}');
+    debugPrint(
+        'OwnerEstimateUpdateScreen: item ${editingIndex != null ? 'updated' : 'added'} locally. '
+            'Total items now = ${_items.length}');
     _resetItemForm();
   }
 
@@ -525,9 +548,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   // ---------------- Submit ----------------
 
-  /// First validation message among all main-form fields (null if all pass).
-  /// Used so the user is told WHICH field blocks "Save Changes" instead of a
-  /// generic message, and so the console shows the reason.
   String? _firstFormError() {
     final errors = <String, String?>{
       'Customer name': _validateCustomerName(_nameCtrl.text),
@@ -568,8 +588,6 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
         .map((row) => EstimateUpdateItem(
       productId: row.productId,
       quantity: row.quantity,
-      // Only send box/piece when they have a value, so the payload
-      // matches the API sample (product_id, quantity, rate).
       boxQuantity: row.boxQuantity > 0 ? row.boxQuantity : null,
       pieceQuantity: row.pieceQuantity > 0 ? row.pieceQuantity : null,
       rate: row.rate,
@@ -600,15 +618,29 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     context.read<OwnerEstimateDetailBloc>().add(OwnerEstimateUpdateRequested(request));
   }
 
+  // ---------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final number = NumberFormat.decimalPattern('en_IN');
+
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
+    final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+    final sectionGap = SizedBox(height: Responsive.h(14));
 
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: Text('Update Estimate', style: AppTextStyles.h6())),
+        appBar: AppBar(
+          title: Text('Update Estimate', style: AppTextStyles.h6()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
         body: SafeArea(
           child: BlocConsumer<OwnerEstimateDetailBloc, OwnerEstimateDetailState>(
             listenWhen: (previous, current) =>
@@ -665,6 +697,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
               final isBusy = state.actionStatus == OwnerEstimateActionStatus.inProgress;
               final isUpdatingItem =
                   state.itemUpdateStatus == OwnerEstimateActionStatus.inProgress;
+              final isEditing = _editingItemIndex != null;
 
               return Column(
                 children: [
@@ -673,10 +706,9 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                       key: _formKey,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: ListView(
-                        padding: EdgeInsets.all(Responsive.w(18)),
+                        padding: listPadding,
                         children: [
-                          Text('Customer Details', style: AppTextStyles.h3()),
-                          SizedBox(height: Responsive.h(12)),
+                          // ---- Customer ----
                           EstimateCustomerSection(
                             phone: _phoneCtrl,
                             name: _nameCtrl,
@@ -686,10 +718,9 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                             nameValidator: _validateCustomerName,
                             emailValidator: _validateOptionalEmail,
                           ),
-                          SizedBox(height: Responsive.h(20)),
+                          sectionGap,
 
-                          Text('Contractor Details', style: AppTextStyles.h3()),
-                          SizedBox(height: Responsive.h(12)),
+                          // ---- Contractor ----
                           EstimateContractorSection(
                             name: _contractorNameCtrl,
                             phone: _contractorPhoneCtrl,
@@ -700,93 +731,114 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                             // Re-validate so the name/phone cross-check updates live.
                             onChanged: (_) => _formKey.currentState?.validate(),
                           ),
+                          sectionGap,
 
-                          EstimateOtherDetailsSection(
-                            handlingCharge: _handlingChargeCtrl,
-                            notes: _notesCtrl,
-                            handlingValidator: _validateHandlingCharge,
-                          ),
-                          SizedBox(height: Responsive.h(20)),
+                          // ---- Add / Edit item ----
+                          EstimateSectionCard(
+                            title: isEditing ? 'Edit Item' : 'Add Item',
+                            icon: isEditing ? Icons.edit_outlined : Icons.add_box_outlined,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                EstimateItemFormFields(
+                                  formKey: _itemFormKey,
+                                  productField: EstimateProductSearch(
+                                    loading: _loadingProducts,
+                                    products: _products,
+                                    searchCtrl: _productSearchCtrl,
+                                    focusNode: _productSearchFocus,
+                                    selectedProduct: _selectedProduct,
+                                    showSuggestions: _showProductSuggestions,
+                                    onFieldTap: () =>
+                                        setState(() => _showProductSuggestions = true),
+                                    onTextChanged: (text) {
+                                      if (_selectedProduct != null &&
+                                          text !=
+                                              estimateProductDisplayString(
+                                                  _selectedProduct!)) {
+                                        _onProductSelected(null);
+                                      }
+                                      setState(() => _showProductSuggestions = true);
+                                    },
+                                    onClear: _clearProductSelection,
+                                    onSelected: (p) {
+                                      _onProductSelected(p);
+                                      setState(() => _showProductSuggestions = false);
+                                      _productSearchFocus.unfocus();
+                                    },
+                                  ),
+                                  companyCtrl: _itemCompanyCtrl,
+                                  sizeCtrl: _itemSizeCtrl,
+                                  unitCtrl: _itemUnitCtrl,
+                                  mrpCtrl: _itemMrpCtrl,
+                                  rateCtrl: _itemRateCtrl,
+                                  qtyCtrl: _itemQtyCtrl,
+                                  boxQtyCtrl: _itemBoxQtyCtrl,
+                                  pieceQtyCtrl: _itemPieceQtyCtrl,
+                                  isBoxUnit: _isBoxUnitProduct,
+                                  onRateChanged: (_) => setState(() {}),
+                                  onQtyChanged: (_) => setState(_recomputeBoxQtyIfNeeded),
+                                  onPieceChanged: (_) => setState(() {}),
+                                ),
+                                SizedBox(height: Responsive.h(14)),
 
-                          Text('Add / Edit Item', style: AppTextStyles.h3()),
-                          SizedBox(height: Responsive.h(10)),
-                          EstimateItemFormFields(
-                            formKey: _itemFormKey,
-                            productField: EstimateProductSearch(
-                              loading: _loadingProducts,
-                              products: _products,
-                              searchCtrl: _productSearchCtrl,
-                              focusNode: _productSearchFocus,
-                              selectedProduct: _selectedProduct,
-                              showSuggestions: _showProductSuggestions,
-                              onFieldTap: () => setState(() => _showProductSuggestions = true),
-                              onTextChanged: (text) {
-                                if (_selectedProduct != null &&
-                                    text != estimateProductDisplayString(_selectedProduct!)) {
-                                  _onProductSelected(null);
-                                }
-                                setState(() => _showProductSuggestions = true);
-                              },
-                              onClear: _clearProductSelection,
-                              onSelected: (p) {
-                                _onProductSelected(p);
-                                setState(() => _showProductSuggestions = false);
-                                _productSearchFocus.unfocus();
-                              },
+                                if (isEditing)
+                                  EstimateEditingBanner(
+                                    itemNumber: _editingItemIndex! + 1,
+                                    onCancel: _cancelEditItem,
+                                  ),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: Responsive.h(48),
+                                  child: ElevatedButton.icon(
+                                    onPressed:
+                                    (_loadingProducts || _isAddingItem || isUpdatingItem)
+                                        ? null
+                                        : _saveItemFromForm,
+                                    icon: (_isAddingItem || isUpdatingItem)
+                                        ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white),
+                                    )
+                                        : Icon(
+                                      isEditing ? Icons.save_outlined : Icons.add,
+                                      color: Colors.white,
+                                    ),
+                                    label: Text(
+                                      (_isAddingItem || isUpdatingItem)
+                                          ? (isEditing ? 'Updating…' : 'Calculating…')
+                                          : (isEditing ? 'Update Item' : 'Add Item'),
+                                      style: AppTextStyles.bodyBold(color: Colors.white),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: buttonShape,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: Responsive.h(8)),
+                              ],
                             ),
-                            companyCtrl: _itemCompanyCtrl,
-                            sizeCtrl: _itemSizeCtrl,
-                            unitCtrl: _itemUnitCtrl,
-                            mrpCtrl: _itemMrpCtrl,
-                            rateCtrl: _itemRateCtrl,
-                            qtyCtrl: _itemQtyCtrl,
-                            boxQtyCtrl: _itemBoxQtyCtrl,
-                            pieceQtyCtrl: _itemPieceQtyCtrl,
-                            isBoxUnit: _isBoxUnitProduct,
-                            onRateChanged: (_) => setState(() {}),
-                            onQtyChanged: (_) => setState(_recomputeBoxQtyIfNeeded),
-                            onPieceChanged: (_) => setState(() {}),
                           ),
-                          SizedBox(height: Responsive.h(20)),
+                          SizedBox(height: Responsive.h(18)),
 
-                          if (_editingItemIndex != null)
-                            EstimateEditingBanner(
-                              itemNumber: _editingItemIndex! + 1,
-                              onCancel: _cancelEditItem,
-                            ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: (_loadingProducts || _isAddingItem || isUpdatingItem)
-                                  ? null
-                                  : _saveItemFromForm,
-                              icon: (_isAddingItem || isUpdatingItem)
-                                  ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                                  : Icon(
-                                _editingItemIndex != null ? Icons.save_outlined : Icons.add,
-                                color: Colors.white,
+                          // ---- Items list ----
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const EstimateSectionHeader('Items'),
+                              EstimatePill(
+                                label:
+                                '${_items.length} ${_items.length == 1 ? 'item' : 'items'}',
+                                color: AppColors.primary,
                               ),
-                              label: Text(
-                                (_isAddingItem || isUpdatingItem)
-                                    ? (_editingItemIndex != null ? 'Updating…' : 'Calculating…')
-                                    : (_editingItemIndex != null ? 'Update Item' : 'Add Item'),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
-                              ),
-                            ),
+                            ],
                           ),
-                          SizedBox(height: Responsive.h(20)),
-
-                          Text('Items (${_items.length})', style: AppTextStyles.h3()),
                           SizedBox(height: Responsive.h(10)),
                           if (_loadingProducts)
                             const Padding(
@@ -794,12 +846,13 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                               child: Center(child: CircularProgressIndicator()),
                             )
                           else if (_items.isEmpty)
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
-                              child: Center(
-                                child: Text('No items added yet',
-                                    style: AppTextStyles.body(color: AppColors.textHint)),
-                              ),
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.all(Responsive.w(18)),
+                              decoration: estimateCardDecoration(),
+                              child: Text('No items added yet',
+                                  style: AppTextStyles.caption(
+                                      color: AppColors.textSecondary)),
                             )
                           else
                             ..._items.asMap().entries.map((entry) {
@@ -813,13 +866,39 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                 onEdit: () => _editItem(index),
                               );
                             }),
+                          SizedBox(height: Responsive.h(8)),
+
+                          // ---- Other details ----
+                          EstimateOtherDetailsSection(
+                            handlingCharge: _handlingChargeCtrl,
+                            notes: _notesCtrl,
+                            handlingValidator: _validateHandlingCharge,
+                            onHandlingChanged: (_) => setState(() {}),
+                          ),
+                          sectionGap,
+
+                          // ---- Summary ----
+                          EstimateTotalsCard(
+                            totalSqft: _totalSqft,
+                            itemsTotal: _itemsTotal,
+                            handling: _handling,
+                            grandTotal: _grandTotal,
+                            currency: currency,
+                            number: number,
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  Padding(
+
+                  // ---- Bottom bar ----
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.background,
+                      border: Border(top: BorderSide(color: AppColors.border)),
+                    ),
                     padding: EdgeInsets.fromLTRB(
-                        Responsive.w(18), 0, Responsive.w(18), Responsive.h(18)),
+                        Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(14)),
                     child: PrimaryButton(
                       label: isBusy ? 'Saving...' : 'Save Changes',
                       height: 48,

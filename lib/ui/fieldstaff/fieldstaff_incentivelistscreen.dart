@@ -10,6 +10,65 @@ import '../../bloc/fieldstaffbloc/fieldstaffincentiveview/fieldstaffview_incenti
 import '../../bloc/fieldstaffbloc/fieldstaffincentiveview/fieldstaffview_incentive_state.dart';
 import '../../models/fieldstaffmodels/fieldstaffincentiveviewingmodel.dart';
 
+// =====================================================================
+// SHARED LOOK (same as dashboard / add visit / visit detail)
+// =====================================================================
+
+BoxDecoration _cardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+class _IconBadge extends StatelessWidget {
+  const _IconBadge(this.icon, {this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// SCREEN
+// =====================================================================
 
 class IncentiveListScreen extends StatelessWidget {
   const IncentiveListScreen({super.key});
@@ -60,23 +119,22 @@ class _IncentiveListViewState extends State<_IncentiveListView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final currency =
-    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
           title: Text('Incentive Earned', style: AppTextStyles.h6()),
         ),
         body: SafeArea(
-          child: BlocBuilder<FieldStaffIncentivesListBloc,
-              FieldStaffIncentivesListState>(
+          child: BlocBuilder<FieldStaffIncentivesListBloc, FieldStaffIncentivesListState>(
             builder: (context, state) {
-              // Chip row is shown as soon as we know about at least one
-              // status (i.e. after the first successful fetch), even while
-              // a filtered fetch is loading — so it doesn't flicker away
-              // every time you tap a chip.
+              // Chip row stays visible once at least one status is known,
+              // even while a filtered fetch is loading (no flicker).
               final showChips = state.chipOptions.length > 1;
 
               if (state.isInitialLoading) {
@@ -87,23 +145,32 @@ class _IncentiveListViewState extends State<_IncentiveListView> {
                   state.list.isEmpty) {
                 return Center(
                   child: Padding(
-                    padding: EdgeInsets.all(Responsive.w(20)),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          state.errorMessage ?? 'Something went wrong',
-                          style: AppTextStyles.subtitle(),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: Responsive.h(12)),
-                        OutlinedButton(
-                          onPressed: () => context
-                              .read<FieldStaffIncentivesListBloc>()
-                              .add(const FetchFieldStaffIncentivesEvent()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
+                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(Responsive.w(18)),
+                      decoration: _cardDecoration(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.error_outline_rounded,
+                              size: 32, color: AppColors.textSecondary.withOpacity(0.5)),
+                          SizedBox(height: Responsive.h(8)),
+                          Text(
+                            state.errorMessage ?? 'Something went wrong',
+                            style: AppTextStyles.subtitle().copyWith(fontSize: Responsive.sp(12)),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: Responsive.h(8)),
+                          TextButton(
+                            onPressed: () => context
+                                .read<FieldStaffIncentivesListBloc>()
+                                .add(const FetchFieldStaffIncentivesEvent()),
+                            child: Text('Try again',
+                                style: AppTextStyles.link().copyWith(fontSize: Responsive.sp(12))),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -122,10 +189,31 @@ class _IncentiveListViewState extends State<_IncentiveListView> {
                   Expanded(
                     child: state.list.isEmpty
                         ? Center(
-                      child: Text('No incentives added yet',
-                          style: AppTextStyles.subtitle()),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                        child: Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(vertical: Responsive.h(22)),
+                          decoration: _cardDecoration(),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.monetization_on_outlined,
+                                  size: 34,
+                                  color: AppColors.textSecondary.withOpacity(0.4)),
+                              SizedBox(height: Responsive.h(8)),
+                              Text(
+                                'No incentives added yet',
+                                style: AppTextStyles.subtitle()
+                                    .copyWith(fontSize: Responsive.sp(12)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     )
                         : RefreshIndicator(
+                      color: AppColors.primary,
                       onRefresh: () async {
                         context
                             .read<FieldStaffIncentivesListBloc>()
@@ -134,21 +222,19 @@ class _IncentiveListViewState extends State<_IncentiveListView> {
                             .read<FieldStaffIncentivesListBloc>()
                             .stream
                             .firstWhere((s) =>
-                        s.status !=
-                            FieldStaffIncentivesListStatus.loading);
+                        s.status != FieldStaffIncentivesListStatus.loading);
                       },
                       child: ListView.separated(
                         controller: _scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: EdgeInsets.fromLTRB(
-                          Responsive.w(16),
-                          Responsive.h(14),
-                          Responsive.w(16),
+                          Responsive.w(20),
+                          Responsive.h(6),
+                          Responsive.w(20),
                           Responsive.h(90),
                         ),
                         itemCount: state.list.length + 1,
-                        separatorBuilder: (_, __) =>
-                            SizedBox(height: Responsive.h(10)),
+                        separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
                         itemBuilder: (context, index) {
                           if (index == 0) {
                             return _TotalIncentiveCard(
@@ -161,27 +247,26 @@ class _IncentiveListViewState extends State<_IncentiveListView> {
                           final i = index - 1;
                           if (i == state.list.length) {
                             if (state.status !=
-                                FieldStaffIncentivesListStatus
-                                    .loadingMore) {
+                                FieldStaffIncentivesListStatus.loadingMore) {
                               return const SizedBox.shrink();
                             }
                             return Padding(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: Responsive.h(16)),
+                              padding: EdgeInsets.symmetric(vertical: Responsive.h(14)),
                               child: const Center(
                                 child: SizedBox(
-                                  width: 22,
-                                  height: 22,
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2.4),
+                                    strokeWidth: 2.2,
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                               ),
                             );
                           }
 
                           final item = state.list[i];
-                          return _IncentiveCard(
-                              item: item, currency: currency);
+                          return _IncentiveCard(item: item, currency: currency);
                         },
                       ),
                     ),
@@ -217,10 +302,8 @@ Color _statusColor(String statusColorKey, String statusKey) {
   }
 }
 
-/// Horizontally scrollable row of filter chips, built from whatever
-/// statuses have actually shown up in the API data so far (state.chipOptions
-/// = ['All', ...discovered statuses]). Selected chip is filled with
-/// AppColors.primary; others sit outlined on AppColors.surface.
+/// Horizontally scrollable filter chips built from the statuses found in
+/// the API data (state.chipOptions = ['All', ...statuses]).
 class _StatusChipRow extends StatelessWidget {
   const _StatusChipRow({
     required this.options,
@@ -235,38 +318,40 @@ class _StatusChipRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: Responsive.h(44),
+      height: Responsive.h(46),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: Responsive.w(16)),
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(20), vertical: Responsive.h(8)),
         itemCount: options.length,
         separatorBuilder: (_, __) => SizedBox(width: Responsive.w(8)),
         itemBuilder: (context, index) {
           final label = options[index];
           final isSelected = label == selected;
 
-          return ChoiceChip(
-            label: Text(label),
-            selected: isSelected,
-            onSelected: (_) => onSelected(label),
-            showCheckmark: false,
-            labelStyle: AppTextStyles.caption().copyWith(
-              color: isSelected ? Colors.white : AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
+          return InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => onSelected(label),
+            child: Container(
+              alignment: Alignment.center,
+              padding: EdgeInsets.symmetric(horizontal: Responsive.w(14)),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
+                  fontSize: Responsive.sp(11),
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
             ),
-            backgroundColor: AppColors.surface,
-            selectedColor: AppColors.primary,
-            side: BorderSide(
-              color: isSelected ? AppColors.primary : AppColors.border,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: Responsive.w(12),
-              vertical: Responsive.h(4),
-            ),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           );
         },
       ),
@@ -274,8 +359,7 @@ class _StatusChipRow extends StatelessWidget {
   }
 }
 
-/// Total summary card, restyled to sit on the same surface/border
-/// language as the rest of the app instead of a custom gradient.
+/// Total summary card.
 class _TotalIncentiveCard extends StatelessWidget {
   const _TotalIncentiveCard({
     required this.value,
@@ -291,37 +375,33 @@ class _TotalIncentiveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(16)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(14)),
+      decoration: _cardDecoration(),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Icon(Icons.currency_rupee_rounded,
-                size: 20, color: AppColors.primary),
-          ),
+          const _IconBadge(Icons.currency_rupee_rounded, size: 20),
           SizedBox(width: Responsive.w(12)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total Incentive', style: AppTextStyles.caption()),
+                Text(
+                  'Total Incentive',
+                  style: AppTextStyles.caption(color: AppColors.textSecondary)
+                      .copyWith(fontSize: Responsive.sp(10.5)),
+                ),
                 SizedBox(height: Responsive.h(2)),
-                Text(value, style: AppTextStyles.h3()),
-                SizedBox(height: Responsive.h(2)),
-
+                Text(
+                  value,
+                  style: AppTextStyles.bodyBold(color: AppColors.primary)
+                      .copyWith(fontSize: Responsive.sp(18)),
+                ),
               ],
             ),
+          ),
+          _Pill(
+            label: '$visitCount${isComplete ? '' : '+'} ${visitCount == 1 ? 'visit' : 'visits'}',
+            color: AppColors.primary,
           ),
         ],
       ),
@@ -348,54 +428,30 @@ class _IncentiveCard extends StatelessWidget {
     final badgeColor = _statusColor(item.statusColor, item.status);
 
     return Container(
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+      padding: EdgeInsets.all(Responsive.w(12)),
+      decoration: _cardDecoration(radius: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const _IconBadge(Icons.receipt_long_outlined),
+          SizedBox(width: Responsive.w(10)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.estimateNumber.isEmpty
-                            ? 'Estimate #${item.estimateId}'
-                            : item.estimateNumber,
-                        style: AppTextStyles.bodyBold(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    SizedBox(width: Responsive.w(8)),
-                    Container(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: badgeColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        item.statusLabel.isEmpty ? item.status : item.statusLabel,
-                        style: TextStyle(
-                          color: badgeColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  item.estimateNumber.isEmpty
+                      ? 'Estimate #${item.estimateId}'
+                      : item.estimateNumber,
+                  style: AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(12.5)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: Responsive.h(3)),
+                SizedBox(height: Responsive.h(2)),
                 Text(
                   dateLabel,
-                  style: AppTextStyles.caption(),
+                  style: AppTextStyles.caption(color: AppColors.textSecondary)
+                      .copyWith(fontSize: Responsive.sp(10.5)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -403,9 +459,20 @@ class _IncentiveCard extends StatelessWidget {
             ),
           ),
           SizedBox(width: Responsive.w(8)),
-          Text(
-            currency.format(displayAmount),
-            style: AppTextStyles.bodyBold().copyWith(color: Colors.green),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                currency.format(displayAmount),
+                style: AppTextStyles.bodyBold(color: AppColors.success)
+                    .copyWith(fontSize: Responsive.sp(12.5)),
+              ),
+              SizedBox(height: Responsive.h(6)),
+              _Pill(
+                label: item.statusLabel.isEmpty ? item.status : item.statusLabel,
+                color: badgeColor,
+              ),
+            ],
           ),
         ],
       ),

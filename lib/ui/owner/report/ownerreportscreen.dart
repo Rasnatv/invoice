@@ -168,8 +168,8 @@ class _ReportTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: AppTextStyles.bodyBold(color: AppColors.black)
-                          .copyWith(fontSize: Responsive.sp(14.5)),
+                      style: AppTextStyles.h3(color: AppColors.black)
+
                     ),
                     SizedBox(height: Responsive.h(2)),
                     Text(subtitle, style: AppTextStyles.caption()),

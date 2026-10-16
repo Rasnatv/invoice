@@ -1,4 +1,3 @@
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/salesman/widget/esalesmanestimatetype.dart';
@@ -11,6 +10,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/validator/validationfile.dart';
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
+import '../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
 import '../../../widgets/custom_text_field.dart';
 import '../../../widgets/primary_button.dart';
 
@@ -27,19 +27,589 @@ class _UnitFieldVisibility {
     if (product == null) {
       return const _UnitFieldVisibility(showSize: false, showPacking: false);
     }
-
-    final sizeAvailable = product.size.trim().isNotEmpty;
-    final packingAvailable = product.packing.trim().isNotEmpty;
-
     return _UnitFieldVisibility(
-      showSize: sizeAvailable,
-      showPacking: packingAvailable,
+      showSize: product.size.trim().isNotEmpty,
+      showPacking: product.packing.trim().isNotEmpty,
     );
   }
 }
 
+// =====================================================================
+// SHARED LOOK (same as the Owner create-estimate screen)
+// =====================================================================
+
+/// White card, radius 16, 1px border, no shadow.
+BoxDecoration _cardDecoration({double radius = 16}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: AppColors.border),
+);
+
+class _IconBadge extends StatelessWidget {
+  const _IconBadge(this.icon, {this.color, this.size = 16});
+  final IconData icon;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: size, color: c),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: Responsive.sp(10.5),
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(width: Responsive.w(8)),
+        Text(title, style: AppTextStyles.bodyBold()),
+      ],
+    );
+  }
+}
+
+class _CardTitle extends StatelessWidget {
+  const _CardTitle({required this.title, this.icon, this.trailing});
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            _IconBadge(icon!),
+            SizedBox(width: Responsive.w(10)),
+          ],
+          Expanded(child: Text(title, style: AppTextStyles.bodyBold())),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
+/// Card with a title bar and a padded body.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.icon,
+    this.trailing,
+  });
+  final String title;
+  final Widget child;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: _cardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(title: title, icon: icon, trailing: trailing),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+                Responsive.w(14), Responsive.h(14), Responsive.w(14), Responsive.h(6)),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TotalRow extends StatelessWidget {
+  const _TotalRow(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(label, style: AppTextStyles.body(color: AppColors.textSecondary)),
+        SizedBox(width: Responsive.w(12)),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(value, maxLines: 1, style: AppTextStyles.bodyBold()),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =====================================================================
+// STEP INDICATOR
+// =====================================================================
+
+class StepIndicator extends StatelessWidget {
+  const StepIndicator({super.key, required this.step});
+  final EstimateStep step;
+
+  static const _labels = ['Details', 'Items', 'Preview'];
+
+  @override
+  Widget build(BuildContext context) {
+    final index = EstimateStep.values.indexOf(step);
+    final count = EstimateStep.values.length;
+
+    Widget dot(int dotIndex) {
+      final active = dotIndex == index;
+      final done = dotIndex < index;
+      return Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: (active || done) ? AppColors.primary : AppColors.background,
+          shape: BoxShape.circle,
+          border: Border.all(color: (active || done) ? AppColors.primary : AppColors.border),
+        ),
+        child: done
+            ? const Icon(Icons.check, size: 14, color: Colors.white)
+            : Text(
+          '${dotIndex + 1}',
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            color: active ? Colors.white : AppColors.textHint,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: Responsive.w(20), vertical: Responsive.h(12)),
+      child: Row(
+        children: List.generate(count * 2 - 1, (i) {
+          if (i.isOdd) {
+            final segmentDone = (i ~/ 2) < index;
+            return Expanded(
+              child: Container(
+                height: 2,
+                margin: EdgeInsets.symmetric(horizontal: Responsive.w(6)),
+                decoration: BoxDecoration(
+                  color: segmentDone ? AppColors.primary : AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }
+          final dotIndex = i ~/ 2;
+          final label = dotIndex < _labels.length ? _labels[dotIndex] : '';
+          final reached = dotIndex <= index;
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              dot(dotIndex),
+              SizedBox(width: Responsive.w(6)),
+              Text(
+                label,
+                style: AppTextStyles.caption(
+                  color: reached ? AppColors.primary : AppColors.textHint,
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// STEP 1 — DETAILS
+// =====================================================================
+
+class DetailsStep extends StatelessWidget {
+  const DetailsStep({
+    super.key,
+    required this.date,
+    required this.onDateChanged,
+    required this.partyNameCtrl,
+    required this.addressCtrl,
+    required this.phoneCtrl,
+    required this.customerEmailCtrl,
+    required this.contractorNameCtrl,
+    required this.contractorPhoneCtrl,
+    required this.contractorEmailCtrl,
+    required this.contractorAddressCtrl,
+    required this.onSelectSiteVisit,
+    required this.onNext,
+  });
+
+  final DateTime date;
+  final ValueChanged<DateTime> onDateChanged;
+  final TextEditingController partyNameCtrl;
+  final TextEditingController addressCtrl;
+  final TextEditingController phoneCtrl;
+  final TextEditingController customerEmailCtrl;
+  final TextEditingController contractorNameCtrl;
+  final TextEditingController contractorPhoneCtrl;
+  final TextEditingController contractorEmailCtrl;
+  final TextEditingController contractorAddressCtrl;
+  final ValueChanged<SiteVisitDropdownItem> onSelectSiteVisit;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final sectionGap = SizedBox(height: Responsive.h(14));
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+                Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24)),
+            children: [
+              // ---- Estimate header (title + date) ----
+              Container(
+                padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+                decoration: _cardDecoration(),
+                child: Row(
+                  children: [
+                    const _IconBadge(Icons.description_outlined),
+                    SizedBox(width: Responsive.w(10)),
+                    Expanded(child: Text('New Estimate', style: AppTextStyles.bodyBold())),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: date,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) onDateChanged(picked);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.w(10), vertical: Responsive.h(6)),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_today_outlined,
+                                size: 14, color: AppColors.textSecondary),
+                            SizedBox(width: Responsive.w(6)),
+                            Text(DateFormat('dd-MM-yyyy').format(date),
+                                style: AppTextStyles.body()),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              sectionGap,
+
+              // ---- Customer ----
+              _SectionCard(
+                title: 'Customer Details',
+                icon: Icons.groups_2_outlined,
+                child: Column(
+                  children: [
+                    _PhoneSiteVisitField(
+                      phoneCtrl: phoneCtrl,
+                      onSelectSiteVisit: onSelectSiteVisit,
+                    ),
+                    LabeledField(
+                      label: 'Party Name',
+                      field: CustomTextField(
+                        hint: 'Enter party name',
+                        icon: Icons.groups_2_outlined,
+                        controller: partyNameCtrl,
+                        inputFormatters: DValidator.lettersOnly,
+                      ),
+                    ),
+                    LabeledField(
+                      label: 'Address',
+                      field: CustomTextField(
+                        hint: 'Enter site address',
+                        icon: Icons.location_on_outlined,
+                        controller: addressCtrl,
+                        inputFormatters: DValidator.textWithLimit,
+                      ),
+                    ),
+                    LabeledField(
+                      label: 'Email (optional)',
+                      field: CustomTextField(
+                        hint: 'Enter customer email',
+                        icon: Icons.alternate_email,
+                        keyboardType: TextInputType.emailAddress,
+                        controller: customerEmailCtrl,
+                        inputFormatters: DValidator.textWithLimit,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              sectionGap,
+
+              // ---- Contractor ----
+              _SectionCard(
+                title: 'Contractor Details',
+                icon: Icons.engineering_outlined,
+                child: Column(
+                  children: [
+                    LabeledField(
+                      label: 'Contractor Name',
+                      field: CustomTextField(
+                        hint: 'Enter contractor name',
+                        icon: Icons.engineering_outlined,
+                        controller: contractorNameCtrl,
+                        inputFormatters: DValidator.lettersOnly,
+                      ),
+                    ),
+                    LabeledField(
+                      label: 'Contact No.',
+                      field: CustomTextField(
+                        hint: 'Enter contractor phone number',
+                        icon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                        controller: contractorPhoneCtrl,
+                        inputFormatters: DValidator.phoneNumber,
+                      ),
+                    ),
+                    LabeledField(
+                      label: 'Email (optional)',
+                      field: CustomTextField(
+                        hint: 'Enter contractor email',
+                        icon: Icons.alternate_email,
+                        keyboardType: TextInputType.emailAddress,
+                        controller: contractorEmailCtrl,
+                        inputFormatters: DValidator.textWithLimit,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        BottomActionBar(
+          right: PrimaryButton(label: 'Add Items', height: 48, onPressed: onNext),
+        ),
+      ],
+    );
+  }
+}
+
+// =====================================================================
+// PHONE FIELD WITH LIVE SITE-VISIT SUGGESTIONS (from the bloc)
+// =====================================================================
+
+class _PhoneSiteVisitField extends StatelessWidget {
+  const _PhoneSiteVisitField({
+    required this.phoneCtrl,
+    required this.onSelectSiteVisit,
+  });
+
+  final TextEditingController phoneCtrl;
+  final ValueChanged<SiteVisitDropdownItem> onSelectSiteVisit;
+
+  static const int _minDigitsToSearch = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: phoneCtrl,
+      builder: (context, value, _) {
+        final query = value.text.trim();
+
+        return BlocBuilder<SalesmanEstimateBloc, SalesmanEstimateState>(
+          buildWhen: (prev, curr) =>
+          prev.siteVisits != curr.siteVisits ||
+              prev.siteVisitsStatus != curr.siteVisitsStatus ||
+              prev.selectedSiteVisit != curr.selectedSiteVisit,
+          builder: (context, state) {
+            List<SiteVisitDropdownItem> matches = [];
+            if (query.length >= _minDigitsToSearch) {
+              matches = state.siteVisits.where((v) => v.customerPhone.contains(query)).toList();
+            }
+            // Hide the list once a visit has been picked and the phone
+            // still equals it; it reappears as soon as the number is edited.
+            final selected = state.selectedSiteVisit;
+            final alreadySelected = selected != null && selected.customerPhone == query;
+            final showSuggestions = matches.isNotEmpty && !alreadySelected;
+            final loading = state.siteVisitsStatus == LoadStatus.loading;
+            final failed = state.siteVisitsStatus == LoadStatus.failure;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LabeledField(
+                  label: 'Contact No.',
+                  field: CustomTextField(
+                    hint: 'Enter phone number',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    controller: phoneCtrl,
+                    inputFormatters: DValidator.phoneNumber,
+                  ),
+                ),
+                if (query.length >= _minDigitsToSearch && loading) ...[
+                  Padding(
+                    padding: EdgeInsets.only(bottom: Responsive.h(12)),
+                    child: Text('Searching pending site visits…',
+                        style: AppTextStyles.caption(color: AppColors.textSecondary)),
+                  ),
+                ] else if (query.length >= _minDigitsToSearch && failed) ...[
+                  Padding(
+                    padding: EdgeInsets.only(bottom: Responsive.h(12)),
+                    child: InkWell(
+                      onTap: () => context
+                          .read<SalesmanEstimateBloc>()
+                          .add(const PendingSiteVisitsRequested()),
+                      child: Text(
+                        'Couldn\'t load site visits — tap to retry',
+                        style: AppTextStyles.caption(color: AppColors.error),
+                      ),
+                    ),
+                  ),
+                ] else if (showSuggestions) ...[
+                  Container(
+                    width: double.infinity,
+                    constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+                    decoration: _cardDecoration(radius: 14),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      itemCount: matches.length,
+                      separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: AppColors.border),
+                      itemBuilder: (context, i) {
+                        final v = matches[i];
+                        return ListTile(
+                          dense: true,
+                          leading: Container(
+                            width: 30,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              v.customerName.isNotEmpty ? v.customerName[0].toUpperCase() : '?',
+                              style: AppTextStyles.caption(color: AppColors.primary),
+                            ),
+                          ),
+                          title: Text(v.customerName, style: AppTextStyles.bodyBold()),
+                          subtitle: Text(
+                            '${v.customerPhone} · ${v.siteAddress}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption(color: AppColors.textSecondary),
+                          ),
+                          trailing:
+                          const Icon(Icons.north_west, size: 16, color: AppColors.primary),
+                          onTap: () => onSelectSiteVisit(v),
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(4)),
+                  Padding(
+                    padding: EdgeInsets.only(bottom: Responsive.h(12)),
+                    child: Text('Tap a match to fill party name and address',
+                        style: AppTextStyles.caption(color: AppColors.textSecondary)),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// =====================================================================
+// STEP 2 — ADD ITEMS
+// Amount is never computed locally. Box Qty / Piece Qty only render for
+// box-unit products. Limits: Quantity/Piece Qty -> 5 digits (+2 dec),
+// Rate -> 8 digits (+2 dec).
+// =====================================================================
+
 class AddItemsSteps extends StatelessWidget {
   const AddItemsSteps({
+    super.key,
     required this.selectedProduct,
     required this.onProductSelected,
     required this.itemCompanyCtrl,
@@ -90,13 +660,30 @@ class AddItemsSteps extends StatelessWidget {
   final VoidCallback onSaveItems;
 
   _UnitFieldVisibility get _fieldVisibility => _UnitFieldVisibility.forProduct(selectedProduct);
-
   bool get _isBoxUnit => selectedProduct?.isBoxUnit ?? false;
+
+  Widget _autoField(String label, String hint, IconData icon, TextEditingController c,
+      {TextInputType keyboardType = TextInputType.text}) {
+    return LabeledField(
+      label: label,
+      field: IgnorePointer(
+        child: CustomTextField(
+          hint: hint,
+          icon: icon,
+          keyboardType: keyboardType,
+          controller: c,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final visibility = _fieldVisibility;
+    final isEditing = editingIndex != null;
+    final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+    final gap = SizedBox(width: Responsive.w(10));
 
     return StatefulBuilder(
       builder: (context, setLocalState) {
@@ -104,362 +691,355 @@ class AddItemsSteps extends StatelessWidget {
           children: [
             Expanded(
               child: ListView(
-                padding: EdgeInsets.all(Responsive.w(18)),
+                padding: EdgeInsets.fromLTRB(
+                    Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24)),
                 children: [
-                  BlocBuilder<SalesmanEstimateBloc, SalesmanEstimateState>(
-                    buildWhen: (prev, curr) =>
-                    prev.products != curr.products || prev.productsStatus != curr.productsStatus,
-                    builder: (context, state) {
-                      if (state.productsStatus == LoadStatus.loading && state.products.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      if (state.productsStatus == LoadStatus.failure && state.products.isEmpty) {
-                        return Container(
-                          padding: EdgeInsets.all(Responsive.w(12)),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  state.productsError ?? 'Failed to load products.',
-                                  style: AppTextStyles.caption(color: AppColors.error),
+                  // ---------- Add / Edit item card ----------
+                  _SectionCard(
+                    title: isEditing ? 'Edit Item' : 'Add Item',
+                    icon: isEditing ? Icons.edit_outlined : Icons.add_box_outlined,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BlocBuilder<SalesmanEstimateBloc, SalesmanEstimateState>(
+                          buildWhen: (prev, curr) =>
+                          prev.products != curr.products ||
+                              prev.productsStatus != curr.productsStatus,
+                          builder: (context, state) {
+                            if (state.productsStatus == LoadStatus.loading &&
+                                state.products.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            if (state.productsStatus == LoadStatus.failure &&
+                                state.products.isEmpty) {
+                              return Container(
+                                margin: EdgeInsets.only(bottom: Responsive.h(12)),
+                                padding: EdgeInsets.all(Responsive.w(12)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.error.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.error.withOpacity(0.25)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        state.productsError ?? 'Failed to load products.',
+                                        style: AppTextStyles.caption(color: AppColors.error),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => context
+                                          .read<SalesmanEstimateBloc>()
+                                          .add(const ActiveProductsRequested()),
+                                      child: Text('Retry', style: AppTextStyles.bodyBold()),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return LabeledField(
+                              label: 'Select Product',
+                              field: KeyedSubtree(
+                                key: ValueKey(selectedProduct?.id ?? 'none'),
+                                child: Autocomplete<ActiveProductModel>(
+                                  displayStringForOption: (p) => '${p.name} — ${p.company}',
+                                  initialValue: TextEditingValue(
+                                    text: selectedProduct != null
+                                        ? '${selectedProduct!.name} — ${selectedProduct!.company}'
+                                        : '',
+                                  ),
+                                  optionsBuilder: (textEditingValue) {
+                                    final query = textEditingValue.text.trim().toLowerCase();
+                                    if (query.isEmpty) return state.products;
+                                    return state.products.where((p) =>
+                                    p.name.toLowerCase().contains(query) ||
+                                        p.company.toLowerCase().contains(query));
+                                  },
+                                  onSelected: (p) {
+                                    onProductSelected(p);
+                                    setLocalState(() {});
+                                  },
+                                  fieldViewBuilder:
+                                      (context, controller, focusNode, onFieldSubmitted) {
+                                    return TextField(
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      style: AppTextStyles.body(),
+                                      decoration: InputDecoration(
+                                        hintText: 'Search product by name',
+                                        hintStyle: AppTextStyles.body(color: AppColors.textHint),
+                                        prefixIcon: Icon(Icons.search,
+                                            size: 20, color: AppColors.textSecondary),
+                                        suffixIcon: controller.text.isNotEmpty
+                                            ? IconButton(
+                                          icon: Icon(Icons.clear,
+                                              size: 18, color: AppColors.textSecondary),
+                                          onPressed: () {
+                                            controller.clear();
+                                            onProductSelected(null);
+                                            setLocalState(() {});
+                                          },
+                                        )
+                                            : null,
+                                        filled: true,
+                                        fillColor: AppColors.background,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: Responsive.w(14),
+                                          vertical: Responsive.h(14),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  optionsViewBuilder: (context, onSelected, options) {
+                                    return Align(
+                                      alignment: Alignment.topLeft,
+                                      child: Material(
+                                        color: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                          side: const BorderSide(color: AppColors.border),
+                                        ),
+                                        clipBehavior: Clip.antiAlias,
+                                        child: ConstrainedBox(
+                                          constraints:
+                                          BoxConstraints(maxHeight: Responsive.h(260)),
+                                          child: options.isEmpty
+                                              ? Padding(
+                                            padding: EdgeInsets.all(Responsive.w(14)),
+                                            child: Text('No matching products',
+                                                style: AppTextStyles.caption(
+                                                    color: AppColors.textSecondary)),
+                                          )
+                                              : ListView.separated(
+                                            padding: EdgeInsets.zero,
+                                            shrinkWrap: true,
+                                            itemCount: options.length,
+                                            separatorBuilder: (_, __) => const Divider(
+                                                height: 1, color: AppColors.border),
+                                            itemBuilder: (context, i) {
+                                              final p = options.elementAt(i);
+                                              return ListTile(
+                                                dense: true,
+                                                leading: const _IconBadge(
+                                                    Icons.inventory_2_outlined,
+                                                    size: 14),
+                                                title: Text(p.name,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: AppTextStyles.bodyBold()),
+                                                subtitle: Text(p.company,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: AppTextStyles.caption(
+                                                        color: AppColors.textSecondary)),
+                                                onTap: () => onSelected(p),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
-                              TextButton(
-                                onPressed: () =>
-                                    context.read<SalesmanEstimateBloc>().add(const ActiveProductsRequested()),
-                                child: const Text('Retry'),
+                            );
+                          },
+                        ),
+
+                        _autoField('Company (auto)', 'Select a product first',
+                            Icons.factory_outlined, itemCompanyCtrl),
+                        Row(
+                          children: [
+                            Expanded(
+                                child: _autoField('Size (auto)', 'Select a product first',
+                                    Icons.straighten_outlined, itemSizeCtrl)),
+                            gap,
+                            Expanded(
+                                child: _autoField('Unit (auto)', 'Select a product first',
+                                    Icons.square_foot_outlined, itemUnitCtrl)),
+                          ],
+                        ),
+                        if (visibility.showPacking)
+                          _autoField('Packing (auto)', 'Select a product first',
+                              Icons.inventory_outlined, itemPackingCtrl),
+                        Row(
+                          children: [
+                            Expanded(
+                                child: _autoField('MRP (auto)', 'MRP', Icons.currency_rupee,
+                                    itemMrpCtrl,
+                                    keyboardType: TextInputType.number)),
+                            gap,
+                            Expanded(
+                              child: LabeledField(
+                                label: 'Rate',
+                                field: CustomTextField(
+                                  hint: 'Rate',
+                                  icon: Icons.currency_rupee,
+                                  keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: true),
+                                  controller: itemRateCtrl,
+                                  // Rate: max 8 digits + 2 decimals
+                                  inputFormatters: DValidator.priceNumber,
+                                  onChanged: (_) {
+                                    setLocalState(() {});
+                                    onQtyRateChanged();
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        LabeledField(
+                          label: _isBoxUnit ? 'Quantity (Box)' : 'Quantity',
+                          field: CustomTextField(
+                            hint: 'Enter quantity',
+                            icon: Icons.numbers_outlined,
+                            keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                            controller: itemQtyCtrl,
+                            // Quantity: max 5 digits + 2 decimals
+                            inputFormatters: DValidator.quantityNumber,
+                            onChanged: (_) {
+                              setLocalState(() {});
+                              onQuantityChanged();
+                            },
+                          ),
+                        ),
+                        if (_isBoxUnit)
+                          Row(
+                            children: [
+                              Expanded(
+                                  child: _autoField('Box Qty (auto)', '0',
+                                      Icons.inventory_2_outlined, itemBoxQtyCtrl,
+                                      keyboardType: TextInputType.number)),
+                              gap,
+                              Expanded(
+                                child: LabeledField(
+                                  label: 'Piece Qty',
+                                  field: CustomTextField(
+                                    hint: '0',
+                                    icon: Icons.widgets_outlined,
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                    controller: itemPieceQtyCtrl,
+                                    // Piece qty: max 5 digits + 2 decimals
+                                    inputFormatters: DValidator.quantityNumber,
+                                    onChanged: (_) {
+                                      setLocalState(() {});
+                                      onQtyRateChanged();
+                                    },
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        );
-                      }
-                      return LabeledField(
-                        label: 'Select Product',
-                        field: KeyedSubtree(
-                          key: ValueKey(selectedProduct?.id ?? 'none'),
-                          child: Autocomplete<ActiveProductModel>(
-                            displayStringForOption: (p) => '${p.name} — ${p.company}',
-                            initialValue: TextEditingValue(
-                              text: selectedProduct != null
-                                  ? '${selectedProduct!.name} — ${selectedProduct!.company}'
-                                  : '',
+
+                        if (selectedProduct != null) ...[
+                          SizedBox(height: Responsive.h(2)),
+                          const _IncentivePreviewCard(),
+                          SizedBox(height: Responsive.h(10)),
+                        ] else
+                          SizedBox(height: Responsive.h(2)),
+
+                        if (isEditing)
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: Responsive.w(12), vertical: Responsive.h(10)),
+                            margin: EdgeInsets.only(bottom: Responsive.h(10)),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.primary.withOpacity(0.25)),
                             ),
-                            optionsBuilder: (textEditingValue) {
-                              final query = textEditingValue.text.trim().toLowerCase();
-                              if (query.isEmpty) return state.products;
-                              return state.products.where((p) =>
-                              p.name.toLowerCase().contains(query) ||
-                                  p.company.toLowerCase().contains(query));
-                            },
-                            onSelected: (p) {
-                              onProductSelected(p);
+                            child: Row(
+                              children: [
+                                const Icon(Icons.edit_outlined,
+                                    size: 16, color: AppColors.primary),
+                                SizedBox(width: Responsive.w(6)),
+                                Expanded(
+                                  child: Text('Editing item #${editingIndex! + 1}',
+                                      style: AppTextStyles.caption(
+                                          color: AppColors.textSecondary)),
+                                ),
+                                InkWell(
+                                  onTap: () {
+                                    onCancelEdit();
+                                    setLocalState(() {});
+                                  },
+                                  child: Text('Cancel',
+                                      style: AppTextStyles.bodyBold(color: AppColors.error)),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: Responsive.h(48),
+                          child: ElevatedButton.icon(
+                            onPressed: isAdding
+                                ? null
+                                : () {
+                              onAddItem();
                               setLocalState(() {});
                             },
-                            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                              return TextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                decoration: InputDecoration(
-                                  hintText: 'Search product by name',
-                                  prefixIcon: const Icon(Icons.search),
-                                  suffixIcon: controller.text.isNotEmpty
-                                      ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 18),
-                                    onPressed: () {
-                                      controller.clear();
-                                      onProductSelected(null);
-                                      setLocalState(() {});
-                                    },
-                                  )
-                                      : null,
-                                  filled: true,
-                                  fillColor: AppColors.surface,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.border),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.border),
-                                  ),
-                                ),
-                              );
-                            },
-                            optionsViewBuilder: (context, onSelected, options) {
-                              return Align(
-                                alignment: Alignment.topLeft,
-                                child: Material(
-                                  elevation: 4,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxHeight: Responsive.h(260),
-                                    ),
-                                    child: options.isEmpty
-                                        ? Padding(
-                                      padding: EdgeInsets.all(Responsive.w(14)),
-                                      child: Text('No matching products', style: AppTextStyles.caption()),
-                                    )
-                                        : ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      shrinkWrap: true,
-                                      itemCount: options.length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
-                                      itemBuilder: (context, i) {
-                                        final p = options.elementAt(i);
-                                        return ListTile(
-                                          dense: true,
-                                          title: Text(p.name, overflow: TextOverflow.ellipsis),
-                                          subtitle: Text(p.company, overflow: TextOverflow.ellipsis),
-                                          onTap: () => onSelected(p),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  SizedBox(height: Responsive.h(10)),
-
-                  LabeledField(
-                    label: 'Company (auto)',
-                    field: IgnorePointer(
-                      child: CustomTextField(
-                        hint: 'Select a product first',
-                        icon: Icons.factory_outlined,
-                        controller: itemCompanyCtrl,
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: LabeledField(
-                          label: 'Size (auto)',
-                          field: IgnorePointer(
-                            child: CustomTextField(
-                              hint: 'Select a product first',
-                              icon: Icons.straighten_outlined,
-                              controller: itemSizeCtrl,
+                            icon: isAdding
+                                ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                                : Icon(isEditing ? Icons.save_outlined : Icons.add,
+                                color: Colors.white),
+                            label: Text(
+                              isAdding
+                                  ? 'Calculating…'
+                                  : (isEditing ? 'Update Item' : 'Add Item'),
+                              style: AppTextStyles.bodyBold(color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: buttonShape,
                             ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: Responsive.w(10)),
-                      Expanded(
-                        child: LabeledField(
-                          label: 'Unit (auto)',
-                          field: IgnorePointer(
-                            child: CustomTextField(
-                              hint: 'Select a product first',
-                              icon: Icons.square_foot_outlined,
-                              controller: itemUnitCtrl,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (visibility.showPacking)
-                    LabeledField(
-                      label: 'Packing (auto)',
-                      field: IgnorePointer(
-                        child: CustomTextField(
-                          hint: 'Select a product first',
-                          icon: Icons.inventory_outlined,
-                          controller: itemPackingCtrl,
-                        ),
-                      ),
-                    ),
-                  // MRP and Rate share one row.
-                  Row(
-                    children: [
-                      Expanded(
-                        child: LabeledField(
-                          label: 'MRP (auto)',
-                          field: IgnorePointer(
-                            child: CustomTextField(
-                              hint: 'MRP',
-                              icon: Icons.currency_rupee,
-                              keyboardType: TextInputType.number,
-                              controller: itemMrpCtrl,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: Responsive.w(10)),
-                      Expanded(
-                        child: LabeledField(
-                          label: 'Rate',
-                          field: CustomTextField(
-                            hint: 'Rate',
-                            icon: Icons.currency_rupee,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            controller: itemRateCtrl,
-                            // Rate: max 8 digits + 2 decimals
-                            inputFormatters: DValidator.priceNumber,
-                            onChanged: (_) {
-                              setLocalState(() {});
-                              onQtyRateChanged();
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  LabeledField(
-                    label: 'Quantity',
-                    field: CustomTextField(
-                      hint: 'Enter quantity',
-                      icon: Icons.numbers_outlined,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      controller: itemQtyCtrl,
-                      // Quantity: max 5 digits + 2 decimals
-                      inputFormatters: DValidator.quantityNumber,
-                      onChanged: (_) {
-                        setLocalState(() {});
-                        onQuantityChanged();
-                      },
-                    ),
-                  ),
-                  if (_isBoxUnit)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: LabeledField(
-                            label: 'Box Qty (auto)',
-                            field: IgnorePointer(
-                              child: CustomTextField(
-                                hint: '0',
-                                icon: Icons.inventory_2_outlined,
-                                keyboardType: TextInputType.number,
-                                controller: itemBoxQtyCtrl,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: Responsive.w(10)),
-                        Expanded(
-                          child: LabeledField(
-                            label: 'Piece Qty',
-                            field: CustomTextField(
-                              hint: '0',
-                              icon: Icons.view_module_outlined,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              controller: itemPieceQtyCtrl,
-                              // Piece qty: max 5 digits + 2 decimals
-                              inputFormatters: DValidator.quantityNumber,
-                              onChanged: (_) {
-                                setLocalState(() {});
-                                onQtyRateChanged();
-                              },
-                            ),
-                          ),
-                        ),
+                        SizedBox(height: Responsive.h(8)),
                       ],
                     ),
-
-                  if (selectedProduct != null) ...[
-                    SizedBox(height: Responsive.h(8)),
-                    const _IncentivePreviewCard(),
-                  ],
-
-                  SizedBox(height: Responsive.h(14)),
-
-                  if (editingIndex != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(8)),
-                      margin: EdgeInsets.only(bottom: Responsive.h(10)),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
-                          SizedBox(width: Responsive.w(6)),
-                          Expanded(
-                            child: Text(
-                              'Editing item #${editingIndex! + 1}',
-                              style: AppTextStyles.caption(),
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () {
-                              onCancelEdit();
-                              setLocalState(() {});
-                            },
-                            child: Text(
-                              'Cancel',
-                              style: AppTextStyles.bodyBold(color: AppColors.error),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: isAdding
-                          ? null
-                          : () {
-                        onAddItem();
-                        setLocalState(() {});
-                      },
-                      icon: isAdding
-                          ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                          : Icon(
-                        editingIndex != null ? Icons.save_outlined : Icons.add,
-                        color: Colors.white,
-                      ),
-                      label: Text(
-                        isAdding
-                            ? 'Calculating…'
-                            : (editingIndex != null ? 'Update Item' : 'Add Item'),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
                   ),
-                  SizedBox(height: Responsive.h(20)),
+                  SizedBox(height: Responsive.h(18)),
 
-                  Text('Items Added (${items.length})', style: AppTextStyles.h3()),
+                  // ---------- Items list ----------
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const _SectionHeader('Items'),
+                      _Pill(
+                        label: '${items.length} ${items.length == 1 ? 'item' : 'items'}',
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
                   SizedBox(height: Responsive.h(10)),
 
                   if (items.isEmpty)
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: Responsive.h(20)),
-                      child: Center(
-                        child: Text(
-                          'No items added yet',
-                          style: AppTextStyles.body(color: AppColors.textHint),
-                        ),
-                      ),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(Responsive.w(18)),
+                      decoration: _cardDecoration(),
+                      child: Text('No items added yet',
+                          style: AppTextStyles.caption(color: AppColors.textSecondary)),
                     )
                   else
                     ...items.asMap().entries.map((entry) {
@@ -487,10 +1067,11 @@ class AddItemsSteps extends StatelessWidget {
               left: OutlinedButton(
                 onPressed: onCancel,
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  minimumSize: Size.fromHeight(Responsive.h(48)),
+                  side: const BorderSide(color: AppColors.border),
+                  shape: buttonShape,
                 ),
-                child: const Text('Cancel'),
+                child: Text('Back', style: AppTextStyles.bodyBold()),
               ),
               right: PrimaryButton(label: 'Save Items', height: 48, onPressed: onSaveItems),
             ),
@@ -500,6 +1081,10 @@ class AddItemsSteps extends StatelessWidget {
     );
   }
 }
+
+// =====================================================================
+// INCENTIVE PREVIEW (salesman-only, live from the bloc)
+// =====================================================================
 
 class _IncentivePreviewCard extends StatelessWidget {
   const _IncentivePreviewCard();
@@ -522,8 +1107,9 @@ class _IncentivePreviewCard extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -533,7 +1119,8 @@ class _IncentivePreviewCard extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 SizedBox(width: Responsive.w(10)),
-                Text('Checking incentive…', style: AppTextStyles.caption()),
+                Text('Checking incentive…',
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ],
             ),
           );
@@ -544,7 +1131,8 @@ class _IncentivePreviewCard extends StatelessWidget {
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
               color: AppColors.error.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.error.withOpacity(0.25)),
             ),
             child: Text(
               state.incentiveError ?? 'Couldn\'t fetch incentive for this item.',
@@ -560,8 +1148,9 @@ class _IncentivePreviewCard extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -572,7 +1161,7 @@ class _IncentivePreviewCard extends StatelessWidget {
                     incentive.eligibilityReason.isNotEmpty
                         ? incentive.eligibilityReason
                         : 'Not eligible for incentive on this quantity/rate.',
-                    style: AppTextStyles.caption(),
+                    style: AppTextStyles.caption(color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -584,21 +1173,19 @@ class _IncentivePreviewCard extends StatelessWidget {
           padding: EdgeInsets.all(Responsive.w(12)),
           decoration: BoxDecoration(
             color: AppColors.success.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.success.withOpacity(0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.percent, size: 16, color: AppColors.success),
-                      SizedBox(width: Responsive.w(6)),
-                      Text('Incentive on this item', style: AppTextStyles.bodyBold(color: AppColors.success)),
-                    ],
+                  _IconBadge(Icons.percent, color: AppColors.success, size: 14),
+                  SizedBox(width: Responsive.w(8)),
+                  Expanded(
+                    child: Text('Incentive on this item',
+                        style: AppTextStyles.bodyBold(color: AppColors.success)),
                   ),
                   Text(
                     currency.format(incentive.totalIncentive),
@@ -607,8 +1194,9 @@ class _IncentivePreviewCard extends StatelessWidget {
                 ],
               ),
               if (incentive.eligibilityReason.isNotEmpty) ...[
-                SizedBox(height: Responsive.h(4)),
-                Text(incentive.eligibilityReason, style: AppTextStyles.caption()),
+                SizedBox(height: Responsive.h(6)),
+                Text(incentive.eligibilityReason,
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
               ],
             ],
           ),
@@ -636,21 +1224,27 @@ class _AddedItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasBoxPiece = item.boxQuantity > 0 || item.pieceQuantity > 0;
     return Container(
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
-      padding: EdgeInsets.all(Responsive.w(12)),
+      padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: isEditing ? AppColors.primary.withOpacity(0.06) : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        color: isEditing ? AppColors.primary.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: AppColors.surfaceAlt,
-            child: Text('$serialNo', style: AppTextStyles.caption()),
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('$serialNo', style: AppTextStyles.caption(color: AppColors.primary)),
           ),
           SizedBox(width: Responsive.w(10)),
           Expanded(
@@ -662,19 +1256,24 @@ class _AddedItemTile extends StatelessWidget {
                 Text(
                   '${item.size.isNotEmpty ? '${item.size} | ' : ''}${item.company}'
                       '${item.packing.isNotEmpty ? ' | ${item.packing}' : ''}',
-                  style: AppTextStyles.caption(),
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
                 SizedBox(height: Responsive.h(2)),
                 Text(
                   'Qty: ${item.quantity.toStringAsFixed(2)} ${item.unit}'
-                      '${item.boxQuantity > 0 ? '   Box Qty: ${item.boxQuantity.toStringAsFixed(0)}' : ''}'
-                      '${item.boxQuantity > 0 ? '   Piece Qty: ${item.pieceQuantity.toStringAsFixed(0)}' : ''}'
                       '${item.mrp > 0 ? '   MRP: ${item.mrp.toStringAsFixed(0)}' : ''}'
                       '   Rate: ${item.rate.toStringAsFixed(0)}',
-                  style: AppTextStyles.caption(),
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
-                if (item.incentiveEligible && item.incentiveAmount > 0) ...[
+                if (hasBoxPiece) ...[
                   SizedBox(height: Responsive.h(2)),
+                  Text(
+                    'Box: ${item.boxQuantity.toStringAsFixed(0)}   Piece: ${item.pieceQuantity.toStringAsFixed(0)}',
+                    style: AppTextStyles.caption(color: AppColors.textSecondary),
+                  ),
+                ],
+                if (item.incentiveEligible && item.incentiveAmount > 0) ...[
+                  SizedBox(height: Responsive.h(4)),
                   Row(
                     children: [
                       Icon(Icons.percent, size: 12, color: AppColors.success),
@@ -689,17 +1288,25 @@ class _AddedItemTile extends StatelessWidget {
               ],
             ),
           ),
+          SizedBox(width: Responsive.w(8)),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(currency.format(item.amount), style: AppTextStyles.bodyBold(color: AppColors.primary)),
+              Text(currency.format(item.amount),
+                  style: AppTextStyles.bodyBold(color: AppColors.primary)),
               SizedBox(height: Responsive.h(8)),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  InkWell(onTap: onEdit, child: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary)),
+                  InkWell(
+                    onTap: onEdit,
+                    child: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
+                  ),
                   SizedBox(width: Responsive.w(14)),
-                  InkWell(onTap: onDelete, child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error)),
+                  InkWell(
+                    onTap: onDelete,
+                    child: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                  ),
                 ],
               ),
             ],
@@ -720,6 +1327,7 @@ class _AddedItemTile extends StatelessWidget {
 
 class PreviewStep extends StatelessWidget {
   const PreviewStep({
+    super.key,
     required this.date,
     required this.partyName,
     required this.address,
@@ -755,6 +1363,8 @@ class PreviewStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final number = NumberFormat.decimalPattern('en_IN');
+    final sectionGap = SizedBox(height: Responsive.h(14));
+    final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
 
     return Column(
       children: [
@@ -782,7 +1392,16 @@ class PreviewStep extends StatelessWidget {
                           style: AppTextStyles.body(color: AppColors.error),
                         ),
                         SizedBox(height: Responsive.h(12)),
-                        ElevatedButton(onPressed: onRetryPreview, child: const Text('Retry')),
+                        ElevatedButton(
+                          onPressed: onRetryPreview,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: buttonShape,
+                          ),
+                          child: const Text('Retry'),
+                        ),
                       ],
                     ),
                   ),
@@ -793,32 +1412,32 @@ class PreviewStep extends StatelessWidget {
               if (preview == null) return const SizedBox.shrink();
 
               return ListView(
-                padding: EdgeInsets.all(Responsive.w(18)),
+                padding: EdgeInsets.fromLTRB(
+                    Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24)),
                 children: [
+                  // ---- Header (title + date) ----
                   Container(
-                    padding: EdgeInsets.all(Responsive.w(14)),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.w(14), vertical: Responsive.h(12)),
+                    decoration: _cardDecoration(),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('New Estimate', style: AppTextStyles.h3()),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('Date', style: AppTextStyles.caption()),
-                            Text(DateFormat('dd-MM-yyyy').format(date), style: AppTextStyles.h3()),
-                          ],
-                        ),
+                        const _IconBadge(Icons.description_outlined),
+                        SizedBox(width: Responsive.w(10)),
+                        Expanded(child: Text('New Estimate', style: AppTextStyles.bodyBold())),
+                        Icon(Icons.calendar_today_outlined,
+                            size: 14, color: AppColors.textSecondary),
+                        SizedBox(width: Responsive.w(6)),
+                        Text(DateFormat('dd-MM-yyyy').format(date),
+                            style: AppTextStyles.body()),
                       ],
                     ),
                   ),
-                  SizedBox(height: Responsive.h(16)),
+                  sectionGap,
 
                   _PreviewSection(
                     title: 'Customer Details',
+                    icon: Icons.groups_2_outlined,
                     rows: [
                       _PreviewRow('Party Name', partyName.isEmpty ? '-' : partyName),
                       _PreviewRow('Address', address.isEmpty ? '-' : address),
@@ -826,32 +1445,26 @@ class PreviewStep extends StatelessWidget {
                       _PreviewRow('Email', customerEmail.isEmpty ? '-' : customerEmail),
                     ],
                   ),
-                  SizedBox(height: Responsive.h(14)),
+                  sectionGap,
 
                   _PreviewSection(
-                    title: 'Contractor',
+                    title: 'Contractor Details',
+                    icon: Icons.engineering_outlined,
                     rows: [
                       _PreviewRow('Name', contractorName.isEmpty ? '-' : contractorName),
                       _PreviewRow('Contact No.', contractorPhone.isEmpty ? '-' : contractorPhone),
                       _PreviewRow('Email', contractorEmail.isEmpty ? '-' : contractorEmail),
                     ],
                   ),
-                  SizedBox(height: Responsive.h(20)),
+                  SizedBox(height: Responsive.h(18)),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Items', style: AppTextStyles.h3()),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceAlt,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Total Items: ${preview.totals.totalItems}',
-                          style: AppTextStyles.bodyBold(color: AppColors.primary),
-                        ),
+                      const _SectionHeader('Items'),
+                      _Pill(
+                        label: 'Total Items: ${preview.totals.totalItems}',
+                        color: AppColors.primary,
                       ),
                     ],
                   ),
@@ -863,51 +1476,61 @@ class PreviewStep extends StatelessWidget {
                     currency: currency,
                     number: number,
                   ),
-                  SizedBox(height: Responsive.h(16)),
+                  sectionGap,
 
-                  LabeledField(
-                    label: 'Handling Charge',
-                    field: CustomTextField(
-                      hint: 'Enter handling charge',
-                      icon: Icons.currency_rupee,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      controller: handlingChargeCtrl,
-                      // Handling charge: max 8 digits + 2 decimals
-                      inputFormatters: DValidator.priceNumber,
-                      onChanged: (_) => onHandlingChargeChanged(),
-                    ),
-                  ),
-                  SizedBox(height: Responsive.h(10)),
-                  LabeledField(
-                    label: 'Notes (optional)',
-                    field: CustomTextField(
-                      hint: 'e.g. Customer enquiry for new project',
-                      icon: Icons.notes_outlined,
-                      controller: notesCtrl,
-                      inputFormatters: DValidator.textWithLimit,
-                    ),
-                  ),
-                  SizedBox(height: Responsive.h(10)),
-
-                  // ---------- Totals (overflow-safe) ----------
-                  Container(
-                    padding: EdgeInsets.all(Responsive.w(14)),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                  // ---- Other details ----
+                  _SectionCard(
+                    title: 'Other Details',
+                    icon: Icons.tune_rounded,
                     child: Column(
                       children: [
-                        _totalRow('Total Sq.Ft', number.format(preview.totals.totalSquareFeet)),
-                        SizedBox(height: Responsive.h(6)),
-                        _totalRow('Subtotal', currency.format(preview.totals.subtotal)),
-                        SizedBox(height: Responsive.h(6)),
-                        _totalRow('Handling Charge', currency.format(preview.totals.handlingCharge)),
-                        const Divider(height: 20),
+                        LabeledField(
+                          label: 'Handling Charge',
+                          field: CustomTextField(
+                            hint: 'Enter handling charge',
+                            icon: Icons.currency_rupee,
+                            keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                            controller: handlingChargeCtrl,
+                            // Handling charge: max 8 digits + 2 decimals
+                            inputFormatters: DValidator.priceNumber,
+                            onChanged: (_) => onHandlingChargeChanged(),
+                          ),
+                        ),
+                        LabeledField(
+                          label: 'Notes (optional)',
+                          field: CustomTextField(
+                            hint: 'e.g. Customer enquiry for new project',
+                            icon: Icons.notes_outlined,
+                            controller: notesCtrl,
+                            inputFormatters: DValidator.textWithLimit,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  sectionGap,
+
+                  // ---- Summary ----
+                  _SectionCard(
+                    title: 'Summary',
+                    icon: Icons.calculate_outlined,
+                    child: Column(
+                      children: [
+                        _TotalRow('Total Sq.Ft', number.format(preview.totals.totalSquareFeet)),
+                        SizedBox(height: Responsive.h(10)),
+                        _TotalRow('Subtotal', currency.format(preview.totals.subtotal)),
+                        SizedBox(height: Responsive.h(10)),
+                        _TotalRow(
+                            'Handling Charge', currency.format(preview.totals.handlingCharge)),
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+                          child: const Divider(height: 1, color: AppColors.border),
+                        ),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Text('Grand Total', style: AppTextStyles.h3()),
+                            Text('Grand Total', style: AppTextStyles.bodyBold()),
                             SizedBox(width: Responsive.w(12)),
                             Expanded(
                               child: Align(
@@ -918,44 +1541,37 @@ class PreviewStep extends StatelessWidget {
                                   child: Text(
                                     currency.format(preview.totals.grandTotal),
                                     maxLines: 1,
-                                    style: AppTextStyles.h3(color: AppColors.primary),
+                                    style: AppTextStyles.amount(color: AppColors.primary),
                                   ),
                                 ),
                               ),
                             ),
                           ],
                         ),
+                        if (preview.totals.totalIncentive > 0) ...[
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
+                            child: const Divider(height: 1, color: AppColors.border),
+                          ),
+                          Row(
+                            children: [
+                              _IconBadge(Icons.percent, color: AppColors.success, size: 14),
+                              SizedBox(width: Responsive.w(8)),
+                              Expanded(
+                                child: Text('Incentive Total',
+                                    style: AppTextStyles.bodyBold(color: AppColors.success)),
+                              ),
+                              Text(
+                                currency.format(preview.totals.totalIncentive),
+                                style: AppTextStyles.bodyBold(color: AppColors.success),
+                              ),
+                            ],
+                          ),
+                        ],
+                        SizedBox(height: Responsive.h(8)),
                       ],
                     ),
                   ),
-                  SizedBox(height: Responsive.h(12)),
-
-                  if (preview.totals.totalIncentive > 0)
-                    Container(
-                      padding: EdgeInsets.all(Responsive.w(14)),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.success.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.percent, size: 18, color: AppColors.success),
-                              SizedBox(width: Responsive.w(8)),
-                              Text('Incentive Total', style: AppTextStyles.bodyBold(color: AppColors.success)),
-                            ],
-                          ),
-                          Text(
-                            currency.format(preview.totals.totalIncentive),
-                            style: AppTextStyles.h3(color: AppColors.success),
-                          ),
-                        ],
-                      ),
-                    ),
-                  SizedBox(height: Responsive.h(12)),
                 ],
               );
             },
@@ -968,58 +1584,35 @@ class PreviewStep extends StatelessWidget {
             final submitting = state.submitStatus == SubmitStatus.submitting;
             final savingDraft = submitting && state.submitAction == 'save_quotation';
             final submittingForApproval = submitting && state.submitAction == 'submit';
+
             return BottomActionBar(
-            left: SizedBox(
-            height: 48, // same as PrimaryButton
-            child: OutlinedButton.icon(
-            onPressed: submitting ? null : onSaveDraft,
-            style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            // Match the PrimaryButton text size (change 13 if yours differs)
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            ),
-            icon: savingDraft
-            ? const SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
-            )
-                : const Icon(Icons.request_quote_outlined, size: 16),
-            label: Text(
-            savingDraft ? 'Saving…' : 'Save as Quotation',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            ),
-            ),
-            ),
-            right: PrimaryButton(
-            label: submittingForApproval ? 'Submitting…' : 'Submit for Approval',
-            height: 48,
-            onPressed: submitting ? null : onSubmit,
-            ),
+              left: OutlinedButton.icon(
+                onPressed: submitting ? null : onSaveDraft,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: Size.fromHeight(Responsive.h(48)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: buttonShape,
+                ),
+                icon: savingDraft
+                    ? const SizedBox(
+                    width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.request_quote_outlined,
+                    size: 16, color: AppColors.primary),
+                label: Text(
+                  savingDraft ? 'Saving…' : 'Save as Quotation',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyBold(color: AppColors.primary),
+                ),
+              ),
+              right: PrimaryButton(
+                label: submittingForApproval ? 'Submitting…' : 'Submit for Approval',
+                height: 48,
+                onPressed: submitting ? null : onSubmit,
+              ),
             );
           },
-        ),
-      ],
-    );
-  }
-
-  Widget _totalRow(String label, String value) {
-    return Row(
-      children: [
-        Text(label, style: AppTextStyles.body()),
-        SizedBox(width: Responsive.w(12)),
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Text(value, maxLines: 1, style: AppTextStyles.body()),
-            ),
-          ),
         ),
       ],
     );
@@ -1027,7 +1620,7 @@ class PreviewStep extends StatelessWidget {
 }
 
 // =====================================================================
-// ITEMS TABLE — Excel-style grid (all columns, borders on every cell)
+// ITEMS TABLE — Excel-style grid inside a bordered card.
 // Columns stretch to the screen width; if the screen is too narrow the
 // table scrolls sideways instead of squeezing the text.
 // =====================================================================
@@ -1050,11 +1643,7 @@ class _ItemsTable extends StatelessWidget {
   Widget _head(String text, {bool right = false}) => Container(
     alignment: right ? Alignment.centerRight : Alignment.centerLeft,
     padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: _padV),
-    child: Text(
-      text,
-      maxLines: 1,
-      style: AppTextStyles.bodyBold(),
-    ),
+    child: Text(text, maxLines: 1, style: AppTextStyles.bodyBold()),
   );
 
   Widget _text(String text, {bool right = false, bool bold = false}) => Container(
@@ -1067,21 +1656,27 @@ class _ItemsTable extends StatelessWidget {
     ),
   );
 
-  // Numbers use the SAME font size as every other cell. They never wrap
-  // or shrink — the columns are simply wide enough (table scrolls if not).
-  Widget _num(String text, {bool bold = false, Color? color}) => Container(
-    alignment: Alignment.centerRight,
-    padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: _padV),
-    child: Text(
-      text,
-      maxLines: 1,
-      softWrap: false,
-      textAlign: TextAlign.right,
-      style: bold
-          ? AppTextStyles.bodyBold(color: Colors.black)
-          : AppTextStyles.body(),
-    ),
-  );
+  Widget _num(String text, {bool bold = false, Color? color}) {
+    final TextStyle style;
+    if (bold) {
+      style = color == null
+          ? AppTextStyles.bodyBold()
+          : AppTextStyles.bodyBold(color: color);
+    } else {
+      style = color == null ? AppTextStyles.body() : AppTextStyles.body(color: color);
+    }
+    return Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: _padV),
+      child: Text(
+        text,
+        maxLines: 1,
+        softWrap: false,
+        textAlign: TextAlign.right,
+        style: style,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1105,15 +1700,10 @@ class _ItemsTable extends StatelessWidget {
     ];
 
     final minTotal = cols.fold<double>(0, (a, c) => a + c.minWidth);
-
     final gridBorder = TableBorder.all(color: AppColors.border, width: 1);
 
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: _cardDecoration(),
       clipBehavior: Clip.antiAlias,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -1127,16 +1717,13 @@ class _ItemsTable extends StatelessWidget {
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               // Flex by minimum width => columns stretch proportionally
               columnWidths: {
-                for (var i = 0; i < cols.length; i++)
-                  i: FlexColumnWidth(cols[i].minWidth),
+                for (var i = 0; i < cols.length; i++) i: FlexColumnWidth(cols[i].minWidth),
               },
               children: [
                 // ---------- Header row ----------
                 TableRow(
-                  decoration: BoxDecoration(color: AppColors.surfaceAlt),
-                  children: [
-                    for (final c in cols) _head(c.label, right: c.right),
-                  ],
+                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.08)),
+                  children: [for (final c in cols) _head(c.label, right: c.right)],
                 ),
 
                 // ---------- Data rows ----------
@@ -1147,9 +1734,7 @@ class _ItemsTable extends StatelessWidget {
 
                   return TableRow(
                     decoration: BoxDecoration(
-                      color: i.isOdd
-                          ? AppColors.surfaceAlt.withOpacity(0.35)
-                          : AppColors.surface,
+                      color: i.isOdd ? AppColors.background : Colors.white,
                     ),
                     children: [
                       _text('${i + 1}'),
@@ -1159,24 +1744,16 @@ class _ItemsTable extends StatelessWidget {
                       _num(number.format(item.quantity)),
                       _text(item.productUnit as String),
                       if (hasBoxPieceData)
-                        _num(item.boxQuantity > 0
-                            ? number.format(item.boxQuantity)
-                            : '-'),
+                        _num(item.boxQuantity > 0 ? number.format(item.boxQuantity) : '-'),
                       if (hasBoxPieceData)
-                        _num(item.pieceQuantity > 0
-                            ? number.format(item.pieceQuantity)
-                            : '-'),
+                        _num(item.pieceQuantity > 0 ? number.format(item.pieceQuantity) : '-'),
                       _num(item.mrp > 0 ? number.format(item.mrp) : '-'),
                       _num(number.format(item.rate)),
                       _num(currency.format(item.amount), bold: true),
                       _num(
-                        item.incentiveAmount > 0
-                            ? currency.format(item.incentiveAmount)
-                            : '-',
+                        item.incentiveAmount > 0 ? currency.format(item.incentiveAmount) : '-',
                         bold: true,
-                        color: item.incentiveAmount > 0
-                            ? AppColors.success
-                            : null,
+                        color: item.incentiveAmount > 0 ? AppColors.success : null,
                       ),
                     ],
                   );
@@ -1187,10 +1764,7 @@ class _ItemsTable extends StatelessWidget {
 
           // Fits the screen -> no scroll. Too wide -> scroll sideways.
           if (minTotal <= constraints.maxWidth) return table;
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: table,
-          );
+          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: table);
         },
       ),
     );
@@ -1211,36 +1785,33 @@ class _PreviewRow {
 }
 
 class _PreviewSection extends StatelessWidget {
-  const _PreviewSection({required this.title, required this.rows});
+  const _PreviewSection({required this.title, required this.rows, this.icon});
   final String title;
+  final IconData? icon;
   final List<_PreviewRow> rows;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(Responsive.w(14)),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _SectionCard(
+      title: title,
+      icon: icon,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: AppTextStyles.bodyBold(color: AppColors.primary)),
-          SizedBox(height: Responsive.h(8)),
-          ...rows.map((r) => Padding(
-            padding: EdgeInsets.only(bottom: Responsive.h(4)),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: 100, child: Text(r.label, style: AppTextStyles.caption())),
-                Expanded(child: Text(r.value, style: AppTextStyles.body())),
-              ],
-            ),
-          )),
-        ],
+        children: rows
+            .map((r) => Padding(
+          padding: EdgeInsets.only(bottom: Responsive.h(8)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: Responsive.w(100),
+                child: Text(r.label,
+                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
+              ),
+              Expanded(child: Text(r.value, style: AppTextStyles.body())),
+            ],
+          ),
+        ))
+            .toList(),
       ),
     );
   }
@@ -1260,12 +1831,8 @@ class BottomActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-        Responsive.w(18),
-        Responsive.h(10),
-        Responsive.w(18),
-        Responsive.h(14),
-      ),
-      decoration: BoxDecoration(
+          Responsive.w(20), Responsive.h(10), Responsive.w(20), Responsive.h(14)),
+      decoration: const BoxDecoration(
         color: AppColors.background,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),

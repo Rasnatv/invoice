@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -108,11 +109,12 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                         Text(
                           isEdit ? 'Edit Field Staff' : 'Add Field Staff',
                           style: AppTextStyles.bodyBold(color: AppColors.black)
-                              .copyWith(fontSize: Responsive.sp(17)),
+                          ,
                         ),
                         SizedBox(height: Responsive.h(18)),
                         TextFormField(
                           controller: nameController,
+                          style: _fieldTextStyle(),
                           textCapitalization: TextCapitalization.words,
                           inputFormatters: DValidator.lettersOnly,
                           decoration: _inputDecoration('Full Name', Icons.person_outline),
@@ -121,6 +123,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                         SizedBox(height: Responsive.h(14)),
                         TextFormField(
                           controller: emailController,
+                          style: _fieldTextStyle(),
                           keyboardType: TextInputType.emailAddress,
                           inputFormatters: DValidator.textWithLimit,
                           decoration: _inputDecoration('Email', Icons.email_outlined),
@@ -129,6 +132,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                         SizedBox(height: Responsive.h(14)),
                         TextFormField(
                           controller: mobileController,
+                          style: _fieldTextStyle(),
                           keyboardType: TextInputType.phone,
                           maxLength: DValidator.defaultPhoneLength,
                           inputFormatters: DValidator.phoneNumber,
@@ -138,6 +142,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                         SizedBox(height: Responsive.h(14)),
                         TextFormField(
                           controller: addressController,
+                          style: _fieldTextStyle(),
                           maxLines: 2,
                           inputFormatters: DValidator.textWithLimit,
                           decoration: _inputDecoration('Address', Icons.home_outlined),
@@ -159,8 +164,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(14),
                                   onTap: () async {
                                     final now = DateTime.now();
-                                    final today =
-                                    DateTime(now.year, now.month, now.day);
+                                    final today = DateTime(now.year, now.month, now.day);
 
                                     // initialDate must never be after lastDate,
                                     // otherwise showDatePicker throws an assertion
@@ -173,6 +177,34 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                       initialDate: initial,
                                       firstDate: DateTime(2000),
                                       lastDate: today, // future dates are disabled
+                                      helpText: 'Select joining date',
+                                      builder: (ctx, child) {
+                                        return Theme(
+                                          data: Theme.of(ctx).copyWith(
+                                            datePickerTheme: DatePickerThemeData(
+                                              headerHelpStyle:
+                                              TextStyle(fontSize: Responsive.sp(11)),
+                                              headerHeadlineStyle: TextStyle(
+                                                fontSize: Responsive.sp(20),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              weekdayStyle:
+                                              TextStyle(fontSize: Responsive.sp(11)),
+                                              dayStyle:
+                                              TextStyle(fontSize: Responsive.sp(12)),
+                                              yearStyle:
+                                              TextStyle(fontSize: Responsive.sp(12)),
+                                            ),
+                                            textButtonTheme: TextButtonThemeData(
+                                              style: TextButton.styleFrom(
+                                                textStyle:
+                                                TextStyle(fontSize: Responsive.sp(12)),
+                                              ),
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
                                     );
                                     if (picked != null) {
                                       joiningDate.value = picked;
@@ -189,7 +221,9 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                           ? 'Please select joining date'
                                           : 'Joining date cannot be in the future')
                                           : null,
+                                      errorStyle: TextStyle(fontSize: Responsive.sp(10)),
                                       filled: true,
+                                      isDense: true,
                                       fillColor: AppColors.background,
                                       contentPadding: EdgeInsets.symmetric(
                                         horizontal: Responsive.w(14),
@@ -201,11 +235,8 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                       ),
                                     ),
                                     child: Text(
-                                      date != null
-                                          ? _formatDate(date)
-                                          : 'Select Joining Date',
-                                      style: TextStyle(
-                                        fontSize: Responsive.sp(14),
+                                      date != null ? _formatDate(date) : 'Select Joining Date',
+                                      style: _fieldTextStyle().copyWith(
                                         color: date != null
                                             ? AppColors.black
                                             : AppColors.textSecondary,
@@ -239,7 +270,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                   title: Text(
                                     'Active',
                                     style: TextStyle(
-                                      fontSize: Responsive.sp(14),
+                                      fontSize: Responsive.sp(12),
                                       color: AppColors.black,
                                     ),
                                   ),
@@ -248,7 +279,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                         ? 'Staff can be assigned work'
                                         : 'Staff is marked inactive',
                                     style: TextStyle(
-                                      fontSize: Responsive.sp(11.5),
+                                      fontSize: Responsive.sp(10),
                                       color: AppColors.textSecondary,
                                     ),
                                   ),
@@ -263,7 +294,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                             final isSaving = state.isSubmitting;
                             return SizedBox(
                               width: double.infinity,
-                              height: Responsive.h(48),
+                              height: Responsive.h(46),
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
@@ -274,8 +305,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                 onPressed: isSaving
                                     ? null
                                     : () {
-                                  final formValid =
-                                  formKey.currentState!.validate();
+                                  final formValid = formKey.currentState!.validate();
 
                                   if (joiningDate.value == null) {
                                     showDateError.value = true;
@@ -337,7 +367,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
                                     : Text(
                                   isEdit ? 'Save Changes' : 'Add Field Staff',
                                   style: AppTextStyles.bodyBold(color: Colors.white)
-                                      .copyWith(fontSize: Responsive.sp(14)),
+                                      .copyWith(fontSize: Responsive.sp(13)),
                                 ),
                               ),
                             );
@@ -413,11 +443,21 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
     }
   }
 
+  /// Text style for what the user types into the sheet's fields.
+  /// Change Responsive.sp(12) to 11 for even smaller text.
+  TextStyle _fieldTextStyle() => AppTextStyles.body().copyWith(
+    fontSize: Responsive.sp(12),
+    fontWeight: FontWeight.w400,
+  );
+
   InputDecoration _inputDecoration(String hint, IconData icon) {
     return InputDecoration(
       hintText: hint,
+      hintStyle: AppTextStyles.caption().copyWith(fontSize: Responsive.sp(11)),
+      errorStyle: TextStyle(fontSize: Responsive.sp(10)),
       prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
       filled: true,
+      isDense: true,
       fillColor: AppColors.background,
       counterText: '',
       contentPadding: EdgeInsets.symmetric(
@@ -453,7 +493,7 @@ class _OwnerAddFieldStaffView extends StatelessWidget {
           label: Text(
             'Add Staff',
             style: AppTextStyles.bodyBold(color: Colors.white)
-                .copyWith(fontSize: Responsive.sp(13)),
+                .copyWith(fontSize: Responsive.sp(12)),
           ),
         ),
         body: ResponsiveCenter(
@@ -548,12 +588,12 @@ class _FieldStaffTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 22,
+            radius: 20,
             backgroundColor: AppColors.primary.withOpacity(0.1),
             child: Text(
               staff.name.isNotEmpty ? staff.name[0].toUpperCase() : '?',
               style: AppTextStyles.bodyBold(color: AppColors.primary)
-                  .copyWith(fontSize: Responsive.sp(16)),
+                  .copyWith(fontSize: Responsive.sp(14)),
             ),
           ),
           SizedBox(width: Responsive.w(12)),
@@ -566,7 +606,8 @@ class _FieldStaffTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         staff.name,
-                        style: AppTextStyles.bodyBold(),
+                        style: AppTextStyles.bodyBold()
+                            .copyWith(fontSize: Responsive.sp(13)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -586,7 +627,7 @@ class _FieldStaffTile extends StatelessWidget {
                           'Inactive',
                           style: TextStyle(
                             color: Colors.red,
-                            fontSize: Responsive.sp(10.5),
+                            fontSize: Responsive.sp(9.5),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -597,13 +638,13 @@ class _FieldStaffTile extends StatelessWidget {
                 SizedBox(height: Responsive.h(4)),
                 Row(
                   children: [
-                    Icon(Icons.call_outlined, size: 15, color: AppColors.primary),
+                    Icon(Icons.call_outlined, size: 14, color: AppColors.primary),
                     SizedBox(width: Responsive.w(4)),
                     Text(
                       staff.mobile,
                       style: TextStyle(
                         color: AppColors.primary,
-                        fontSize: Responsive.sp(12.5),
+                        fontSize: Responsive.sp(11.5),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -613,7 +654,7 @@ class _FieldStaffTile extends StatelessWidget {
                 Text(
                   staff.email,
                   style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+                      color: AppColors.textSecondary, fontSize: Responsive.sp(11)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -621,7 +662,7 @@ class _FieldStaffTile extends StatelessWidget {
                 Text(
                   staff.address,
                   style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: Responsive.sp(12)),
+                      color: AppColors.textSecondary, fontSize: Responsive.sp(11)),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -629,7 +670,7 @@ class _FieldStaffTile extends StatelessWidget {
                 Text(
                   'Joined: ${staff.joiningDate}',
                   style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: Responsive.sp(11.5)),
+                      color: AppColors.textSecondary, fontSize: Responsive.sp(10.5)),
                 ),
               ],
             ),
@@ -649,19 +690,20 @@ class _FieldStaffTile extends StatelessWidget {
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                    Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
                     SizedBox(width: Responsive.w(8)),
-                    const Text('Edit'),
+                    Text('Edit', style: TextStyle(fontSize: Responsive.sp(12))),
                   ],
                 ),
               ),
               PopupMenuItem(
                 value: 'delete',
                 child: Row(
-                  children: const [
-                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  children: [
+                    const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                    SizedBox(width: Responsive.w(8)),
+                    Text('Delete',
+                        style: TextStyle(color: Colors.red, fontSize: Responsive.sp(12))),
                   ],
                 ),
               ),
@@ -712,9 +754,14 @@ class _ErrorState extends StatelessWidget {
             Icon(Icons.error_outline_rounded,
                 color: AppColors.error, size: Responsive.w(40)),
             SizedBox(height: Responsive.h(12)),
-            Text(message, textAlign: TextAlign.center, style: AppTextStyles.body()),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body().copyWith(fontSize: Responsive.sp(12))),
             SizedBox(height: Responsive.h(16)),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: Text('Retry', style: TextStyle(fontSize: Responsive.sp(12))),
+            ),
           ],
         ),
       ),

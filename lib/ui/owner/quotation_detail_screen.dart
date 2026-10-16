@@ -16,9 +16,10 @@ import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../widgets/owner_dashboardrefresh.dart';
-import '../../widgets/primary_button.dart';
+import '../../widgets/owner_estimateshimmer.dart';
 import 'ownerquotationeditscreen.dart';
 
+const Color _redColor = Color(0xFFDC2626);
 
 class OwnerQuotationDetailsScreen extends StatelessWidget {
   const OwnerQuotationDetailsScreen({super.key, required this.quotationId});
@@ -41,7 +42,7 @@ class OwnerQuotationDetailsScreen extends StatelessWidget {
 }
 
 class OwnerQuotationDetailsView extends StatefulWidget {
-  const OwnerQuotationDetailsView({required this.quotationId});
+  const OwnerQuotationDetailsView({super.key, required this.quotationId});
   final String quotationId;
 
   @override
@@ -49,16 +50,19 @@ class OwnerQuotationDetailsView extends StatefulWidget {
 }
 
 class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
-  // Cache the bloc reference while context is still safely attached to
-  // the tree. context.read<T>() inside dispose() is unsafe because the
-  // element may already be deactivated.
+  // Cache the bloc reference while context is still safely attached.
   late final OwnerQuotationDetailBloc detailBloc;
-
 
   bool didChange = false;
 
   /// Prevents double taps while a PDF / Excel file is being generated.
   bool exporting = false;
+
+  static const _appBarSpinner = SizedBox(
+    height: 20,
+    width: 20,
+    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+  );
 
   @override
   void initState() {
@@ -72,9 +76,7 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     super.dispose();
   }
 
-  /// Manual refresh (pull-to-refresh + app bar button).
-  /// Fires a reload and waits until the bloc finishes loading so the
-  /// RefreshIndicator spinner stays visible for the right duration.
+  /// Manual refresh (pull-to-refresh).
   Future<void> refresh() async {
     detailBloc.add(OwnerQuotationDetailRequested(widget.quotationId));
 
@@ -93,20 +95,21 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     return q.createdBy.role.trim().toLowerCase() == 'owner';
   }
 
-  /// Shows whatever message the backend sent — success or error — in a
-  /// plain dialog. No frontend-authored copy, no SnackBar.
+  /// Shows whatever message the backend sent in a plain dialog.
   Future<void> showBackendMessage(String? message, {bool isError = false}) async {
     if (message == null || message.trim().isEmpty) return;
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isError ? 'Error' : 'Success'),
-        content: Text(message),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(isError ? 'Error' : 'Success', style: AppTextStyles.bodyBold()),
+        content: Text(message, style: AppTextStyles.body()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('OK'),
+            child: Text('OK', style: AppTextStyles.bodyBold(color: AppColors.primary)),
           ),
         ],
       ),
@@ -114,13 +117,12 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
   }
 
   // ---------------------------------------------------------------------
-  // Export (PDF / Excel / Copy text)  — NEW
+  // Export (PDF / Excel / Copy text)
   // ---------------------------------------------------------------------
 
   Future<void> exportQuotation(QuotationDetailModel q, String type) async {
     if (exporting) return;
-    // Incentive column is hidden when the Owner created the quotation,
-    // same rule as the on-screen table.
+    // Incentive column is hidden when the Owner created the quotation.
     final showIncentive = !checkIsOwner(q);
 
     setState(() => exporting = true);
@@ -151,8 +153,9 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
   Future<void> showExportSheet(QuotationDetailModel q) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Padding(
@@ -161,13 +164,13 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.picture_as_pdf_outlined, color: Colors.red),
-                title: const Text('Download PDF'),
+                leading: const Icon(Icons.picture_as_pdf_rounded, color: _redColor),
+                title: Text('Share as PDF', style: AppTextStyles.bodyBold()),
                 onTap: () => Navigator.of(sheetContext).pop('pdf'),
               ),
               ListTile(
-                leading: const Icon(Icons.table_chart_outlined, color: Colors.green),
-                title: const Text('Download Excel'),
+                leading: Icon(Icons.grid_on_rounded, color: AppColors.success),
+                title: Text('Share as Excel', style: AppTextStyles.bodyBold()),
                 onTap: () => Navigator.of(sheetContext).pop('excel'),
               ),
             ],
@@ -205,18 +208,28 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel Quotation'),
-        content: const Text(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Cancel Quotation', style: AppTextStyles.bodyBold()),
+        content: Text(
           'Are you sure you want to cancel this quotation? This cannot be undone.',
+          style: AppTextStyles.body(),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('No'),
+            child: Text('No',
+                style: AppTextStyles.bodyBold(color: AppColors.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _redColor,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red)),
+            child: Text('Yes, Cancel',
+                style: AppTextStyles.bodyBold(color: Colors.white)),
           ),
         ],
       ),
@@ -229,6 +242,10 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -237,11 +254,12 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     final money = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
     final number = NumberFormat.decimalPattern('en_IN');
 
+    final listPadding = EdgeInsets.fromLTRB(
+        Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
+
     return NetworkAwareWrapper(
       child: PopScope(
-        // We intercept every pop attempt (system back button, gesture,
-        // AppBar back arrow) so we can always hand `didChange` back to
-        // whoever pushed this screen.
+        // Always hand `didChange` back to whoever pushed this screen.
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
@@ -249,10 +267,13 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
         },
         child: Scaffold(
           backgroundColor: AppColors.background,
+
+          // ---------- APPBAR (same as Estimate details) ----------
           appBar: AppBar(
             title: Text('Owner Quotation Details', style: AppTextStyles.h6()),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
             actions: [
-              // Manual refresh — always visible, even while loading / on error.
               BlocBuilder<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
                 buildWhen: (prev, curr) => prev.detail != curr.detail,
                 builder: (context, state) {
@@ -260,51 +281,23 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                   if (q == null) return const SizedBox.shrink();
 
                   final status = q.status.toLowerCase();
-                  // Edit icon hidden once a quotation is approved or
-                  // cancelled — both are final states.
+                  // Edit hidden once approved or cancelled (final states).
                   final hideEditIcon = status == 'approved' || status == 'cancelled';
 
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ---- Export menu (PDF / Excel / Copy) ----
-                      PopupMenuButton<String>(
+                      IconButton(
+                        tooltip: 'Share as PDF',
                         icon: exporting
-                            ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                            : const Icon(Icons.file_download_outlined),
-                        tooltip: 'Export',
-                        enabled: !exporting,
-                        onSelected: (v) => exportQuotation(q, v),
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'pdf',
-                            child: ListTile(
-                              leading: Icon(Icons.picture_as_pdf_outlined, color: Colors.red),
-                              title: Text('Download PDF'),
-                              dense: true,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'excel',
-                            child: ListTile(
-                              leading: Icon(Icons.table_chart_outlined, color: Colors.green),
-                              title: Text('Download Excel'),
-                              dense: true,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'copy',
-                            child: ListTile(
-                              leading: Icon(Icons.copy_outlined),
-                              title: Text('Copy as text'),
-                              dense: true,
-                            ),
-                          ),
-                        ],
+                            ? _appBarSpinner
+                            : const Icon(Icons.picture_as_pdf_rounded),
+                        onPressed: exporting ? null : () => exportQuotation(q, 'pdf'),
+                      ),
+                      IconButton(
+                        tooltip: 'Share as Excel',
+                        icon: const Icon(Icons.grid_on_rounded),
+                        onPressed: exporting ? null : () => exportQuotation(q, 'excel'),
                       ),
                       if (!hideEditIcon)
                         IconButton(
@@ -341,7 +334,7 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                 listener: (context, state) async {
                   if (state.approveStatus == OwnerQuotationApproveStatus.success) {
                     didChange = true;
-                    ownerDataRefresh.value++;   // <-- ADD THIS LINE
+                    ownerDataRefresh.value++;
                     await showBackendMessage(state.approveMessage);
                     if (mounted) {
                       context
@@ -358,48 +351,35 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                   }
                 },
                 builder: (context, state) {
-                  // Full-screen loader only when there is nothing to show yet.
-                  // During a refresh the old data stays on screen (as long as
-                  // the bloc keeps `detail` while emitting `loading`).
+                  // ---- loading skeleton (only when nothing to show yet) ----
                   if ((state.detailStatus == OwnerQuotationDetailStatus.loading ||
                       state.detailStatus == OwnerQuotationDetailStatus.initial) &&
                       state.detail == null) {
-                    return const Center(child: CircularProgressIndicator());
+                    return ShimmerListPlaceholder(
+                      itemCount: 5,
+                      padding: listPadding,
+                      separatorHeight: Responsive.h(10),
+                      itemBuilder: (context, i) => const _DetailCardSkeleton(),
+                    );
                   }
 
+                  // ---- error ----
                   if (state.detailStatus == OwnerQuotationDetailStatus.failure) {
                     return RefreshIndicator(
                       onRefresh: refresh,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(height: Responsive.h(160)),
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.error_outline, size: 40, color: AppColors.textHint),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    state.detailError ?? 'Failed to load quotation.',
-                                    textAlign: TextAlign.center,
-                                    style: AppTextStyles.body(),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  PrimaryButton(
-                                    label: 'Retry',
-                                    height: 44,
-                                    onPressed: () => context
-                                        .read<OwnerQuotationDetailBloc>()
-                                        .add(OwnerQuotationDetailRequested(widget.quotationId)),
-                                  ),
-                                ],
-                              ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                            child: _ErrorView(
+                              message: state.detailError ?? 'Failed to load quotation.',
+                              onRetry: () => context
+                                  .read<OwnerQuotationDetailBloc>()
+                                  .add(OwnerQuotationDetailRequested(widget.quotationId)),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     );
                   }
@@ -408,12 +388,17 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                   if (q == null) {
                     return RefreshIndicator(
                       onRefresh: refresh,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(height: Responsive.h(200)),
-                          const Center(child: Text('No data found.')),
-                        ],
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                            child: Center(
+                              child: Text('No data found.',
+                                  style: AppTextStyles.subtitle()),
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   }
@@ -421,16 +406,15 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                   final status = q.status.toLowerCase();
                   final isApproved = status == 'approved';
                   final isCancelled = status == 'cancelled';
-                  // Approve + Cancel are only meaningful actions for 'draft'
-                  // and 'send'.
+                  // Approve + Cancel only for 'draft' and 'send'.
                   final showActionButtons = status == 'draft' || status == 'send';
-                  final isApproving = state.approveStatus == OwnerQuotationApproveStatus.inProgress;
-                  // Derived from created_by.role_label / role in the response.
-                  // Incentive figures are salesman-facing, so hide them when
-                  // the creator is the Owner.
+                  final isApproving =
+                      state.approveStatus == OwnerQuotationApproveStatus.inProgress;
+                  // Incentive figures are salesman-facing; hide for Owner.
                   final isOwner = checkIsOwner(q);
                   final hasAnyMrp = q.items.any((i) => i.mrp > 0);
-                  final hasAnyCompany = q.items.any((i) => i.companyName.trim().isNotEmpty);
+                  final hasAnyCompany =
+                  q.items.any((i) => i.companyName.trim().isNotEmpty);
                   final hasBoxQty = q.items.any((i) => i.boxQuantity > 0);
                   final hasPieceQty = q.items.any((i) => i.pieceQuantity > 0);
 
@@ -440,124 +424,80 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                         child: RefreshIndicator(
                           onRefresh: refresh,
                           child: ListView(
-                            // Needed so pull-to-refresh works even when content is short
+                            // Pull-to-refresh works even when content is short
                             physics: const AlwaysScrollableScrollPhysics(),
-                            padding: EdgeInsets.all(Responsive.w(18)),
+                            padding: listPadding,
                             children: [
-                              Container(
-                                padding: EdgeInsets.all(Responsive.w(16)),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      AppColors.primary.withOpacity(0.07),
-                                      AppColors.primary.withOpacity(0.02),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: AppColors.primary.withOpacity(0.14)),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Quotation No.', style: AppTextStyles.caption()),
-                                        Text(q.quotationNumber, style: AppTextStyles.h3()),
-                                      ],
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text('Date', style: AppTextStyles.caption()),
-                                        Text(
-                                          q.date != null
-                                              ? DateFormat('dd-MM-yyyy').format(q.date!)
-                                              : q.dateRaw,
-                                          style: AppTextStyles.h3(),
-                                        ),
-                                      ],
-                                    ),
+                              QuotationHeader(q: q),
+                              SizedBox(height: Responsive.h(14)),
+
+                              if (q.notes.isNotEmpty) ...[
+                                DetailSection(
+                                  title: 'Notes',
+                                  icon: Icons.sticky_note_2_outlined,
+                                  rows: [
+                                    DetailRow('Notes', q.notes,
+                                        icon: Icons.sticky_note_2_outlined),
                                   ],
                                 ),
-                              ),
-                              SizedBox(height: Responsive.h(10)),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor(q.status).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    q.status.isEmpty ? '-' : q.status,
-                                    style: AppTextStyles.bodyBold(color: statusColor(q.status)),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: Responsive.h(16)),
+                                SizedBox(height: Responsive.h(14)),
+                              ],
 
                               DetailSection(
                                 title: 'Customer Details',
+                                icon: Icons.groups_2_outlined,
                                 rows: [
-                                  DetailRow('Name', q.customer.name, icon: Icons.groups_2_outlined),
-                                  DetailRow('Address', q.customer.address, icon: Icons.location_on_outlined),
-                                  DetailRow('Phone', q.customer.phone, icon: Icons.phone_outlined),
-                                  DetailRow('Email', q.customer.email, icon: Icons.email_outlined),
+                                  DetailRow('Name', q.customer.name,
+                                      icon: Icons.groups_2_outlined),
+                                  DetailRow('Phone', q.customer.phone,
+                                      icon: Icons.phone_outlined),
+                                  DetailRow('Email', q.customer.email,
+                                      icon: Icons.email_outlined),
+                                  DetailRow('Address', q.customer.address,
+                                      icon: Icons.location_on_outlined),
                                 ],
                               ),
                               SizedBox(height: Responsive.h(14)),
                               DetailSection(
                                 title: 'Contractor Details',
+                                icon: Icons.engineering_outlined,
                                 rows: [
-                                  DetailRow('Name', q.contractor.name, icon: Icons.engineering_outlined),
-                                  DetailRow('Mobile', q.contractor.mobile, icon: Icons.phone_outlined),
-                                  DetailRow('Email', q.contractor.email, icon: Icons.email),
+                                  DetailRow('Name', q.contractor.name,
+                                      icon: Icons.person_outline),
+                                  DetailRow('Mobile', q.contractor.mobile,
+                                      icon: Icons.phone_outlined),
+                                  DetailRow('Email', q.contractor.email,
+                                      icon: Icons.email_outlined),
                                 ],
                               ),
                               if (q.salesman.employeeCode.isNotEmpty) ...[
                                 SizedBox(height: Responsive.h(14)),
                                 DetailSection(
                                   title: 'Salesman',
+                                  icon: Icons.badge_outlined,
                                   rows: [
-                                    DetailRow('Created By', q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
-                                        icon: Icons.person_outline),
+                                    DetailRow(
+                                        'Created By',
+                                        q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
+                                        icon: Icons.badge_outlined),
                                   ],
                                 ),
                               ],
-                              if (q.notes.isNotEmpty) ...[
-                                SizedBox(height: Responsive.h(14)),
-                                DetailSection(
-                                  title: 'Notes',
-                                  rows: [DetailRow('Notes', q.notes, icon: Icons.notes_outlined)],
-                                ),
-                              ],
-                              SizedBox(height: Responsive.h(20)),
+                              SizedBox(height: Responsive.h(18)),
 
+                              // ---- Items ----
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Items', style: AppTextStyles.h3()),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: Responsive.w(10), vertical: Responsive.h(4)),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surfaceAlt,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      'Total Items: ${q.itemsCount}',
-                                      style: AppTextStyles.bodyBold(color: AppColors.primary),
-                                    ),
+                                  const QSectionHeader('Items'),
+                                  QStatusPill(
+                                    label:
+                                    '${q.itemsCount} ${q.itemsCount == 1 ? 'item' : 'items'}',
+                                    color: AppColors.primary,
                                   ),
                                 ],
                               ),
                               SizedBox(height: Responsive.h(10)),
-
-                              // ---- Excel-style bordered items table ----
                               InvoiceTable(
                                 items: q.items,
                                 showCompany: hasAnyCompany,
@@ -568,71 +508,54 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                                 currency: currency,
                                 number: number,
                               ),
-                              SizedBox(height: Responsive.h(16)),
+                              SizedBox(height: Responsive.h(14)),
 
-                              // Totals card
+                              // ---- Summary ----
                               TotalsCard(q: q, money: money, number: number),
 
-                              // Payments received (only when the API returns them).
+                              // ---- Payments ----
                               if (q.payments.isNotEmpty) ...[
                                 SizedBox(height: Responsive.h(14)),
                                 PaymentsCard(q: q, money: money),
                               ],
-                              SizedBox(height: Responsive.h(12)),
 
-                              // Total incentive — hidden when the Owner created it.
-                              if (!isOwner)
-                                Container(
-                                  padding: EdgeInsets.all(Responsive.w(14)),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.success.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.percent, size: 18, color: AppColors.success),
-                                          SizedBox(width: Responsive.w(8)),
-                                          Text('Total Incentive', style: AppTextStyles.bodyBold(color: AppColors.success)),
-                                        ],
-                                      ),
-                                      Text(
-                                        currency.format(
-                                          q.items.fold<double>(0, (s, i) => s + i.incentiveAmount),
-                                        ),
-                                        style: AppTextStyles.h3(color: AppColors.success),
-                                      ),
-                                    ],
+                              // ---- Total incentive (hidden for Owner) ----
+                              if (!isOwner) ...[
+                                SizedBox(height: Responsive.h(14)),
+                                IncentiveCard(
+                                  amountText: currency.format(
+                                    q.items.fold<double>(
+                                        0, (s, i) => s + i.incentiveAmount),
                                   ),
                                 ),
-                              if (!isOwner) SizedBox(height: Responsive.h(12)),
+                              ],
                             ],
                           ),
                         ),
                       ),
 
-                      // Bottom action bar.
+                      // ---- Bottom action bar ----
                       Container(
-                        padding: EdgeInsets.fromLTRB(
-                            Responsive.w(18), Responsive.h(10), Responsive.w(18), Responsive.h(14)),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.background,
                           border: Border(top: BorderSide(color: AppColors.border)),
                         ),
-                        child: BlocBuilder<OwnerCancelQuotationBloc, OwnerCancelQuotationState>(
+                        padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                            Responsive.h(10), Responsive.w(20), Responsive.h(14)),
+                        child: BlocBuilder<OwnerCancelQuotationBloc,
+                            OwnerCancelQuotationState>(
                           builder: (context, cancelState) {
-                            final isCancelling =
-                                cancelState.status == OwnerCancelQuotationStatus.inProgress;
+                            final isCancelling = cancelState.status ==
+                                OwnerCancelQuotationStatus.inProgress;
+                            final buttonHeight = Responsive.h(48);
+                            final buttonShape = RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14));
 
                             return Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Row(
                                   children: [
-                                    // Share -> bottom sheet: PDF / Excel / Copy text
                                     RoundIconButton(
                                       icon: Icons.share_outlined,
                                       tooltip: 'Share / Export',
@@ -641,44 +564,40 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                                     SizedBox(width: Responsive.w(10)),
                                     Expanded(
                                       child: isApproved
-                                          ? Container(
-                                        height: 48,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.success.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                              color: AppColors.success.withValues(alpha: 0.3)),
-                                        ),
-                                        child: Text(
-                                          'Quotation Approved',
-                                          style: AppTextStyles.bodyBold(color: AppColors.success),
-                                        ),
+                                          ? _StatusBanner(
+                                        height: buttonHeight,
+                                        icon: Icons.check_circle_rounded,
+                                        label: 'Quotation Approved',
+                                        color: AppColors.success,
                                       )
                                           : isCancelled
-                                          ? Container(
-                                        height: 48,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                              color: Colors.red.withValues(alpha: 0.3)),
-                                        ),
-                                        child: Text(
-                                          'Quotation Cancelled',
-                                          style: AppTextStyles.bodyBold(color: Colors.red),
-                                        ),
+                                          ? _StatusBanner(
+                                        height: buttonHeight,
+                                        icon: Icons.cancel_rounded,
+                                        label: 'Quotation Cancelled',
+                                        color: _redColor,
                                       )
                                           : showActionButtons
-                                          ? PrimaryButton(
-                                        label: isApproving
-                                            ? 'Approving...'
-                                            : 'Approve Quotation',
-                                        height: 48,
-                                        onPressed: (isApproving || isCancelling)
-                                            ? null
-                                            : () => showApproveDialog(q),
+                                          ? SizedBox(
+                                        height: buttonHeight,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: buttonShape,
+                                          ),
+                                          onPressed: (isApproving || isCancelling)
+                                              ? null
+                                              : () => showApproveDialog(q),
+                                          child: Text(
+                                            isApproving
+                                                ? 'Approving...'
+                                                : 'Approve Quotation',
+                                            style: AppTextStyles.bodyBold(
+                                                color: Colors.white),
+                                          ),
+                                        ),
                                       )
                                           : const SizedBox.shrink(),
                                     ),
@@ -688,19 +607,21 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                                   SizedBox(height: Responsive.h(10)),
                                   SizedBox(
                                     width: double.infinity,
+                                    height: buttonHeight,
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.red,
-                                        side: const BorderSide(color: Colors.red),
-                                        minimumSize: const Size.fromHeight(48),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12)),
+                                        foregroundColor: _redColor,
+                                        side: const BorderSide(color: _redColor),
+                                        shape: buttonShape,
                                       ),
                                       onPressed: (isApproving || isCancelling)
                                           ? null
                                           : () => confirmAndCancel(q),
                                       icon: const Icon(Icons.cancel_outlined, size: 18),
-                                      label: Text(isCancelling ? 'Cancelling...' : 'Cancel Quotation'),
+                                      label: Text(
+                                        isCancelling ? 'Cancelling...' : 'Cancel Quotation',
+                                        style: AppTextStyles.bodyBold(color: _redColor),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -716,6 +637,101 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// STATUS BANNER / ERROR / SKELETON (private to this file)
+// =====================================================================
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({
+    required this.height,
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+  final double height;
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: color),
+          SizedBox(width: Responsive.w(6)),
+          Text(label, style: AppTextStyles.bodyBold(color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(Responsive.w(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded,
+                color: AppColors.textSecondary.withOpacity(0.5), size: 38),
+            SizedBox(height: Responsive.h(10)),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            SizedBox(height: Responsive.h(10)),
+            TextButton(
+              onPressed: onRetry,
+              child: Text('Try again', style: AppTextStyles.bodyBold()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailCardSkeleton extends StatelessWidget {
+  const _DetailCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(Responsive.w(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ShimmerBox(width: 120, height: 13),
+          SizedBox(height: 10),
+          ShimmerBox(width: 200, height: 11),
+          SizedBox(height: 10),
+          ShimmerBox(width: 160, height: 11),
+        ],
       ),
     );
   }

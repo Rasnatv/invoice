@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -12,6 +11,15 @@ import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/unit/unit_bloc.dart';
 import '../../bloc/ownerbloc/unit/unit_event.dart';
 import '../../bloc/ownerbloc/unit/unit_state.dart';
+
+/// Shared input decoration so every field uses the app font.
+InputDecoration _inputDec(String label, {String? hint}) => InputDecoration(
+  labelText: label,
+  hintText: hint,
+  labelStyle: AppTextStyles.body(color: AppColors.textHint),
+  hintStyle: AppTextStyles.body(color: AppColors.textHint),
+  errorStyle: AppTextStyles.caption(color: AppColors.error),
+);
 
 class UnitSetupScreen extends StatelessWidget {
   const UnitSetupScreen({super.key});
@@ -33,7 +41,7 @@ class _UnitSetupView extends StatefulWidget {
 }
 
 class _UnitSetupViewState extends State<_UnitSetupView> {
-  // ---------------- UNCHANGED: form logic ----------------
+  // ---------------- form logic (unchanged) ----------------
   Future<void> _openUnitForm(BuildContext context, {UnitModel? unit}) async {
     final bloc = context.read<UnitBloc>();
     final formKey = GlobalKey<FormState>();
@@ -53,7 +61,8 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
             left: Responsive.w(16),
             right: Responsive.w(16),
             top: Responsive.h(16),
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + Responsive.h(16),
+            bottom:
+            MediaQuery.of(sheetContext).viewInsets.bottom + Responsive.h(16),
           ),
           child: Form(
             key: formKey,
@@ -61,18 +70,21 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(unit == null ? 'Add Unit' : 'Edit Unit', style: AppTextStyles.h6()),
+                Text(unit == null ? 'Add Unit' : 'Edit Unit',
+                    style: AppTextStyles.h6()),
                 SizedBox(height: Responsive.h(16)),
                 TextFormField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Unit Name'),
+                  style: AppTextStyles.body(),
+                  decoration: _inputDec('Unit Name'),
                   inputFormatters: DValidator.unitNameText,
                   validator: DValidator.validateUnitName,
                 ),
                 SizedBox(height: Responsive.h(12)),
                 TextFormField(
                   controller: abbrCtrl,
-                  decoration: const InputDecoration(labelText: 'Abbreviation'),
+                  style: AppTextStyles.body(),
+                  decoration: _inputDec('Abbreviation'),
                   inputFormatters: DValidator.unitAbbrText,
                   validator: DValidator.validateUnitAbbr,
                 ),
@@ -86,7 +98,10 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                         onPressed: state.isSubmitting
                             ? null
                             : () {
-                          if (!(formKey.currentState?.validate() ?? false)) return;
+                          if (!(formKey.currentState?.validate() ??
+                              false)) {
+                            return;
+                          }
                           if (unit == null) {
                             bloc.add(AddUnitRequested(
                               name: nameCtrl.text.trim(),
@@ -103,8 +118,10 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          padding: EdgeInsets.symmetric(vertical: Responsive.h(12)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: EdgeInsets.symmetric(
+                              vertical: Responsive.h(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: state.isSubmitting
                             ? const SizedBox(
@@ -117,7 +134,8 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                         )
                             : Text(
                           unit == null ? 'Add' : 'Update',
-                          style: AppTextStyles.bodyBold().copyWith(color: Colors.white),
+                          style: AppTextStyles.bodyBold(
+                              color: Colors.white),
                         ),
                       );
                     },
@@ -131,7 +149,7 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
     );
   }
 
-  // ---------------- UNCHANGED: delete logic ----------------
+  // ---------------- delete logic (unchanged) ----------------
   Future<void> _confirmDelete(BuildContext context, UnitModel unit) async {
     final bloc = context.read<UnitBloc>();
     final confirmed = await showDialog<bool>(
@@ -145,12 +163,13 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: AppTextStyles.bodyBold()),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child: Text('Delete',
+                style: AppTextStyles.bodyBold(color: Colors.white)),
           ),
         ],
       ),
@@ -165,26 +184,34 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
     Responsive.init(context);
 
     return BlocListener<UnitBloc, UnitState>(
-        listenWhen: (previous, current) =>
-        previous.errorMessage != current.errorMessage ||
-            previous.successMessage != current.successMessage,
-        listener: (context, state) {
-          if (state.errorMessage != null) {
-            AppSnackbar.error(state.errorMessage!);
-            context.read<UnitBloc>().add(const UnitMessageConsumed());
-          } else if (state.successMessage != null) {
-            AppSnackbar.success(state.successMessage!);
-            context.read<UnitBloc>().add(const UnitMessageConsumed());
-          }
-        },
-        child: NetworkAwareWrapper(child: Scaffold(
+      listenWhen: (previous, current) =>
+      previous.errorMessage != current.errorMessage ||
+          previous.successMessage != current.successMessage,
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          AppSnackbar.error(state.errorMessage!);
+          context.read<UnitBloc>().add(const UnitMessageConsumed());
+        } else if (state.successMessage != null) {
+          AppSnackbar.success(state.successMessage!);
+          context.read<UnitBloc>().add(const UnitMessageConsumed());
+        }
+      },
+      child: NetworkAwareWrapper(
+        child: Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(title: Text('Unit Setup', style: AppTextStyles.h6())),
+          appBar: AppBar(
+            title: Text('Unit Setup', style: AppTextStyles.h6()),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _openUnitForm(context),
             backgroundColor: AppColors.primary,
             icon: const Icon(Icons.add, color: Colors.white),
-            label: Text('Add Unit', style: AppTextStyles.bodyBold().copyWith(color: Colors.white)),
+            label: Text(
+              'Add Unit',
+              style: AppTextStyles.bodyBold(color: Colors.white),
+            ),
           ),
           body: SafeArea(
             child: BlocBuilder<UnitBloc, UnitState>(
@@ -207,8 +234,12 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                           ),
                           SizedBox(height: Responsive.h(12)),
                           OutlinedButton(
-                            onPressed: () => context.read<UnitBloc>().add(const LoadUnits()),
-                            child: const Text('Retry'),
+                            onPressed: () => context
+                                .read<UnitBloc>()
+                                .add(const LoadUnits()),
+                            child: Text('Retry',
+                                style: AppTextStyles.bodyBold(
+                                    color: AppColors.primary)),
                           ),
                         ],
                       ),
@@ -216,14 +247,13 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
                   );
                 }
 
-                // ---------------- NEW: modern empty state ----------------
                 if (state.units.isEmpty) {
                   return const _EmptyUnits();
                 }
 
-                // ---------------- NEW: section title + modern list ----------------
                 return RefreshIndicator(
-                  onRefresh: () async => context.read<UnitBloc>().add(const LoadUnits()),
+                  onRefresh: () async =>
+                      context.read<UnitBloc>().add(const LoadUnits()),
                   child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(
@@ -253,11 +283,12 @@ class _UnitSetupViewState extends State<_UnitSetupView> {
             ),
           ),
         ),
-        ));
+      ),
+    );
   }
 }
 
-/// NEW: Small section label above the list.
+/// Small section label above the list.
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
 
@@ -282,7 +313,7 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// NEW: Clean centered empty state.
+/// Clean centered empty state.
 class _EmptyUnits extends StatelessWidget {
   const _EmptyUnits();
 
@@ -301,14 +332,15 @@ class _EmptyUnits extends StatelessWidget {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.straighten_rounded, size: 40, color: AppColors.primary),
+              child: Icon(Icons.straighten_rounded,
+                  size: 40, color: AppColors.primary),
             ),
             SizedBox(height: Responsive.h(16)),
             Text('No units added yet', style: AppTextStyles.bodyBold()),
             SizedBox(height: Responsive.h(6)),
             Text(
               'Tap "Add Unit" to create your first unit.',
-              style: AppTextStyles.caption(),
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -318,9 +350,10 @@ class _EmptyUnits extends StatelessWidget {
   }
 }
 
-/// RESTYLED: Modern unit card (icon avatar + name + abbreviation chip).
+/// Unit card (icon avatar + name + abbreviation chip).
 class _UnitCard extends StatelessWidget {
-  const _UnitCard({required this.unit, required this.onEdit, required this.onDelete});
+  const _UnitCard(
+      {required this.unit, required this.onEdit, required this.onDelete});
 
   final UnitModel unit;
   final VoidCallback onEdit;
@@ -354,7 +387,8 @@ class _UnitCard extends StatelessWidget {
               color: AppColors.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.straighten_rounded, size: 22, color: AppColors.primary),
+            child: Icon(Icons.straighten_rounded,
+                size: 22, color: AppColors.primary),
           ),
           SizedBox(width: Responsive.w(12)),
 
@@ -371,7 +405,8 @@ class _UnitCard extends StatelessWidget {
                 ),
                 SizedBox(height: Responsive.h(6)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -379,8 +414,9 @@ class _UnitCard extends StatelessWidget {
                   child: Text(
                     unit.abbreviation,
                     style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
                       color: AppColors.primary,
-                      fontSize: 11,
+                      fontSize: Responsive.sp(10.5),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -393,30 +429,35 @@ class _UnitCard extends StatelessWidget {
           PopupMenuButton<String>(
             padding: EdgeInsets.zero,
             color: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textSecondary),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            icon: Icon(Icons.more_vert,
+                size: 20, color: AppColors.textSecondary),
             onSelected: (value) {
               if (value == 'edit') onEdit();
               if (value == 'delete') onDelete();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'edit',
                 child: Row(
                   children: [
-                    Icon(Icons.edit_outlined, size: 18, color: AppColors.textPrimary),
-                    SizedBox(width: 8),
-                    Text('Edit'),
+                    const Icon(Icons.edit_outlined,
+                        size: 18, color: AppColors.textPrimary),
+                    const SizedBox(width: 8),
+                    Text('Edit', style: AppTextStyles.body()),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_outline, size: 18, color: AppColors.error),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: AppColors.error)),
+                    const Icon(Icons.delete_outline,
+                        size: 18, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    Text('Delete',
+                        style: AppTextStyles.body(color: AppColors.error)),
                   ],
                 ),
               ),

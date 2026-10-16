@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -13,7 +14,6 @@ import '../../widgets/appsnackbar.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_bloc.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_event.dart';
 import '../../bloc/ownerbloc/ownersalesman/salesman_state.dart';
-
 
 class OwnerAddSalesmanScreen extends StatefulWidget {
   const OwnerAddSalesmanScreen({super.key, this.salesman});
@@ -47,6 +47,15 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
   DesignationModel? _selectedDesignation;
   bool _loadingDesignations = true;
   String? _designationError;
+
+  // ---------- Shared text styles (same fonts as Estimates screen) ----------
+  InputDecoration _dec(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: AppTextStyles.body(color: AppColors.textHint),
+    errorStyle: AppTextStyles.caption(color: AppColors.error),
+  );
+
+  TextStyle get _inputStyle => AppTextStyles.body();
 
   @override
   void initState() {
@@ -125,9 +134,8 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
     // initialDate must be between firstDate and lastDate (today), otherwise
     // showDatePicker throws. This also covers an old saved date that is in
     // the future or older than 10 years when editing.
-    DateTime initial = _joiningDate != null
-        ? DateUtils.dateOnly(_joiningDate!)
-        : today;
+    DateTime initial =
+    _joiningDate != null ? DateUtils.dateOnly(_joiningDate!) : today;
     if (initial.isAfter(today)) initial = today;
     if (initial.isBefore(firstDate)) initial = firstDate;
 
@@ -135,7 +143,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
       context: context,
       initialDate: initial,
       firstDate: firstDate,
-      lastDate: today, // <-- no dates after today
+      lastDate: today, // no dates after today
     );
     if (picked != null) {
       setState(() => _joiningDate = picked);
@@ -143,7 +151,8 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
   }
 
   String? _validateSalary(String? value) {
-    final error = DValidator.validateRequired(value, message: 'Salary is required');
+    final error =
+    DValidator.validateRequired(value, message: 'Salary is required');
     if (error != null) return error;
     final parsed = num.tryParse(value!.trim());
     if (parsed == null) return 'Enter a valid salary';
@@ -223,164 +232,197 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(
-          widget.isEdit ? 'Edit Salesman' : 'Add Salesman',
-          style: AppTextStyles.h6(),
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(
+            widget.isEdit ? 'Edit Salesman' : 'Add Salesman',
+            style: AppTextStyles.h3(color: Colors.white),
+          ),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
         ),
-      ),
-      body: BlocListener<SalesmanBloc, SalesmanState>(
-        listener: (context, state) {
-          if (state is SalesmanActionLoading) {
-            setState(() => _isSubmitting = true);
-          } else if (state is SalesmanActionSuccess) {
-            setState(() => _isSubmitting = false);
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
+        body: BlocListener<SalesmanBloc, SalesmanState>(
+          listener: (context, state) {
+            if (state is SalesmanActionLoading) {
+              setState(() => _isSubmitting = true);
+            } else if (state is SalesmanActionSuccess) {
+              setState(() => _isSubmitting = false);
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            } else if (state is SalesmanActionFailure) {
+              setState(() => _isSubmitting = false);
+              AppSnackbar.error(state.message ?? '');
             }
-          } else if (state is SalesmanActionFailure) {
-            setState(() => _isSubmitting = false);
-            AppSnackbar.error(state.message ?? '');
-          }
-        },
-        child: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: EdgeInsets.all(Responsive.w(16)),
-              children: [
-                // Name Field
-                Text('Name', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                TextFormField(
-                  controller: _nameCtrl,
-                  inputFormatters: DValidator.lettersOnly,
-                  validator: (v) => DValidator.validateName('Name', v),
-                  decoration: const InputDecoration(hintText: 'Enter full name'),
-                ),
-                SizedBox(height: Responsive.h(16)),
+          },
+          child: SafeArea(
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                padding: EdgeInsets.all(Responsive.w(16)),
+                children: [
+                  // Name Field
+                  Text('Name', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  TextFormField(
+                    controller: _nameCtrl,
+                    style: _inputStyle,
+                    inputFormatters: DValidator.lettersOnly,
+                    validator: (v) => DValidator.validateName('Name', v),
+                    decoration: _dec('Enter full name'),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
 
-                // Email Field
-                Text('Email', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                TextFormField(
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  inputFormatters: DValidator.textWithLimit,
-                  validator: DValidator.validateEmail,
-                  decoration: const InputDecoration(hintText: 'name@example.com'),
-                ),
-                SizedBox(height: Responsive.h(16)),
+                  // Email Field
+                  Text('Email', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  TextFormField(
+                    controller: _emailCtrl,
+                    style: _inputStyle,
+                    keyboardType: TextInputType.emailAddress,
+                    inputFormatters: DValidator.textWithLimit,
+                    validator: DValidator.validateEmail,
+                    decoration: _dec('name@example.com'),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
 
-                // Mobile Field
-                Text('Mobile', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                TextFormField(
-                  controller: _mobileCtrl,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: DValidator.phoneNumber,
-                  validator: (v) => DValidator.validatePhoneNumber(v),
-                  decoration: const InputDecoration(hintText: '10-digit mobile number'),
-                ),
-                SizedBox(height: Responsive.h(16)),
+                  // Mobile Field
+                  Text('Mobile', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  TextFormField(
+                    controller: _mobileCtrl,
+                    style: _inputStyle,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: DValidator.phoneNumber,
+                    validator: (v) => DValidator.validatePhoneNumber(v),
+                    decoration: _dec('10-digit mobile number'),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
 
-                // Designation Field
-                Text('Designation', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                _buildDesignationField(),
-                SizedBox(height: Responsive.h(16)),
+                  // Designation Field
+                  Text('Designation', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  _buildDesignationField(),
+                  SizedBox(height: Responsive.h(16)),
 
-                // Salary Field
-                Text('Salary', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                TextFormField(
-                  controller: _salaryCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: DValidator.decimalNumber,
-                  validator: _validateSalary,
-                  decoration: const InputDecoration(hintText: 'Monthly salary'),
-                ),
-                SizedBox(height: Responsive.h(16)),
+                  // Salary Field
+                  Text('Salary', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  TextFormField(
+                    controller: _salaryCtrl,
+                    style: _inputStyle,
+                    keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: DValidator.decimalNumber,
+                    validator: _validateSalary,
+                    decoration: _dec('Monthly salary'),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
 
-                // Joining Date Field (today or earlier only)
-                Text('Joining Date', style: AppTextStyles.bodyBold()),
-                SizedBox(height: Responsive.h(6)),
-                InkWell(
-                  onTap: _pickJoiningDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(),
-                    child: Row(
+                  // Joining Date Field (today or earlier only)
+                  Text('Joining Date', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  InkWell(
+                    onTap: _pickJoiningDate,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined,
+                              size: 18, color: AppColors.textSecondary),
+                          SizedBox(width: Responsive.w(8)),
+                          Text(
+                            _joiningDate != null
+                                ? DateFormat('dd-MM-yyyy')
+                                .format(_joiningDate!)
+                                : 'Select joining date',
+                            style: _joiningDate != null
+                                ? AppTextStyles.body()
+                                : AppTextStyles.body(
+                                color: AppColors.textHint),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
+
+                  // Password Field (required on add, optional on edit -
+                  // leave blank on edit to keep the existing password)
+                  Text('Password', style: AppTextStyles.bodyBold()),
+                  SizedBox(height: Responsive.h(6)),
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    obscureText: _obscurePassword,
+                    style: _inputStyle,
+                    validator: _validatePasswordOptional,
+                    decoration: _dec(widget.isEdit
+                        ? 'Leave blank to keep current'
+                        : 'Enter password')
+                        .copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: Responsive.h(16)),
+
+                  // Active toggle (only for edit mode)
+                  if (widget.isEdit) ...[
+                    Row(
                       children: [
-                        const Icon(Icons.calendar_today_outlined,
-                            size: 18, color: AppColors.textSecondary),
-                        SizedBox(width: Responsive.w(8)),
+                        Switch(
+                          value: _isActive,
+                          onChanged: (value) =>
+                              setState(() => _isActive = value),
+                          activeColor: AppColors.primary,
+                        ),
                         Text(
-                          _joiningDate != null
-                              ? DateFormat('dd-MM-yyyy').format(_joiningDate!)
-                              : 'Select joining date',
-                          style: _joiningDate != null
-                              ? AppTextStyles.caption()
-                              : AppTextStyles.caption()
-                              .copyWith(color: AppColors.textSecondary),
+                          _isActive ? 'Active' : 'Inactive',
+                          style: AppTextStyles.bodyBold(),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                SizedBox(height: Responsive.h(16)),
+                    SizedBox(height: Responsive.h(16)),
+                  ],
 
-                // Password Field (required on add, optional on edit —
-                // leave blank on edit to keep the existing password)
-
-                SizedBox(height: Responsive.h(16)),
-
-                // Active toggle (only for edit mode)
-                if (widget.isEdit) ...[
-                  Row(
-                    children: [
-                      Switch(
-                        value: _isActive,
-                        onChanged: (value) => setState(() => _isActive = value),
-                        activeColor: AppColors.primary,
-                      ),
-                      Text(
-                        _isActive ? 'Active' : 'Inactive',
-                        style: AppTextStyles.bodyBold(),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: Responsive.h(16)),
-                ],
-
-                // Submit Button
-                ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    minimumSize: Size.fromHeight(Responsive.h(48)),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+                  // Submit Button
+                  ElevatedButton(
+                    onPressed: _isSubmitting ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      minimumSize: Size.fromHeight(Responsive.h(48)),
                     ),
-                  )
-                      : Text(
-                    widget.isEdit ? 'Update Salesman' : 'Add Salesman',
-                    style: const TextStyle(color: Colors.white),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : Text(
+                      widget.isEdit ? 'Update Salesman' : 'Add Salesman',
+                      style:
+                      AppTextStyles.bodyBold(color: Colors.white),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _buildDesignationField() {
@@ -403,7 +445,7 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
             ),
             TextButton(
               onPressed: _loadDesignations,
-              child: const Text('Retry'),
+              child: Text('Retry', style: AppTextStyles.bodyBold()),
             ),
           ],
         ),
@@ -421,11 +463,12 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
         child: Row(
           children: [
             Expanded(
-              child: Text('No designations found', style: AppTextStyles.caption()),
+              child: Text('No designations found',
+                  style: AppTextStyles.caption()),
             ),
             TextButton(
               onPressed: _loadDesignations,
-              child: const Text('Refresh'),
+              child: Text('Refresh', style: AppTextStyles.bodyBold()),
             ),
           ],
         ),
@@ -435,14 +478,13 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
     return DropdownButtonFormField<DesignationModel>(
       value: _selectedDesignation,
       isExpanded: true,
-      decoration: const InputDecoration(
-        hintText: 'Select designation',
-        border: OutlineInputBorder(),
-      ),
+      style: _inputStyle,
+      decoration:
+      _dec('Select designation').copyWith(border: const OutlineInputBorder()),
       items: _designations
           .map((d) => DropdownMenuItem(
         value: d,
-        child: Text(d.name),
+        child: Text(d.name, style: _inputStyle),
       ))
           .toList(),
       onChanged: (v) => setState(() => _selectedDesignation = v),
