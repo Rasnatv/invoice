@@ -1,3 +1,4 @@
+//
 // import 'package:flutter/material.dart';
 // import '../core/constants/app_colors.dart';
 // import '../core/constants/app_text_styles.dart';
@@ -37,20 +38,21 @@
 //         ),
 //         child: isLoading
 //             ? const SizedBox(
-//                 height: 22,
-//                 width: 22,
-//                 child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-//               )
+//           height: 22,
+//           width: 22,
+//           child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+//         )
 //             : Row(
-//                 mainAxisAlignment: MainAxisAlignment.center,
-//                 children: [
-//                   Text(label, style: AppTextStyles.captionsave()),
-//                   if (trailingIcon != null) ...[
-//                     const SizedBox(width: 10),
-//                     Icon(trailingIcon, color: Colors.white, size: 18),
-//                   ],
-//                 ],
-//               ),
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             // h3 label style, white to sit on the primary background.
+//             Text(label, style: AppTextStyles.h3(color: Colors.white)),
+//             if (trailingIcon != null) ...[
+//               const SizedBox(width: 10),
+//               Icon(trailingIcon, color: Colors.white, size: 18),
+//             ],
+//           ],
+//         ),
 //       ),
 //     );
 //   }
@@ -77,8 +79,8 @@
 //       child: Row(
 //         mainAxisSize: MainAxisSize.min,
 //         children: [
-//           if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
-//           Text(label, style: AppTextStyles.bodyBold()),
+//           if (icon != null) ...[Icon(icon, size: 14), const SizedBox(width: 4)],
+//           Text(label, style: AppTextStyles.h3()),
 //         ],
 //       ),
 //     );
@@ -91,6 +93,10 @@ import '../core/constants/app_text_styles.dart';
 /// Big red rounded CTA button used on Onboarding, Login, Create Estimate,
 /// Add Contractor, Send to Admin, etc. Matches the "Get Started" /
 /// "Login" / "Create Estimate" buttons from the screenshots.
+///
+/// The label is wrapped in Flexible + FittedBox(scaleDown), so a long label
+/// (e.g. "Submit for Approval" in a half-width button on a small screen)
+/// shrinks slightly to fit instead of causing "RIGHT OVERFLOWED BY x PIXELS".
 class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -119,6 +125,9 @@ class PrimaryButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: color ?? AppColors.primary,
           disabledBackgroundColor: (color ?? AppColors.primary).withOpacity(0.6),
+          // Smaller side padding than the default (24) gives the label
+          // more room before it needs to scale down.
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: isLoading
@@ -131,7 +140,17 @@ class PrimaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // h3 label style, white to sit on the primary background.
-            Text(label, style: AppTextStyles.h3(color: Colors.white)),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: AppTextStyles.h3(color: Colors.white),
+                ),
+              ),
+            ),
             if (trailingIcon != null) ...[
               const SizedBox(width: 10),
               Icon(trailingIcon, color: Colors.white, size: 18),
@@ -164,8 +183,13 @@ class SecondaryButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
-          Text(label, style: AppTextStyles.h3()),
+          if (icon != null) ...[Icon(icon, size: 14), const SizedBox(width: 4)],
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label, maxLines: 1, softWrap: false, style: AppTextStyles.h3()),
+            ),
+          ),
         ],
       ),
     );

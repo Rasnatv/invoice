@@ -227,12 +227,12 @@ class _SalesmanDispatchDetailViewState
           columnWidths: const {
             0: FixedColumnWidth(32), // #
             1: FixedColumnWidth(160), // Item
-            2: FixedColumnWidth(140), // Company
-            3: FixedColumnWidth(110), // Size
-            4: FixedColumnWidth(95), // Unit
-            5: FixedColumnWidth(50), // Box
-            6: FixedColumnWidth(50), // Pcs
-            7: FixedColumnWidth(60), // Qty
+            2: FixedColumnWidth(160), // Company
+            3: FixedColumnWidth(140), // Size
+            4: FixedColumnWidth(110), // Unit
+            5: FixedColumnWidth(80), // Box
+            6: FixedColumnWidth(80), // Pcs
+            7: FixedColumnWidth(80), // Qty
           },
           children: [
             TableRow(

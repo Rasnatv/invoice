@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -28,6 +29,9 @@ class _DsCol {
   static const double size = 120; // Size
   static const double unit = 150; // Unit
   static const double input = 110; // Box / Pcs inputs
+
+  /// Box / Pcs accept at most this many digits.
+  static const int maxQtyDigits = 6;
 }
 
 BoxDecoration _cardDecoration({double radius = 16}) => BoxDecoration(
@@ -295,6 +299,20 @@ class _DespatchFormState extends State<_DespatchForm> {
     );
   }
 
+  /// Decoration for a read-only (non-editable) field: greyed background,
+  /// lock icon, and no highlighted focus border so it clearly looks locked.
+  InputDecoration _readOnlyDecor(String label, {IconData? icon}) {
+    return _decor(label, icon: icon).copyWith(
+      fillColor: AppColors.surfaceAlt.withOpacity(0.5),
+      suffixIcon: Icon(Icons.lock_outline_rounded,
+          size: 16, color: AppColors.textHint),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: AppColors.border),
+      ),
+    );
+  }
+
   TextStyle get _fieldStyle => AppTextStyles.bodyBold();
 
   @override
@@ -363,11 +381,14 @@ class _DespatchFormState extends State<_DespatchForm> {
                   icon: Icons.local_shipping_outlined,
                   child: Column(
                     children: [
+                      // Reference No. is auto-filled from the estimate and
+                      // is NOT editable.
                       TextFormField(
                         controller: _refNoCtrl,
+                        readOnly: true,
+                        enableInteractiveSelection: false,
                         style: _fieldStyle,
-                        inputFormatters: DValidator.textWithLimit,
-                        decoration: _decor('Reference No.',
+                        decoration: _readOnlyDecor('Reference No.',
                             icon: Icons.confirmation_number_outlined),
                         validator: (v) => DValidator.validateRequired(v,
                             message: 'Reference No. is required'),
@@ -757,7 +778,11 @@ class _DespatchItemsTableState extends State<_DespatchItemsTable> {
         controller: ctrl,
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
-        inputFormatters: DValidator.digitsOnly,
+        // digits only, and at most 6 digits (also applies to pasted text)
+        inputFormatters: [
+          ...DValidator.digitsOnly,
+          LengthLimitingTextInputFormatter(_DsCol.maxQtyDigits),
+        ],
         style: AppTextStyles.bodyBold().copyWith(fontSize: _cellFontSize),
         decoration: InputDecoration(
           isDense: true,

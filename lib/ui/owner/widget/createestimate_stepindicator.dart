@@ -1419,17 +1419,22 @@ class PreviewStep extends StatelessWidget {
                 onPressed: submitting ? null : onSaveDraft,
                 style: OutlinedButton.styleFrom(
                   minimumSize: Size.fromHeight(Responsive.h(48)),
+                  padding: const EdgeInsets.symmetric(horizontal: 8), // was the default (wider)
                   side: const BorderSide(color: AppColors.primary),
                   shape: buttonShape,
                 ),
                 icon: savingDraft
                     ? const SizedBox(
                     width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.request_quote_outlined,
-                    size: 18, color: AppColors.primary),
-                label: Text(
-                  savingDraft ? 'Saving…' : 'Save as Quotation',
-                  style: AppTextStyles.bodyBold(color: AppColors.primary),
+                    : const Icon(Icons.request_quote_outlined, size: 16, color: AppColors.primary),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    savingDraft ? 'Saving…' : 'Save as Quotation',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: AppTextStyles.bodyBold(color: AppColors.primary),
+                  ),
                 ),
               ),
               right: PrimaryButton(

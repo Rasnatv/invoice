@@ -297,11 +297,11 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
             0: FixedColumnWidth(32), // #
             1: FixedColumnWidth(160), // Item
             2: FixedColumnWidth(140), // Company
-            3: FixedColumnWidth(110), // Size
-            4: FixedColumnWidth(95), // Unit
-            5: FixedColumnWidth(50), // Box
-            6: FixedColumnWidth(50), // Pcs
-            7: FixedColumnWidth(60), // Qty
+            3: FixedColumnWidth(140), // Size
+            4: FixedColumnWidth(120), // Unit
+            5: FixedColumnWidth(70), // Box
+            6: FixedColumnWidth(70), // Pcs
+            7: FixedColumnWidth(120), // Qty
           },
           children: [
             TableRow(
