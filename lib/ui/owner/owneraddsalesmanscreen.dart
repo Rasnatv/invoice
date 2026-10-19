@@ -34,11 +34,9 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
   late final TextEditingController _emailCtrl;
   late final TextEditingController _mobileCtrl;
   late final TextEditingController _salaryCtrl;
-  final _passwordCtrl = TextEditingController();
 
   DateTime? _joiningDate;
   bool _isActive = true;
-  bool _obscurePassword = true;
   bool _isSubmitting = false;
 
   // Use DesignationProvider directly
@@ -77,7 +75,6 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
     _emailCtrl.dispose();
     _mobileCtrl.dispose();
     _salaryCtrl.dispose();
-    _passwordCtrl.dispose();
     super.dispose();
   }
 
@@ -160,18 +157,6 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
     return null;
   }
 
-  String? _validatePasswordOptional(String? value) {
-    if (value == null || value.isEmpty) {
-      // Password is optional on edit (leave blank to keep current password).
-      // On add, treat a blank password as invalid since an account needs one.
-      if (!widget.isEdit) {
-        return 'Password is required';
-      }
-      return null;
-    }
-    return DValidator.validatePassword(value);
-  }
-
   void _submit() {
     final isValid = _formKey.currentState?.validate() ?? false;
 
@@ -207,9 +192,6 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
         mobile: _mobileCtrl.text.trim(),
         salary: salary,
         joiningDate: joiningDateStr,
-        password: _passwordCtrl.text.trim().isEmpty
-            ? null
-            : _passwordCtrl.text.trim(),
         isActive: _isActive,
       ));
     } else {
@@ -220,9 +202,6 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
         mobile: _mobileCtrl.text.trim(),
         salary: salary,
         joiningDate: joiningDateStr,
-        password: _passwordCtrl.text.trim().isEmpty
-            ? null
-            : _passwordCtrl.text.trim(),
         isActive: _isActive,
       ));
     }
@@ -344,32 +323,6 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
                                 color: AppColors.textHint),
                           ),
                         ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: Responsive.h(16)),
-
-                  // Password Field (required on add, optional on edit -
-                  // leave blank on edit to keep the existing password)
-                  Text('Password', style: AppTextStyles.bodyBold()),
-                  SizedBox(height: Responsive.h(6)),
-                  TextFormField(
-                    controller: _passwordCtrl,
-                    obscureText: _obscurePassword,
-                    style: _inputStyle,
-                    validator: _validatePasswordOptional,
-                    decoration: _dec(widget.isEdit
-                        ? 'Leave blank to keep current'
-                        : 'Enter password')
-                        .copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                        ),
-                        onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
                       ),
                     ),
                   ),

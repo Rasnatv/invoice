@@ -1,4 +1,5 @@
 
+
 import '../../../models/salesmanmodels/cretaeestimate_quotationmodel.dart';
 import '../../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
 import '../../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
@@ -116,9 +117,6 @@ class QuotationItemUpdateSubmitted extends SalesmanEstimateEvent {
   });
 }
 
-/// Resets itemUpdateStatus back to idle after the screen has already
-/// reacted to a success/failure, mirroring QuotationSubmitResultConsumed
-/// above.
 class QuotationItemUpdateResultConsumed extends SalesmanEstimateEvent {
   const QuotationItemUpdateResultConsumed();
 }

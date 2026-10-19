@@ -1,3 +1,5 @@
+
+import 'dart:io';
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,6 +16,14 @@ import '../../bloc/salemanbloc/quatation/quotation_listdetail_bloc.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/owner_estimateshimmer.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart'; // Noto Sans -> has the ₹ glyph
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+
+// Excel export
+import 'package:excel/excel.dart' as xls;
 
 const Color _redColor = Color(0xFFDC2626);
 
@@ -29,6 +39,16 @@ class QuotationPreviewScreen extends StatefulWidget {
 class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     with WidgetsBindingObserver {
   late final SalesmanQuotationBloc _bloc;
+
+  // Spinner state while a PDF / Excel is being built and shared.
+  bool _isGeneratingPdf = false;
+  bool _isGeneratingExcel = false;
+
+  static const _appBarSpinner = SizedBox(
+    height: 20,
+    width: 20,
+    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+  );
 
   @override
   void initState() {
@@ -144,6 +164,482 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
     _bloc.add(QuotationSubmitForApprovalRequested(estimate.id));
   }
 
+  // ---------------------------------------------------------------------
+  // Share helpers (PDF / Excel)
+  // ---------------------------------------------------------------------
+
+  static final NumberFormat _money =
+  NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+
+  String _safeRef(QuotationDetailModel q) => q.quotationNumber.isNotEmpty
+      ? q.quotationNumber.replaceAll(RegExp(r'[^\w\-]'), '_')
+      : q.id;
+
+  String _dateText(QuotationDetailModel q) =>
+      q.date != null ? DateFormat('dd-MM-yyyy').format(q.date!) : q.dateRaw;
+
+  /// Returns the loaded detail, or shows an error and returns null.
+  QuotationDetailModel? _requireDetail() {
+    final detail = _bloc.state.detail;
+    if (detail == null) {
+      AppSnackbar.error('Quotation data not loaded yet');
+    }
+    return detail;
+  }
+
+  /// PDF (no incentive figures).
+  Future<void> _sharePdf(QuotationDetailModel q) async {
+    setState(() => _isGeneratingPdf = true);
+    try {
+      final bytes = await _buildPdfBytes(q);
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/Quotation_${_safeRef(q)}.pdf');
+      await file.writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/pdf')],
+        text: 'Quotation - ${q.quotationNumber}',
+      );
+    } catch (e) {
+      if (mounted) AppSnackbar.error('Failed to generate PDF: $e');
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+  Future<List<int>> _buildPdfBytes(QuotationDetailModel q) async {
+    final baseFont = await PdfGoogleFonts.notoSansRegular();
+    final boldFont = await PdfGoogleFonts.notoSansBold();
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
+    );
+
+    final approved = _isApproved(q);
+    final title = approved ? 'Bill' : 'Quotation Details';
+    final hasBoxQty = q.items.any((i) => i.boxQuantity > 0);
+    final hasPieceQty = q.items.any((i) => i.pieceQuantity > 0);
+
+    // ---- info block ----
+    final pairs = <List<String>>[
+      ['Reference No.', q.quotationNumber],
+      ['Date', _dateText(q)],
+      ['Status', statusLabel(q.status)],
+      if (q.salesman.name.isNotEmpty) ['Salesman', q.salesman.name],
+      ['Customer Name', q.customer.name],
+      ['Customer Phone', q.customer.phone],
+      if (q.customer.email.isNotEmpty) ['Customer Email', q.customer.email],
+      if (q.contractor.name.isNotEmpty) ['Contractor Name', q.contractor.name],
+      if (q.contractor.mobile.isNotEmpty)
+        ['Contractor Phone', q.contractor.mobile],
+    ];
+    final wide = <List<String>>[
+      if (q.customer.address.isNotEmpty) ['Customer Address', q.customer.address],
+      if (q.notes.isNotEmpty) ['Notes', q.notes],
+    ];
+
+    pw.Widget infoCell(List<String> r) => pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 6),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(r[0].toUpperCase(),
+              style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)),
+          pw.SizedBox(height: 1.5),
+          pw.Text(r[1].isEmpty ? '-' : r[1],
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
+    );
+
+    final infoRows = <pw.Widget>[];
+    for (var i = 0; i < pairs.length; i += 2) {
+      infoRows.add(
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(child: infoCell(pairs[i])),
+            pw.SizedBox(width: 16),
+            pw.Expanded(
+              child: i + 1 < pairs.length
+                  ? infoCell(pairs[i + 1])
+                  : pw.SizedBox(),
+            ),
+          ],
+        ),
+      );
+    }
+    for (final w in wide) {
+      infoRows.add(infoCell(w));
+    }
+
+    final infoBlock = pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.fromLTRB(12, 10, 12, 4),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey100,
+        border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
+        borderRadius: pw.BorderRadius.circular(4),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: infoRows,
+      ),
+    );
+
+    // ---- items table (no incentive column) ----
+    final headers = [
+      'Sl No',
+      'Item',
+      'Company',
+      'Size',
+      'Unit',
+      'Qty',
+      if (hasBoxQty) 'Box Qty',
+      if (hasPieceQty) 'Piece Qty',
+      'MRP',
+      'Rate',
+      'Amount',
+    ];
+    final data = <List<String>>[
+      for (var i = 0; i < q.items.length; i++)
+        [
+          '${i + 1}',
+          q.items[i].productName.isEmpty ? '-' : q.items[i].productName,
+          q.items[i].companyName.isEmpty ? '-' : q.items[i].companyName,
+          q.items[i].productSize.isEmpty ? '-' : q.items[i].productSize,
+          q.items[i].productUnit.isEmpty ? '-' : q.items[i].productUnit,
+          q.items[i].quantity.toStringAsFixed(0),
+          if (hasBoxQty)
+            q.items[i].boxQuantity > 0
+                ? q.items[i].boxQuantity.toStringAsFixed(0)
+                : '-',
+          if (hasPieceQty)
+            q.items[i].pieceQuantity > 0
+                ? q.items[i].pieceQuantity.toStringAsFixed(0)
+                : '-',
+          q.items[i].mrp > 0 ? q.items[i].mrp.toStringAsFixed(0) : '-',
+          q.items[i].rate.toStringAsFixed(0),
+          _money.format(q.items[i].amount),
+        ],
+    ];
+
+    final aligns = <int, pw.Alignment>{
+      0: pw.Alignment.center,
+      1: pw.Alignment.centerLeft,
+      2: pw.Alignment.centerLeft,
+      3: pw.Alignment.centerLeft,
+      4: pw.Alignment.centerLeft,
+    };
+    final widths = <int, pw.TableColumnWidth>{
+      0: const pw.IntrinsicColumnWidth(),
+      1: const pw.FlexColumnWidth(),
+      2: const pw.FlexColumnWidth(),
+      3: const pw.FlexColumnWidth(),
+      4: const pw.IntrinsicColumnWidth(),
+    };
+    for (var c = 5; c < headers.length; c++) {
+      aligns[c] = pw.Alignment.centerRight;
+      widths[c] = const pw.IntrinsicColumnWidth();
+    }
+
+    final itemsTable = pw.TableHelper.fromTextArray(
+      headers: headers,
+      data: data,
+      columnWidths: widths,
+      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      headerStyle: pw.TextStyle(
+          fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+      headerAlignments: aligns,
+      cellStyle: const pw.TextStyle(fontSize: 8),
+      cellAlignments: aligns,
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+      oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+    );
+
+    // ---- summary ----
+    final showDiscount = approved && q.hasDiscount;
+    final showPayment = approved && q.showPaymentSummary;
+    final payable = approved ? q.amountAfterDiscount : q.grandTotal;
+    final hasBalance = q.balanceAmount > 0;
+
+    pw.Widget line(String label, String value,
+        {bool bold = false, PdfColor? color, double size = 10}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(label,
+                style: pw.TextStyle(
+                    fontSize: size,
+                    fontWeight:
+                    bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+            pw.SizedBox(width: 14),
+            pw.Text(value,
+                softWrap: false,
+                style: pw.TextStyle(
+                    fontSize: size,
+                    fontWeight: pw.FontWeight.bold,
+                    color: color)),
+          ],
+        ),
+      );
+    }
+
+    final summary = pw.Align(
+      alignment: pw.Alignment.centerRight,
+      child: pw.Container(
+        width: 300,
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.Column(
+          children: [
+            line('Total Sq.Ft', q.totalSquareFeet.toStringAsFixed(0)),
+            line('Sub Total', _money.format(q.subtotal)),
+            line('Handling Charge', _money.format(q.handlingCharge)),
+            if (showDiscount) ...[
+              line('Total Before Discount', _money.format(q.grandTotal)),
+              line(q.discountLabel, '- ${_money.format(q.discountAmount)}',
+                  color: PdfColors.red700),
+            ],
+            pw.Divider(color: PdfColors.grey400, thickness: 0.5, height: 10),
+            line('Grand Total', _money.format(payable), bold: true, size: 12),
+            if (showPayment) ...[
+              line('Total Paid', _money.format(q.totalPaid),
+                  color: PdfColors.green800),
+              pw.SizedBox(height: 4),
+              pw.Container(
+                width: double.infinity,
+                padding:
+                const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                color: hasBalance ? PdfColors.red50 : PdfColors.green50,
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Balance Due',
+                        style: pw.TextStyle(
+                            fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.SizedBox(width: 14),
+                    pw.Text(
+                      _money.format(q.balanceAmount),
+                      softWrap: false,
+                      style: pw.TextStyle(
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold,
+                        color:
+                        hasBalance ? PdfColors.red700 : PdfColors.green800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    // ---- payments (approved only) ----
+    pw.Widget? paymentsTable;
+    if (approved && q.payments.isNotEmpty) {
+      const pAligns = <int, pw.Alignment>{
+        0: pw.Alignment.centerLeft,
+        1: pw.Alignment.centerRight,
+        2: pw.Alignment.centerLeft,
+      };
+      paymentsTable = pw.TableHelper.fromTextArray(
+        headers: const ['Method', 'Amount', 'Date'],
+        data: [
+          for (final p in q.payments)
+            [
+              p.methodLabel.toString().isEmpty
+                  ? 'Payment'
+                  : p.methodLabel.toString(),
+              _money.format(p.amount),
+              p.date.toString().isEmpty ? '-' : p.date.toString(),
+            ],
+        ],
+        cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        headerStyle: pw.TextStyle(
+            fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+        headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+        headerAlignments: pAligns,
+        cellStyle: const pw.TextStyle(fontSize: 9),
+        cellAlignments: pAligns,
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+        rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+        oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+      );
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        header: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(title,
+                style:
+                pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            pw.Divider(color: PdfColors.grey400),
+          ],
+        ),
+        build: (context) => [
+          infoBlock,
+          pw.SizedBox(height: 18),
+          pw.Text('Items',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 8),
+          itemsTable,
+          pw.SizedBox(height: 14),
+          summary,
+          if (paymentsTable != null) ...[
+            pw.SizedBox(height: 14),
+            pw.Text('Payments',
+                style:
+                pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 8),
+            paymentsTable,
+          ],
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<void> _shareExcel(QuotationDetailModel q) async {
+    setState(() => _isGeneratingExcel = true);
+    try {
+      final isOwner = _isOwner(q);
+      final approved = _isApproved(q);
+      final excelFile = xls.Excel.createExcel();
+      const sheetName = 'Quotation';
+      final sheet = excelFile[sheetName];
+      excelFile.setDefaultSheet(sheetName);
+
+      void addRow(List<dynamic> values) {
+        sheet.appendRow(
+            values.map((v) => xls.TextCellValue(v.toString())).toList());
+      }
+
+      final hasBoxQty = q.items.any((i) => i.boxQuantity > 0);
+      final hasPieceQty = q.items.any((i) => i.pieceQuantity > 0);
+
+      addRow(['Quotation Details']);
+      addRow([]);
+      addRow(['Reference No.', q.quotationNumber]);
+      addRow(['Date', _dateText(q)]);
+      addRow(['Status', statusLabel(q.status)]);
+      addRow(['Customer Name', q.customer.name]);
+      addRow(['Customer Phone', q.customer.phone]);
+      addRow(['Customer Email', q.customer.email]);
+      addRow(['Customer Address', q.customer.address]);
+      addRow(['Contractor Name', q.contractor.name]);
+      addRow(['Contractor Phone', q.contractor.mobile]);
+      if (q.salesman.name.isNotEmpty) addRow(['Salesman', q.salesman.name]);
+      if (q.notes.isNotEmpty) addRow(['Notes', q.notes]);
+      addRow([]);
+
+      addRow([
+        '#',
+        'Item',
+        'Company',
+        'Size',
+        'Unit',
+        'Qty',
+        if (hasBoxQty) 'Box Qty',
+        if (hasPieceQty) 'Piece Qty',
+        'MRP',
+        'Rate',
+        'Amount',
+        if (!isOwner) 'Incentive',
+      ]);
+      for (var i = 0; i < q.items.length; i++) {
+        final item = q.items[i];
+        addRow([
+          i + 1,
+          item.productName,
+          item.companyName.isEmpty ? '-' : item.companyName,
+          item.productSize.isEmpty ? '-' : item.productSize,
+          item.productUnit.isEmpty ? '-' : item.productUnit,
+          item.quantity.toStringAsFixed(0),
+          if (hasBoxQty)
+            (item.boxQuantity > 0 ? item.boxQuantity.toStringAsFixed(0) : '-'),
+          if (hasPieceQty)
+            (item.pieceQuantity > 0
+                ? item.pieceQuantity.toStringAsFixed(0)
+                : '-'),
+          item.mrp > 0 ? item.mrp.toStringAsFixed(0) : '-',
+          item.rate.toStringAsFixed(0),
+          _money.format(item.amount),
+          if (!isOwner)
+            (item.incentiveAmount > 0 ? _money.format(item.incentiveAmount) : '-'),
+        ]);
+      }
+      addRow([]);
+
+      addRow(['Total Sq.Ft', q.totalSquareFeet.toStringAsFixed(0)]);
+      addRow(['Sub Total', _money.format(q.subtotal)]);
+      addRow(['Handling Charge', _money.format(q.handlingCharge)]);
+      if (approved && q.hasDiscount) {
+        addRow(['Total Before Discount', _money.format(q.grandTotal)]);
+        addRow([q.discountLabel, '- ${_money.format(q.discountAmount)}']);
+        addRow(['Grand Total', _money.format(q.amountAfterDiscount)]);
+      } else {
+        addRow(['Grand Total', _money.format(q.grandTotal)]);
+      }
+      if (approved && q.showPaymentSummary) {
+        addRow(['Total Paid', _money.format(q.totalPaid)]);
+        addRow(['Balance Due', _money.format(q.balanceAmount)]);
+      }
+
+      if (approved && q.payments.isNotEmpty) {
+        addRow([]);
+        addRow(['Payments']);
+        addRow(['Method', 'Amount', 'Date']);
+        for (final p in q.payments) {
+          addRow([
+            p.methodLabel.toString().isEmpty
+                ? 'Payment'
+                : p.methodLabel.toString(),
+            _money.format(p.amount),
+            p.date.toString().isEmpty ? '-' : p.date.toString(),
+          ]);
+        }
+      }
+
+      final bytes = excelFile.save();
+      if (bytes == null) throw Exception('Could not generate Excel file');
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/Quotation_${_safeRef(q)}.xlsx');
+      await file.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles(
+        [
+          XFile(
+            file.path,
+            mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ),
+        ],
+        text: 'Quotation - ${q.quotationNumber}',
+      );
+    } catch (e) {
+      if (mounted) AppSnackbar.error('Failed to generate Excel file: $e');
+    } finally {
+      if (mounted) setState(() => _isGeneratingExcel = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -161,11 +657,39 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
       child: Scaffold(
         backgroundColor: AppColors.background,
 
-        // ---------- APPBAR (same as owner) ----------
+        // ---------- APPBAR (PDF + Excel share) ----------
         appBar: AppBar(
           title: Text('Quotation Preview', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
+          actions: [
+            // Share as PDF
+            IconButton(
+              tooltip: 'Share as PDF',
+              icon: _isGeneratingPdf
+                  ? _appBarSpinner
+                  : const Icon(Icons.picture_as_pdf_rounded),
+              onPressed: _isGeneratingPdf
+                  ? null
+                  : () {
+                final detail = _requireDetail();
+                if (detail != null) _sharePdf(detail);
+              },
+            ),
+            // Share as Excel
+            IconButton(
+              tooltip: 'Share as Excel',
+              icon: _isGeneratingExcel
+                  ? _appBarSpinner
+                  : const Icon(Icons.grid_on_rounded),
+              onPressed: _isGeneratingExcel
+                  ? null
+                  : () {
+                final detail = _requireDetail();
+                if (detail != null) _shareExcel(detail);
+              },
+            ),
+          ],
         ),
         body: SafeArea(
           child: BlocListener<SalesmanQuotationBloc, SalesmanQuotationState>(
@@ -1153,7 +1677,9 @@ class _DetailCardSkeleton extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: BorderRadius.circular(16) == null
+            ? null
+            : Border.all(color: AppColors.border),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,

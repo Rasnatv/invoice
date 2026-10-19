@@ -9,10 +9,6 @@ enum LoadStatus { initial, loading, success, failure }
 
 enum SubmitStatus { idle, submitting, success, failure }
 
-/// Status for the single-item PUT /quotations/update-item call, kept
-/// separate from SubmitStatus (the whole-quotation create/save/submit)
-/// so the two don't stomp on each other's UI state. Used by the Salesman
-/// Quotation Edit screen's "Update Item" action.
 enum ItemUpdateStatus { idle, submitting, success, failure }
 
 class SalesmanEstimateState {

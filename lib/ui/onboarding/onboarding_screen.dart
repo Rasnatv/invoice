@@ -7,10 +7,6 @@ import '../../core/utils/responsive.dart';
 import '../../widgets/primary_button.dart';
 import '../auth/login_screen.dart';
 
-/// Single onboarding page — shown only once, ever, on first launch.
-/// After this, TokenStorage remembers it's been seen and Splash skips
-/// straight to LoginScreen (or a dashboard, if a session exists) on
-/// every future launch.
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
 
