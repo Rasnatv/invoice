@@ -585,6 +585,12 @@ class _QuotationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = quotationStatusColor(quotation.status);
 
+    final hasCreator = quotation.createdByName.isNotEmpty;
+    // Avoid showing the same name twice when salesman == creator.
+    final showSalesmanRow = showSalesman &&
+        quotation.salesmanName.isNotEmpty &&
+        quotation.salesmanName != quotation.createdByName;
+
     return _ListCard(
       onTap: onTap,
       child: Column(
@@ -611,8 +617,8 @@ class _QuotationCard extends StatelessWidget {
                       quotation.customerName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                      AppTextStyles.caption(color: AppColors.textSecondary),
+                      style: AppTextStyles.caption(
+                          color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -625,7 +631,7 @@ class _QuotationCard extends StatelessWidget {
             ],
           ),
 
-          // ---- phone / salesman ----
+          // ---- phone / created by / salesman ----
           if (quotation.customerPhone.isNotEmpty) ...[
             SizedBox(height: Responsive.h(10)),
             _InfoRow(
@@ -633,7 +639,15 @@ class _QuotationCard extends StatelessWidget {
               text: quotation.customerPhone,
             ),
           ],
-          if (showSalesman && quotation.salesmanName.isNotEmpty) ...[
+          if (hasCreator) ...[
+            SizedBox(height: Responsive.h(6)),
+            _InfoRow(
+              icon: Icons.person_outline_rounded,
+              text: 'Created by: ${quotation.createdByName}',
+              color: AppColors.primary,
+            ),
+          ],
+          if (showSalesmanRow) ...[
             SizedBox(height: Responsive.h(6)),
             _InfoRow(
               icon: Icons.badge_outlined,
@@ -657,13 +671,22 @@ class _QuotationCard extends StatelessWidget {
                   '${quotation.date}  •  ${quotation.totalItemsValue} items',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption(color: AppColors.textSecondary),
+                  style:
+                  AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
               SizedBox(width: Responsive.w(6)),
-              Text(
-                currency.format(quotation.grandTotalValue),
-                style: AppTextStyles.amount(color: AppColors.primary),
+              // FittedBox shrinks very large totals instead of overflowing.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    currency.format(quotation.grandTotalValue),
+                    maxLines: 1,
+                    style: AppTextStyles.amount(color: AppColors.primary),
+                  ),
+                ),
               ),
             ],
           ),

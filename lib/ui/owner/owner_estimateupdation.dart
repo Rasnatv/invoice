@@ -83,6 +83,14 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text.trim()) ?? 0;
 
+  /// NEW: product IDs already added to the estimate, EXCLUDING the item that
+  /// is currently being edited (so its product still shows while editing).
+  /// Used to hide those products from the "Select Product" suggestions.
+  Set<String> get _addedProductIds => <String>{
+    for (var i = 0; i < _items.length; i++)
+      if (i != _editingItemIndex) _items[i].productId,
+  };
+
   void _recomputeBoxQtyIfNeeded() {
     if (!_isBoxUnitProduct) return;
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
@@ -407,6 +415,15 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       return;
     }
 
+    // NEW: block duplicates (ignore the item currently being edited)
+    final alreadyAdded = _items.asMap().entries.any(
+          (e) => e.key != editingIndex && e.value.productId == productIdStr,
+    );
+    if (alreadyAdded) {
+      AppSnackbar.error('This product is already added. Edit the existing item instead.');
+      return;
+    }
+
     final productId = int.tryParse(productIdStr);
     if (productId == null) {
       AppSnackbar.error('Invalid product selected.');
@@ -567,8 +584,76 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     return null;
   }
 
-  void _submit(BuildContext context) {
+  /// NEW: runs before Save Changes.
+  /// If the owner picked a product (or started editing an item) but never
+  /// tapped "Add Item" / "Update Item", ask what to do instead of silently
+  /// dropping it. Returns true when it is OK to continue saving.
+  Future<bool> _resolvePendingItem() async {
+    final editingIndex = _editingItemIndex;
+    final isEditing = editingIndex != null;
+    final hasPendingNew = !isEditing && _selectedProduct != null;
+
+    if (!isEditing && !hasPendingNew) return true;
+
+    final editingSaved = isEditing && _items[editingIndex].id.isNotEmpty;
+
+    final choice = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEditing ? 'Item not updated' : 'Item not added'),
+        content: Text(
+          isEditing
+              ? 'You changed item #${editingIndex + 1} but did not tap '
+              '"Update Item". Your changes will not be saved and the old '
+              'quantity/rate/amount will be kept.'
+              : 'You selected a product but did not tap "Add Item". '
+              'It will not be included in the estimate.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('discard'),
+            child: Text(isEditing ? 'Keep old item' : 'Skip it'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('apply'),
+            child: Text(isEditing ? 'Update now' : 'Add now'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || choice == null) return false;
+
+    if (choice == 'discard') {
+      // Drop the half-filled form so stale values don't linger.
+      _resetItemForm();
+      return true;
+    }
+
+    // choice == 'apply'
+    await _saveItemFromForm(); // recalculates / updates the item
+    if (!mounted) return false;
+
+    // Saved rows are updated on the server through the bloc (async), so the
+    // owner should tap Save Changes again once that finishes.
+    if (editingSaved) return false;
+
+    // Validation / API failed -> stay on screen so the owner can fix it.
+    if (_editingItemIndex != null || _selectedProduct != null) return false;
+
+    return true;
+  }
+
+  Future<void> _submit(BuildContext context) async {
     debugPrint('SAVE tapped (items=${_items.length})');
+
+    // Read the bloc before any await so we don't use a stale context later.
+    final bloc = context.read<OwnerEstimateDetailBloc>();
+
+    // NEW: handle a forgotten Add Item / Update Item first.
+    final canContinue = await _resolvePendingItem();
+    if (!mounted || !canContinue) return;
 
     final formValid = _formKey.currentState?.validate() ?? true;
     final firstError = _firstFormError();
@@ -615,7 +700,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     debugPrint('SAVE dispatching OwnerEstimateUpdateRequested: '
         '${jsonEncode(request.toJson())}');
 
-    context.read<OwnerEstimateDetailBloc>().add(OwnerEstimateUpdateRequested(request));
+    bloc.add(OwnerEstimateUpdateRequested(request));
   }
 
   // ---------------------------------------------------------------------
@@ -745,6 +830,8 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                                   productField: EstimateProductSearch(
                                     loading: _loadingProducts,
                                     products: _products,
+                                    // NEW: hide products already added
+                                    excludedProductIds: _addedProductIds,
                                     searchCtrl: _productSearchCtrl,
                                     focusNode: _productSearchFocus,
                                     selectedProduct: _selectedProduct,

@@ -606,6 +606,10 @@ class _PhoneSiteVisitField extends StatelessWidget {
 // Amount is never computed locally. Box Qty / Piece Qty only render for
 // box-unit products. Limits: Quantity/Piece Qty -> 5 digits (+2 dec),
 // Rate -> 8 digits (+2 dec).
+//
+// UPDATED: products already added to the list are hidden from the
+// "Select Product" dropdown (the item currently being edited is NOT
+// hidden, so it still shows while editing).
 // =====================================================================
 
 class AddItemsStep extends StatelessWidget {
@@ -662,6 +666,13 @@ class AddItemsStep extends StatelessWidget {
 
   _UnitFieldVisibility get _fieldVisibility => _UnitFieldVisibility.forProduct(selectedProduct);
   bool get _isBoxUnit => selectedProduct?.isBoxUnit ?? false;
+
+  /// Product IDs already added to the estimate, EXCLUDING the item that is
+  /// currently being edited (so it still shows up while editing).
+  Set<String> get _addedProductIds => <String>{
+    for (var i = 0; i < items.length; i++)
+      if (i != editingIndex) items[i].productId,
+  };
 
   Widget _autoField(String label, String hint, IconData icon, TextEditingController c,
       {TextInputType keyboardType = TextInputType.text}) {
@@ -742,10 +753,18 @@ class AddItemsStep extends StatelessWidget {
                                 ),
                               );
                             }
+
+                            // Products already in the list (hidden from dropdown)
+                            final addedIds = _addedProductIds;
+                            final allAdded = state.products.isNotEmpty &&
+                                state.products.every((p) => addedIds.contains(p.id));
+
                             return LabeledField(
                               label: 'Select Product',
                               field: KeyedSubtree(
-                                key: ValueKey(selectedProduct?.id ?? 'none'),
+                                // Rebuild cleanly after every add / delete / edit change
+                                key: ValueKey(
+                                    '${selectedProduct?.id ?? 'none'}_${items.length}_$editingIndex'),
                                 child: Autocomplete<ActiveProductModel>(
                                   displayStringForOption: (p) => '${p.name} — ${p.company}',
                                   initialValue: TextEditingValue(
@@ -755,8 +774,13 @@ class AddItemsStep extends StatelessWidget {
                                   ),
                                   optionsBuilder: (textEditingValue) {
                                     final query = textEditingValue.text.trim().toLowerCase();
-                                    if (query.isEmpty) return state.products;
-                                    return state.products.where((p) =>
+
+                                    // Hide products that are already added
+                                    final available = state.products
+                                        .where((p) => !addedIds.contains(p.id));
+
+                                    if (query.isEmpty) return available;
+                                    return available.where((p) =>
                                     p.name.toLowerCase().contains(query) ||
                                         p.company.toLowerCase().contains(query));
                                   },
@@ -816,7 +840,10 @@ class AddItemsStep extends StatelessWidget {
                                           child: options.isEmpty
                                               ? Padding(
                                             padding: EdgeInsets.all(Responsive.w(14)),
-                                            child: Text('No matching products',
+                                            child: Text(
+                                                allAdded
+                                                    ? 'All products already added'
+                                                    : 'No matching products',
                                                 style: AppTextStyles.caption(
                                                     color: AppColors.textSecondary)),
                                           )

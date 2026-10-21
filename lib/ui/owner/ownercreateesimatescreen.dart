@@ -1,3 +1,5 @@
+
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
@@ -358,6 +360,11 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   /// piece_quantity — waits for the real response, and adds/updates the
   /// item using ONLY that response's amount/incentive fields. No cached
   /// bloc state, no local quantity*rate fallback, ever.
+  ///
+  /// UPDATED:
+  ///  - blocks adding the same product twice (ignores the item being edited)
+  ///  - catches unexpected errors and shows a message (loading flag is still
+  ///    always reset by `finally`)
   Future<void> _addItemToList() async {
     if (_isAddingItem) return;
     if (!_validateCurrentItemFields()) return;
@@ -366,6 +373,15 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     final productId = int.tryParse(product.id);
     if (productId == null) {
       _showError('Invalid product selected.');
+      return;
+    }
+
+    // NEW: block duplicates (ignore the item currently being edited)
+    final alreadyAdded = _items.asMap().entries.any(
+          (e) => e.key != _editingItemIndex && e.value.productId == product.id,
+    );
+    if (alreadyAdded) {
+      _showError('This product is already added. Edit the existing item instead.');
       return;
     }
 
@@ -387,6 +403,12 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
         boxQuantity: boxQuantity,
         pieceQuantity: pieceQuantity,
       ));
+    } catch (_) {
+      // NEW: show a message instead of failing silently
+      if (mounted) {
+        _showError('Could not calculate the amount for this item. Please try again.');
+      }
+      return;
     } finally {
       if (mounted) setState(() => _isAddingItem = false);
     }
@@ -1190,7 +1212,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
             child: Scaffold(
               backgroundColor: AppColors.background,
               appBar: AppBar(
-                title: Text(_appBarTitle,style: AppTextStyles.h6(),),
+                title: Text(_appBarTitle, style: AppTextStyles.h6()),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () {

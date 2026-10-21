@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -565,6 +566,10 @@ class QeItemFormFields extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 // Product search dropdown
+//
+// UPDATED: [addedProductIds] are hidden from the suggestion list. The screen
+// passes the IDs of every item already in the quotation EXCEPT the one being
+// edited, so the edited item's product is still selectable.
 // ---------------------------------------------------------------------------
 class QeProductDropdown extends StatelessWidget {
   const QeProductDropdown({
@@ -578,6 +583,7 @@ class QeProductDropdown extends StatelessWidget {
     required this.onTextChanged,
     required this.onClear,
     required this.onSelected,
+    this.addedProductIds = const <String>{},
   });
 
   final TextEditingController searchCtrl;
@@ -587,6 +593,10 @@ class QeProductDropdown extends StatelessWidget {
   /// Product id of the item being edited (used so validation doesn't block
   /// items that have no catalog match).
   final String? editingProductId;
+
+  /// NEW: product ids that are already added (hidden from the list).
+  final Set<String> addedProductIds;
+
   final bool showSuggestions;
   final VoidCallback onFieldTap;
   final ValueChanged<String> onTextChanged;
@@ -633,14 +643,20 @@ class QeProductDropdown extends StatelessWidget {
         }
 
         final products = state.products;
+
+        // NEW: hide products that are already added
+        final available =
+        products.where((p) => !addedProductIds.contains(p.id)).toList();
+        final allAdded = products.isNotEmpty && available.isEmpty;
+
         final typed = searchCtrl.text.trim();
         final showingChosenText =
             selectedProduct != null && typed == qeProductDisplayString(selectedProduct!);
         final query = showingChosenText ? '' : typed.toLowerCase();
 
         final filtered = query.isEmpty
-            ? products
-            : products.where((p) {
+            ? available
+            : available.where((p) {
           return p.name.toLowerCase().contains(query) ||
               p.company.toLowerCase().contains(query) ||
               p.size.toLowerCase().contains(query);
@@ -702,7 +718,10 @@ class QeProductDropdown extends StatelessWidget {
                   child: filtered.isEmpty
                       ? Padding(
                     padding: EdgeInsets.all(Responsive.w(14)),
-                    child: Text('No matching products',
+                    child: Text(
+                        allAdded
+                            ? 'All products already added'
+                            : 'No matching products',
                         style: AppTextStyles.caption(color: AppColors.textSecondary)),
                   )
                       : ListView.separated(

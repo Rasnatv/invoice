@@ -560,6 +560,10 @@ class OwnerItemFormFields extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 // Product search dropdown
+//
+// UPDATED: products whose IDs are in [excludedProductIds] (i.e. already added
+// to the quotation) are hidden from the suggestion list. The screen leaves the
+// item currently being edited out of that set, so it still shows while editing.
 // ---------------------------------------------------------------------------
 class OwnerProductDropdown extends StatelessWidget {
   const OwnerProductDropdown({
@@ -572,6 +576,7 @@ class OwnerProductDropdown extends StatelessWidget {
     required this.onTextChanged,
     required this.onClear,
     required this.onSelected,
+    this.excludedProductIds = const {},
   });
 
   final TextEditingController searchCtrl;
@@ -582,6 +587,9 @@ class OwnerProductDropdown extends StatelessWidget {
   final ValueChanged<String> onTextChanged;
   final VoidCallback onClear;
   final ValueChanged<ActiveProductModel> onSelected;
+
+  /// Product IDs already added to the quotation (hidden from suggestions).
+  final Set<String> excludedProductIds;
 
   @override
   Widget build(BuildContext context) {
@@ -624,6 +632,11 @@ class OwnerProductDropdown extends StatelessWidget {
 
         final products = state.products;
 
+        // Hide products already added to the quotation
+        final available =
+        products.where((p) => !excludedProductIds.contains(p.id)).toList();
+        final allAdded = products.isNotEmpty && available.isEmpty;
+
         // When a product is already chosen the box shows its full text;
         // treat that as "no search" so tapping lists every product.
         final typed = searchCtrl.text.trim();
@@ -632,8 +645,8 @@ class OwnerProductDropdown extends StatelessWidget {
         final query = showingChosenText ? '' : typed.toLowerCase();
 
         final filtered = query.isEmpty
-            ? products
-            : products.where((p) {
+            ? available
+            : available.where((p) {
           return p.name.toLowerCase().contains(query) ||
               p.company.toLowerCase().contains(query) ||
               p.size.toLowerCase().contains(query);
@@ -683,7 +696,8 @@ class OwnerProductDropdown extends StatelessWidget {
                   child: filtered.isEmpty
                       ? Padding(
                     padding: EdgeInsets.all(Responsive.w(14)),
-                    child: Text('No matching products',
+                    child: Text(
+                        allAdded ? 'All products already added' : 'No matching products',
                         style: AppTextStyles.caption(color: AppColors.textSecondary)),
                   )
                       : ListView.separated(

@@ -125,6 +125,14 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     _itemBoxQtyCtrl.text = _itemQtyCtrl.text;
   }
 
+  /// Product IDs already in the quotation, EXCLUDING the item that is
+  /// currently being edited (so it still shows in the dropdown while editing).
+  /// Used to hide already-added products from the "Select Product" list.
+  Set<String> get _addedProductIds => <String>{
+    for (var i = 0; i < _items.length; i++)
+      if (i != _editingItemIndex) _items[i].productId,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -403,6 +411,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     _itemFormKey.currentState?.reset();
   }
 
+  /// - blocks adding the same product twice (ignores the item being edited)
+  /// - try/catch so "Calculating…" can never get stuck if the call throws
   Future<void> _saveItemFromForm() async {
     if (_isAddingItem) return;
 
@@ -440,19 +450,37 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
       return;
     }
 
+    // Block duplicates (ignore the item currently being edited)
+    final alreadyAdded = _items.asMap().entries.any(
+          (e) => e.key != _editingItemIndex && e.value.productId == productIdStr,
+    );
+    if (alreadyAdded) {
+      _showError('This product is already added. Edit the existing item instead.');
+      return;
+    }
+
     _recomputeBoxQtyIfNeeded();
     final boxQuantity = _isBoxUnitProduct ? (double.tryParse(_itemBoxQtyCtrl.text) ?? 0) : null;
     final pieceQuantity = _isBoxUnitProduct ? (double.tryParse(_itemPieceQtyCtrl.text) ?? 0) : null;
 
     setState(() => _isAddingItem = true);
 
-    final result = await _quotationProvider.getProductIncentive(ProductIncentiveRequest(
-      productId: productId,
-      quantity: qty,
-      rate: rate,
-      boxQuantity: boxQuantity,
-      pieceQuantity: pieceQuantity,
-    ));
+    // try/catch so the loading flag is always reset
+    ProductIncentiveResult result;
+    try {
+      result = await _quotationProvider.getProductIncentive(ProductIncentiveRequest(
+        productId: productId,
+        quantity: qty,
+        rate: rate,
+        boxQuantity: boxQuantity,
+        pieceQuantity: pieceQuantity,
+      ));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isAddingItem = false);
+      _showError('Could not calculate the amount for this item. Please try again.');
+      return;
+    }
 
     if (!mounted) return;
 
@@ -606,6 +634,67 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
   // ---------------- Submit ----------------
 
+  /// NEW: runs before Save Changes.
+  /// If the salesman picked a product (or started editing an item) but never
+  /// tapped "Add Item" / "Update Item", ask what to do instead of silently
+  /// dropping it. Returns true when it is OK to continue saving.
+  Future<bool> _resolvePendingItem() async {
+    final editingIndex = _editingItemIndex;
+    final isEditing = editingIndex != null;
+    final hasPendingNew = !isEditing && _selectedProduct != null;
+
+    if (!isEditing && !hasPendingNew) return true;
+
+    final editingSaved = isEditing && !_isUnsavedItem(_items[editingIndex]);
+
+    final choice = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEditing ? 'Item not updated' : 'Item not added'),
+        content: Text(
+          isEditing
+              ? 'You changed item #${editingIndex + 1} but did not tap '
+              '"Update Item". Your changes will not be saved and the old '
+              'quantity/rate/amount will be kept.'
+              : 'You selected a product but did not tap "Add Item". '
+              'It will not be included in the quotation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('discard'),
+            child: Text(isEditing ? 'Keep old item' : 'Skip it'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('apply'),
+            child: Text(isEditing ? 'Update now' : 'Add now'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || choice == null) return false;
+
+    if (choice == 'discard') {
+      // Drop the half-filled form so stale values don't linger.
+      _resetItemForm();
+      return true;
+    }
+
+    // choice == 'apply'
+    await _saveItemFromForm(); // recalculates / updates the item
+    if (!mounted) return false;
+
+    // Saved rows are updated on the server through the bloc (async), so the
+    // salesman should tap Save Changes again once that finishes.
+    if (editingSaved) return false;
+
+    // Validation / API failed -> stay on screen so the user can fix it.
+    if (_editingItemIndex != null || _selectedProduct != null) return false;
+
+    return true;
+  }
+
   bool _validate() {
     final formValid = _formKey.currentState?.validate() ?? true;
     if (!formValid) {
@@ -624,7 +713,14 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     return t.isEmpty ? null : t;
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    // Read the bloc before any await so we don't use a stale context later.
+    final bloc = context.read<SalesmanQuotationBloc>();
+
+    // NEW: handle a forgotten Add Item / Update Item first.
+    final canContinue = await _resolvePendingItem();
+    if (!mounted || !canContinue) return;
+
     if (!_validate()) return;
 
     final request = QuotationUpdateRequest(
@@ -652,7 +748,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
     debugPrint('UPDATE BODY: ${jsonEncode(request.toJson())}');
 
-    context.read<SalesmanQuotationBloc>().add(QuotationUpdateSubmitted(request));
+    bloc.add(QuotationUpdateSubmitted(request));
   }
 
   @override
@@ -780,6 +876,8 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                                   editingProductId: _editingItemIndex != null
                                       ? _items[_editingItemIndex!].productId
                                       : null,
+                                  // Products already added are hidden from the list
+                                  addedProductIds: _addedProductIds,
                                   showSuggestions: _showProductSuggestions,
                                   onFieldTap: () =>
                                       setState(() => _showProductSuggestions = true),

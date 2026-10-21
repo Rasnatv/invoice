@@ -127,6 +127,14 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
 
   bool isUnsavedItem(OwnerEditItem item) => item.id.startsWith('new_');
 
+  /// NEW: product IDs already added to the quotation, EXCLUDING the item that
+  /// is currently being edited (so its product still shows while editing).
+  /// Used to hide those products from the "Select Product" suggestions.
+  Set<String> get addedProductIds => <String>{
+    for (var i = 0; i < items.length; i++)
+      if (i != editingItemIndex) items[i].productId,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -430,6 +438,16 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
       showError('Please select a product');
       return;
     }
+
+    // NEW: block duplicates (ignore the item currently being edited)
+    final alreadyAdded = items.asMap().entries.any(
+          (e) => e.key != editingItemIndex && e.value.productId == productIdStr,
+    );
+    if (alreadyAdded) {
+      showError('This product is already added. Edit the existing item instead.');
+      return;
+    }
+
     if (qty <= 0) {
       showError(isBoxUnitProduct
           ? 'Please enter a valid box/piece quantity'
@@ -616,6 +634,68 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
   }
 
   // ---- Submit ----
+
+  /// NEW: runs before Save Changes.
+  /// If the owner picked a product (or started editing an item) but never
+  /// tapped "Add Item" / "Update Item", ask what to do instead of silently
+  /// dropping it. Returns true when it is OK to continue saving.
+  Future<bool> resolvePendingItem() async {
+    final editingIndex = editingItemIndex;
+    final isEditing = editingIndex != null;
+    final hasPendingNew = !isEditing && selectedProduct != null;
+
+    if (!isEditing && !hasPendingNew) return true;
+
+    final editingSaved = isEditing && !isUnsavedItem(items[editingIndex]);
+
+    final choice = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEditing ? 'Item not updated' : 'Item not added'),
+        content: Text(
+          isEditing
+              ? 'You changed item #${editingIndex + 1} but did not tap '
+              '"Update Item". Your changes will not be saved and the old '
+              'quantity/rate/amount will be kept.'
+              : 'You selected a product but did not tap "Add Item". '
+              'It will not be included in the quotation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('discard'),
+            child: Text(isEditing ? 'Keep old item' : 'Skip it'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('apply'),
+            child: Text(isEditing ? 'Update now' : 'Add now'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || choice == null) return false;
+
+    if (choice == 'discard') {
+      // Drop the half-filled form so stale values don't linger.
+      resetItemForm();
+      return true;
+    }
+
+    // choice == 'apply'
+    await saveItemFromForm(); // recalculates / updates the item
+    if (!mounted) return false;
+
+    // Saved rows are updated on the server through the bloc (async), so the
+    // owner should tap Save Changes again once that finishes.
+    if (editingSaved) return false;
+
+    // Validation / API failed -> stay on screen so the owner can fix it.
+    if (editingItemIndex != null || selectedProduct != null) return false;
+
+    return true;
+  }
+
   bool validate() {
     final formValid = formKey.currentState?.validate() ?? true;
     final contractorValid = contractorFormKey.currentState?.validate() ?? true;
@@ -636,7 +716,14 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
     return t.isEmpty ? null : t;
   }
 
-  void submit() {
+  Future<void> submit() async {
+    // Read the bloc before any await so we don't use a stale context later.
+    final bloc = context.read<OwnerQuotationEditBloc>();
+
+    // NEW: handle a forgotten Add Item / Update Item first.
+    final canContinue = await resolvePendingItem();
+    if (!mounted || !canContinue) return;
+
     if (!validate()) return;
 
     final request = QuotationUpdateRequest(
@@ -664,7 +751,7 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
           .toList(),
     );
 
-    context.read<OwnerQuotationEditBloc>().add(OwnerQuotationUpdateSubmitted(request));
+    bloc.add(OwnerQuotationUpdateSubmitted(request));
   }
 
   // ---------------------------------------------------------------------
@@ -791,6 +878,8 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                               OwnerItemFormFields(
                                 formKey: itemFormKey,
                                 productField: OwnerProductDropdown(
+                                  // NEW: hide products already added
+                                  excludedProductIds: addedProductIds,
                                   searchCtrl: productSearchCtrl,
                                   focusNode: productSearchFocus,
                                   selectedProduct: selectedProduct,

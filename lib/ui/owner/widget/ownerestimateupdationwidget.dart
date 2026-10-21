@@ -682,6 +682,10 @@ class EstimateItemFormFields extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 // Product search (field + suggestion list)
+//
+// UPDATED: products whose IDs are in [excludedProductIds] (i.e. already added
+// to the estimate) are hidden from the suggestion list. The screen leaves the
+// item currently being edited out of that set, so it still shows while editing.
 // ---------------------------------------------------------------------------
 class EstimateProductSearch extends StatelessWidget {
   const EstimateProductSearch({
@@ -696,6 +700,7 @@ class EstimateProductSearch extends StatelessWidget {
     required this.onTextChanged,
     required this.onClear,
     required this.onSelected,
+    this.excludedProductIds = const {},
   });
 
   final bool loading;
@@ -708,6 +713,9 @@ class EstimateProductSearch extends StatelessWidget {
   final ValueChanged<String> onTextChanged;
   final VoidCallback onClear;
   final ValueChanged<EstimateActiveProduct> onSelected;
+
+  /// Product IDs already added to the estimate (hidden from suggestions).
+  final Set<String> excludedProductIds;
 
   @override
   Widget build(BuildContext context) {
@@ -723,9 +731,14 @@ class EstimateProductSearch extends StatelessWidget {
         selectedProduct != null && typed == estimateProductDisplayString(selectedProduct!);
     final query = showingChosenText ? '' : typed.toLowerCase();
 
+    // Hide products already added to the estimate
+    final available =
+    products.where((p) => !excludedProductIds.contains(p.id)).toList();
+    final allAdded = products.isNotEmpty && available.isEmpty;
+
     final filtered = query.isEmpty
-        ? products
-        : products.where((p) {
+        ? available
+        : available.where((p) {
       return p.name.toLowerCase().contains(query) ||
           p.company.toLowerCase().contains(query) ||
           p.size.toLowerCase().contains(query);
@@ -776,7 +789,10 @@ class EstimateProductSearch extends StatelessWidget {
               child: filtered.isEmpty
                   ? Padding(
                 padding: EdgeInsets.all(Responsive.w(14)),
-                child: Text('No matching products', style: _captionStyle),
+                child: Text(
+                  allAdded ? 'All products already added' : 'No matching products',
+                  style: _captionStyle,
+                ),
               )
                   : ListView.separated(
                 padding: EdgeInsets.zero,
