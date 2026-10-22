@@ -460,8 +460,10 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  Future<Response> rejectQuotation() async => dio.get(
-    ApiConstants.reject,
+  /// POST /quotations/reject — body: { id, rejection_notes }
+  Future<Response> rejectQuotation(Map<String, dynamic> data) async => dio.post(
+    ApiConstants.ownerquotationreject,
+    data: data,
     options: await _authOptions(),
   );
 
@@ -475,14 +477,12 @@ class ApiClient {
     options: await _authOptions(),
   );
 
-  /// POST /quotations/reject — body: { id, rejection_notes }
-  /// Replaces the old `rejectQuotation()` which incorrectly used GET.
+  /// POST /estimates/reject — body: { estimate_id, rejection_notes }
   Future<Response> rejectEstimate(Map<String, dynamic> data) async => dio.post(
-    ApiConstants.reject,
+    ApiConstants.estimatesReject,
     data: data,
     options: await _authOptions(),
   );
-
 
 
   /// despatch section

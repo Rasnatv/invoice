@@ -1,3 +1,4 @@
+
 abstract class DispatchListEvent {
   const DispatchListEvent();
 }
@@ -8,9 +9,13 @@ class FetchDispatchList extends DispatchListEvent {
 }
 
 /// Pull-to-refresh / re-fetch after returning from the detail screen.
-/// Keeps the current list on screen while the new one loads.
 class RefreshDispatchList extends DispatchListEvent {
   const RefreshDispatchList();
+}
+
+/// Load the next page when the user scrolls near the bottom.
+class LoadMoreDispatchList extends DispatchListEvent {
+  const LoadMoreDispatchList();
 }
 
 class SearchDispatchQueryChanged extends DispatchListEvent {

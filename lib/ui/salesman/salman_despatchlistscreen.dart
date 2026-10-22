@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -37,14 +36,46 @@ class _SalesmanDispatchListView extends StatefulWidget {
 
 class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
   final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController(); // pagination
 
   // True while a manual refresh (pull-to-refresh) is in flight.
   bool _isRefreshing = false;
 
   @override
+  void initState() {
+    super.initState();
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  /// Load the next page when the user is near the bottom.
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      context.read<DispatchListBloc>().add(const LoadMoreDispatchList());
+    }
+  }
+
+  /// Search is client-side, so a filtered list can be too short to scroll.
+  /// Keep loading pages until it fills or the server runs out.
+  void _maybeLoadMore(DispatchListState state) {
+    if (!state.hasMore || state.isLoadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final short =
+          !_scrollCtrl.hasClients || _scrollCtrl.position.maxScrollExtent <= 0;
+      if (short) {
+        context.read<DispatchListBloc>().add(const LoadMoreDispatchList());
+      }
+    });
   }
 
   void _onCardTap(DispatchListItem dispatch) {
@@ -164,7 +195,16 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
       );
     }
 
+    // Keep fetching while the (filtered) list is too short to scroll.
+    // Skipped during a manual refresh, when the list isn't on screen.
+    if (!isRefreshing) _maybeLoadMore(state);
+
     if (state.filteredDispatches.isEmpty) {
+      // Still fetching more pages for this search: show a loader.
+      if (state.hasMore || state.isLoadingMore) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
       // Scrollable so pull-down refresh works even with no data.
       return RefreshIndicator(
         color: AppColors.primary,
@@ -204,6 +244,8 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
     final shimmerCount =
     state.filteredDispatches.length > 8 ? 8 : state.filteredDispatches.length;
 
+    final list = state.filteredDispatches;
+
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: () => _doRefresh(context),
@@ -214,12 +256,21 @@ class _SalesmanDispatchListViewState extends State<_SalesmanDispatchListView> {
         separatorHeight: Responsive.h(10),
       )
           : ListView.separated(
+        controller: _scrollCtrl,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: listPadding,
-        itemCount: state.filteredDispatches.length,
+        itemCount: list.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
         itemBuilder: (context, i) {
-          final d = state.filteredDispatches[i];
+          // Bottom loader while the next page loads.
+          if (i >= list.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final d = list[i];
           return _DispatchCard(
             key: ValueKey('${d.id}_${d.status}'),
             dispatch: d,

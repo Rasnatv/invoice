@@ -1,4 +1,9 @@
 
+double _parseAmount(dynamic value) {
+  final cleaned = value?.toString().replaceAll(',', '').trim() ?? '';
+  return double.tryParse(cleaned) ?? 0;
+}
+
 class SiteVisitListItemModel {
   final String id;
   final String customerName;
@@ -37,6 +42,9 @@ class SiteVisitListItemModel {
   }
 
   bool get hasThumbnail => thumbnailUrl.isNotEmpty;
+
+  /// [incentiveEarned] as a number (e.g. for ₹ formatting).
+  double get incentiveAmount => _parseAmount(incentiveEarned);
 }
 
 /// The "today" / "all" blocks in the /my response — both share this shape:
@@ -91,7 +99,8 @@ class SiteVisitMyDataModel {
     return SiteVisitMyDataModel(
       totalVisits: int.tryParse(json['total_visits']?.toString() ?? '') ?? 0,
       todayVisits: int.tryParse(json['today_visits']?.toString() ?? '') ?? 0,
-      totalIncentive: double.tryParse(json['total_incentive']?.toString() ?? '') ?? 0,
+      // Server sends e.g. "395,000.00" (with a comma) -> use _parseAmount.
+      totalIncentive: _parseAmount(json['total_incentive']),
       today: json['today'] is Map
           ? SiteVisitGroupModel.fromJson((json['today'] as Map).cast<String, dynamic>())
           : SiteVisitGroupModel.empty,

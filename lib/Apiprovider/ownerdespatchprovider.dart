@@ -9,14 +9,16 @@ import '../models/owner_models/owner_despatchmodellist.dart';
 class DispatchListResult {
   final bool success;
   final List<DispatchListItem> dispatches;
+  final bool hasMore;
   final String? errorMessage;
 
-  const DispatchListResult.success(this.dispatches)
+  const DispatchListResult.success(this.dispatches, {this.hasMore = false})
       : success = true,
         errorMessage = null;
 
   const DispatchListResult.failure(this.errorMessage)
       : success = false,
+        hasMore = false,
         dispatches = const [];
 }
 
@@ -39,14 +41,18 @@ class DispatchProvider {
 
   DispatchProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
-  /// GET /despatches/my
+  /// GET /despatches/my?page=&per_page=
   Future<DispatchListResult> getMyDispatches({int page = 1, int perPage = 10}) async {
     try {
       final response = await _apiClient.myDispatches(page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = DispatchListResponseModel.fromJson(response.data);
-        return DispatchListResult.success(parsed.data);
+        return DispatchListResult.success(
+          parsed.data,
+          // full page => there may be another page
+          hasMore: parsed.data.length >= perPage,
+        );
       }
       return DispatchListResult.failure(response.statusCode.toString());
     } on DioException catch (e) {
@@ -60,16 +66,12 @@ class DispatchProvider {
         () => _apiClient.showDispatch({'id': id}),
   );
 
-  /// POST /despatches/mark-in-transit — first step of the delivery flow.
+  /// POST /despatches/mark-in-transit
   Future<DispatchDetailResult> markInTransit(String id) => _detailCall(
         () => _apiClient.markInTransit({'id': id}),
   );
 
-  /// POST /despatches/mark-delivered — second step, only valid once the
-  /// dispatch is `in_transit`. Signatures are optional: either, both, or
-  /// neither may be supplied. When provided they're base64 PNG data URIs
-  /// (e.g. `data:image/png;base64,...`); the server responds with hosted
-  /// image URLs for whichever ones were uploaded.
+  /// POST /despatches/mark-delivered
   Future<DispatchDetailResult> markDelivered({
     required String id,
     String? customerSignatureBase64,
@@ -83,7 +85,6 @@ class DispatchProvider {
         }),
       );
 
-  
   Future<DispatchDetailResult> _detailCall(
       Future<Response> Function() request,
       ) async {
@@ -91,8 +92,7 @@ class DispatchProvider {
       final response = await request();
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // TEMP DEBUG — remove after checking
-        debugPrint('DISPATCH DETAIL RAW: ${response.data}');
+        debugPrint('DISPATCH DETAIL RAW: ${response.data}'); // TEMP DEBUG
 
         final parsed = DispatchDetailResponseModel.fromJson(response.data);
         return DispatchDetailResult.success(parsed.data);
@@ -102,4 +102,5 @@ class DispatchProvider {
       final message = await ApiErrorHandler.handleDioError(e);
       return DispatchDetailResult.failure(message);
     }
-  }}
+  }
+}

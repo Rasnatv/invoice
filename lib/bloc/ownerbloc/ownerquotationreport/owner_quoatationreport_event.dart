@@ -1,3 +1,4 @@
+
 import 'package:equatable/equatable.dart';
 
 abstract class QuotationReportEvent extends Equatable {
@@ -7,8 +8,8 @@ abstract class QuotationReportEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Dispatched on screen open, and again whenever the user edits the filter
-/// (type / person / date range / status) and re-generates the report.
+/// Dispatched on screen open, and again whenever the user changes the
+/// status filter. Always loads page 1 and resets the accumulated list.
 class FetchQuotationReport extends QuotationReportEvent {
   const FetchQuotationReport({
     required this.type,
@@ -19,7 +20,7 @@ class FetchQuotationReport extends QuotationReportEvent {
     this.status = 'all',
   });
 
-  /// 'salesman' or 'contractor' — sent as-is to the API.
+  /// '' (All), 'salesman' or 'contractor' — sent as-is to the API.
   final String type;
   final String personId;
 
@@ -33,5 +34,12 @@ class FetchQuotationReport extends QuotationReportEvent {
   final String status;
 
   @override
-  List<Object?> get props => [type, personId, personName, fromDate, toDate, status];
+  List<Object?> get props =>
+      [type, personId, personName, fromDate, toDate, status];
+}
+
+/// Dispatched when the user scrolls near the bottom of the list.
+/// Loads the next page for the filter currently held in the state.
+class LoadMoreQuotationReport extends QuotationReportEvent {
+  const LoadMoreQuotationReport();
 }

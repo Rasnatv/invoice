@@ -112,7 +112,62 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
   // 'all' is only ever the query value sent to the API; it never becomes a chip.
   String _selectedApiValue = 'all';
 
+  final ScrollController _scrollController = ScrollController();
+
   bool get _isAll => widget.personId.trim().isEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Near the bottom of the list -> ask for the next page.
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      _loadMore();
+    }
+  }
+
+  /// Dispatches page + 1 for the filter currently held in the bloc state.
+  /// The bloc itself ignores the event if a load is already running or
+  /// there are no more pages.
+  void _loadMore() {
+    final bloc = context.read<EstimateReportBloc>();
+    final s = bloc.state;
+    if (s is! EstimateReportLoaded || !s.hasMore || s.loadingMore) return;
+
+    bloc.add(FetchEstimateReport(
+      type: s.type,
+      personId: widget.personId,
+      personName: s.personName,
+      fromDate: s.fromDate,
+      toDate: s.toDate,
+      status: s.status,
+      page: s.page + 1,
+    ));
+  }
+
+  /// If the loaded rows don't fill the screen there is nothing to scroll,
+  /// so the scroll listener never fires. Load the next page directly.
+  void _loadMoreIfNotScrollable(EstimateReportLoaded state) {
+    if (!state.hasMore || state.loadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollController.position.maxScrollExtent <= 0) {
+        _loadMore();
+      }
+    });
+  }
 
   /// Runs once, on the first ('all') response — pulls every distinct
   /// status out of the rows the server returned.
@@ -140,6 +195,7 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
     });
   }
 
+  /// Fresh load (page 1) — replaces the list.
   void _fetch(String status) {
     context.read<EstimateReportBloc>().add(FetchEstimateReport(
       type: _apiTypeFor(widget.type, widget.personId),
@@ -148,6 +204,7 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
       fromDate: widget.startDate,
       toDate: widget.endDate,
       status: status,
+      page: 1,
     ));
   }
 
@@ -197,7 +254,7 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
         ? 'Estimate Salesman Report'
         : 'Estimate Contractor Report';
     final subtitle =
-        '${widget.personName} · ${DateFormat('dd').format(widget.startDate)}\u2013${DateFormat('dd MMM yyyy').format(widget.endDate)}';
+        '${widget.personName} · ${DateFormat('dd').format(widget.startDate)}–${DateFormat('dd MMM yyyy').format(widget.endDate)}';
 
     final listPadding = EdgeInsets.fromLTRB(
         Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
@@ -222,11 +279,15 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
         body: SafeArea(
           child: BlocConsumer<EstimateReportBloc, EstimateReportState>(
             listener: (context, state) {
+              if (state is! EstimateReportLoaded) return;
+
               // Only the first ('all') response builds the chip set.
-              if (state is EstimateReportLoaded &&
-                  _selectedApiValue == 'all') {
+              if (_selectedApiValue == 'all') {
                 _discoverStatusesIfNeeded(state.data.list);
               }
+
+              // Short first page -> nothing to scroll -> fetch next page.
+              _loadMoreIfNotScrollable(state);
             },
             builder: (context, state) {
               if (state is EstimateReportInitial ||
@@ -255,7 +316,7 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
 
               final loaded = state as EstimateReportLoaded;
               final summary = loaded.data.summary;
-              final rows = loaded.data.list;
+              final rows = loaded.data.list; // accumulated across all pages
 
               final hasEstimates = rows.isNotEmpty ||
                   _statusOptions.isNotEmpty ||
@@ -292,6 +353,7 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
               return RefreshIndicator(
                 onRefresh: () async => _fetch(_selectedApiValue),
                 child: ListView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: listPadding,
                   children: [
@@ -332,8 +394,11 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
                       children: [
                         const _SectionHeader('Estimates'),
                         _StatusPill(
-                          label:
-                          '${rows.length} ${rows.length == 1 ? 'estimate' : 'estimates'}',
+                          label: _countLabel(
+                            loaded: rows.length,
+                            total: summary.totalEstimates,
+                            filtered: _selectedApiValue != 'all',
+                          ),
                           color: AppColors.primary,
                         ),
                       ],
@@ -366,6 +431,20 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
                               style: AppTextStyles.subtitle()),
                         ),
                       ),
+
+                    // Footer: spinner while the next page is loading.
+                    if (loaded.loadingMore)
+                      Padding(
+                        padding:
+                        EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -375,6 +454,19 @@ class _OwnerEstimateReportViewState extends State<_OwnerEstimateReportView> {
       ),
     );
   }
+}
+
+/// "10 of 42 estimates" while more pages remain, "42 estimates" once
+/// everything is loaded. With a status filter on, the summary total may
+/// cover all statuses, so only the loaded count is shown.
+String _countLabel({
+  required int loaded,
+  required int total,
+  required bool filtered,
+}) {
+  final noun = loaded == 1 ? 'estimate' : 'estimates';
+  if (!filtered && total > loaded) return '$loaded of $total estimates';
+  return '$loaded $noun';
 }
 
 /// Compact Indian format: ₹18.4L / ₹1.2Cr / ₹9,400.

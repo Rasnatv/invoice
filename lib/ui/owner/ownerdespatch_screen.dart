@@ -14,18 +14,18 @@ import '../../widgets/owner_estimateshimmer.dart';
 import 'owner_despatchdetailscreen.dart';
 
 class OwnerdespatchScreen extends StatelessWidget {
-  const OwnerdespatchScreen({super.key, required this.refreshSignal}); // CHANGED
-  final ValueNotifier<int> refreshSignal; // NEW
+  const OwnerdespatchScreen({super.key, required this.refreshSignal});
+  final ValueNotifier<int> refreshSignal;
 
   @override
   Widget build(BuildContext context) {
-    return _OwnerdespatchView(refreshSignal: refreshSignal); // CHANGED
+    return _OwnerdespatchView(refreshSignal: refreshSignal);
   }
 }
 
 class _OwnerdespatchView extends StatefulWidget {
-  const _OwnerdespatchView({required this.refreshSignal}); // CHANGED
-  final ValueNotifier<int> refreshSignal; // NEW
+  const _OwnerdespatchView({required this.refreshSignal});
+  final ValueNotifier<int> refreshSignal;
 
   @override
   State<_OwnerdespatchView> createState() => _OwnerdespatchViewState();
@@ -34,23 +34,49 @@ class _OwnerdespatchView extends StatefulWidget {
 class _OwnerdespatchViewState extends State<_OwnerdespatchView> {
   bool _isRefreshing = false;
   final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController(); // pagination
 
-  // NEW
   @override
   void initState() {
     super.initState();
     widget.refreshSignal.addListener(_handleRefresh);
+    _scrollCtrl.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    widget.refreshSignal.removeListener(_handleRefresh); // NEW
+    widget.refreshSignal.removeListener(_handleRefresh);
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
+  /// Load the next page when the user is near the bottom.
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      context.read<DispatchListBloc>().add(const LoadMoreDispatchList());
+    }
+  }
+
+  /// Search is client-side, so a filtered list can be too short to scroll.
+  /// Keep loading pages until it fills or the server runs out.
+  void _maybeLoadMore(DispatchListState state) {
+    if (!state.hasMore || state.isLoadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final short =
+          !_scrollCtrl.hasClients || _scrollCtrl.position.maxScrollExtent <= 0;
+      if (short) {
+        context.read<DispatchListBloc>().add(const LoadMoreDispatchList());
+      }
+    });
+  }
+
   Future<void> _handleRefresh() async {
-    if (_isRefreshing) return; // NEW: ignore repeated taps
+    if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
     final bloc = context.read<DispatchListBloc>();
     bloc.add(const RefreshDispatchList());
@@ -61,7 +87,7 @@ class _OwnerdespatchViewState extends State<_OwnerdespatchView> {
         s.status == DispatchListStatus.success ||
             s.status == DispatchListStatus.failure,
       )
-          .timeout(const Duration(seconds: 20)); // NEW: never stuck on shimmer
+          .timeout(const Duration(seconds: 20));
     } catch (_) {}
     if (mounted) setState(() => _isRefreshing = false);
   }
@@ -85,11 +111,8 @@ class _OwnerdespatchViewState extends State<_OwnerdespatchView> {
     return NetworkAwareWrapper(
       child: Scaffold(
         backgroundColor: AppColors.background,
-
-        // ---------- APPBAR (unchanged) ----------
         appBar:
         AppBar(title: Text('My Dispatch Bills', style: AppTextStyles.h6())),
-
         body: SafeArea(
           child: Column(
             children: [
@@ -135,6 +158,9 @@ class _OwnerdespatchViewState extends State<_OwnerdespatchView> {
 
                     final list = state.filteredDispatches;
 
+                    // Keep fetching while the (filtered) list is too short to scroll.
+                    _maybeLoadMore(state);
+
                     return RefreshIndicator(
                       onRefresh: _handleRefresh,
                       child: list.isEmpty
@@ -170,12 +196,22 @@ class _OwnerdespatchViewState extends State<_OwnerdespatchView> {
                             ),
                       )
                           : ListView.separated(
+                        controller: _scrollCtrl,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: listPadding,
-                        itemCount: list.length,
+                        itemCount: list.length + (state.isLoadingMore ? 1 : 0),
                         separatorBuilder: (_, __) =>
                             SizedBox(height: Responsive.h(10)),
                         itemBuilder: (context, i) {
+                          // Bottom loader while the next page loads.
+                          if (i >= list.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                  child: CircularProgressIndicator()),
+                            );
+                          }
+
                           final dispatch = list[i];
                           return GestureDetector(
                             behavior: HitTestBehavior.opaque,

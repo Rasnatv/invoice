@@ -5,9 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import 'package:tileshop/ui/owner/widget/owner_quotataionupdateservice.dart';
 import 'package:tileshop/ui/owner/widget/ownerquoattionsdetailscreenwidget.dart';
-import '../../bloc/ownerbloc/ownercancel_quotation/ownercancelquotation_bloc.dart';
-import '../../bloc/ownerbloc/ownercancel_quotation/ownercancelquotation_event.dart';
-import '../../bloc/ownerbloc/ownercancel_quotation/ownercancelquotation_state.dart';
 import '../../bloc/ownerbloc/ownerquattaiondetail/ownerviewqtndetail_bloc.dart';
 import '../../bloc/ownerbloc/ownerquattaiondetail/ownerviewqtndetail_event.dart';
 import '../../bloc/ownerbloc/ownerquattaiondetail/ownerviewqtndetail_state.dart';
@@ -22,35 +19,47 @@ import 'ownerquotationeditscreen.dart';
 const Color _redColor = Color(0xFFDC2626);
 
 class OwnerQuotationDetailsScreen extends StatelessWidget {
-  const OwnerQuotationDetailsScreen({super.key, required this.quotationId});
+  const OwnerQuotationDetailsScreen({
+    super.key,
+    required this.quotationId,
+    this.isSalesmanQuotation,
+  });
 
   final String quotationId;
 
+  /// true  = opened from "Salesman Quotations" tab -> Approve + Reject
+  /// false = opened from "My Quotations" tab       -> Approve + Cancel
+  /// null  = unknown, falls back to the creator's role
+  final bool? isSalesmanQuotation;
+
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (_) => OwnerQuotationDetailBloc()
-            ..add(OwnerQuotationDetailRequested(quotationId)),
-        ),
-        BlocProvider(create: (_) => OwnerCancelQuotationBloc()),
-      ],
-      child: OwnerQuotationDetailsView(quotationId: quotationId),
+    return BlocProvider(
+      create: (_) => OwnerQuotationDetailBloc()
+        ..add(OwnerQuotationDetailRequested(quotationId)),
+      child: OwnerQuotationDetailsView(
+        quotationId: quotationId,
+        isSalesmanQuotation: isSalesmanQuotation,
+      ),
     );
   }
 }
 
 class OwnerQuotationDetailsView extends StatefulWidget {
-  const OwnerQuotationDetailsView({super.key, required this.quotationId});
+  const OwnerQuotationDetailsView({
+    super.key,
+    required this.quotationId,
+    this.isSalesmanQuotation,
+  });
   final String quotationId;
+  final bool? isSalesmanQuotation;
 
   @override
-  State<OwnerQuotationDetailsView> createState() => OwnerQuotationDetailsViewState();
+  State<OwnerQuotationDetailsView> createState() =>
+      OwnerQuotationDetailsViewState();
 }
 
 class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
-  // Cache the bloc reference while context is still safely attached.
   late final OwnerQuotationDetailBloc detailBloc;
 
   bool didChange = false;
@@ -72,7 +81,9 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
 
   @override
   void dispose() {
-    detailBloc.add(const OwnerQuotationDetailCleared());
+    if (!detailBloc.isClosed) {
+      detailBloc.add(const OwnerQuotationDetailCleared());
+    }
     super.dispose();
   }
 
@@ -86,7 +97,8 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
       s.detailStatus != OwnerQuotationDetailStatus.loading &&
           s.detailStatus != OwnerQuotationDetailStatus.initial,
     )
-        .timeout(const Duration(seconds: 20), onTimeout: () => detailBloc.state);
+        .timeout(const Duration(seconds: 20),
+        onTimeout: () => detailBloc.state);
   }
 
   bool checkIsOwner(QuotationDetailModel q) {
@@ -96,7 +108,8 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
   }
 
   /// Shows whatever message the backend sent in a plain dialog.
-  Future<void> showBackendMessage(String? message, {bool isError = false}) async {
+  Future<void> showBackendMessage(String? message,
+      {bool isError = false}) async {
     if (message == null || message.trim().isEmpty) return;
     if (!mounted) return;
     await showDialog<void>(
@@ -104,12 +117,14 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(isError ? 'Error' : 'Success', style: AppTextStyles.bodyBold()),
+        title: Text(isError ? 'Error' : 'Success',
+            style: AppTextStyles.bodyBold()),
         content: Text(message, style: AppTextStyles.body()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('OK', style: AppTextStyles.bodyBold(color: AppColors.primary)),
+            child: Text('OK',
+                style: AppTextStyles.bodyBold(color: AppColors.primary)),
           ),
         ],
       ),
@@ -122,7 +137,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
 
   Future<void> exportQuotation(QuotationDetailModel q, String type) async {
     if (exporting) return;
-    // Incentive column is hidden when the Owner created the quotation.
     final showIncentive = !checkIsOwner(q);
 
     setState(() => exporting = true);
@@ -130,13 +144,15 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
       if (type == 'pdf') {
         await QuotationExportService.sharePdf(q, showIncentive: showIncentive);
       } else if (type == 'excel') {
-        await QuotationExportService.shareExcel(q, showIncentive: showIncentive);
+        await QuotationExportService.shareExcel(q,
+            showIncentive: showIncentive);
       } else {
         await Clipboard.setData(
           ClipboardData(
             text: buildShareText(
               q,
-              NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0),
+              NumberFormat.currency(
+                  locale: 'en_IN', symbol: '₹', decimalDigits: 0),
               NumberFormat.decimalPattern('en_IN'),
             ),
           ),
@@ -149,7 +165,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     }
   }
 
-  /// Bottom sheet used by the Share button in the bottom bar.
   Future<void> showExportSheet(QuotationDetailModel q) async {
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -164,7 +179,8 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.picture_as_pdf_rounded, color: _redColor),
+                leading:
+                const Icon(Icons.picture_as_pdf_rounded, color: _redColor),
                 title: Text('Share as PDF', style: AppTextStyles.bodyBold()),
                 onTap: () => Navigator.of(sheetContext).pop('pdf'),
               ),
@@ -192,19 +208,44 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
 
     if (saved == true && mounted) {
       didChange = true;
-      context
-          .read<OwnerQuotationDetailBloc>()
-          .add(OwnerQuotationDetailRequested(widget.quotationId));
+      detailBloc.add(OwnerQuotationDetailRequested(widget.quotationId));
     }
   }
 
   Future<void> showApproveDialog(QuotationDetailModel q) async {
-    final request = await showApproveQuotationDialog(context, q, widget.quotationId);
+    final request =
+    await showApproveQuotationDialog(context, q, widget.quotationId);
     if (request == null || !mounted) return;
-    context.read<OwnerQuotationDetailBloc>().add(OwnerQuotationApproveRequested(request));
+    detailBloc.add(OwnerQuotationApproveRequested(request));
   }
 
-  Future<void> confirmAndCancel(QuotationDetailModel q) async {
+  // ---------------------------------------------------------------------
+  // Reject dialog  (POST /quotations/reject { id, rejection_notes })
+  //
+  // The TextEditingController now lives inside _RejectDialog (a
+  // StatefulWidget), so Flutter disposes it only after the dialog's
+  // closing animation has finished. This fixes
+  // "A TextEditingController was used after being disposed".
+  // ---------------------------------------------------------------------
+
+  Future<void> showRejectDialog() async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => const _RejectDialog(),
+    );
+
+    if (reason == null || reason.isEmpty || !mounted) return;
+    detailBloc.add(OwnerQuotationRejectRequested(
+      id: widget.quotationId,
+      rejectionNotes: reason,
+    ));
+  }
+
+  // ---------------------------------------------------------------------
+  // Cancel confirmation  (POST /quotations/cancel { id })
+  // ---------------------------------------------------------------------
+
+  Future<void> showCancelDialog() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -212,7 +253,7 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Cancel Quotation', style: AppTextStyles.bodyBold()),
         content: Text(
-          'Are you sure you want to cancel this quotation? This cannot be undone.',
+          'Are you sure you want to cancel this quotation?',
           style: AppTextStyles.body(),
         ),
         actions: [
@@ -225,7 +266,8 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _redColor,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text('Yes, Cancel',
@@ -235,11 +277,8 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
       ),
     );
 
-    if (confirmed == true && mounted) {
-      context.read<OwnerCancelQuotationBloc>().add(
-        OwnerCancelQuotationRequested(widget.quotationId),
-      );
-    }
+    if (confirmed != true || !mounted) return;
+    detailBloc.add(OwnerQuotationCancelRequested(widget.quotationId));
   }
 
   // ---------------------------------------------------------------------
@@ -249,9 +288,10 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-    // Totals / payment section shows paise, like the estimate screen.
-    final money = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+    final currency =
+    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final money =
+    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
     final number = NumberFormat.decimalPattern('en_IN');
 
     final listPadding = EdgeInsets.fromLTRB(
@@ -259,7 +299,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
 
     return NetworkAwareWrapper(
       child: PopScope(
-        // Always hand `didChange` back to whoever pushed this screen.
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
@@ -267,8 +306,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
         },
         child: Scaffold(
           backgroundColor: AppColors.background,
-
-          // ---------- APPBAR (same as Estimate details) ----------
           appBar: AppBar(
             title: Text('Owner Quotation Details', style: AppTextStyles.h6()),
             backgroundColor: AppColors.primary,
@@ -280,9 +317,10 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                   final q = state.detail;
                   if (q == null) return const SizedBox.shrink();
 
-                  final status = q.status.toLowerCase();
-                  // Edit hidden once approved or cancelled (final states).
-                  final hideEditIcon = status == 'approved' || status == 'cancelled';
+                  final status = q.status.toLowerCase().trim();
+                  final hideEditIcon = status.contains('approv') ||
+                      status.contains('cancel') ||
+                      status.contains('reject');
 
                   return Row(
                     mainAxisSize: MainAxisSize.min,
@@ -292,12 +330,15 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                         icon: exporting
                             ? _appBarSpinner
                             : const Icon(Icons.picture_as_pdf_rounded),
-                        onPressed: exporting ? null : () => exportQuotation(q, 'pdf'),
+                        onPressed:
+                        exporting ? null : () => exportQuotation(q, 'pdf'),
                       ),
                       IconButton(
                         tooltip: 'Share as Excel',
                         icon: const Icon(Icons.grid_on_rounded),
-                        onPressed: exporting ? null : () => exportQuotation(q, 'excel'),
+                        onPressed: exporting
+                            ? null
+                            : () => exportQuotation(q, 'excel'),
                       ),
                       if (!hideEditIcon)
                         IconButton(
@@ -312,332 +353,501 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
             ],
           ),
           body: SafeArea(
-            child: BlocListener<OwnerCancelQuotationBloc, OwnerCancelQuotationState>(
-              listenWhen: (previous, current) => previous.status != current.status,
-              listener: (context, cancelState) async {
-                if (cancelState.status == OwnerCancelQuotationStatus.success) {
+            child:
+            BlocConsumer<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
+              listenWhen: (previous, current) =>
+              previous.approveStatus != current.approveStatus ||
+                  previous.actionStatus != current.actionStatus,
+              listener: (context, state) async {
+                // ---- approve result ----
+                if (state.approveStatus ==
+                    OwnerQuotationApproveStatus.success) {
                   didChange = true;
-                  await showBackendMessage(cancelState.message);
-                  if (mounted) Navigator.of(context).pop(true);
-                } else if (cancelState.status == OwnerCancelQuotationStatus.failure) {
-                  await showBackendMessage(cancelState.errorMessage, isError: true);
+                  ownerDataRefresh.value++;
+                  await showBackendMessage(state.approveMessage);
                   if (mounted) {
-                    context
-                        .read<OwnerCancelQuotationBloc>()
-                        .add(const OwnerCancelQuotationResultConsumed());
+                    detailBloc.add(const OwnerQuotationApproveResultConsumed());
+                  }
+                } else if (state.approveStatus ==
+                    OwnerQuotationApproveStatus.failure) {
+                  await showBackendMessage(state.approveError, isError: true);
+                  if (mounted) {
+                    detailBloc.add(const OwnerQuotationApproveResultConsumed());
+                  }
+                }
+
+                // ---- reject / cancel result ----
+                if (state.actionStatus == OwnerQuotationActionStatus.success) {
+                  didChange = true;
+                  ownerDataRefresh.value++;
+                  await showBackendMessage(state.actionMessage);
+                  if (mounted) {
+                    detailBloc.add(const OwnerQuotationActionResultConsumed());
+                  }
+                } else if (state.actionStatus ==
+                    OwnerQuotationActionStatus.failure) {
+                  await showBackendMessage(state.actionError, isError: true);
+                  if (mounted) {
+                    detailBloc.add(const OwnerQuotationActionResultConsumed());
                   }
                 }
               },
-              child: BlocConsumer<OwnerQuotationDetailBloc, OwnerQuotationDetailState>(
-                listenWhen: (previous, current) =>
-                previous.approveStatus != current.approveStatus,
-                listener: (context, state) async {
-                  if (state.approveStatus == OwnerQuotationApproveStatus.success) {
-                    didChange = true;
-                    ownerDataRefresh.value++;
-                    await showBackendMessage(state.approveMessage);
-                    if (mounted) {
-                      context
-                          .read<OwnerQuotationDetailBloc>()
-                          .add(const OwnerQuotationApproveResultConsumed());
-                    }
-                  } else if (state.approveStatus == OwnerQuotationApproveStatus.failure) {
-                    await showBackendMessage(state.approveError, isError: true);
-                    if (mounted) {
-                      context
-                          .read<OwnerQuotationDetailBloc>()
-                          .add(const OwnerQuotationApproveResultConsumed());
-                    }
-                  }
-                },
-                builder: (context, state) {
-                  // ---- loading skeleton (only when nothing to show yet) ----
-                  if ((state.detailStatus == OwnerQuotationDetailStatus.loading ||
-                      state.detailStatus == OwnerQuotationDetailStatus.initial) &&
-                      state.detail == null) {
-                    return ShimmerListPlaceholder(
-                      itemCount: 5,
-                      padding: listPadding,
-                      separatorHeight: Responsive.h(10),
-                      itemBuilder: (context, i) => const _DetailCardSkeleton(),
-                    );
-                  }
+              builder: (context, state) {
+                // ---- loading skeleton ----
+                if ((state.detailStatus == OwnerQuotationDetailStatus.loading ||
+                    state.detailStatus ==
+                        OwnerQuotationDetailStatus.initial) &&
+                    state.detail == null) {
+                  return ShimmerListPlaceholder(
+                    itemCount: 5,
+                    padding: listPadding,
+                    separatorHeight: Responsive.h(10),
+                    itemBuilder: (context, i) => const _DetailCardSkeleton(),
+                  );
+                }
 
-                  // ---- error ----
-                  if (state.detailStatus == OwnerQuotationDetailStatus.failure) {
-                    return RefreshIndicator(
-                      onRefresh: refresh,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                            child: _ErrorView(
-                              message: state.detailError ?? 'Failed to load quotation.',
-                              onRetry: () => context
-                                  .read<OwnerQuotationDetailBloc>()
-                                  .add(OwnerQuotationDetailRequested(widget.quotationId)),
-                            ),
+                // ---- error ----
+                if (state.detailStatus == OwnerQuotationDetailStatus.failure) {
+                  return RefreshIndicator(
+                    onRefresh: refresh,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints:
+                          BoxConstraints(minHeight: constraints.maxHeight),
+                          child: _ErrorView(
+                            message:
+                            state.detailError ?? 'Failed to load quotation.',
+                            onRetry: () => detailBloc.add(
+                                OwnerQuotationDetailRequested(
+                                    widget.quotationId)),
                           ),
                         ),
                       ),
-                    );
-                  }
+                    ),
+                  );
+                }
 
-                  final q = state.detail;
-                  if (q == null) {
-                    return RefreshIndicator(
-                      onRefresh: refresh,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) => SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                            child: Center(
-                              child: Text('No data found.',
-                                  style: AppTextStyles.subtitle()),
-                            ),
+                final q = state.detail;
+                if (q == null) {
+                  return RefreshIndicator(
+                    onRefresh: refresh,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints:
+                          BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Center(
+                            child: Text('No data found.',
+                                style: AppTextStyles.subtitle()),
                           ),
                         ),
                       ),
-                    );
-                  }
+                    ),
+                  );
+                }
 
-                  final status = q.status.toLowerCase();
-                  final isApproved = status == 'approved';
-                  final isCancelled = status == 'cancelled';
-                  // Approve + Cancel only for 'draft' and 'send'.
-                  final showActionButtons = status == 'draft' || status == 'send';
-                  final isApproving =
-                      state.approveStatus == OwnerQuotationApproveStatus.inProgress;
-                  // Incentive figures are salesman-facing; hide for Owner.
-                  final isOwner = checkIsOwner(q);
-                  final hasAnyMrp = q.items.any((i) => i.mrp > 0);
-                  final hasAnyCompany =
-                  q.items.any((i) => i.companyName.trim().isNotEmpty);
-                  final hasBoxQty = q.items.any((i) => i.boxQuantity > 0);
-                  final hasPieceQty = q.items.any((i) => i.pieceQuantity > 0);
+                // ---------------- status logic ----------------
+                final status = q.status.toLowerCase().trim();
 
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: RefreshIndicator(
-                          onRefresh: refresh,
-                          child: ListView(
-                            // Pull-to-refresh works even when content is short
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: listPadding,
+                // Used for hiding incentive figures on owner-created quotations.
+                final isOwner = checkIsOwner(q);
+
+                // Which tab was it opened from? Falls back to creator's role.
+                final isSalesmanQuotation =
+                    widget.isSalesmanQuotation ?? !isOwner;
+
+                final isApproved = status.contains('approv');
+                final isCancelled = status.contains('cancel');
+                final isRejected = status.contains('reject');
+                final isFinal = isApproved || isCancelled || isRejected;
+
+                // Adjust to the exact status strings your API returns.
+                const approvableStatuses = {
+                  'draft',
+                  'send',
+                  'sent',
+                  'submitted',
+                  'pending',
+                };
+                final showApproveButton =
+                    !isFinal && approvableStatuses.contains(status);
+
+                // Salesman's quotation -> owner can REJECT it.
+                final showRejectButton = isSalesmanQuotation && !isFinal;
+
+                // Owner's own quotation -> owner can CANCEL it.
+                final showCancelButton = !isSalesmanQuotation && !isFinal;
+
+                final isApproving = state.approveStatus ==
+                    OwnerQuotationApproveStatus.inProgress;
+                final isRejecting =
+                    state.actionStatus == OwnerQuotationActionStatus.inProgress &&
+                        state.actionType == OwnerQuotationActionType.reject;
+                final isCancelling =
+                    state.actionStatus == OwnerQuotationActionStatus.inProgress &&
+                        state.actionType == OwnerQuotationActionType.cancel;
+                final isBusy = isApproving || isRejecting || isCancelling;
+
+                final hasAnyMrp = q.items.any((i) => i.mrp > 0);
+                final hasAnyCompany =
+                q.items.any((i) => i.companyName.trim().isNotEmpty);
+                final hasBoxQty = q.items.any((i) => i.boxQuantity > 0);
+                final hasPieceQty = q.items.any((i) => i.pieceQuantity > 0);
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: refresh,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: listPadding,
+                          children: [
+                            QuotationHeader(q: q),
+                            SizedBox(height: Responsive.h(14)),
+
+                            if (q.notes.isNotEmpty) ...[
+                              DetailSection(
+                                title: 'Notes',
+                                icon: Icons.sticky_note_2_outlined,
+                                rows: [
+                                  DetailRow('Notes', q.notes,
+                                      icon: Icons.sticky_note_2_outlined),
+                                ],
+                              ),
+                              SizedBox(height: Responsive.h(14)),
+                            ],
+
+                            DetailSection(
+                              title: 'Customer Details',
+                              icon: Icons.groups_2_outlined,
+                              rows: [
+                                DetailRow('Name', q.customer.name,
+                                    icon: Icons.groups_2_outlined),
+                                DetailRow('Phone', q.customer.phone,
+                                    icon: Icons.phone_outlined),
+                                DetailRow('Email', q.customer.email,
+                                    icon: Icons.email_outlined),
+                                DetailRow('Address', q.customer.address,
+                                    icon: Icons.location_on_outlined),
+                              ],
+                            ),
+                            SizedBox(height: Responsive.h(14)),
+                            DetailSection(
+                              title: 'Contractor Details',
+                              icon: Icons.engineering_outlined,
+                              rows: [
+                                DetailRow('Name', q.contractor.name,
+                                    icon: Icons.person_outline),
+                                DetailRow('Mobile', q.contractor.mobile,
+                                    icon: Icons.phone_outlined),
+                                DetailRow('Email', q.contractor.email,
+                                    icon: Icons.email_outlined),
+                              ],
+                            ),
+                            if (q.salesman.employeeCode.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(14)),
+                              DetailSection(
+                                title: 'Salesman',
+                                icon: Icons.badge_outlined,
+                                rows: [
+                                  DetailRow(
+                                      'Created By',
+                                      q.createdBy.name.isEmpty
+                                          ? '-'
+                                          : q.createdBy.name,
+                                      icon: Icons.badge_outlined),
+                                ],
+                              ),
+                            ],
+                            SizedBox(height: Responsive.h(18)),
+
+                            // ---- Items ----
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const QSectionHeader('Items'),
+                                QStatusPill(
+                                  label:
+                                  '${q.itemsCount} ${q.itemsCount == 1 ? 'item' : 'items'}',
+                                  color: AppColors.primary,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: Responsive.h(10)),
+                            InvoiceTable(
+                              items: q.items,
+                              showCompany: hasAnyCompany,
+                              showMrp: hasAnyMrp,
+                              showBox: hasBoxQty,
+                              showPiece: hasPieceQty,
+                              showIncentive: !isOwner,
+                              currency: currency,
+                              number: number,
+                            ),
+                            SizedBox(height: Responsive.h(14)),
+
+                            // ---- Summary ----
+                            TotalsCard(q: q, money: money, number: number),
+
+                            // ---- Payments ----
+                            if (q.payments.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(14)),
+                              PaymentsCard(q: q, money: money),
+                            ],
+
+                            // ---- Total incentive (hidden for Owner) ----
+                            if (!isOwner) ...[
+                              SizedBox(height: Responsive.h(14)),
+                              IncentiveCard(
+                                amountText: currency.format(
+                                  q.items.fold<double>(
+                                      0, (s, i) => s + i.incentiveAmount),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // ---- Bottom action bar ----
+                    Container(
+                      decoration: const BoxDecoration(
+                        color: AppColors.background,
+                        border: Border(top: BorderSide(color: AppColors.border)),
+                      ),
+                      padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                          Responsive.h(10), Responsive.w(20), Responsive.h(14)),
+                      child: Builder(
+                        builder: (context) {
+                          final buttonHeight = Responsive.h(48);
+                          final buttonShape = RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14));
+
+                          Widget primaryArea() {
+                            if (isApproved) {
+                              return _StatusBanner(
+                                height: buttonHeight,
+                                icon: Icons.check_circle_rounded,
+                                label: 'Quotation Approved',
+                                color: AppColors.success,
+                              );
+                            }
+                            if (isCancelled) {
+                              return _StatusBanner(
+                                height: buttonHeight,
+                                icon: Icons.cancel_rounded,
+                                label: 'Quotation Cancelled',
+                                color: _redColor,
+                              );
+                            }
+                            if (isRejected) {
+                              return _StatusBanner(
+                                height: buttonHeight,
+                                icon: Icons.block_rounded,
+                                label: 'Quotation Rejected',
+                                color: _redColor,
+                              );
+                            }
+                            if (showApproveButton) {
+                              return SizedBox(
+                                height: buttonHeight,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: buttonShape,
+                                  ),
+                                  onPressed:
+                                  isBusy ? null : () => showApproveDialog(q),
+                                  child: Text(
+                                    isApproving
+                                        ? 'Approving...'
+                                        : 'Approve Quotation',
+                                    style: AppTextStyles.bodyBold(
+                                        color: Colors.white),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          }
+
+                          final hasSecondaryRow =
+                              showRejectButton || showCancelButton;
+
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              QuotationHeader(q: q),
-                              SizedBox(height: Responsive.h(14)),
-
-                              if (q.notes.isNotEmpty) ...[
-                                DetailSection(
-                                  title: 'Notes',
-                                  icon: Icons.sticky_note_2_outlined,
-                                  rows: [
-                                    DetailRow('Notes', q.notes,
-                                        icon: Icons.sticky_note_2_outlined),
-                                  ],
-                                ),
-                                SizedBox(height: Responsive.h(14)),
-                              ],
-
-                              DetailSection(
-                                title: 'Customer Details',
-                                icon: Icons.groups_2_outlined,
-                                rows: [
-                                  DetailRow('Name', q.customer.name,
-                                      icon: Icons.groups_2_outlined),
-                                  DetailRow('Phone', q.customer.phone,
-                                      icon: Icons.phone_outlined),
-                                  DetailRow('Email', q.customer.email,
-                                      icon: Icons.email_outlined),
-                                  DetailRow('Address', q.customer.address,
-                                      icon: Icons.location_on_outlined),
-                                ],
-                              ),
-                              SizedBox(height: Responsive.h(14)),
-                              DetailSection(
-                                title: 'Contractor Details',
-                                icon: Icons.engineering_outlined,
-                                rows: [
-                                  DetailRow('Name', q.contractor.name,
-                                      icon: Icons.person_outline),
-                                  DetailRow('Mobile', q.contractor.mobile,
-                                      icon: Icons.phone_outlined),
-                                  DetailRow('Email', q.contractor.email,
-                                      icon: Icons.email_outlined),
-                                ],
-                              ),
-                              if (q.salesman.employeeCode.isNotEmpty) ...[
-                                SizedBox(height: Responsive.h(14)),
-                                DetailSection(
-                                  title: 'Salesman',
-                                  icon: Icons.badge_outlined,
-                                  rows: [
-                                    DetailRow(
-                                        'Created By',
-                                        q.createdBy.name.isEmpty ? '-' : q.createdBy.name,
-                                        icon: Icons.badge_outlined),
-                                  ],
-                                ),
-                              ],
-                              SizedBox(height: Responsive.h(18)),
-
-                              // ---- Items ----
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const QSectionHeader('Items'),
-                                  QStatusPill(
-                                    label:
-                                    '${q.itemsCount} ${q.itemsCount == 1 ? 'item' : 'items'}',
-                                    color: AppColors.primary,
+                                  RoundIconButton(
+                                    icon: Icons.share_outlined,
+                                    tooltip: 'Share / Export',
+                                    onPressed: exporting
+                                        ? null
+                                        : () => showExportSheet(q),
                                   ),
+                                  SizedBox(width: Responsive.w(10)),
+                                  Expanded(child: primaryArea()),
                                 ],
                               ),
-                              SizedBox(height: Responsive.h(10)),
-                              InvoiceTable(
-                                items: q.items,
-                                showCompany: hasAnyCompany,
-                                showMrp: hasAnyMrp,
-                                showBox: hasBoxQty,
-                                showPiece: hasPieceQty,
-                                showIncentive: !isOwner,
-                                currency: currency,
-                                number: number,
-                              ),
-                              SizedBox(height: Responsive.h(14)),
-
-                              // ---- Summary ----
-                              TotalsCard(q: q, money: money, number: number),
-
-                              // ---- Payments ----
-                              if (q.payments.isNotEmpty) ...[
-                                SizedBox(height: Responsive.h(14)),
-                                PaymentsCard(q: q, money: money),
-                              ],
-
-                              // ---- Total incentive (hidden for Owner) ----
-                              if (!isOwner) ...[
-                                SizedBox(height: Responsive.h(14)),
-                                IncentiveCard(
-                                  amountText: currency.format(
-                                    q.items.fold<double>(
-                                        0, (s, i) => s + i.incentiveAmount),
-                                  ),
+                              if (hasSecondaryRow) ...[
+                                SizedBox(height: Responsive.h(10)),
+                                Row(
+                                  children: [
+                                    // Salesman quotation -> Reject
+                                    if (showRejectButton)
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: buttonHeight,
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: _redColor,
+                                              side: const BorderSide(
+                                                  color: _redColor),
+                                              shape: buttonShape,
+                                            ),
+                                            onPressed: isBusy
+                                                ? null
+                                                : showRejectDialog,
+                                            child: Text(
+                                              isRejecting
+                                                  ? 'Rejecting...'
+                                                  : 'Reject Quotation',
+                                              style: AppTextStyles.bodyBold(
+                                                  color: _redColor),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    // Owner's own quotation -> Cancel
+                                    if (showCancelButton)
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: buttonHeight,
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: _redColor,
+                                              side: const BorderSide(
+                                                  color: _redColor),
+                                              shape: buttonShape,
+                                            ),
+                                            onPressed: isBusy
+                                                ? null
+                                                : showCancelDialog,
+                                            child: Text(
+                                              isCancelling
+                                                  ? 'Cancelling...'
+                                                  : 'Cancel Quotation',
+                                              style: AppTextStyles.bodyBold(
+                                                  color: _redColor),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ],
-                          ),
-                        ),
+                          );
+                        },
                       ),
-
-                      // ---- Bottom action bar ----
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: AppColors.background,
-                          border: Border(top: BorderSide(color: AppColors.border)),
-                        ),
-                        padding: EdgeInsets.fromLTRB(Responsive.w(20),
-                            Responsive.h(10), Responsive.w(20), Responsive.h(14)),
-                        child: BlocBuilder<OwnerCancelQuotationBloc,
-                            OwnerCancelQuotationState>(
-                          builder: (context, cancelState) {
-                            final isCancelling = cancelState.status ==
-                                OwnerCancelQuotationStatus.inProgress;
-                            final buttonHeight = Responsive.h(48);
-                            final buttonShape = RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14));
-
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    RoundIconButton(
-                                      icon: Icons.share_outlined,
-                                      tooltip: 'Share / Export',
-                                      onPressed: exporting ? null : () => showExportSheet(q),
-                                    ),
-                                    SizedBox(width: Responsive.w(10)),
-                                    Expanded(
-                                      child: isApproved
-                                          ? _StatusBanner(
-                                        height: buttonHeight,
-                                        icon: Icons.check_circle_rounded,
-                                        label: 'Quotation Approved',
-                                        color: AppColors.success,
-                                      )
-                                          : isCancelled
-                                          ? _StatusBanner(
-                                        height: buttonHeight,
-                                        icon: Icons.cancel_rounded,
-                                        label: 'Quotation Cancelled',
-                                        color: _redColor,
-                                      )
-                                          : showActionButtons
-                                          ? SizedBox(
-                                        height: buttonHeight,
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            shape: buttonShape,
-                                          ),
-                                          onPressed: (isApproving || isCancelling)
-                                              ? null
-                                              : () => showApproveDialog(q),
-                                          child: Text(
-                                            isApproving
-                                                ? 'Approving...'
-                                                : 'Approve Quotation',
-                                            style: AppTextStyles.bodyBold(
-                                                color: Colors.white),
-                                          ),
-                                        ),
-                                      )
-                                          : const SizedBox.shrink(),
-                                    ),
-                                  ],
-                                ),
-                                if (showActionButtons) ...[
-                                  SizedBox(height: Responsive.h(10)),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: buttonHeight,
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: _redColor,
-                                        side: const BorderSide(color: _redColor),
-                                        shape: buttonShape,
-                                      ),
-                                      onPressed: (isApproving || isCancelling)
-                                          ? null
-                                          : () => confirmAndCancel(q),
-                                      icon: const Icon(Icons.cancel_outlined, size: 18),
-                                      label: Text(
-                                        isCancelling ? 'Cancelling...' : 'Cancel Quotation',
-                                        style: AppTextStyles.bodyBold(color: _redColor),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+// =====================================================================
+// REJECT DIALOG (owns its own TextEditingController)
+// =====================================================================
+
+class _RejectDialog extends StatefulWidget {
+  const _RejectDialog();
+
+  @override
+  State<_RejectDialog> createState() => _RejectDialogState();
+}
+
+class _RejectDialogState extends State<_RejectDialog> {
+  final TextEditingController _reasonController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    // Flutter calls this only after the dialog is fully removed from the
+    // tree, so the TextFormField can never touch a disposed controller.
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text('Reject Quotation', style: AppTextStyles.bodyBold()),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _reasonController,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          style: AppTextStyles.body(),
+          decoration: InputDecoration(
+            hintText: 'Why is this quotation being rejected?',
+            hintStyle: AppTextStyles.body(color: AppColors.textHint),
+            errorStyle: AppTextStyles.caption(color: AppColors.error),
+            filled: true,
+            fillColor: AppColors.background,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: Responsive.w(14),
+              vertical: Responsive.h(14),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (v) =>
+          (v == null || v.trim().isEmpty) ? 'Reason is required' : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Cancel',
+              style: AppTextStyles.bodyBold(color: AppColors.textSecondary)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _redColor,
+            elevation: 0,
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.of(context).pop(_reasonController.text.trim());
+            }
+          },
+          child: Text('Reject',
+              style: AppTextStyles.bodyBold(color: Colors.white)),
+        ),
+      ],
     );
   }
 }

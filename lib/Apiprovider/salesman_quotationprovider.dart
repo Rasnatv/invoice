@@ -160,7 +160,8 @@ class QuotationItemUpdateRequest {
 class QuotationProvider {
   final ApiClient _apiClient;
 
-  QuotationProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+  QuotationProvider({ApiClient? apiClient})
+      : _apiClient = apiClient ?? ApiClient();
 
   /// GET /site-visits/pending-dropdown
   Future<SiteVisitDropdownResult> getPendingSiteVisits() async {
@@ -213,7 +214,8 @@ class QuotationProvider {
 
   /// POST /quotations/product-incentive — live incentive preview for the
   /// item currently being entered on the Add Items step.
-  Future<ProductIncentiveResult> getProductIncentive(ProductIncentiveRequest request) async {
+  Future<ProductIncentiveResult> getProductIncentive(
+      ProductIncentiveRequest request) async {
     try {
       final response = await _apiClient.productIncentive(request.toJson());
 
@@ -232,7 +234,8 @@ class QuotationProvider {
   }
 
   /// POST /quotations/preview — server-calculated preview.
-  Future<QuotationPreviewResult> previewQuotation(QuotationPreviewRequest request) async {
+  Future<QuotationPreviewResult> previewQuotation(
+      QuotationPreviewRequest request) async {
     try {
       final response = await _apiClient.previewQuotation(request.toJson());
 
@@ -253,13 +256,15 @@ class QuotationProvider {
   /// POST /quotations/create
   /// `request.action` must be 'save_quotation' or 'submit' from the
   /// salesman screen, or 'approve' from the owner screen.
-  Future<QuotationActionResult> createQuotation(QuotationCreateRequest request) => _actionCall(
-        () => _apiClient.createQuotation(request.toJson()),
-        (data) {
-      final parsed = QuotationCreateResponseModel.fromJson(data);
-      return (status: parsed.status, message: parsed.message);
-    },
-  );
+  Future<QuotationActionResult> createQuotation(
+      QuotationCreateRequest request) =>
+      _actionCall(
+            () => _apiClient.createQuotation(request.toJson()),
+            (data) {
+          final parsed = QuotationCreateResponseModel.fromJson(data);
+          return (status: parsed.status, message: parsed.message);
+        },
+      );
 
   /// GET /quotations/my?page=&per_page= — the logged-in salesman/owner's own
   /// quotations, newest first (server-ordered), one page at a time.
@@ -268,7 +273,8 @@ class QuotationProvider {
     int perPage = 15,
   }) async {
     try {
-      final response = await _apiClient.myQuotations(page: page, perPage: perPage);
+      final response = await _apiClient.myQuotations(
+          page: page, perPage: perPage);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = QuotationListResponseModel.fromJson(response.data);
@@ -284,7 +290,8 @@ class QuotationProvider {
   /// POST /quotations/show — full detail of a single quotation/estimate.
   Future<QuotationDetailResult> getQuotationDetail(String id) async {
     try {
-      final response = await _apiClient.showQuotation(QuotationIdRequest(id).toJson());
+      final response = await _apiClient.showQuotation(
+          QuotationIdRequest(id).toJson());
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = QuotationDetailResponseModel.fromJson(response.data);
@@ -301,47 +308,65 @@ class QuotationProvider {
   }
 
   /// POST /quotations/update — updates an existing (draft) quotation.
-  Future<QuotationActionResult> updateQuotation(QuotationUpdateRequest request) => _actionCall(
-        () => _apiClient.updateQuotation(request.toJson()),
-        (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
-  );
+  Future<QuotationActionResult> updateQuotation(
+      QuotationUpdateRequest request) =>
+      _actionCall(
+            () => _apiClient.updateQuotation(request.toJson()),
+            (data) =>
+        (status: data['status']?.toString(), message: data['message']
+            ?.toString()),
+      );
 
   /// PUT /quotations/update-item — updates a single existing line item on a
   /// quotation without touching the rest of the quotation or its other items.
-  Future<QuotationActionResult> updateQuotationItem(QuotationItemUpdateRequest request) =>
+  Future<QuotationActionResult> updateQuotationItem(
+      QuotationItemUpdateRequest request) =>
       _actionCall(
             () => _apiClient.updateQuotationItem(request.toJson()),
-            (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
+            (data) =>
+        (status: data['status']?.toString(), message: data['message']
+            ?.toString()),
       );
 
   /// POST /quotations/delete
-  Future<QuotationActionResult> deleteQuotation(String id) => _actionCall(
-        () => _apiClient.deleteQuotation(QuotationIdRequest(id).toJson()),
-        (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
-  );
+  Future<QuotationActionResult> deleteQuotation(String id) =>
+      _actionCall(
+            () => _apiClient.deleteQuotation(QuotationIdRequest(id).toJson()),
+            (data) =>
+        (status: data['status']?.toString(), message: data['message']
+            ?.toString()),
+      );
 
   /// POST /quotations/submit — sends a saved (draft) quotation for
   /// admin/owner approval.
-  Future<QuotationActionResult> submitQuotationForApproval(String id) => _actionCall(
-        () => _apiClient.submitQuotation(QuotationIdRequest(id).toJson()),
-        (data) => (status: data['status']?.toString(), message: data['message']?.toString()),
-  );
+  Future<QuotationActionResult> submitQuotationForApproval(String id) =>
+      _actionCall(
+            () => _apiClient.submitQuotation(QuotationIdRequest(id).toJson()),
+            (data) =>
+        (status: data['status']?.toString(), message: data['message']
+            ?.toString()),
+      );
 
   /// POST /quotations/approve — owner-only.
-  Future<QuotationActionResult> approveQuotation(QuotationApproveRequest request) => _actionCall(
-        () => _apiClient.approveQuotation(request.toJson()),
-        (data) {
-      final parsed = QuotationApproveResponseModel.fromJson(data);
-      return (status: parsed.status, message: parsed.message);
-    },
-  );
+  Future<QuotationActionResult> approveQuotation(
+      QuotationApproveRequest request) =>
+      _actionCall(
+            () => _apiClient.approveQuotation(request.toJson()),
+            (data) {
+          final parsed = QuotationApproveResponseModel.fromJson(data);
+          return (status: parsed.status, message: parsed.message);
+        },
+      );
 
   /// Shared response handling for every /quotations/* action endpoint
   /// (create, update, update-item, delete, submit, approve). Each one
   /// reports success via a body `status` field rather than the HTTP status
   /// code alone, so [extract] pulls out that pair however the specific
   /// endpoint's body is shaped (raw map or a dedicated response model).
-  Future<QuotationActionResult> _actionCall(
+  Future<QuotationActionResult> _actionCall
+
+  (
+
   Future<Response> Function() request,
   ({String? status, String? message}) Function(dynamic data) extract,
   ) async {
@@ -361,4 +386,34 @@ class QuotationProvider {
   return QuotationActionResult(success: false, message: message);
   }
   }
+  /// POST /quotations/cancel — body: { id }
+  Future<QuotationActionResult> cancelQuotation(String id) => _actionCall(
+  () => _apiClient.cancelQuotation(QuotationIdRequest(id).toJson()),
+  (data) => (
+  status: data['status']?.toString(),
+  message: data['message']?.toString()
+  ),
+  );
+
+  /// POST /quotations/reject — owner-only (only the owner screen calls this).
+  Future<QuotationActionResult> rejectQuotation({
+  required String id,
+  required String rejectionNotes,
+  }) =>
+  _actionCall(
+  () => _apiClient.rejectQuotation({
+  'id': int.tryParse(id) ?? id,
+  'rejection_notes': rejectionNotes.trim(),
+  }),
+  (data) => (
+  status: data['status']?.toString(),
+  message: data['message']?.toString(
+
+  )
+
+  )
+
+  ,
+
+  );
 }

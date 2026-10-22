@@ -132,7 +132,7 @@ class ApiConstants {
   //ownerall
   static const String quotationsAll = '/quotations/all';
   //owner reject quoatation
-  static const String reject = '/quotations/reject';
+  static const String ownerquotationreject = '/quotations/reject';
   static const String estimatesApprove = '/estimates/approve';
 
   //despatch
@@ -227,5 +227,8 @@ static const String quotationsCancel='/quotations/cancel';
 
   static const String estimateUpdateItem = '/estimates/update-item';
   static const String quotationsUpdateItem='/quotations/update-item';
+
+  // Estimates
+  static const String estimatesReject = '/estimates/reject';
 
 }

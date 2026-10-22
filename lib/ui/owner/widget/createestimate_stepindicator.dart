@@ -601,16 +601,7 @@ class _PhoneSiteVisitField extends StatelessWidget {
   }
 }
 
-// =====================================================================
-// STEP 2 — ADD ITEMS
-// Amount is never computed locally. Box Qty / Piece Qty only render for
-// box-unit products. Limits: Quantity/Piece Qty -> 5 digits (+2 dec),
-// Rate -> 8 digits (+2 dec).
-//
-// UPDATED: products already added to the list are hidden from the
-// "Select Product" dropdown (the item currently being edited is NOT
-// hidden, so it still shows while editing).
-// =====================================================================
+
 
 class AddItemsStep extends StatelessWidget {
   const AddItemsStep({

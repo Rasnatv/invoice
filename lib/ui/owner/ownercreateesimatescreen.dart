@@ -355,16 +355,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     _itemRateCtrl.clear();
   }
 
-  /// Fires a FRESH POST /quotations/product-incentive with exactly what's
-  /// on the form right now — product_id, quantity, rate, box_quantity,
-  /// piece_quantity — waits for the real response, and adds/updates the
-  /// item using ONLY that response's amount/incentive fields. No cached
-  /// bloc state, no local quantity*rate fallback, ever.
-  ///
-  /// UPDATED:
-  ///  - blocks adding the same product twice (ignores the item being edited)
-  ///  - catches unexpected errors and shows a message (loading flag is still
-  ///    always reset by `finally`)
+
   Future<void> _addItemToList() async {
     if (_isAddingItem) return;
     if (!_validateCurrentItemFields()) return;
@@ -903,8 +894,8 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                       return 'Enter a valid value';
                                     }
                                     if (discType == QuotationDiscountType.percentage &&
-                                        parsed > 100) {
-                                      return 'Cannot exceed 100%';
+                                        parsed > 99) {
+                                      return 'Cannot exceed 99%';
                                     }
                                     if (discType != QuotationDiscountType.percentage &&
                                         parsed > DValidator.maxPrice) {

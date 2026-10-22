@@ -29,6 +29,7 @@ class _DsCol {
   static const double size = 120; // Size
   static const double unit = 150; // Unit
   static const double input = 110; // Box / Pcs inputs
+  static const double qty = 110; // Qty
 
   /// Box / Pcs accept at most this many digits.
   static const int maxQtyDigits = 6;
@@ -846,13 +847,14 @@ class _DespatchItemsTableState extends State<_DespatchItemsTable> {
               BorderSide(color: AppColors.border.withOpacity(0.30)),
             ),
             columnWidths: const {
-              0: FixedColumnWidth(_DsCol.sl), // #
-              1: FixedColumnWidth(_DsCol.item), // Item
-              2: FixedColumnWidth(_DsCol.text), // Company
-              3: FixedColumnWidth(_DsCol.size), // Size
-              4: FixedColumnWidth(_DsCol.unit), // Unit
-              5: FixedColumnWidth(_DsCol.input), // Box
-              6: FixedColumnWidth(_DsCol.input), // Pcs
+                0: FixedColumnWidth(_DsCol.sl),    // #
+                1: FixedColumnWidth(_DsCol.item),  // Item
+                2: FixedColumnWidth(_DsCol.text),  // Company
+                3: FixedColumnWidth(_DsCol.size),  // Size
+                4: FixedColumnWidth(_DsCol.unit),  // Unit
+                5: FixedColumnWidth(_DsCol.qty),   // Qty
+                6: FixedColumnWidth(_DsCol.input), // Box
+                7: FixedColumnWidth(_DsCol.input), // Pcs
             },
             children: [
               // ---- Header row ----
@@ -865,14 +867,15 @@ class _DespatchItemsTableState extends State<_DespatchItemsTable> {
                   ),
                 ),
                 children: [
-                  _headerCell('#', align: TextAlign.center),
-                  _headerCell('Item'),
-                  _headerCell('Company'),
-                  _headerCell('Size'),
-                  _headerCell('Unit'),
-                  _headerCell('Box', align: TextAlign.center),
-                  _headerCell('Pcs', align: TextAlign.center),
-                ],
+                    _headerCell('#', align: TextAlign.center),
+                    _headerCell('Item'),
+                    _headerCell('Company'),
+                    _headerCell('Size'),
+                    _headerCell('Unit'),
+                    _headerCell('Qty', align: TextAlign.center),   // NEW
+                    _headerCell('Box', align: TextAlign.center),
+                    _headerCell('Pcs', align: TextAlign.center),
+                  ],
               ),
               // ---- Data rows ----
               for (var i = 0; i < items.length; i++)
@@ -884,19 +887,17 @@ class _DespatchItemsTableState extends State<_DespatchItemsTable> {
                   ),
                   children: [
                     _dataCell('${i + 1}', align: TextAlign.center),
-                    _dataCell(items[i].productName,
-                        bold: true, maxLines: 3, vertical: 16),
-                    _dataCell(items[i].companyName.isEmpty
-                        ? '-'
-                        : items[i].companyName),
-                    _dataCell(items[i].productSize.isEmpty
-                        ? '-'
-                        : items[i].productSize),
+                    _dataCell(items[i].productName, bold: true, maxLines: 3, vertical: 16),
+                    _dataCell(items[i].companyName.isEmpty ? '-' : items[i].companyName),
+                    _dataCell(items[i].productSize.isEmpty ? '-' : items[i].productSize),
                     _dataCell(items[i].unit.isEmpty ? '-' : items[i].unit),
-                    _inputCell(
-                        widget.boxesCtrls[items[i].estimateItemId], 'Boxes'),
-                    _inputCell(
-                        widget.piecesCtrls[items[i].estimateItemId], 'Pieces'),
+                    _dataCell(                                      // NEW
+                      widget.qtyCtrls[items[i].estimateItemId]?.text ?? '-',
+                      align: TextAlign.center,
+                      bold: true,
+                    ),
+                    _inputCell(widget.boxesCtrls[items[i].estimateItemId], 'Boxes'),
+                    _inputCell(widget.piecesCtrls[items[i].estimateItemId], 'Pieces'),
                   ],
                 ),
             ],

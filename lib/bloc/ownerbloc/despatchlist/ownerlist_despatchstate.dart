@@ -9,6 +9,9 @@ class DispatchListState {
   final List<DispatchListItem> filteredDispatches;
   final String searchQuery;
   final String? errorMessage;
+  final int page;
+  final bool hasMore;
+  final bool isLoadingMore;
 
   const DispatchListState({
     this.status = DispatchListStatus.initial,
@@ -16,6 +19,9 @@ class DispatchListState {
     this.filteredDispatches = const [],
     this.searchQuery = '',
     this.errorMessage,
+    this.page = 1,
+    this.hasMore = false,
+    this.isLoadingMore = false,
   });
 
   DispatchListState copyWith({
@@ -25,6 +31,9 @@ class DispatchListState {
     String? searchQuery,
     String? errorMessage,
     bool clearError = false,
+    int? page,
+    bool? hasMore,
+    bool? isLoadingMore,
   }) {
     return DispatchListState(
       status: status ?? this.status,
@@ -32,6 +41,9 @@ class DispatchListState {
       filteredDispatches: filteredDispatches ?? this.filteredDispatches,
       searchQuery: searchQuery ?? this.searchQuery,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 }

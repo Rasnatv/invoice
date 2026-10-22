@@ -140,41 +140,6 @@ class OwnerviewQuotationProvider {
     }
   }
 
-  // ===================================================================
-  // CANCEL QUOTATION
-  // POST /quotations/cancel — body: { id }
-  //
-  // Same success/failure shape as updateQuotation() above: checks the
-  // HTTP status, pulls `message` straight off the raw response body on
-  // success, and routes DioExceptions through ApiErrorHandler on failure.
-  // `data` in the response is an empty object, so there's nothing else
-  // to parse out of it.
-  // ===================================================================
 
-  Future<QuotationCancelResult> cancelQuotation(String id) async {
-    try {
-      final response = await _apiClient.cancelQuotation({'id': id});
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final message = response.data['message']?.toString();
-
-        return QuotationCancelResult(
-          success: true,
-          message: message,
-        );
-      }
-
-      return QuotationCancelResult(
-        success: false,
-        errorMessage: response.statusCode.toString(),
-      );
-    } on DioException catch (e) {
-      final message = await ApiErrorHandler.handleDioError(e);
-
-      return QuotationCancelResult(
-        success: false,
-        errorMessage: message,
-      );
-    }
-  }
-}
+ }

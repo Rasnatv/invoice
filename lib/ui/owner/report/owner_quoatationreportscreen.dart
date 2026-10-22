@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -119,7 +120,45 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
   // 'all' is only ever the query value sent to the API; it never becomes a chip.
   String _selectedApiValue = 'all';
 
+  final ScrollController _scrollController = ScrollController();
+
   bool get _isAll => widget.personId.trim().isEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Ask the bloc for the next page when the user is near the bottom.
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200) {
+      context.read<QuotationReportBloc>().add(const LoadMoreQuotationReport());
+    }
+  }
+
+  /// If the loaded rows don't fill the screen there is nothing to scroll,
+  /// so the scroll listener would never fire. Load the next page directly.
+  void _loadMoreIfNotScrollable(QuotationReportLoaded state) {
+    if (!state.hasMore || state.isLoadingMore) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollController.position.maxScrollExtent <= 0) {
+        context
+            .read<QuotationReportBloc>()
+            .add(const LoadMoreQuotationReport());
+      }
+    });
+  }
 
   /// Runs once, on the first ('all') response — pulls every distinct
   /// status (status + status_label) from the rows the server returned.
@@ -168,7 +207,7 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
         ? 'Salesman Report'
         : 'Contractor Report';
     final subtitle =
-        '${widget.personName} · ${DateFormat('dd').format(widget.startDate)}\u2013${DateFormat('dd MMM yyyy').format(widget.endDate)}';
+        '${widget.personName} · ${DateFormat('dd').format(widget.startDate)}–${DateFormat('dd MMM yyyy').format(widget.endDate)}';
 
     final listPadding = EdgeInsets.fromLTRB(
         Responsive.w(20), Responsive.h(14), Responsive.w(20), Responsive.h(24));
@@ -187,11 +226,15 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
         body: SafeArea(
           child: BlocConsumer<QuotationReportBloc, QuotationReportState>(
             listener: (context, state) {
+              if (state is! QuotationReportLoaded) return;
+
               // Only the first ('all') response builds the chip set.
-              if (state is QuotationReportLoaded &&
-                  _selectedApiValue == 'all') {
-                _discoverStatusesIfNeeded(state.data.list);
+              if (_selectedApiValue == 'all') {
+                _discoverStatusesIfNeeded(state.rows);
               }
+
+              // Short first page -> nothing to scroll -> fetch next page.
+              _loadMoreIfNotScrollable(state);
             },
             builder: (context, state) {
               // 1. Loading -> spinner only.
@@ -210,7 +253,7 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
 
               final loaded = state as QuotationReportLoaded;
               final summary = loaded.data.summary;
-              final rows = loaded.data.list;
+              final rows = loaded.rows; // accumulated across all pages
 
               final hasBills = rows.isNotEmpty ||
                   _statusOptions.isNotEmpty ||
@@ -256,6 +299,7 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
               return RefreshIndicator(
                 onRefresh: () async => _fetch(_selectedApiValue),
                 child: ListView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: listPadding,
                   children: [
@@ -306,9 +350,13 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const _SectionHeader('Quotations'),
+                        // Show the server's total, not just what's loaded.
                         _StatusPill(
-                          label:
-                          '${rows.length} ${rows.length == 1 ? 'quotation' : 'quotations'}',
+                          label: _countLabel(
+                            loaded: rows.length,
+                            total: summary.totalQuotations,
+                            filtered: _selectedApiValue != 'all',
+                          ),
                           color: AppColors.primary,
                         ),
                       ],
@@ -336,6 +384,20 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
                               style: AppTextStyles.subtitle()),
                         ),
                       ),
+
+                    // Footer: spinner while the next page is loading.
+                    if (loaded.isLoadingMore)
+                      Padding(
+                        padding:
+                        EdgeInsets.symmetric(vertical: Responsive.h(16)),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -345,6 +407,19 @@ class _OwnerQuotationReportViewState extends State<_OwnerQuotationReportView> {
       ),
     );
   }
+}
+
+/// "10 of 42 quotations" while more pages remain, "42 quotations" once
+/// everything is loaded. When a status filter is on, the summary total
+/// may cover all statuses, so only the loaded count is shown.
+String _countLabel({
+  required int loaded,
+  required int total,
+  required bool filtered,
+}) {
+  final noun = loaded == 1 ? 'quotation' : 'quotations';
+  if (!filtered && total > loaded) return '$loaded of $total quotations';
+  return '$loaded $noun';
 }
 
 /// Compact Indian format: ₹18.4L / ₹1.2Cr / ₹9,400.

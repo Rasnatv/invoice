@@ -15,6 +15,7 @@ import '../../widgets/monthlysale.dart';
 import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/owner_widgets.dart'; // StatusBadge
 import '../../widgets/ownerdashboardscreen_shimmer.dart';
+import 'ownerestuimatedetailscreen.dart';
 
 class OwnerDashboardScreen extends StatelessWidget {
   const OwnerDashboardScreen({super.key});
@@ -109,7 +110,13 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
     if (!mounted) return;
     context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
   }
-
+  Future<void> _openAndRefresh(Widget screen) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+    if (!mounted) return;
+    context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
+  }
   bool _hasSalesData(List<dynamic> monthlySales) {
     if (monthlySales.isEmpty) return false;
     return monthlySales.any((m) => (m.total as num) > 0);
@@ -232,8 +239,11 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                               for (int i = 0; i < state.recentEstimates.length; i++) ...[
                                 _RecentEstimateCard(
                                   estimate: state.recentEstimates[i],
-                                  onTap: () => context.push(
-                                      '/owner/estimate-detail/${state.recentEstimates[i].id}'),
+                                  onTap: () => _openAndRefresh(
+                                    OwnerEstimateDetailsScreen(
+                                      estimateId: state.recentEstimates[i].id.toString(),
+                                    ),
+                                  ),
                                 ),
                                 if (i != state.recentEstimates.length - 1)
                                   SizedBox(height: Responsive.h(10)),

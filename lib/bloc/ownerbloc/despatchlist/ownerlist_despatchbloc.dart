@@ -1,3 +1,4 @@
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../Apiprovider/ownerdespatchprovider.dart';
@@ -11,6 +12,7 @@ class DispatchListBloc extends Bloc<DispatchListEvent, DispatchListState> {
   DispatchListBloc(this.provider) : super(const DispatchListState()) {
     on<FetchDispatchList>(_onFetch);
     on<RefreshDispatchList>(_onRefresh);
+    on<LoadMoreDispatchList>(_onLoadMore);
     on<SearchDispatchQueryChanged>(_onSearch);
   }
 
@@ -24,26 +26,61 @@ class DispatchListBloc extends Bloc<DispatchListEvent, DispatchListState> {
     await _load(emit);
   }
 
+  /// Always loads page 1 and resets paging.
   Future<void> _load(Emitter<DispatchListState> emit) async {
-    final result = await provider.getMyDispatches();
+    final result = await provider.getMyDispatches(page: 1);
 
     if (result.success) {
       emit(state.copyWith(
         status: DispatchListStatus.success,
         allDispatches: result.dispatches,
         filteredDispatches: _filter(result.dispatches, state.searchQuery),
+        page: 1,
+        hasMore: result.hasMore,
+        isLoadingMore: false,
         clearError: true,
       ));
       return;
     }
 
-    // On a real 401 with a valid token, ApiErrorHandler has already
-    // cleared it and redirected to LoginScreen — this screen will be
-    // popped shortly. If there was no token to clear, no redirect
-    // happens, so we still show the message instead of a blank state.
     emit(state.copyWith(
       status: DispatchListStatus.failure,
       errorMessage: result.errorMessage,
+      isLoadingMore: false,
+    ));
+  }
+
+  Future<void> _onLoadMore(
+      LoadMoreDispatchList event, Emitter<DispatchListState> emit) async {
+    if (!state.hasMore ||
+        state.isLoadingMore ||
+        state.status != DispatchListStatus.success) {
+      return;
+    }
+
+    emit(state.copyWith(isLoadingMore: true));
+
+    final nextPage = state.page + 1;
+    final result = await provider.getMyDispatches(page: nextPage);
+
+    if (!result.success) {
+      emit(state.copyWith(isLoadingMore: false));
+      return;
+    }
+
+    // skip duplicates in case a record moved between pages
+    final existingIds = state.allDispatches.map((d) => d.id).toSet();
+    final merged = [
+      ...state.allDispatches,
+      ...result.dispatches.where((d) => !existingIds.contains(d.id)),
+    ];
+
+    emit(state.copyWith(
+      allDispatches: merged,
+      filteredDispatches: _filter(merged, state.searchQuery),
+      page: nextPage,
+      hasMore: result.hasMore,
+      isLoadingMore: false,
     ));
   }
 

@@ -1103,8 +1103,8 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                               if (parsed == null || parsed < 0) {
                                 return 'Enter a valid value';
                               }
-                              if (discountType == 'percentage' && parsed > 100) {
-                                return 'Cannot exceed 100%';
+                              if (discountType == 'percentage' && parsed > 99) {
+                                return 'Cannot exceed 99%';
                               }
                               return null;
                             },
