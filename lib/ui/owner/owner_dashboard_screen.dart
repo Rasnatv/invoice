@@ -12,7 +12,6 @@ import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_state.dart';
 import '../../bloc/ownerbloc/ownerdashboard/ownerdashboard_bloc.dart';
 import 'package:tileshop/models/salesmanmodels/salesman_dashboardmodel.dart'; // DashboardHomeRecentEstimate etc.
 import '../../widgets/monthlysale.dart';
-import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/owner_widgets.dart'; // StatusBadge
 import '../../widgets/ownerdashboardscreen_shimmer.dart';
 import 'ownerestuimatedetailscreen.dart';
@@ -53,19 +52,24 @@ const List<_ActionGroup> _actionGroups = [
         primary: true),
     _ActionItem(Icons.request_quote_outlined, 'Quotations', '/owner/quotations',
         primary: true),
-    _ActionItem(Icons.inventory_2_outlined, 'Product Setup', '/owner/product-setup'),
+    _ActionItem(
+        Icons.inventory_2_outlined, 'Product Setup', '/owner/product-setup'),
   ]),
   _ActionGroup('Team', [
     _ActionItem(Icons.groups_2_outlined, 'Salesmen', '/owner/salesmen',
         primary: true),
-    _ActionItem(Icons.monetization_on_outlined, 'Salesman Incentive', '/owner/incentives'),
-    _ActionItem(Icons.calendar_month_rounded, 'Monthly Target', '/owner/monthly-target'),
+    _ActionItem(Icons.monetization_on_outlined, 'Salesman Incentive',
+        '/owner/incentives'),
+    _ActionItem(Icons.calendar_month_rounded, 'Monthly Target',
+        '/owner/monthly-target'),
     _ActionItem(Icons.bar_chart_rounded, 'Reports', '/owner/reports'),
   ]),
   _ActionGroup('Field Operations', [
     _ActionItem(Icons.assignment_ind_rounded, 'Field Staff', '/field-staff'),
-    _ActionItem(Icons.paid_outlined, 'Field Staff Incentive', '/owner/fieldstaff-incentive'),
-    _ActionItem(Icons.location_on_outlined, 'Site Visits', '/owner/site-visits'),
+    _ActionItem(Icons.paid_outlined, 'Field Staff Incentive',
+        '/owner/fieldstaff-incentive'),
+    _ActionItem(
+        Icons.location_on_outlined, 'Site Visits', '/owner/site-visits'),
     _ActionItem(Icons.local_shipping_rounded, 'Driver', '/owner/drivers'),
   ]),
 ];
@@ -94,22 +98,7 @@ class _OwnerDashboardView extends StatefulWidget {
 }
 
 class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
-  @override
-  void initState() {
-    super.initState();
-    ownerDataRefresh.addListener(_onOwnerDataChanged);
-  }
-
-  @override
-  void dispose() {
-    ownerDataRefresh.removeListener(_onOwnerDataChanged);
-    super.dispose();
-  }
-
-  void _onOwnerDataChanged() {
-    if (!mounted) return;
-    context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
-  }
+  /// Opens a widget screen and reloads the dashboard when it is closed.
   Future<void> _openAndRefresh(Widget screen) async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => screen),
@@ -117,6 +106,15 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
     if (!mounted) return;
     context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
   }
+
+  /// Opens a go_router route and reloads the dashboard when the user
+  /// comes back (used by Quick Actions and "View all").
+  Future<void> _pushAndRefresh(String route) async {
+    await context.push(route);
+    if (!mounted) return;
+    context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
+  }
+
   bool _hasSalesData(List<dynamic> monthlySales) {
     if (monthlySales.isEmpty) return false;
     return monthlySales.any((m) => (m.total as num) > 0);
@@ -125,7 +123,8 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final currency =
+    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final today = DateFormat('EEEE, dd MMM yyyy').format(DateTime.now());
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -145,7 +144,9 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
 
             return RefreshIndicator(
               onRefresh: () async {
-                context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
+                context
+                    .read<OwnerDashboardBloc>()
+                    .add(const OwnerDashboardRefreshed());
                 await context.read<OwnerDashboardBloc>().stream.firstWhere(
                       (s) => s.status != OwnerDashboardStatus.refreshing,
                 );
@@ -166,7 +167,8 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                       pending: state.pending,
                     ),
                   ),
-                  SliverToBoxAdapter(child: SizedBox(height: Responsive.h(76))),
+                  SliverToBoxAdapter(
+                      child: SizedBox(height: Responsive.h(76))),
 
                   // ---------- QUICK ACTIONS ----------
                   SliverPadding(
@@ -182,7 +184,7 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                         children: [
                           const _SectionTitle(title: 'Quick Actions'),
                           SizedBox(height: Responsive.h(10)),
-                          const _QuickAccessPanel(),
+                          _QuickAccessPanel(onOpen: _pushAndRefresh),
                           SizedBox(height: Responsive.h(14)),
                         ],
                       ),
@@ -191,7 +193,8 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
 
                   // ---------- SALES + RECENT ----------
                   SliverPadding(
-                    padding: EdgeInsets.symmetric(horizontal: Responsive.w(20)),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Responsive.w(20)),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         SizedBox(height: Responsive.h(6)),
@@ -218,12 +221,14 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                         _SectionTitle(
                           title: 'Recent Estimates',
                           actionLabel: 'View all',
-                          onAction: () => context.push('/owner/estimates'),
+                          onAction: () =>
+                              _pushAndRefresh('/owner/estimates'),
                         ),
                         SizedBox(height: Responsive.h(12)),
                         if (state.status == OwnerDashboardStatus.failure)
                           _ErrorState(
-                            message: state.errorMessage ?? 'Could not load the dashboard.',
+                            message: state.errorMessage ??
+                                'Could not load the dashboard.',
                             onRetry: () => context
                                 .read<OwnerDashboardBloc>()
                                 .add(const OwnerDashboardRequested()),
@@ -231,21 +236,27 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                         else if (state.recentEstimates.isEmpty)
                           const _EmptyState(
                             icon: Icons.description_outlined,
-                            message: 'No estimates yet. Create your first one.',
+                            message:
+                            'No estimates yet. Create your first one.',
                           )
                         else
                           Column(
                             children: [
-                              for (int i = 0; i < state.recentEstimates.length; i++) ...[
+                              for (int i = 0;
+                              i < state.recentEstimates.length;
+                              i++) ...[
                                 _RecentEstimateCard(
                                   estimate: state.recentEstimates[i],
                                   onTap: () => _openAndRefresh(
                                     OwnerEstimateDetailsScreen(
-                                      estimateId: state.recentEstimates[i].id.toString(),
+                                      estimateId: state
+                                          .recentEstimates[i].id
+                                          .toString(),
                                     ),
                                   ),
                                 ),
-                                if (i != state.recentEstimates.length - 1)
+                                if (i !=
+                                    state.recentEstimates.length - 1)
                                   SizedBox(height: Responsive.h(10)),
                               ],
                             ],
@@ -316,7 +327,8 @@ class _OwnerHeader extends StatelessWidget {
                     color: Colors.white.withOpacity(0.16),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 24),
+                  child: const Icon(Icons.storefront_rounded,
+                      color: Colors.white, size: 24),
                 ),
                 SizedBox(width: Responsive.w(12)),
                 Expanded(
@@ -364,7 +376,8 @@ class _OwnerHeader extends StatelessWidget {
           right: Responsive.w(20),
           bottom: -Responsive.h(52),
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: Responsive.h(14), horizontal: Responsive.w(6)),
+            padding: EdgeInsets.symmetric(
+                vertical: Responsive.h(14), horizontal: Responsive.w(6)),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -505,7 +518,11 @@ class _SectionTitle extends StatelessWidget {
 // ---------------- QUICK ACCESS (collapsible grid) ----------------
 
 class _QuickAccessPanel extends StatefulWidget {
-  const _QuickAccessPanel();
+  const _QuickAccessPanel({required this.onOpen});
+
+  /// Called with the route to open; the dashboard pushes it and
+  /// refreshes itself when the user returns.
+  final Future<void> Function(String route) onOpen;
 
   @override
   State<_QuickAccessPanel> createState() => _QuickAccessPanelState();
@@ -517,8 +534,9 @@ class _QuickAccessPanelState extends State<_QuickAccessPanel> {
   @override
   Widget build(BuildContext context) {
     final canExpand = _quickActions.length > _collapsedCount;
-    final visible =
-    _expanded ? _quickActions : _quickActions.take(_collapsedCount).toList();
+    final visible = _expanded
+        ? _quickActions
+        : _quickActions.take(_collapsedCount).toList();
 
     return Container(
       width: double.infinity,
@@ -548,7 +566,7 @@ class _QuickAccessPanelState extends State<_QuickAccessPanel> {
                   _ActionTile(
                     icon: a.icon,
                     label: a.label,
-                    onTap: () => context.push(a.route),
+                    onTap: () => widget.onOpen(a.route),
                   ),
               ],
             ),
@@ -672,9 +690,11 @@ class _EmptyState extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: Responsive.h(22)),
         child: Column(
           children: [
-            Icon(icon, size: 38, color: AppColors.textSecondary.withOpacity(0.4)),
+            Icon(icon,
+                size: 38, color: AppColors.textSecondary.withOpacity(0.4)),
             SizedBox(height: Responsive.h(10)),
-            Text(message, textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
+            Text(message,
+                textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
           ],
         ),
       ),
@@ -745,7 +765,8 @@ class _RecentEstimateCard extends StatelessWidget {
                   color: AppColors.primary.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
+                child: Icon(Icons.description_outlined,
+                    color: AppColors.primary, size: 20),
               ),
               SizedBox(width: Responsive.w(12)),
               Expanded(
@@ -766,7 +787,8 @@ class _RecentEstimateCard extends StatelessWidget {
                       style: AppTextStyles.caption(),
                     ),
                     SizedBox(height: Responsive.h(2)),
-                    Text(estimate.dateFormatted, style: AppTextStyles.caption()),
+                    Text(estimate.dateFormatted,
+                        style: AppTextStyles.caption()),
                   ],
                 ),
               ),

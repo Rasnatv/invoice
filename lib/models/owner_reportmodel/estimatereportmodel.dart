@@ -1,5 +1,3 @@
-
-
 /// Request body for the estimate report endpoint.
 class EstimateReportRequest {
   const EstimateReportRequest({
@@ -42,6 +40,34 @@ class EstimateReportRequest {
 /// but this also copes with real numbers, null and blank values.
 int _toInt(dynamic v) => int.tryParse('${v ?? 0}'.trim()) ?? 0;
 double _toDouble(dynamic v) => double.tryParse('${v ?? 0}'.trim()) ?? 0;
+
+/// Parses dates like "23-10-2026" (dd-MM-yyyy). Also accepts ISO
+/// "2026-10-23" or "2026-10-23 10:30:00" and "23/10/2026".
+/// Returns null for blank/invalid values.
+DateTime? _toDate(dynamic v) {
+  final s = '${v ?? ''}'.trim();
+  if (s.isEmpty) return null;
+
+  // dd-MM-yyyy or dd/MM/yyyy
+  final m = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(s);
+  if (m != null) {
+    final day = int.parse(m.group(1)!);
+    final month = int.parse(m.group(2)!);
+    final year = int.parse(m.group(3)!);
+    return DateTime(year, month, day);
+  }
+
+  // Fallback: ISO format (yyyy-MM-dd ...)
+  return DateTime.tryParse(s);
+}
+
+/// dd-MM-yyyy text (no intl needed). Empty if the date is null.
+String _formatDate(DateTime? d) {
+  if (d == null) return '';
+  final dd = d.day.toString().padLeft(2, '0');
+  final mm = d.month.toString().padLeft(2, '0');
+  return '$dd-$mm-${d.year}';
+}
 
 class EstimateReportSummaryModel {
   const EstimateReportSummaryModel({
@@ -109,6 +135,12 @@ class EstimateListItemModel {
   /// Null when the estimate hasn't been approved yet (backend sends "").
   final DateTime? approvedAt;
 
+  /// Date as dd-MM-yyyy text. Empty if missing.
+  String get dateLabel => _formatDate(date);
+
+  /// Approved date as dd-MM-yyyy text. Empty if not approved yet.
+  String get approvedAtLabel => _formatDate(approvedAt);
+
   /// Who raised the estimate: salesman, else contractor, else empty.
   String get ownerName {
     if (salesmanName.trim().isNotEmpty) return salesmanName.trim();
@@ -117,7 +149,6 @@ class EstimateListItemModel {
   }
 
   factory EstimateListItemModel.fromJson(Map<String, dynamic> json) {
-    final approvedRaw = '${json['approved_at'] ?? ''}'.trim();
     final status = '${json['status'] ?? ''}';
     final label = '${json['status_label'] ?? ''}'.trim();
     return EstimateListItemModel(
@@ -125,13 +156,13 @@ class EstimateListItemModel {
       estimateNumber: '${json['estimate_number'] ?? ''}',
       customerName: '${json['customer_name'] ?? ''}',
       customerPhone: '${json['customer_phone'] ?? ''}',
-      date: DateTime.tryParse('${json['date'] ?? ''}'),
+      date: _toDate(json['date']),
       grandTotal: _toDouble(json['grand_total']),
       status: status,
       statusLabel: label.isNotEmpty ? label : status,
       salesmanName: '${json['salesman_name'] ?? ''}',
       contractorName: '${json['contractor_name'] ?? ''}',
-      approvedAt: approvedRaw.isEmpty ? null : DateTime.tryParse(approvedRaw),
+      approvedAt: _toDate(json['approved_at']),
     );
   }
 }

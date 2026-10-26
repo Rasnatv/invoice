@@ -199,15 +199,16 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
             horizontalInside: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
             verticalInside: BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
           ),
-          // Fixed widths (not Flex) — the table can be wider than the
+          // Fixed widths (not Flex) - the table can be wider than the
           // screen and scroll horizontally.
           columnWidths: const {
-            0: FixedColumnWidth(32), // #
+            0: FixedColumnWidth(32),  // #
             1: FixedColumnWidth(170), // Item
-            2: FixedColumnWidth(140), // Company
-            3: FixedColumnWidth(110), // Size
-            4: FixedColumnWidth(55), // Box
-            5: FixedColumnWidth(55), // Pcs
+            2: FixedColumnWidth(170),
+            3: FixedColumnWidth(170),
+            4: FixedColumnWidth(70),
+            5: FixedColumnWidth(70), // Pcs
+            6: FixedColumnWidth(70),  // Qty (NEW)
           },
           children: [
             TableRow(
@@ -219,6 +220,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
                 _headerCell('Size'),
                 _headerCell('Box', align: TextAlign.right),
                 _headerCell('Pcs', align: TextAlign.right),
+                _headerCell('Qty', align: TextAlign.right), // NEW
               ],
             ),
             for (var i = 0; i < b.items.length; i++)
@@ -233,6 +235,11 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
                   _dataCell(b.items[i].size.isEmpty ? '-' : b.items[i].size),
                   _dataCell(b.items[i].boxes, align: TextAlign.right, bold: true),
                   _dataCell(b.items[i].pieces, align: TextAlign.right, bold: true),
+                  _dataCell(
+                    b.items[i].quantity.isEmpty ? '-' : b.items[i].quantity,
+                    align: TextAlign.right,
+                    bold: true,
+                  ), // NEW
                 ],
               ),
           ],
@@ -240,7 +247,6 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
       ),
     );
   }
-
   Widget _headerCell(String text, {TextAlign align = TextAlign.left}) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: Responsive.w(8), vertical: Responsive.h(9)),

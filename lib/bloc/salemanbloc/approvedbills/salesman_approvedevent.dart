@@ -7,14 +7,20 @@ abstract class ApprovedEstimatesEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Fetches (or refreshes) the approved-estimates list from
+/// Fetches the first page of approved estimates from
 /// GET /estimates/myapproved.
 class ApprovedEstimatesRequested extends ApprovedEstimatesEvent {
   const ApprovedEstimatesRequested();
 }
 
+/// Pull-to-refresh: reloads from page 1 and replaces the list.
 class ApprovedEstimatesRefreshed extends ApprovedEstimatesEvent {
   const ApprovedEstimatesRefreshed();
+}
+
+/// Loads the next page and appends it to the list (infinite scroll).
+class ApprovedEstimatesLoadMore extends ApprovedEstimatesEvent {
+  const ApprovedEstimatesLoadMore();
 }
 
 /// Client-side search box filtering.

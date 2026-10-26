@@ -1,4 +1,3 @@
-
 /// Request body for the quotation report endpoint.
 class QuotationReportRequest {
   const QuotationReportRequest({
@@ -41,6 +40,25 @@ class QuotationReportRequest {
 /// but this also copes with real numbers, null and blank values.
 int _toInt(dynamic v) => int.tryParse('${v ?? 0}'.trim()) ?? 0;
 double _toDouble(dynamic v) => double.tryParse('${v ?? 0}'.trim()) ?? 0;
+
+/// Parses dates like "23-10-2026" (dd-MM-yyyy). Also accepts ISO
+/// "2026-10-23" or "2026-10-23 10:30:00" and "23/10/2026".
+DateTime? _toDate(dynamic v) {
+  final s = '${v ?? ''}'.trim();
+  if (s.isEmpty) return null;
+
+  // dd-MM-yyyy or dd/MM/yyyy
+  final m = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(s);
+  if (m != null) {
+    final day = int.parse(m.group(1)!);
+    final month = int.parse(m.group(2)!);
+    final year = int.parse(m.group(3)!);
+    return DateTime(year, month, day);
+  }
+
+  // Fallback: ISO format (yyyy-MM-dd ...)
+  return DateTime.tryParse(s);
+}
 
 class QuotationReportSummaryModel {
   const QuotationReportSummaryModel({
@@ -99,6 +117,15 @@ class QuotationListItemModel {
   final String salesmanName;
   final String contractorName;
 
+  /// Date as dd-MM-yyyy text (no intl needed). Empty if date is missing.
+  String get dateLabel {
+    final d = date;
+    if (d == null) return '';
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '$dd-$mm-${d.year}';
+  }
+
   /// Who raised the quotation: salesman, else contractor, else empty.
   String get ownerName {
     if (salesmanName.trim().isNotEmpty) return salesmanName.trim();
@@ -121,7 +148,7 @@ class QuotationListItemModel {
       quotationNumber: '${json['quotation_number'] ?? ''}',
       customerName: '${json['customer_name'] ?? ''}',
       customerPhone: '${json['customer_phone'] ?? ''}',
-      date: DateTime.tryParse('${json['date'] ?? ''}'),
+      date: _toDate(json['date']),
       grandTotal: _toDouble(json['grand_total']),
       status: status,
       statusLabel: label.isNotEmpty ? label : status,

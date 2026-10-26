@@ -270,7 +270,7 @@ class QuotationProvider {
   /// quotations, newest first (server-ordered), one page at a time.
   Future<QuotationListResult> getMyQuotations({
     int page = 1,
-    int perPage = 15,
+    int perPage = 10,
   }) async {
     try {
       final response = await _apiClient.myQuotations(

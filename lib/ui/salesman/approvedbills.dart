@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -18,7 +17,8 @@ class ApprovedBills extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => ApprovedEstimatesBloc()..add(const ApprovedEstimatesRequested()),
+      create: (_) =>
+      ApprovedEstimatesBloc()..add(const ApprovedEstimatesRequested()),
       child: const _ApprovedBillsView(),
     );
   }
@@ -44,7 +44,17 @@ class _ApprovedBillsView extends StatelessWidget {
   Future<void> _refresh(BuildContext context) async {
     final bloc = context.read<ApprovedEstimatesBloc>();
     bloc.add(const ApprovedEstimatesRefreshed());
-    await bloc.stream.firstWhere((s) => s.status != ApprovedEstimatesStatus.refreshing);
+    await bloc.stream
+        .firstWhere((s) => s.status != ApprovedEstimatesStatus.refreshing);
+  }
+
+  /// Dispatches LoadMore after the current frame (never inside build()).
+  /// The bloc ignores it if a page is already loading or nothing is left.
+  void _requestNextPage(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      context.read<ApprovedEstimatesBloc>().add(const ApprovedEstimatesLoadMore());
+    });
   }
 
   @override
@@ -79,7 +89,8 @@ class _ApprovedBillsView extends StatelessWidget {
               ),
               SizedBox(height: Responsive.h(4)),
               Expanded(
-                child: BlocBuilder<ApprovedEstimatesBloc, ApprovedEstimatesState>(
+                child:
+                BlocBuilder<ApprovedEstimatesBloc, ApprovedEstimatesState>(
                   builder: (context, state) {
                     // ---- loading skeleton ----
                     if (state.isLoading && state.list.isEmpty) {
@@ -87,7 +98,8 @@ class _ApprovedBillsView extends StatelessWidget {
                         itemCount: 6,
                         padding: listPadding,
                         separatorHeight: Responsive.h(10),
-                        itemBuilder: (context, i) => const _ApprovedCardSkeleton(),
+                        itemBuilder: (context, i) =>
+                        const _ApprovedCardSkeleton(),
                       );
                     }
 
@@ -95,59 +107,102 @@ class _ApprovedBillsView extends StatelessWidget {
                     if (state.status == ApprovedEstimatesStatus.failure &&
                         state.list.isEmpty) {
                       return _ErrorView(
-                        message: state.errorMessage ?? 'Failed to load approved bills.',
+                        message: state.errorMessage ??
+                            'Failed to load approved bills.',
                         onRetry: () => context
                             .read<ApprovedEstimatesBloc>()
                             .add(const ApprovedEstimatesRequested()),
                       );
                     }
 
-                    // ---- empty (still pull-to-refresh) ----
                     final list = state.filtered;
+
+                    // Search is client-side, so while a search is active keep
+                    // pulling pages until everything has been searched.
+                    final searching = state.query.trim().isNotEmpty;
+                    final canLoadMore = state.hasMore &&
+                        !state.loadMoreFailed &&
+                        state.status == ApprovedEstimatesStatus.success;
+
+                    // ---- empty (still pull-to-refresh) ----
                     if (list.isEmpty) {
+                      if (searching && canLoadMore) {
+                        _requestNextPage(context);
+                      }
+                      final stillSearching = searching &&
+                          state.hasMore &&
+                          !state.loadMoreFailed;
+
                       return RefreshIndicator(
                         color: AppColors.primary,
                         onRefresh: () => _refresh(context),
                         child: LayoutBuilder(
-                          builder: (context, constraints) => SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            child: ConstrainedBox(
-                              constraints:
-                              BoxConstraints(minHeight: constraints.maxHeight),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.description_rounded,
-                                      size: 44,
-                                      color: AppColors.textSecondary.withOpacity(0.4),
+                          builder: (context, constraints) =>
+                              SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                      minHeight: constraints.maxHeight),
+                                  child: Center(
+                                    child: stillSearching
+                                        ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2.5),
+                                    )
+                                        : Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.description_rounded,
+                                          size: 44,
+                                          color: AppColors.textSecondary
+                                              .withOpacity(0.4),
+                                        ),
+                                        SizedBox(height: Responsive.h(10)),
+                                        Text('No estimates found',
+                                            style: AppTextStyles.subtitle()),
+                                      ],
                                     ),
-                                    SizedBox(height: Responsive.h(10)),
-                                    Text('No estimates found',
-                                        style: AppTextStyles.subtitle()),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
                         ),
                       );
                     }
 
+                    // ---- list + pagination footer ----
+                    final showFooter = state.hasMore;
+
                     return RefreshIndicator(
                       color: AppColors.primary,
                       onRefresh: () => _refresh(context),
-                      child: ListView.separated(
+                      child: ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: listPadding,
-                        itemCount: list.length,
-                        // The tile already adds its own bottom spacing.
-                        separatorBuilder: (_, __) => const SizedBox.shrink(),
-                        itemBuilder: (context, i) => ApprovedEstimateTile(
-                          estimate: list[i],
-                          onTap: () => _openEstimateDetail(context, list[i].id),
-                        ),
+                        itemCount: list.length + (showFooter ? 1 : 0),
+                        itemBuilder: (context, i) {
+                          // Footer row (last item)
+                          if (i == list.length) {
+                            return _PaginationFooter(
+                              failed: state.loadMoreFailed,
+                              onRetry: () => context
+                                  .read<ApprovedEstimatesBloc>()
+                                  .add(const ApprovedEstimatesLoadMore()),
+                              // Built only when the user scrolls to the end
+                              // (or the list is too short to scroll).
+                              onVisible: () => _requestNextPage(context),
+                            );
+                          }
+
+                          // The tile already adds its own bottom spacing.
+                          return ApprovedEstimateTile(
+                            estimate: list[i],
+                            onTap: () =>
+                                _openEstimateDetail(context, list[i].id),
+                          );
+                        },
                       ),
                     );
                   },
@@ -155,6 +210,53 @@ class _ApprovedBillsView extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// PAGINATION FOOTER
+// =====================================================================
+
+class _PaginationFooter extends StatelessWidget {
+  const _PaginationFooter({
+    required this.failed,
+    required this.onRetry,
+    required this.onVisible,
+  });
+
+  final bool failed;
+  final VoidCallback onRetry;
+  final VoidCallback onVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    if (failed) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: Responsive.h(8)),
+        child: Center(
+          child: TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text('Failed to load more. Tap to retry',
+                style: AppTextStyles.link()),
+          ),
+        ),
+      );
+    }
+
+    // Footer got built => user reached the end => ask for the next page.
+    onVisible();
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: Responsive.h(16)),
+      child: const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
         ),
       ),
     );

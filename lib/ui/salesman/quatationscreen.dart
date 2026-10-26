@@ -276,10 +276,6 @@ class _QuotationListViewState extends State<_QuotationListView> {
   }
 }
 
-// =====================================================================
-// CARD
-// =====================================================================
-
 class _QuotationTile extends StatelessWidget {
   const _QuotationTile({
     required this.quotation,
@@ -308,6 +304,9 @@ class _QuotationTile extends StatelessWidget {
         return AppColors.textSecondary;
     }
   }
+
+  /// Approved quotations cannot be deleted.
+  bool get _canDelete => quotation.status.toLowerCase() != 'approved';
 
   @override
   Widget build(BuildContext context) {
@@ -389,25 +388,30 @@ class _QuotationTile extends StatelessWidget {
                         style: AppTextStyles.caption(color: AppColors.textSecondary),
                       ),
                     ),
-                    isDeleting
-                        ? const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+
+                    // Delete icon hidden for approved quotations
+                    if (_canDelete) ...[
+                      isDeleting
+                          ? const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                          : InkWell(
+                        onTap: onDelete,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.delete_outline,
+                              size: 19, color: AppColors.error),
+                        ),
                       ),
-                    )
-                        : InkWell(
-                      onTap: onDelete,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(Icons.delete_outline,
-                            size: 19, color: AppColors.error),
-                      ),
-                    ),
-                    SizedBox(width: Responsive.w(6)),
+                      SizedBox(width: Responsive.w(6)),
+                    ],
+
                     Text(
                       currency.format(quotation.grandTotal),
                       style: AppTextStyles.amount(color: AppColors.primary),

@@ -7,7 +7,7 @@ import '../../../Apiprovider/salesman_quotationprovider.dart';
 class SalesmanQuotationBloc extends Bloc<SalesmanQuotationEvent, SalesmanQuotationState> {
   final QuotationProvider _provider;
 
-  static const int _perPage = 15;
+  static const int _perPage = 10;
 
   /// Incremented on every fresh list load so a slow in-flight load-more
   /// can't append stale data after a refresh.

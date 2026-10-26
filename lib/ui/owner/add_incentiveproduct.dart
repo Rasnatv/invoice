@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
@@ -77,28 +78,28 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         TextEditingController(text: p != null ? p.incentivePercentage.toString() : '');
     _incentiveFixedCtrl =
         TextEditingController(text: p != null ? p.incentiveAmount.toString() : '');
-    _minQuantityCtrl =
-        TextEditingController(text: p != null ? p.minQuantity.toString() : '0');
+    _minQuantityCtrl = TextEditingController(
+        text: (p != null && p.minQuantity.toString() != '0')
+            ? p.minQuantity.toString()
+            : '');
 
-    // Packing/pieces-per-box are prefilled straight from the saved product
-    // (ProductModel.packing / .piecesPerBox).
+    // Packing/pieces-per-box are prefilled straight from the saved product.
     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
     _packingCtrl = TextEditingController(text: p?.packing ?? '');
 
-    // Auto-fill Pieces per Box from whatever number is typed into Packing
-    // (e.g. "8pcs/box" -> "8"), but only while the selected unit is a
-    // box/sq-ft type unit that actually uses pieces-per-box.
+    // Auto-fill Pieces per Box from the number typed into Packing
+    // (e.g. "8pcs/box" -> "8"), only for box / sq-ft type units.
     _packingCtrl.addListener(_onPackingChanged);
 
-    // Prefill dropdown selections from the product being edited.
     _selectedCompanyId = p?.companyId;
     _selectedUnitId = p?.unitId;
 
-    // ProductModel.incentiveType is parsed straight from the API's
-    // incentive_type field ('fixed' / 'percentage' / '' -> none).
     _incentiveType = p == null ? ProductIncentiveType.none : p.incentiveType;
 
-    _bonusType = p?.bonusType ?? ProductBonusType.none;
+    // Bonus only exists when an incentive (fixed / percentage) is selected.
+    _bonusType = _incentiveType == ProductIncentiveType.none
+        ? ProductBonusType.none
+        : (p?.bonusType ?? ProductBonusType.none);
 
     _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
   }
@@ -119,8 +120,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
   }
 
   // Pulls the first number out of the Packing text and mirrors it into
-  // Pieces per Box, e.g. "8pcs/box" -> "8". Only runs for box/sq-ft type
-  // units; for other units Pieces per Box stays untouched (and hidden).
+  // Pieces per Box, e.g. "8pcs/box" -> "8". Only runs for box/sq-ft units.
   void _onPackingChanged() {
     if (_syncingPiecesFromPacking) return;
     if (!_isBoxUnit) return;
@@ -147,12 +147,11 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
       _selectedUnitId = unitId;
       _isBoxUnit = _computeIsBoxUnit(state);
       if (!_isBoxUnit) {
-        // Packing stays visible/editable for every unit. Only Pieces per Box
-        // is unit-gated, so clear it when the new unit doesn't use it.
+        // Packing stays for every unit; Pieces per Box is cleared when the
+        // new unit doesn't use it.
         _piecesPerBoxCtrl.clear();
       } else {
-        // Switched into a box/sq-ft unit — derive Pieces per Box from
-        // whatever is already typed in Packing.
+        // Switched into a box/sq-ft unit — derive Pieces per Box from Packing.
         _onPackingChanged();
       }
     });
@@ -170,8 +169,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
       if (!unitExists) _selectedUnitId = null;
       _dropdownSelectionSynced = true;
 
-      // Only upgrade _isBoxUnit to true here, never silently downgrade it
-      // from what was derived from the product's own data in initState.
+      // Only upgrade _isBoxUnit to true here, never silently downgrade it.
       if (unitExists) {
         final dropdownSaysBox = _computeIsBoxUnit(state);
         _isBoxUnit = _isBoxUnit || dropdownSaysBox;
@@ -186,6 +184,28 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     return null;
   }
 
+  // Bulk bonus: Minimum Quantity is required, must be a whole number
+  // between 2 and 100.
+  String? _minQuantityValidator(String? v) {
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'Minimum quantity is required';
+    final qty = int.tryParse(text);
+    if (qty == null) return 'Enter a valid number';
+    if (qty < 2) return 'Minimum quantity must be at least 2';
+    if (text.length > 5) return 'Maximum 5 digits allowed';
+    return null;
+  }
+
+  // For box / sq-ft units, at least one of Packing or Pieces per Box is required.
+  String? _packingOrPiecesValidator(String? _) {
+    if (!_isBoxUnit) return null;
+    if (_packingCtrl.text.trim().isEmpty &&
+        _piecesPerBoxCtrl.text.trim().isEmpty) {
+      return 'Enter Packing or Pieces per Box';
+    }
+    return null;
+  }
+
   void _save(BuildContext context) {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCompanyId == null || _selectedUnitId == null) {
@@ -196,6 +216,11 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     final bloc = context.read<ProductBloc>();
     final packingValue =
     _packingCtrl.text.trim().isEmpty ? null : _packingCtrl.text.trim();
+
+    // Never send a bonus when the incentive is none.
+    final effectiveBonusType = _incentiveType == ProductIncentiveType.none
+        ? ProductBonusType.none
+        : _bonusType;
 
     if (_isEditing) {
       bloc.add(UpdateProduct(ProductUpdateRequestModel(
@@ -213,9 +238,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         incentiveAmount: _incentiveType == ProductIncentiveType.fixed
             ? double.parse(_incentiveFixedCtrl.text.trim())
             : null,
-        bonusType: _bonusType,
-        minQuantity:
-        _bonusType == ProductBonusType.bulk ? _minQuantityCtrl.text.trim() : '0',
+        bonusType: effectiveBonusType,
+        minQuantity: effectiveBonusType == ProductBonusType.bulk
+            ? _minQuantityCtrl.text.trim()
+            : '0',
         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
         packing: packingValue,
         isBoxUnit: _isBoxUnit,
@@ -235,8 +261,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         incentiveAmount: _incentiveType == ProductIncentiveType.fixed
             ? double.parse(_incentiveFixedCtrl.text.trim())
             : null,
-        bonusType: _bonusType,
-        minQuantity: _bonusType == ProductBonusType.bulk
+        bonusType: effectiveBonusType,
+        minQuantity: effectiveBonusType == ProductBonusType.bulk
             ? (int.tryParse(_minQuantityCtrl.text.trim()) ?? 0)
             : 0,
         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
@@ -281,8 +307,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
               final dropdownsLoading = state.dropdownStatus == DropdownStatus.loading;
               final dropdownsFailed = state.dropdownStatus == DropdownStatus.error;
 
-              // Also try syncing on build (covers the case where dropdowns
-              // were already loaded before the listener ever fired).
               if (state.dropdownStatus == DropdownStatus.loaded &&
                   !_dropdownSelectionSynced) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -291,7 +315,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
               }
 
               // ---- Smaller, responsive text styles ----
-              // Change Responsive.sp(12) to 11 for even smaller field text.
               final baseTheme = Theme.of(context);
               final fieldTextStyle = AppTextStyles.body().copyWith(
                 fontSize: Responsive.sp(12),
@@ -305,8 +328,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
               return Theme(
                 data: baseTheme.copyWith(
                   textTheme: baseTheme.textTheme.copyWith(
-                    titleMedium: fieldTextStyle, // input + dropdown text (Material 2)
-                    bodyLarge: fieldTextStyle, // input + dropdown text (Material 3)
+                    titleMedium: fieldTextStyle,
+                    bodyLarge: fieldTextStyle,
                   ),
                   inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
                     isDense: true,
@@ -354,7 +377,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                           items: state.companies
                               .map((c) => DropdownMenuItem(
                             value: c.id,
-                            child: Text(c.label, overflow: TextOverflow.ellipsis),
+                            child: Text(c.label,
+                                overflow: TextOverflow.ellipsis),
                           ))
                               .toList(),
                           onChanged: dropdownsLoading
@@ -395,7 +419,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                                     isExpanded: true,
                                     initialValue: _selectedUnitId,
                                     decoration: InputDecoration(
-                                      hintText: dropdownsLoading ? 'Loading...' : 'Select',
+                                      hintText:
+                                      dropdownsLoading ? 'Loading...' : 'Select',
                                     ),
                                     items: state.units
                                         .map((u) => DropdownMenuItem(
@@ -417,9 +442,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       ),
                       SizedBox(height: Responsive.h(14)),
 
-                      // Packing is shown for every unit. Pieces per Box only
-                      // appears alongside it (auto-filled from Packing) when
-                      // the selected unit is a box/sq-ft type unit.
+                      // Packing is shown for every unit. Pieces per Box appears
+                      // alongside it (auto-filled from Packing) for box / sq-ft
+                      // units, where at least one of the two is required.
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -427,10 +452,11 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _FieldLabel('Packing'),
+                                _FieldLabel(_isBoxUnit ? 'Packing *' : 'Packing'),
                                 TextFormField(
                                   controller: _packingCtrl,
                                   inputFormatters: DValidator.packingText,
+                                  validator: _packingOrPiecesValidator,
                                 ),
                               ],
                             ),
@@ -441,12 +467,14 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _FieldLabel('Pieces per Box'),
+                                  _FieldLabel('Pieces per Box *'),
                                   TextFormField(
                                     controller: _piecesPerBoxCtrl,
                                     keyboardType: TextInputType.number,
                                     inputFormatters: DValidator.digitsOnly,
-                                    decoration: const InputDecoration(hintText: 'e.g. 8'),
+                                    decoration:
+                                    const InputDecoration(hintText: 'e.g. 8'),
+                                    validator: _packingOrPiecesValidator,
                                   ),
                                 ],
                               ),
@@ -504,12 +532,22 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       DropdownButtonFormField<ProductIncentiveType>(
                         isExpanded: true,
                         initialValue: _incentiveType,
-                        decoration: const InputDecoration(hintText: 'Select incentive type'),
+                        decoration:
+                        const InputDecoration(hintText: 'Select incentive type'),
                         items: ProductIncentiveType.values
-                            .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
+                            .map((t) =>
+                            DropdownMenuItem(value: t, child: Text(t.label)))
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _incentiveType = v);
+                          if (v == null) return;
+                          setState(() {
+                            _incentiveType = v;
+                            // No incentive -> no bonus.
+                            if (v == ProductIncentiveType.none) {
+                              _bonusType = ProductBonusType.none;
+                              _minQuantityCtrl.clear();
+                            }
+                          });
                         },
                       ),
                       SizedBox(height: Responsive.h(12)),
@@ -537,33 +575,51 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                           validator: _requiredNumberValidator,
                         ),
                       ],
-                      SizedBox(height: Responsive.h(20)),
 
-                      Text('Bonus', style: sectionStyle),
-                      SizedBox(height: Responsive.h(10)),
+                      // Bonus is only available when an incentive
+                      // (fixed / percentage) is selected.
+                      if (_incentiveType != ProductIncentiveType.none) ...[
+                        SizedBox(height: Responsive.h(20)),
+                        Text('Bonus', style: sectionStyle),
+                        SizedBox(height: Responsive.h(10)),
 
-                      _FieldLabel('Bonus Type'),
-                      DropdownButtonFormField<ProductBonusType>(
-                        isExpanded: true,
-                        initialValue: _bonusType,
-                        decoration: const InputDecoration(hintText: 'Select bonus type'),
-                        items: ProductBonusType.values
-                            .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) setState(() => _bonusType = v);
-                        },
-                      ),
-                      if (_bonusType == ProductBonusType.bulk) ...[
-                        SizedBox(height: Responsive.h(12)),
-                        _FieldLabel('Minimum Quantity'),
-                        TextFormField(
-                          controller: _minQuantityCtrl,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: DValidator.digitsOnly,
-                          decoration: const InputDecoration(hintText: 'e.g. 5'),
-                          validator: _requiredNumberValidator,
+                        _FieldLabel('Bonus Type'),
+                        // Required when an incentive is selected, and "None"
+                        // is not offered, so the user must pick a real bonus.
+                        DropdownButtonFormField<ProductBonusType>(
+                          isExpanded: true,
+                          initialValue: _bonusType == ProductBonusType.none
+                              ? null
+                              : _bonusType,
+                          decoration:
+                          const InputDecoration(hintText: 'Select bonus type'),
+                          items: ProductBonusType.values
+                              .where((t) => t != ProductBonusType.none)
+                              .map((t) =>
+                              DropdownMenuItem(value: t, child: Text(t.label)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _bonusType = v);
+                          },
+                          validator: (v) => (v == null || v == ProductBonusType.none)
+                              ? 'Bonus type is required'
+                              : null,
                         ),
+                        if (_bonusType == ProductBonusType.bulk) ...[
+                          SizedBox(height: Responsive.h(12)),
+                          _FieldLabel('Minimum Quantity'),
+                          TextFormField(
+                            controller: _minQuantityCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              ...DValidator.digitsOnly,
+                              LengthLimitingTextInputFormatter(5),
+                            ],
+                            decoration:
+                            const InputDecoration(hintText: 'Min 2, max 5 digits'),
+                            validator: _minQuantityValidator,
+                          ),
+                        ],
                       ],
                       SizedBox(height: Responsive.h(28)),
 

@@ -9,6 +9,8 @@ class ProductListState extends Equatable {
   final int total;
   final int page;
   final int perPage;
+  final bool hasMore;
+  final bool loadMoreFailed;
   final String? errorMessage;
 
   const ProductListState({
@@ -17,6 +19,8 @@ class ProductListState extends Equatable {
     required this.total,
     required this.page,
     required this.perPage,
+    required this.hasMore,
+    required this.loadMoreFailed,
     required this.errorMessage,
   });
 
@@ -26,11 +30,10 @@ class ProductListState extends Equatable {
     total: 0,
     page: 1,
     perPage: perPage,
+    hasMore: true,
+    loadMoreFailed: false,
     errorMessage: null,
   );
-
-  /// True while more pages remain to be fetched.
-  bool get hasMore => products.length < total;
 
   ProductListState copyWith({
     ProductListStatus? status,
@@ -38,6 +41,8 @@ class ProductListState extends Equatable {
     int? total,
     int? page,
     int? perPage,
+    bool? hasMore,
+    bool? loadMoreFailed,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
@@ -47,10 +52,22 @@ class ProductListState extends Equatable {
       total: total ?? this.total,
       page: page ?? this.page,
       perPage: perPage ?? this.perPage,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      hasMore: hasMore ?? this.hasMore,
+      loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
+      errorMessage:
+      clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 
   @override
-  List<Object?> get props => [status, products, total, page, perPage, errorMessage];
+  List<Object?> get props => [
+    status,
+    products,
+    total,
+    page,
+    perPage,
+    hasMore,
+    loadMoreFailed,
+    errorMessage,
+  ];
 }

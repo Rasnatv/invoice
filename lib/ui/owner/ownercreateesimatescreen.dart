@@ -26,7 +26,6 @@ import '../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
 import '../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/primary_button.dart';
 
 class OwnerCreateEstimateScreen extends StatelessWidget {
@@ -355,7 +354,6 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     _itemRateCtrl.clear();
   }
 
-
   Future<void> _addItemToList() async {
     if (_isAddingItem) return;
     if (!_validateCurrentItemFields()) return;
@@ -367,7 +365,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
       return;
     }
 
-    // NEW: block duplicates (ignore the item currently being edited)
+    // Block duplicates (ignore the item currently being edited)
     final alreadyAdded = _items.asMap().entries.any(
           (e) => e.key != _editingItemIndex && e.value.productId == product.id,
     );
@@ -395,7 +393,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
         pieceQuantity: pieceQuantity,
       ));
     } catch (_) {
-      // NEW: show a message instead of failing silently
+      // Show a message instead of failing silently
       if (mounted) {
         _showError('Could not calculate the amount for this item. Please try again.');
       }
@@ -1184,10 +1182,14 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
             AppSnackbar.success(state.submitMessage ?? 'Saved successfully.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());
 
-            // Go to the owner dashboard, then tell the shell (dashboard)
-            // and the Estimates tab to reload their data.
-            context.go('/owner');
-            ownerDataRefresh.value++;
+            // If this screen was pushed from the dashboard (or any other
+            // screen), pop back with `true` so that screen can reload.
+            // Otherwise (deep link / no previous page) fall back to go().
+            if (context.canPop()) {
+              context.pop(true);
+            } else {
+              context.go('/owner');
+            }
           } else if (state.submitStatus == SubmitStatus.failure) {
             _showError(state.submitError ?? 'Something went wrong. Please try again.');
             context.read<OwnerEstimateBloc>().add(const OwnerQuotationSubmitResultConsumed());

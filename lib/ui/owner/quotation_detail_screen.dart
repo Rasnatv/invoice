@@ -1,3 +1,4 @@
+
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +13,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/salesmanmodels/quotationlistdetailmodel.dart';
-import '../../widgets/owner_dashboardrefresh.dart';
 import '../../widgets/owner_estimateshimmer.dart';
 import 'ownerquotationeditscreen.dart';
 
@@ -62,6 +62,8 @@ class OwnerQuotationDetailsView extends StatefulWidget {
 class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
   late final OwnerQuotationDetailBloc detailBloc;
 
+  /// Becomes true when approve / reject / cancel / edit succeeds.
+  /// It is returned via Navigator.pop so the previous screen can reload.
   bool didChange = false;
 
   /// Prevents double taps while a PDF / Excel file is being generated.
@@ -222,9 +224,9 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
   // ---------------------------------------------------------------------
   // Reject dialog  (POST /quotations/reject { id, rejection_notes })
   //
-  // The TextEditingController now lives inside _RejectDialog (a
+  // The TextEditingController lives inside _RejectDialog (a
   // StatefulWidget), so Flutter disposes it only after the dialog's
-  // closing animation has finished. This fixes
+  // closing animation has finished. This avoids
   // "A TextEditingController was used after being disposed".
   // ---------------------------------------------------------------------
 
@@ -363,7 +365,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                 if (state.approveStatus ==
                     OwnerQuotationApproveStatus.success) {
                   didChange = true;
-                  ownerDataRefresh.value++;
                   await showBackendMessage(state.approveMessage);
                   if (mounted) {
                     detailBloc.add(const OwnerQuotationApproveResultConsumed());
@@ -379,7 +380,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
                 // ---- reject / cancel result ----
                 if (state.actionStatus == OwnerQuotationActionStatus.success) {
                   didChange = true;
-                  ownerDataRefresh.value++;
                   await showBackendMessage(state.actionMessage);
                   if (mounted) {
                     detailBloc.add(const OwnerQuotationActionResultConsumed());

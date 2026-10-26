@@ -368,7 +368,7 @@ class ApiClient {
   );
 
   /// GET /quotations/my?page=&per_page=
-  Future<Response> myQuotations({int page = 1, int perPage = 15}) async => dio.get(
+  Future<Response> myQuotations({int page = 1, int perPage = 10}) async => dio.get(
     ApiConstants.quotationsMy,
     queryParameters: {'page': page, 'per_page': perPage},
     options: await _authOptions(),

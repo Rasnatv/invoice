@@ -28,6 +28,12 @@ class ReportEntryModel {
     this.approvedAt,
   });
 
+  /// Date as dd-MM-yyyy text. Empty if missing.
+  String get dateLabel => _formatDate(date);
+
+  /// Approved date as dd-MM-yyyy text. Empty if not approved yet.
+  String get approvedAtLabel => _formatDate(approvedAt);
+
   factory ReportEntryModel.fromQuotationJson(Map<String, dynamic> json) {
     return ReportEntryModel(
       id: json['id']?.toString() ?? '',
@@ -61,11 +67,29 @@ class ReportEntryModel {
     );
   }
 
-  static double _parseDouble(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;
+  static double _parseDouble(dynamic v) =>
+      double.tryParse(v?.toString() ?? '') ?? 0;
 
+  /// Parses "23-10-2026" (dd-MM-yyyy), "23/10/2026" or ISO "2026-10-23".
   static DateTime? _parseDate(dynamic v) {
-    final s = v?.toString();
+    final s = v?.toString().trim();
     if (s == null || s.isEmpty) return null;
+
+    final m = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(s);
+    if (m != null) {
+      return DateTime(
+        int.parse(m.group(3)!),
+        int.parse(m.group(2)!),
+        int.parse(m.group(1)!),
+      );
+    }
     return DateTime.tryParse(s);
+  }
+
+  static String _formatDate(DateTime? d) {
+    if (d == null) return '';
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '$dd-$mm-${d.year}';
   }
 }
