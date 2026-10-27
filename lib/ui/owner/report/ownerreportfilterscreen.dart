@@ -1,10 +1,10 @@
+
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_bloc.dart';
-import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_event.dart' hide LoadActiveSalesmen;
-import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_state.dart';
+import '../../../Apiprovider/ownerreportprovider.dart';
+// NOTE: adjust this file name/path to where SalesmanProvider lives.
+import '../../../Apiprovider/salesmanprovider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
@@ -14,9 +14,9 @@ import 'ownersalesmanreportscreen.dart';
 enum ReportPersonType { salesman, contractor }
 
 /// Filter screen shown before generating a Salesman/Contractor report.
-/// Options are loaded from the real GET /salesmen/active and
-/// GET /reports/contractors/active endpoints.
-class OwnerReportFilterScreen extends StatelessWidget {
+/// Salesmen are loaded from GET /salesmen (all salesmen, active + inactive).
+/// Contractors are loaded from the active contractors endpoint.
+class OwnerReportFilterScreen extends StatefulWidget {
   const OwnerReportFilterScreen({
     super.key,
     required this.type,
@@ -31,50 +31,38 @@ class OwnerReportFilterScreen extends StatelessWidget {
   final DateTime? initialEnd;
 
   @override
-  Widget build(BuildContext context) {
-    // If OwnerReportsBloc is already provided higher up your widget tree,
-    // swap this for BlocProvider.value(value: context.read<OwnerReportsBloc>(), ...)
-    return BlocProvider(
-      create: (_) => OwnerReportsBloc()
-        ..add(newLoadActiveSalesmen())
-        ..add(const LoadActiveContractors()),
-      child: _OwnerReportFilterView(
-        type: type,
-        initialPersonId: initialPersonId,
-        initialStart: initialStart,
-        initialEnd: initialEnd,
-      ),
-    );
-  }
+  State<OwnerReportFilterScreen> createState() =>
+      _OwnerReportFilterScreenState();
 }
 
 class _DropdownEntry {
-  const _DropdownEntry(this.id, this.label);
-  final String id;
-  final String label;
-}
-
-class _OwnerReportFilterView extends StatefulWidget {
-  const _OwnerReportFilterView({
-    required this.type,
-    this.initialPersonId,
-    this.initialStart,
-    this.initialEnd,
+  const _DropdownEntry({
+    required this.id,
+    required this.label,
+    required this.name,
   });
 
-  final ReportPersonType type;
-  final String? initialPersonId;
-  final DateTime? initialStart;
-  final DateTime? initialEnd;
+  /// Backend id sent to the report screen.
+  final String id;
 
-  @override
-  State<_OwnerReportFilterView> createState() => _OwnerReportFilterViewState();
+  /// Unique text shown in the dropdown (may include "(2)" / "(Inactive)").
+  final String label;
+
+  /// Clean name passed to the report screen.
+  final String name;
 }
 
-class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
+class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
+  final SalesmanProvider _salesmanProvider = SalesmanProvider();
+  final OwnerReportsProvider _reportsProvider = OwnerReportsProvider();
+
   String? _selectedId;
   late DateTime _startDate;
   late DateTime _endDate;
+
+  bool _loading = true;
+  String? _error;
+  List<_DropdownEntry> _options = [];
 
   bool get _isSalesman => widget.type == ReportPersonType.salesman;
   String get _label => _isSalesman ? 'Select Salesman' : 'Select Contractor';
@@ -87,7 +75,88 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
     final now = DateTime.now();
     _startDate = widget.initialStart ?? DateTime(now.year, now.month, 1);
     _endDate = widget.initialEnd ?? DateTime(now.year, now.month + 1, 0);
+    _loadOptions();
   }
+
+  // ---------------------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------------------
+
+  Future<void> _loadOptions() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    if (_isSalesman) {
+      // All salesmen (active + inactive) from GET /salesmen.
+      final result = await _salesmanProvider.getSalesmen();
+      if (!mounted) return;
+      if (result.success) {
+        // Skip blank-name records; keep id/name pairs together.
+        final people = result.salesmen
+            .where((s) => s.name.trim().isNotEmpty)
+            .map((s) => (
+        id: s.id,
+        name: s.name.trim(),
+        inactive: !s.isActive,
+        ))
+            .toList();
+        _applyOptions(people);
+      } else {
+        setState(() {
+          _loading = false;
+          _error = result.errorMessage ?? 'Failed to load salesmen.';
+        });
+      }
+    } else {
+      final result = await _reportsProvider.getActiveContractors();
+      if (!mounted) return;
+      if (result.success) {
+        final people = result.contractors
+            .where((c) => c.name.trim().isNotEmpty)
+            .map((c) => (
+        id: c.id.toString(),
+        name: c.name.trim(),
+        inactive: false,
+        ))
+            .toList();
+        _applyOptions(people);
+      } else {
+        setState(() {
+          _loading = false;
+          _error = result.errorMessage ?? 'Failed to load contractors.';
+        });
+      }
+    }
+  }
+
+  /// Builds unique dropdown labels ("rasna", "rasna (2)", ...) so duplicate
+  /// names never create duplicate DropdownMenuItem values, and clears a
+  /// previously selected id that is no longer in the list.
+  void _applyOptions(
+      List<({String id, String name, bool inactive})> people) {
+    final seen = <String, int>{};
+    final entries = people.map((p) {
+      final count = (seen[p.name] ?? 0) + 1;
+      seen[p.name] = count;
+      var label = count == 1 ? p.name : '${p.name} ($count)';
+      if (p.inactive) label += ' (Inactive)';
+      return _DropdownEntry(id: p.id, label: label, name: p.name);
+    }).toList();
+
+    setState(() {
+      _options = entries;
+      _loading = false;
+      if (_selectedId != null && entries.every((e) => e.id != _selectedId)) {
+        _selectedId = null;
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
 
   Future<void> _pickDate({required bool isStart}) async {
     final picked = await showDatePicker(
@@ -106,13 +175,14 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
     });
   }
 
-  void _generate(OwnerReportsState state) {
+  void _generate() {
     final id = _selectedId;
     if (id == null) return;
 
+    final match = _options.where((o) => o.id == id);
+    final name = match.isNotEmpty ? match.first.name : '';
+
     if (_isSalesman) {
-      final match = state.activeSalesmen.where((s) => s.id == id);
-      final name = match.isNotEmpty ? match.first.name : '';
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => OwnerSalesmanReportScreen(
@@ -124,8 +194,6 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
         ),
       );
     } else {
-      final match = state.activeContractors.where((c) => c.id == id);
-      final name = match.isNotEmpty ? match.first.name : '';
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => OwnerContractorReportScreen(
@@ -139,21 +207,16 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
     }
   }
 
-  /// Safely clears a selection that's no longer valid, AFTER the current
-  /// build finishes. Mutating state directly inside build() can leave the
-  /// UI stuck, so this defers it to a post-frame callback.
-  void _clearInvalidSelection() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _selectedId != null) {
-        setState(() => _selectedId = null);
-      }
-    });
-  }
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
     final dateFmt = DateFormat('dd MMM yyyy');
+
+    final isEmpty = !_loading && _error == null && _options.isEmpty;
 
     return NetworkAwareWrapper(
       child: Scaffold(
@@ -167,153 +230,116 @@ class _OwnerReportFilterViewState extends State<_OwnerReportFilterView> {
         ),
 
         body: SafeArea(
-          child: BlocBuilder<OwnerReportsBloc, OwnerReportsState>(
-            builder: (context, state) {
-              final loading = _isSalesman
-                  ? state.activeSalesmenStatus == LoadStatus.loading
-                  : state.activeContractorsStatus == LoadStatus.loading;
-              final error = _isSalesman
-                  ? state.activeSalesmenError
-                  : state.activeContractorsError;
-
-              // Skip entries with a null/blank name entirely — only show
-              // people who actually have a real name.
-              final options = _isSalesman
-                  ? state.activeSalesmen
-                  .where((s) => s.name.trim().isNotEmpty)
-                  .map((s) => _DropdownEntry(s.id, s.name.trim()))
-                  .toList()
-                  : state.activeContractors
-                  .where((c) => c.name.trim().isNotEmpty)
-                  .map((c) => _DropdownEntry(c.id, c.name.trim()))
-                  .toList();
-
-              final isEmpty = !loading && error == null && options.isEmpty;
-
-              // If a previously-selected id no longer exists in the
-              // freshly-loaded list, clear it safely (post-frame).
-              if (_selectedId != null &&
-                  options.isNotEmpty &&
-                  options.every((o) => o.id != _selectedId)) {
-                _clearInvalidSelection();
-              }
-
-              return Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(Responsive.w(20),
-                          Responsive.h(14), Responsive.w(20), Responsive.h(24)),
-                      child: _FilterCard(
-                        title: 'Filters',
-                        icon: Icons.tune_rounded,
-                        child: Column(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                      Responsive.h(14), Responsive.w(20), Responsive.h(24)),
+                  child: _FilterCard(
+                    title: 'Filters',
+                    icon: Icons.tune_rounded,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _FieldLabel(_label),
+                        SizedBox(height: Responsive.h(8)),
+                        if (_loading)
+                          Container(
+                            height: Responsive.h(52),
+                            alignment: Alignment.centerLeft,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: Responsive.w(14)),
+                            decoration: _fieldDecoration(),
+                            child: const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        else if (_error != null)
+                          Text(_error!,
+                              style: AppTextStyles.caption(
+                                  color: AppColors.error))
+                        else if (isEmpty)
+                          // Never render DropdownButton with an empty
+                          // items list — it throws RangeError.
+                            Container(
+                              height: Responsive.h(52),
+                              alignment: Alignment.centerLeft,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: Responsive.w(14)),
+                              decoration: _fieldDecoration(),
+                              child: Text(
+                                _isSalesman
+                                    ? 'No salesmen found'
+                                    : 'No active contractors found',
+                                style: AppTextStyles.body(
+                                    color: AppColors.textSecondary),
+                              ),
+                            )
+                          else
+                            _DropdownField(
+                              value: _selectedId,
+                              hint: _hint,
+                              options: _options,
+                              onChanged: (v) => setState(() => _selectedId = v),
+                            ),
+                        SizedBox(height: Responsive.h(16)),
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _FieldLabel(_label),
-                            SizedBox(height: Responsive.h(8)),
-                            if (loading)
-                              Container(
-                                height: Responsive.h(52),
-                                alignment: Alignment.centerLeft,
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: Responsive.w(14)),
-                                decoration: _fieldDecoration(),
-                                child: const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2),
-                                ),
-                              )
-                            else if (error != null)
-                              Text(error,
-                                  style: AppTextStyles.caption(
-                                      color: AppColors.error))
-                            else if (isEmpty)
-                              // Never render DropdownButton with an empty
-                              // items list — it throws RangeError.
-                                Container(
-                                  height: Responsive.h(52),
-                                  alignment: Alignment.centerLeft,
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: Responsive.w(14)),
-                                  decoration: _fieldDecoration(),
-                                  child: Text(
-                                    _isSalesman
-                                        ? 'No active salesmen found'
-                                        : 'No active contractors found',
-                                    style: AppTextStyles.body(
-                                        color: AppColors.textSecondary),
-                                  ),
-                                )
-                              else
-                                _DropdownField(
-                                  value: _selectedId,
-                                  hint: _hint,
-                                  options: options,
-                                  onChanged: (v) =>
-                                      setState(() => _selectedId = v),
-                                ),
-                            SizedBox(height: Responsive.h(16)),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _DateField(
-                                    label: 'Start Date',
-                                    dateLabel: dateFmt.format(_startDate),
-                                    onTap: () => _pickDate(isStart: true),
-                                  ),
-                                ),
-                                SizedBox(width: Responsive.w(12)),
-                                Expanded(
-                                  child: _DateField(
-                                    label: 'End Date',
-                                    dateLabel: dateFmt.format(_endDate),
-                                    onTap: () => _pickDate(isStart: false),
-                                  ),
-                                ),
-                              ],
+                            Expanded(
+                              child: _DateField(
+                                label: 'Start Date',
+                                dateLabel: dateFmt.format(_startDate),
+                                onTap: () => _pickDate(isStart: true),
+                              ),
+                            ),
+                            SizedBox(width: Responsive.w(12)),
+                            Expanded(
+                              child: _DateField(
+                                label: 'End Date',
+                                dateLabel: dateFmt.format(_endDate),
+                                onTap: () => _pickDate(isStart: false),
+                              ),
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
+                ),
+              ),
 
-                  // ---------- BOTTOM BAR (same as Estimate Details) ----------
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.background,
-                      border: Border(top: BorderSide(color: AppColors.border)),
+              // ---------- BOTTOM BAR (same as Estimate Details) ----------
+              Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.background,
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                padding: EdgeInsets.fromLTRB(Responsive.w(20),
+                    Responsive.h(10), Responsive.w(20), Responsive.h(14)),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: Responsive.h(48),
+                  child: ElevatedButton(
+                    onPressed: _selectedId == null ? null : _generate,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor:
+                      AppColors.primary.withOpacity(0.4),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
-                    padding: EdgeInsets.fromLTRB(Responsive.w(20),
-                        Responsive.h(10), Responsive.w(20), Responsive.h(14)),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: Responsive.h(48),
-                      child: ElevatedButton(
-                        onPressed:
-                        _selectedId == null ? null : () => _generate(state),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          disabledBackgroundColor:
-                          AppColors.primary.withOpacity(0.4),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: Text('Generate Report',
-                            style:
-                            AppTextStyles.bodyBold(color: Colors.white)),
-                      ),
-                    ),
+                    child: Text('Generate Report',
+                        style: AppTextStyles.bodyBold(color: Colors.white)),
                   ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
         ),
       ),

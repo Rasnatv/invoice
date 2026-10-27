@@ -478,6 +478,25 @@ class QeItemFormFields extends StatelessWidget {
             ),
           ),
           LabeledField(
+            label: 'Rate',
+            field: CustomTextField(
+              hint: 'Enter rate per unit',
+              icon: Icons.currency_rupee,
+              keyboardType: decimal,
+              controller: rateCtrl,
+              inputFormatters: DValidator.priceNumber,
+              validator: (v) {
+                final n = double.tryParse((v ?? '').trim());
+                if (n == null || n <= 0) return 'Enter a valid rate';
+                if (n > DValidator.maxPrice) {
+                  return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
+                }
+                return null;
+              },
+              onChanged: onRateChanged,
+            ),
+          ),
+          LabeledField(
             label: 'Quantity',
             field: CustomTextField(
               hint: 'Enter quantity',
@@ -539,25 +558,25 @@ class QeItemFormFields extends StatelessWidget {
                 ),
               ],
             ),
-          LabeledField(
-            label: 'Rate',
-            field: CustomTextField(
-              hint: 'Enter rate per unit',
-              icon: Icons.currency_rupee,
-              keyboardType: decimal,
-              controller: rateCtrl,
-              inputFormatters: DValidator.priceNumber,
-              validator: (v) {
-                final n = double.tryParse((v ?? '').trim());
-                if (n == null || n <= 0) return 'Enter a valid rate';
-                if (n > DValidator.maxPrice) {
-                  return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
-                }
-                return null;
-              },
-              onChanged: onRateChanged,
-            ),
-          ),
+          // LabeledField(
+          //   label: 'Rate',
+          //   field: CustomTextField(
+          //     hint: 'Enter rate per unit',
+          //     icon: Icons.currency_rupee,
+          //     keyboardType: decimal,
+          //     controller: rateCtrl,
+          //     inputFormatters: DValidator.priceNumber,
+          //     validator: (v) {
+          //       final n = double.tryParse((v ?? '').trim());
+          //       if (n == null || n <= 0) return 'Enter a valid rate';
+          //       if (n > DValidator.maxPrice) {
+          //         return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
+          //       }
+          //       return null;
+          //     },
+          //     onChanged: onRateChanged,
+          //   ),
+          //),
         ],
       ),
     );
@@ -567,7 +586,7 @@ class QeItemFormFields extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Product search dropdown
 //
-// UPDATED: [addedProductIds] are hidden from the suggestion list. The screen
+// [addedProductIds] are hidden from the suggestion list. The screen
 // passes the IDs of every item already in the quotation EXCEPT the one being
 // edited, so the edited item's product is still selectable.
 // ---------------------------------------------------------------------------
@@ -594,7 +613,7 @@ class QeProductDropdown extends StatelessWidget {
   /// items that have no catalog match).
   final String? editingProductId;
 
-  /// NEW: product ids that are already added (hidden from the list).
+  /// Product ids that are already added (hidden from the list).
   final Set<String> addedProductIds;
 
   final bool showSuggestions;
@@ -644,7 +663,7 @@ class QeProductDropdown extends StatelessWidget {
 
         final products = state.products;
 
-        // NEW: hide products that are already added
+        // Hide products that are already added
         final available =
         products.where((p) => !addedProductIds.contains(p.id)).toList();
         final allAdded = products.isNotEmpty && available.isEmpty;
@@ -948,119 +967,159 @@ class QeIncentiveTotalCard extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 // Incentive preview (live /quotations/product-incentive result)
+//
+// Shown ONLY when:
+//   - a quantity is entered (> 0)
+//   - the incentive lookup succeeded
+// Then:
+//   - eligible AND incentive > 0                  -> green incentive card
+//   - not eligible, product HAS an incentive      -> orange "minimum quantity" hint
+//   - product has NO incentive (min qty 0.00)     -> nothing
+//   - no qty / loading / error / ₹0               -> nothing (no gap either)
 // ---------------------------------------------------------------------------
+
+/// True when the server reason means "this product has no incentive at all".
+/// The server sends "Minimum quantity required: 0.00" for such products.
+/// Adjust the keywords below if your API uses different wording.
+bool qeLooksLikeNoIncentive(String reason) {
+  final r = reason.toLowerCase();
+
+  final numbers = RegExp(r'\d+(?:\.\d+)?')
+      .allMatches(r)
+      .map((m) => double.tryParse(m.group(0)!) ?? 0)
+      .toList();
+  if (numbers.isNotEmpty && numbers.every((n) => n <= 0)) return true;
+
+  const noSchemeKeywords = [
+    'no incentive',
+    'not configured',
+    'no scheme',
+    'not applicable',
+    'not available',
+    'no active',
+  ];
+  return noSchemeKeywords.any(r.contains);
+}
+
+/// Orange hint: the product has an incentive, but the entered quantity is
+/// below the minimum. Shows the server message (e.g. the minimum quantity).
+class QeMinQtyHintCard extends StatelessWidget {
+  const QeMinQtyHintCard({super.key, required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Colors.orange;
+    return Padding(
+      padding: EdgeInsets.only(top: Responsive.h(2), bottom: Responsive.h(10)),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(Responsive.w(12)),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const QeIconBadge(Icons.info_outline, color: color, size: 14),
+            SizedBox(width: Responsive.w(8)),
+            Expanded(
+              child: Text(
+                message,
+                style: AppTextStyles.caption(color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class IncentivePreviewCard extends StatelessWidget {
-  const IncentivePreviewCard({super.key});
+  const IncentivePreviewCard({super.key, required this.qtyCtrl});
+
+  /// Quantity field controller: the card stays hidden until a quantity is entered.
+  final TextEditingController qtyCtrl;
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
-    return BlocBuilder<SalesmanEstimateBloc, SalesmanEstimateState>(
-      buildWhen: (prev, curr) =>
-      prev.incentiveStatus != curr.incentiveStatus ||
-          prev.incentive != curr.incentive ||
-          prev.incentiveError != curr.incentiveError,
-      builder: (context, state) {
-        if (state.incentiveStatus == LoadStatus.initial) {
-          return const SizedBox.shrink();
-        }
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: qtyCtrl,
+      builder: (context, qtyValue, _) {
+        final qty = double.tryParse(qtyValue.text.trim()) ?? 0;
 
-        if (state.incentiveStatus == LoadStatus.loading) {
-          return Container(
-            padding: EdgeInsets.all(Responsive.w(12)),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+        // No quantity entered -> nothing to show
+        if (qty <= 0) return const SizedBox.shrink();
+
+        return BlocBuilder<SalesmanEstimateBloc, SalesmanEstimateState>(
+          buildWhen: (prev, curr) =>
+          prev.incentiveStatus != curr.incentiveStatus ||
+              prev.incentive != curr.incentive,
+          builder: (context, state) {
+            // Only a successful response is considered.
+            // Loading / failure / initial -> show nothing.
+            if (state.incentiveStatus != LoadStatus.success) {
+              return const SizedBox.shrink();
+            }
+
+            final incentive = state.incentive;
+            if (incentive == null) return const SizedBox.shrink();
+
+            final reason = incentive.eligibilityReason.trim();
+
+            // Product HAS an incentive but this quantity is too low
+            // -> show the "minimum quantity required" hint.
+            // Product with no incentive at all -> show nothing.
+            if (!incentive.isEligible) {
+              if (reason.isEmpty || qeLooksLikeNoIncentive(reason)) {
+                return const SizedBox.shrink();
+              }
+              return QeMinQtyHintCard(message: reason);
+            }
+
+            // Eligible but incentive amount is 0 -> show nothing
+            if (incentive.totalIncentive <= 0) return const SizedBox.shrink();
+
+            return Padding(
+              padding: EdgeInsets.only(top: Responsive.h(2), bottom: Responsive.h(10)),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(Responsive.w(12)),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
                 ),
-                SizedBox(width: Responsive.w(10)),
-                Text('Checking incentive…',
-                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
-              ],
-            ),
-          );
-        }
-
-        if (state.incentiveStatus == LoadStatus.failure) {
-          return Container(
-            padding: EdgeInsets.all(Responsive.w(12)),
-            decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.error.withOpacity(0.25)),
-            ),
-            child: Text(
-              state.incentiveError ?? 'Couldn\'t fetch incentive for this item.',
-              style: AppTextStyles.caption(color: AppColors.error),
-            ),
-          );
-        }
-
-        final incentive = state.incentive;
-        if (incentive == null) return const SizedBox.shrink();
-
-        if (!incentive.isEligible) {
-          return Container(
-            padding: EdgeInsets.all(Responsive.w(12)),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, size: 16, color: AppColors.textHint),
-                SizedBox(width: Responsive.w(8)),
-                Expanded(
-                  child: Text(
-                    incentive.eligibilityReason.isNotEmpty
-                        ? incentive.eligibilityReason
-                        : 'Not eligible for incentive on this quantity/rate.',
-                    style: AppTextStyles.caption(color: AppColors.textSecondary),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        QeIconBadge(Icons.percent, color: AppColors.success, size: 14),
+                        SizedBox(width: Responsive.w(8)),
+                        Expanded(
+                          child: Text('Incentive on this item',
+                              style: AppTextStyles.bodyBold(color: AppColors.success)),
+                        ),
+                        Text(currency.format(incentive.totalIncentive),
+                            style: AppTextStyles.bodyBold(color: AppColors.success)),
+                      ],
+                    ),
+                    if (reason.isNotEmpty) ...[
+                      SizedBox(height: Responsive.h(6)),
+                      Text(reason,
+                          style: AppTextStyles.caption(color: AppColors.textSecondary)),
+                    ],
+                  ],
                 ),
-              ],
-            ),
-          );
-        }
-
-        return Container(
-          padding: EdgeInsets.all(Responsive.w(12)),
-          decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.success.withOpacity(0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  QeIconBadge(Icons.percent, color: AppColors.success, size: 14),
-                  SizedBox(width: Responsive.w(8)),
-                  Expanded(
-                    child: Text('Incentive on this item',
-                        style: AppTextStyles.bodyBold(color: AppColors.success)),
-                  ),
-                  Text(currency.format(incentive.totalIncentive),
-                      style: AppTextStyles.bodyBold(color: AppColors.success)),
-                ],
               ),
-              if (incentive.eligibilityReason.isNotEmpty) ...[
-                SizedBox(height: Responsive.h(6)),
-                Text(incentive.eligibilityReason,
-                    style: AppTextStyles.caption(color: AppColors.textSecondary)),
-              ],
-            ],
-          ),
+            );
+          },
         );
       },
     );

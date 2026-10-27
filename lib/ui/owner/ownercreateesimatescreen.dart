@@ -25,8 +25,7 @@ import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../models/salesmanmodels/estimatewith_activesitedropdownmodel.dart';
 import '../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 import '../../widgets/appsnackbar.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/primary_button.dart';
+
 
 class OwnerCreateEstimateScreen extends StatelessWidget {
   const OwnerCreateEstimateScreen({super.key});

@@ -13,9 +13,6 @@ import '../../core/validator/validationfile.dart';
 import '../../models/owner_models/owner_incentivesetupmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
-// =====================================================================
-// SHARED HELPERS (private to this file)
-// =====================================================================
 
 /// Input decoration that uses the app font everywhere.
 InputDecoration _dec(String hint, {String? prefixText, String? suffixText}) =>

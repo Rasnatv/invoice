@@ -134,7 +134,7 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
           child: Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(
-              title: Text('Record Payment', style: AppTextStyles.h6()),
+              title: Text(' Payments', style: AppTextStyles.h6()),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),

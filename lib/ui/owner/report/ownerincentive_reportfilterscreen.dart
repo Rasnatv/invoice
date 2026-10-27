@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
-import '../../../bloc/ownerbloc/fieldstaffactive/owner_fieldstaffactive_bloc.dart';
-import '../../../bloc/ownerbloc/fieldstaffactive/owner_fieldstaffactive_event.dart';
-import '../../../bloc/ownerbloc/fieldstaffactive/owner_fieldstaffactive_state.dart';
-import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_bloc.dart';
-import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_event.dart';
-import '../../../bloc/ownerbloc/ownerreportbloc/ownerreport_state.dart';
+// NOTE: adjust these two provider paths/file names to your project.
+import '../../../Apiprovider/salesmanprovider.dart';
+import '../../../Apiprovider/fieldstaffprovider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../models/owner_models/fieldstaff_getmodel.dart';
+import '../../../models/owner_models/salesmanmodel.dart';
 import 'owner_incentivereportscreen.dart';
 
 enum IncentiveEntityType { salesman, fieldStaff }
@@ -43,15 +41,15 @@ class _OwnerIncentiveReportFilterScreenState
     extends State<OwnerIncentiveReportFilterScreen> {
   static const List<String> _statusOptions = ['All', 'Paid', 'Pending'];
 
-  // Salesman list: GET /salesmen/active via OwnerReportsBloc.
-  late final OwnerReportsBloc _ownerReportsBloc;
+  // Salesman list: GET /salesmen (all salesmen).
+  final SalesmanProvider _salesmanProvider = SalesmanProvider();
 
-  // Field staff list: GET /field-staff/active via FieldStaffActiveBloc.
-  late final FieldStaffActiveBloc _fieldStaffBloc;
+  // Field staff list: GET /field-staff (all field staff).
+  final FieldStaffProvider _fieldStaffProvider = FieldStaffProvider();
 
   late IncentiveEntityType _type;
 
-  /// Display name shown in the dropdown.
+  /// Display name (clean, without any "(2)" / "(Inactive)" suffix).
   String? _person;
 
   /// The id actually sent to the API.
@@ -62,12 +60,14 @@ class _OwnerIncentiveReportFilterScreenState
   late DateTime _endDate;
   late String _status;
 
+  bool _loadingPeople = false;
+  String? _peopleError;
+  List<HSalesmanModel> _salesmen = [];
+  List<FieldStaffModel> _fieldStaff = [];
+
   @override
   void initState() {
     super.initState();
-    _ownerReportsBloc = OwnerReportsBloc()..add(const newLoadActiveSalesmen());
-    _fieldStaffBloc = FieldStaffActiveBloc()
-      ..add(const FetchActiveFieldStaff());
     _type = widget.initialType ?? IncentiveEntityType.salesman;
     _person = widget.initialPerson;
     _personId = widget.initialPersonId;
@@ -77,22 +77,136 @@ class _OwnerIncentiveReportFilterScreenState
     _endDate = widget.initialEnd ?? DateTime(now.year, now.month + 1, 0);
 
     _status = widget.initialStatus ?? _statusOptions.first;
+
+    _loadPeople();
   }
 
-  @override
-  void dispose() {
-    _ownerReportsBloc.close();
-    _fieldStaffBloc.close();
-    super.dispose();
+  // ---------------------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------------------
+
+  Future<void> _loadPeople() async {
+    setState(() {
+      _loadingPeople = true;
+      _peopleError = null;
+    });
+
+    if (_type == IncentiveEntityType.salesman) {
+      final result = await _salesmanProvider.getSalesmen();
+      if (!mounted) return;
+      if (result.success) {
+        setState(() {
+          // Drop blank-name records so they never show as selectable rows.
+          _salesmen =
+              result.salesmen.where((s) => s.name.trim().isNotEmpty).toList();
+          _loadingPeople = false;
+          _syncSelection();
+        });
+      } else {
+        setState(() {
+          _loadingPeople = false;
+          _peopleError = result.errorMessage ?? 'Failed to load salesmen.';
+        });
+      }
+    } else {
+      final result = await _fieldStaffProvider.getFieldStaff();
+      if (!mounted) return;
+      if (result.success) {
+        setState(() {
+          _fieldStaff =
+              result.staff.where((f) => f.name.trim().isNotEmpty).toList();
+          _loadingPeople = false;
+          _syncSelection();
+        });
+      } else {
+        setState(() {
+          _loadingPeople = false;
+          _peopleError = result.errorMessage ?? 'Failed to load field staff.';
+        });
+      }
+    }
   }
+
+  /// Makes sure the selected person exists in the freshly loaded list;
+  /// otherwise clears it so the dropdown shows its hint. Call inside setState.
+  void _syncSelection() {
+    final index = _peopleIds.indexOf(_personId ?? '');
+    if (index != -1) {
+      _person = _rawNames[index];
+      return;
+    }
+    _person = null;
+    _personId = null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dropdown helpers
+  // ---------------------------------------------------------------------------
+
+  bool get _isSalesman => _type == IncentiveEntityType.salesman;
+
+  List<String> get _rawNames => _isSalesman
+      ? _salesmen.map((s) => s.name.trim()).toList()
+      : _fieldStaff.map((f) => f.name.trim()).toList();
+
+  // HSalesmanModel.id is a String; FieldStaffModel.id is an int.
+  List<String> get _peopleIds => _isSalesman
+      ? _salesmen.map((s) => s.id).toList()
+      : _fieldStaff.map((f) => f.id.toString()).toList();
+
+  List<bool> get _inactiveFlags => _isSalesman
+      ? _salesmen.map((s) => !s.isActive).toList()
+      : _fieldStaff.map((f) => !f.isActive).toList();
+
+  /// Unique dropdown labels: "rasna", "rasna (2)", ... so two people with the
+  /// same name never produce duplicate DropdownMenuItem values or resolve to
+  /// the wrong id. Inactive people get an " (Inactive)" suffix.
+  List<String> get _peopleNames {
+    final seen = <String, int>{};
+    final raw = _rawNames;
+    final inactive = _inactiveFlags;
+
+    return List.generate(raw.length, (i) {
+      final n = raw[i];
+      final count = (seen[n] ?? 0) + 1;
+      seen[n] = count;
+      var label = count == 1 ? n : '$n ($count)';
+      if (inactive[i]) label += ' (Inactive)';
+      return label;
+    });
+  }
+
+  String? get _selectedLabel {
+    final i = _peopleIds.indexOf(_personId ?? '');
+    return i == -1 ? null : _peopleNames[i];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
 
   void _onTypeChanged(bool isSalesman) {
+    final newType = isSalesman
+        ? IncentiveEntityType.salesman
+        : IncentiveEntityType.fieldStaff;
+    if (newType == _type) return;
+
     setState(() {
-      _type = isSalesman
-          ? IncentiveEntityType.salesman
-          : IncentiveEntityType.fieldStaff;
+      _type = newType;
       _person = null; // reset: the two lists don't overlap
       _personId = null;
+    });
+    _loadPeople();
+  }
+
+  /// Selects by index in the unique-label list, so duplicate names still
+  /// resolve to the correct backend id.
+  void _onPersonChanged(String label) {
+    final i = _peopleNames.indexOf(label);
+    if (i == -1) return;
+    setState(() {
+      _personId = _peopleIds[i];
+      _person = _rawNames[i];
     });
   }
 
@@ -131,11 +245,15 @@ class _OwnerIncentiveReportFilterScreenState
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
 
-    final isSalesman = _type == IncentiveEntityType.salesman;
+    final isSalesman = _isSalesman;
 
     return NetworkAwareWrapper(
       child: Scaffold(
@@ -271,107 +389,45 @@ class _OwnerIncentiveReportFilterScreenState
     );
   }
 
-  /// Salesman pulls live data from [_ownerReportsBloc] via GET
-  /// /salesmen/active. Field Staff pulls live data from [_fieldStaffBloc]
-  /// via GET /field-staff/active.
+  /// Salesman list comes from GET /salesmen, field staff list from
+  /// GET /field-staff (both include inactive people, marked in the label).
   Widget _buildPersonDropdown() {
-    if (_type == IncentiveEntityType.salesman) {
-      return BlocBuilder<OwnerReportsBloc, OwnerReportsState>(
-        bloc: _ownerReportsBloc,
-        builder: (context, state) {
-          if (state.activeSalesmenStatus == LoadStatus.loading ||
-              state.activeSalesmenStatus == LoadStatus.initial) {
-            return _DropdownField(
-              options: const [],
-              value: null,
-              hint: 'Loading salesmen…',
-              onChanged: (_) {},
-            );
-          }
+    final isSalesman = _isSalesman;
+    final hint = isSalesman ? 'Choose salesman' : 'Choose field staff';
 
-          if (state.activeSalesmenStatus == LoadStatus.failure) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DropdownField(
-                  options: const [],
-                  value: null,
-                  hint: 'Choose salesman',
-                  onChanged: (_) {},
-                ),
-                SizedBox(height: Responsive.h(6)),
-                Text(
-                  state.activeSalesmenError ?? 'Failed to load salesmen.',
-                  style: AppTextStyles.caption(color: AppColors.error),
-                ),
-              ],
-            );
-          }
-
-          final salesmen = state.activeSalesmen;
-          // NOTE: adjust `.name` / `.id` if ActiveSalesmanModel differs.
-          final names = salesmen.map((s) => s.name).toList();
-          final nameToId = {for (final s in salesmen) s.name: s.id};
-
-          return _DropdownField(
-            options: names,
-            value: _person,
-            hint: 'Choose salesman',
-            onChanged: (v) => setState(() {
-              _person = v;
-              _personId = nameToId[v];
-            }),
-          );
-        },
+    if (_loadingPeople) {
+      return _DropdownField(
+        options: const [],
+        value: null,
+        hint: isSalesman ? 'Loading salesmen…' : 'Loading field staff…',
+        onChanged: (_) {},
       );
     }
 
-    return BlocBuilder<FieldStaffActiveBloc, FieldStaffActiveState>(
-      bloc: _fieldStaffBloc,
-      builder: (context, state) {
-        if (state is FieldStaffActiveLoading ||
-            state is FieldStaffActiveInitial) {
-          return _DropdownField(
+    if (_peopleError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DropdownField(
             options: const [],
             value: null,
-            hint: 'Loading field staff…',
+            hint: hint,
             onChanged: (_) {},
-          );
-        }
+          ),
+          SizedBox(height: Responsive.h(6)),
+          Text(
+            _peopleError!,
+            style: AppTextStyles.caption(color: AppColors.error),
+          ),
+        ],
+      );
+    }
 
-        if (state is FieldStaffActiveError) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DropdownField(
-                options: const [],
-                value: null,
-                hint: 'Choose field staff',
-                onChanged: (_) {},
-              ),
-              SizedBox(height: Responsive.h(6)),
-              Text(
-                state.message ?? 'Failed to load field staff.',
-                style: AppTextStyles.caption(color: AppColors.error),
-              ),
-            ],
-          );
-        }
-
-        final loaded = state as FieldStaffActiveLoaded;
-        final names = loaded.fieldStaff.map((f) => f.name).toList();
-        final nameToId = {for (final f in loaded.fieldStaff) f.name: f.id};
-
-        return _DropdownField(
-          options: names,
-          value: _person,
-          hint: 'Choose field staff',
-          onChanged: (v) => setState(() {
-            _person = v;
-            _personId = nameToId[v];
-          }),
-        );
-      },
+    return _DropdownField(
+      options: _peopleNames,
+      value: _selectedLabel,
+      hint: hint,
+      onChanged: _onPersonChanged,
     );
   }
 }

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -248,6 +249,18 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
   /// payment covers the whole incentive (product incentive + target bonus).
   Future<void> _openMarkPaidDialog(
       BuildContext context, String totalIncentive) async {
+    // Safety guard: never allow a payment when there is nothing to pay.
+    final total = context
+        .read<OwnerIncentiveBloc>()
+        .state
+        .summary
+        ?.totalPayableValue ??
+        0;
+    if (total <= 0) {
+      AppSnackbar.error('No incentive to pay for this period.');
+      return;
+    }
+
     final refController = TextEditingController();
     final notesController = TextEditingController();
     DateTime paymentDate = DateTime.now();
@@ -655,7 +668,13 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                                       summary.productIncentiveValue;
                                   final bonusAmount = summary.bonusAmountValue;
                                   final totalPayable = summary.totalPayableValue;
-                                  final isPaid = summary.bonusStatus.isPaid;
+
+                                  // Payment / paid status is only meaningful
+                                  // when there is actually something to pay
+                                  // (product incentive and/or bonus).
+                                  final hasIncentive = totalPayable > 0;
+                                  final isPaid =
+                                      hasIncentive && summary.bonusStatus.isPaid;
 
                                   return _IncentivePaymentCard(
                                     productIncentive:
@@ -664,6 +683,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                                         ? currency.format(bonusAmount)
                                         : null,
                                     totalPayable: currency.format(totalPayable),
+                                    hasIncentive: hasIncentive,
                                     isPaid: isPaid,
                                     // Only meaningful once paid.
                                     paidAmount: currency.format(isPaid
@@ -672,7 +692,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                                     paidAt: summary.bonusStatus.paidAt,
                                     paymentReference:
                                     summary.bonusStatus.paymentReference,
-                                    canMarkPaid: state.isOwner,
+                                    canMarkPaid: state.isOwner && hasIncentive,
                                     markingPaid: state.markPaidStatus ==
                                         MarkPaidStatus.submitting,
                                     onTapMarkPaid: () => _openMarkPaidDialog(
@@ -1151,11 +1171,15 @@ class _Pill extends StatelessWidget {
 
 /// Bottom card: product incentive + bonus amount = total payable,
 /// with the paid / unpaid status and the "Payment Given" button.
+///
+/// When [hasIncentive] is false (total payable = 0) the card shows a neutral
+/// "No Incentive" status: no Paid / Unpaid pill and no "Payment Given" button.
 class _IncentivePaymentCard extends StatelessWidget {
   const _IncentivePaymentCard({
     required this.productIncentive,
     this.bonusAmount,
     required this.totalPayable,
+    required this.hasIncentive,
     required this.isPaid,
     required this.paidAmount,
     this.paidAt,
@@ -1168,6 +1192,7 @@ class _IncentivePaymentCard extends StatelessWidget {
   final String productIncentive;
   final String? bonusAmount; // null -> no bonus, row hidden
   final String totalPayable;
+  final bool hasIncentive; // false -> nothing to pay, no paid status
   final bool isPaid;
   final String paidAmount;
   final String? paidAt;
@@ -1216,9 +1241,15 @@ class _IncentivePaymentCard extends StatelessWidget {
                 Text('Incentive Payment', style: AppTextStyles.bodyBold()),
               ),
               _Pill(
-                label: isPaid ? 'Paid' : 'Unpaid',
-                color: isPaid ? AppColors.success : _amber,
-                icon: isPaid ? Icons.check_circle_rounded : null,
+                label: !hasIncentive
+                    ? 'No Incentive'
+                    : (isPaid ? 'Paid' : 'Unpaid'),
+                color: !hasIncentive
+                    ? AppColors.textSecondary
+                    : (isPaid ? AppColors.success : _amber),
+                icon: hasIncentive && isPaid
+                    ? Icons.check_circle_rounded
+                    : null,
               ),
             ],
           ),
@@ -1237,7 +1268,13 @@ class _IncentivePaymentCard extends StatelessWidget {
           _row('Total Payable', totalPayable,
               bold: true, color: AppColors.success),
 
-          if (isPaid) ...[
+          if (!hasIncentive) ...[
+            SizedBox(height: Responsive.h(10)),
+            Text(
+              'No incentive earned for this period, so no payment is due.',
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
+            ),
+          ] else if (isPaid) ...[
             SizedBox(height: Responsive.h(10)),
             _row('Amount Paid', paidAmount),
             if ((paidAt?.isNotEmpty ?? false) ||

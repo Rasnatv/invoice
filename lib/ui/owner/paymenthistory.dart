@@ -146,7 +146,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: Text('Record Payment',
+                  child: Text('Pay Now',
                       style:
                       AppTextStyles.bodyBold(color: Colors.white)),
                 ),

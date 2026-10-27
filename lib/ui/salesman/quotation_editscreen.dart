@@ -916,11 +916,9 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                                 onPieceChanged: (_) => setState(() {}),
                               ),
 
-                              if (_selectedProduct != null || _editingItemIndex != null) ...[
-                                SizedBox(height: Responsive.h(2)),
-                                const IncentivePreviewCard(),
-                                SizedBox(height: Responsive.h(10)),
-                              ] else
+                              if (_selectedProduct != null || _editingItemIndex != null)
+                                IncentivePreviewCard(qtyCtrl: _itemQtyCtrl)
+                              else
                                 SizedBox(height: Responsive.h(2)),
 
                               if (_editingItemIndex != null)

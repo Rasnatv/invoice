@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../Apiprovider/ownerreportprovider.dart';
+// NOTE: adjust this file name/path to where SalesmanProvider lives.
+import '../../../Apiprovider/salesmanprovider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../models/owner_models/salesmanmodel.dart';
 import '../../../models/owner_reportmodel/activecontractormodel.dart';
-import '../../../models/salesmanmodels/activeslaesman_model.dart';
 import 'ownerestimatereportscreen.dart';
 import 'ownerquotation_reportfilterscreen.dart'; // ReportEntityType
 
@@ -41,6 +43,9 @@ class _OwnerEstimateReportFilterScreenState
 
   final OwnerReportsProvider _reportsProvider = OwnerReportsProvider();
 
+  /// Used for the full salesman list (GET /salesmen).
+  final SalesmanProvider _salesmanProvider = SalesmanProvider();
+
   /// True when the "All" chip is selected: no person dropdown, and the report
   /// is requested with type = "" and person_id = "".
   late bool _isAll;
@@ -52,7 +57,7 @@ class _OwnerEstimateReportFilterScreenState
 
   bool _loadingPeople = false;
   String? _peopleError;
-  List<ActiveSalesmanModel> _salesmen = [];
+  List<HSalesmanModel> _salesmen = [];
   List<ActiveContractorModel> _contractors = [];
 
   String? _selectedPersonId;
@@ -84,7 +89,8 @@ class _OwnerEstimateReportFilterScreenState
     });
 
     if (_type == ReportEntityType.salesman) {
-      final result = await _reportsProvider.getActiveSalesmen();
+      // All salesmen (active + inactive) from GET /salesmen.
+      final result = await _salesmanProvider.getSalesmen();
       if (!mounted) return;
       if (result.success) {
         setState(() {
@@ -143,20 +149,27 @@ class _OwnerEstimateReportFilterScreenState
       ? _salesmen.map((s) => s.name.trim()).toList()
       : _contractors.map((c) => c.name.trim()).toList();
 
+  // HSalesmanModel.id is already a String.
   List<String> get _peopleIds => _type == ReportEntityType.salesman
-      ? _salesmen.map((s) => s.id.toString()).toList()
+      ? _salesmen.map((s) => s.id).toList()
       : _contractors.map((c) => c.id.toString()).toList();
 
   /// Unique dropdown labels: "rasna", "rasna (2)", ... so two people with the
   /// same name never produce duplicate DropdownMenuItem values or resolve
-  /// to the wrong id.
+  /// to the wrong id. Inactive salesmen get an " (Inactive)" suffix.
   List<String> get _peopleNames {
     final seen = <String, int>{};
-    return _rawNames.map((n) {
+    final raw = _rawNames;
+    final isSalesman = _type == ReportEntityType.salesman;
+
+    return List.generate(raw.length, (i) {
+      final n = raw[i];
       final count = (seen[n] ?? 0) + 1;
       seen[n] = count;
-      return count == 1 ? n : '$n ($count)';
-    }).toList();
+      var label = count == 1 ? n : '$n ($count)';
+      if (isSalesman && !_salesmen[i].isActive) label += ' (Inactive)';
+      return label;
+    });
   }
 
   String? get _selectedLabel {
@@ -319,7 +332,7 @@ class _OwnerEstimateReportFilterScreenState
                           else if (names.isEmpty)
                               Text(
                                 isSalesman
-                                    ? 'No active salesmen found.'
+                                    ? 'No salesmen found.'
                                     : 'No active contractors found.',
                                 style: AppTextStyles.caption(
                                     color: AppColors.textSecondary),

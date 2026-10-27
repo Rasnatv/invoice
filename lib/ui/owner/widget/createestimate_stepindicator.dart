@@ -470,7 +470,7 @@ class DetailsStep extends StatelessWidget {
           ),
         ),
         BottomActionBar(
-          right: PrimaryButton(label: 'Add Items', height: 48, onPressed: onNext),
+          right: PrimaryButton(label: 'Next', height: 48, onPressed: onNext,trailingIcon: Icons.arrow_right_alt_rounded,),
         ),
       ],
     );
