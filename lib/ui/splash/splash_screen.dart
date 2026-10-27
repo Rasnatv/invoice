@@ -224,7 +224,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         children: [
                           Text(
-                            'CERAMO',
+                            'DREAMS CERAMICS',
                             style: AppTextStyles.h1(
                               color: AppColors.primary,
                             ).copyWith(
