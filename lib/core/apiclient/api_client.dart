@@ -724,7 +724,7 @@ class ApiClient {
   Future<Response> fieldStaffIncentiveSummary(
       Map<String, dynamic> data, {
         int page = 1,
-        int perPage = 20,
+        int perPage = 10,
       }) async => dio.post(
     '${ApiConstants.fieldStaffIncentivesSummary}?page=$page&per_page=$perPage',
     data: data,

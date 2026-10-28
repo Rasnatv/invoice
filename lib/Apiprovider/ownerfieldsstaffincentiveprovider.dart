@@ -93,7 +93,7 @@ class IncentiveProvider {
     String? fieldStaffId, // omit for "all field staff"
     String? status, // pending | approved | paid — omit/pass 'all' to skip
     int page = 1,
-    int perPage = 20,
+    int perPage = 10,
   }) async {
     try {
       final body = <String, dynamic>{
