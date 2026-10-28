@@ -151,7 +151,7 @@ class _OwnerContractorReportViewState
                           label: 'Estimates'),
                       ReportStat(
                         value: currency.format(
-                            summary.quotationsValue + summary.estimatesValue),
+                            summary.estimatesValue),
                         label: 'Total Business',
                         color: AppColors.primary,
                       ),
