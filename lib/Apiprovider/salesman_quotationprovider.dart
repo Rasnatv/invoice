@@ -1,5 +1,6 @@
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import '../core/apiclient/api_client.dart';
 import '../core/errors/apierrorhandler.dart';
 import '../models/owner_models/get_activedrivermodel.dart';
@@ -287,11 +288,32 @@ class QuotationProvider {
     }
   }
 
+  // /// POST /quotations/show — full detail of a single quotation/estimate.
+  // Future<QuotationDetailResult> getQuotationDetail(String id) async {
+  //   try {
+  //     final response = await _apiClient.showQuotation(
+  //         QuotationIdRequest(id).toJson());
+  //
+  //     if (response.statusCode == 200 || response.statusCode == 201) {
+  //       final parsed = QuotationDetailResponseModel.fromJson(response.data);
+  //       if (parsed.data != null) {
+  //         return QuotationDetailResult.success(parsed.data);
+  //       }
+  //       return QuotationDetailResult.failure(parsed.message);
+  //     }
+  //     return QuotationDetailResult.failure(response.statusCode.toString());
+  //   } on DioException catch (e) {
+  //     final message = await ApiErrorHandler.handleDioError(e);
+  //     return QuotationDetailResult.failure(message);
+  //   }
+  // }
   /// POST /quotations/show — full detail of a single quotation/estimate.
   Future<QuotationDetailResult> getQuotationDetail(String id) async {
     try {
       final response = await _apiClient.showQuotation(
           QuotationIdRequest(id).toJson());
+
+      debugPrint('RAW SHOW: ${response.data}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final parsed = QuotationDetailResponseModel.fromJson(response.data);

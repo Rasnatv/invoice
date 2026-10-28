@@ -856,51 +856,51 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                               ),
                               if (discType != null) ...[
                                 const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: discValueCtrl,
-                                  style: inputStyle,
-                                  onChanged: (_) => setDialogState(() {}),
-                                  keyboardType:
-                                  const TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: DValidator.decimalWithLimit(
-                                    maxIntDigits:
-                                    discType == QuotationDiscountType.percentage
-                                        ? 3
-                                        : DValidator.maxPriceDigits,
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText:
-                                    discType == QuotationDiscountType.percentage
-                                        ? 'Discount %'
-                                        : 'Discount Amount',
-                                    prefixText:
-                                    discType == QuotationDiscountType.percentage
-                                        ? null
-                                        : '₹ ',
-                                    suffixText:
-                                    discType == QuotationDiscountType.percentage
-                                        ? '%'
-                                        : null,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Enter a value or choose "No discount"';
-                                    }
-                                    final parsed = double.tryParse(value.trim());
-                                    if (parsed == null || parsed < 0) {
-                                      return 'Enter a valid value';
-                                    }
-                                    if (discType == QuotationDiscountType.percentage &&
-                                        parsed > 99) {
-                                      return 'Cannot exceed 99%';
-                                    }
-                                    if (discType != QuotationDiscountType.percentage &&
-                                        parsed > DValidator.maxPrice) {
-                                      return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
-                                    }
-                                    return null;
-                                  },
-                                ),
+
+                TextFormField(
+                controller: discValueCtrl,
+                style: inputStyle,
+                onChanged: (_) => setDialogState(() {}),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                inputFormatters: DValidator.decimalWithLimit(
+                maxIntDigits: discType == QuotationDiscountType.percentage
+                ? 3
+                    : DValidator.maxPriceDigits,
+                ),
+                decoration: InputDecoration(
+                labelText: discType == QuotationDiscountType.percentage
+                ? 'Discount %'
+                    : 'Discount Amount',
+                prefixText:
+                discType == QuotationDiscountType.percentage ? null : '₹ ',
+                suffixText:
+                discType == QuotationDiscountType.percentage ? '%' : null,
+                ),
+                validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                return 'Enter a value or choose "No discount"';
+                }
+                final parsed = double.tryParse(value.trim());
+                if (parsed == null || parsed <= 0) {
+                return 'Enter a valid value';
+                }
+                if (discType == QuotationDiscountType.percentage) {
+                if (parsed > 99) return 'Cannot exceed 99%';
+                } else {
+                if (parsed > DValidator.maxPrice) {
+                return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                }
+                // Fixed discount cannot exceed the grand total
+                // (compare in paise to avoid floating-point issues)
+                if ((parsed * 100).round() > (grandTotal * 100).round()) {
+                return 'Cannot exceed grand total (${money.format(grandTotal)})';
+                }
+                }
+                return null;
+                },
+                ),
+
                                 const SizedBox(height: 12),
                               ],
 
@@ -944,13 +944,15 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                               TextFormField(
                                 controller: payAmountCtrl,
                                 style: inputStyle,
-                                keyboardType:
-                                const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: DValidator.priceNumber,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                // 15 integer digits + 2 decimals
+                                inputFormatters: DValidator.paymentAmount,
+                                autovalidateMode: AutovalidateMode.onUserInteraction,
                                 onChanged: (_) => setDialogState(() {}),
                                 decoration: const InputDecoration(
                                   labelText: 'Amount Received',
                                   prefixText: '₹ ',
+                                  errorMaxLines: 2
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
@@ -960,10 +962,13 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                   if (parsed == null || parsed < 0) {
                                     return 'Enter a valid amount';
                                   }
-                                  if (parsed > DValidator.maxPrice) {
-                                    return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                  if (parsed.truncate().toString().length > DValidator.maxPaymentDigits) {
+                                    return 'Amount can have at most ${DValidator.maxPaymentDigits} digits';
                                   }
-                                  if (grandTotal > 0 && parsed > payable + 0.005) {
+                                  // Compare in paise to avoid floating-point issues
+                                  final receivedPaise = (parsed * 100).round();
+                                  final payablePaise = (payable * 100).round();
+                                  if (receivedPaise > payablePaise) {
                                     return 'Cannot exceed payable amount (${money.format(payable)})';
                                   }
                                   return null;

@@ -1,12 +1,13 @@
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show TextInputType;
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
 import '../../Apiprovider/paymentprovider.dart';
 import '../../core/utils/currency_utils.dart';
+import '../../core/validator/validationfile.dart';
 import '../../models/owner_models/paymentmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
@@ -174,10 +175,8 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
                         style: AppTextStyles.body(),
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d{0,2}')),
-                        ],
+                        // max 15 digits before the decimal point, 2 after
+                        inputFormatters: DValidator.paymentAmount,
                         decoration:
                         _decoration('Enter amount', prefixText: '₹ '),
                         validator: (value) {

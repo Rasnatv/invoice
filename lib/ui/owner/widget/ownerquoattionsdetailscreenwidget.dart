@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/validator/validationfile.dart';
 import '../../../models/owner_models/owner_quotationapprovemodel.dart';
 import '../../../models/salesmanmodels/quotationlistdetailmodel.dart';
 
@@ -906,9 +907,7 @@ class PaymentsCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------
-// Approve dialog (same look as the Estimate approve dialog)
-// ---------------------------------------------------------------------
+
 
 /// Shows the approve dialog. Returns the request to send, or null if the
 /// owner cancelled.
@@ -1048,14 +1047,24 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                           style: inputStyle,
                           keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                          ],
+                          inputFormatters: DValidator.priceNumber, // 8 digits + 2 decimals
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           decoration: const InputDecoration(
                             labelText: 'Handling Charge (optional)',
                             prefixText: '₹ ',
                           ),
                           onChanged: (_) => setDialogState(() {}),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null; // optional
+                            final parsed = double.tryParse(v.trim());
+                            if (parsed == null || parsed < 0) {
+                              return 'Enter a valid amount';
+                            }
+                            if (parsed > DValidator.maxPrice) {
+                              return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                            }
+                            return null;
+                          },
                         ),
 
                         // ---- Discount ----
@@ -1075,8 +1084,12 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                             DropdownMenuItem(
                                 value: 'fixed', child: Text('Fixed', style: inputStyle)),
                           ],
-                          onChanged: (v) =>
-                              setDialogState(() => discountType = v ?? 'none'),
+                          // Clear the value when the type changes so "50%" doesn't
+                          // silently become a fixed ₹50 discount.
+                          onChanged: (v) => setDialogState(() {
+                            discountType = v ?? 'none';
+                            discountValueCtrl.clear();
+                          }),
                         ),
                         if (discountType != 'none') ...[
                           const SizedBox(height: 12),
@@ -1085,9 +1098,12 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                             style: inputStyle,
                             keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                            ],
+                            inputFormatters: DValidator.decimalWithLimit(
+                              maxIntDigits: discountType == 'percentage'
+                                  ? 3
+                                  : DValidator.maxPriceDigits,
+                            ),
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
                             decoration: InputDecoration(
                               labelText: discountType == 'percentage'
                                   ? 'Discount %'
@@ -1098,13 +1114,27 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                             onChanged: (_) => setDialogState(() {}),
                             validator: (v) {
                               if (discountType == 'none') return null;
-                              if (v == null || v.trim().isEmpty) return 'Required';
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Enter a value or choose "No discount"';
+                              }
                               final parsed = double.tryParse(v.trim());
-                              if (parsed == null || parsed < 0) {
+                              if (parsed == null || parsed <= 0) {
                                 return 'Enter a valid value';
                               }
-                              if (discountType == 'percentage' && parsed > 99) {
-                                return 'Cannot exceed 99%';
+                              if (discountType == 'percentage') {
+                                if (parsed > 99) return 'Cannot exceed 99%';
+                              } else {
+                                if (parsed > DValidator.maxPrice) {
+                                  return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                }
+                                // Fixed discount can't be more than subtotal + handling
+                                // (compare in paise to avoid floating-point issues)
+                                final beforeDiscount =
+                                    q.subtotal + calcPreview().handling;
+                                if ((parsed * 100).round() >
+                                    (beforeDiscount * 100).round()) {
+                                  return 'Cannot exceed ${currency.format(beforeDiscount)}';
+                                }
                               }
                               return null;
                             },
@@ -1155,12 +1185,12 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                           style: inputStyle,
                           keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                          ],
+                          inputFormatters: DValidator.paymentAmount, // 15 digits + 2 decimals
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           decoration: const InputDecoration(
                             labelText: 'Amount Received',
                             prefixText: '₹ ',
+                            errorMaxLines: 2
                           ),
                           onChanged: (_) => setDialogState(() {}),
                           validator: (v) {
@@ -1169,8 +1199,13 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                             if (parsed == null || parsed <= 0) {
                               return 'Enter a valid amount';
                             }
+                            if (parsed.truncate().toString().length >
+                                DValidator.maxPaymentDigits) {
+                              return 'Amount can have at most ${DValidator.maxPaymentDigits} digits';
+                            }
                             final payable = calcPreview().payable;
-                            if (parsed > payable + 0.009) {
+                            // Compare in paise to avoid floating-point issues
+                            if ((parsed * 100).round() > (payable * 100).round()) {
                               return 'Cannot exceed payable amount (${currency.format(payable)})';
                             }
                             return null;

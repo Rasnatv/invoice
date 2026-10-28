@@ -11,6 +11,7 @@ import '../../../core/utils/responsive.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_bloc.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_event.dart';
 import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_state.dart';
+import '../../core/validator/validationfile.dart';
 import '../../models/owner_models/owner_estimateactionmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
@@ -550,6 +551,420 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
   // ---------------------------------------------------------------------
   // Approve dialog
   // ---------------------------------------------------------------------
+  //
+  // Future<void> showApproveDialog(BuildContext context, EstimateDetailModel detail) async {
+  //   final bloc = context.read<OwnerEstimateDetailBloc>();
+  //   final formKey = GlobalKey<FormState>();
+  //
+  //   // One set of styles for the whole dialog.
+  //   final headingStyle = AppTextStyles.bodyBold(); // titles, headings
+  //   final inputStyle = AppTextStyles.body(); // typed text, dropdown items
+  //   final labelStyle = AppTextStyles.body(color: AppColors.textSecondary); // labels, hints
+  //   final errorStyle = AppTextStyles.caption(color: AppColors.error); // validation messages
+  //
+  //   final handlingCtrl = TextEditingController(
+  //       text: detail.handlingCharge > 0 ? detail.handlingCharge.toStringAsFixed(0) : '');
+  //   final notesCtrl = TextEditingController();
+  //   String discountType = 'none'; // none | percentage | fixed
+  //   final discountValueCtrl = TextEditingController();
+  //   final discountNotesCtrl = TextEditingController();
+  //   final paymentAmountCtrl = TextEditingController();
+  //   String paymentMethod = 'cash'; // cash | online | cheque | bank_transfer
+  //   final paymentRefCtrl = TextEditingController();
+  //   DateTime? paymentDate;
+  //   final paymentNotesCtrl = TextEditingController();
+  //
+  //   // Pure frontend calculation, no API call. Re-run on every keystroke via
+  //   // setLocal. subtotal + handling - discount = payable; payable - received = balance.
+  //   ({double handling, double discount, double payable, double received, double balance})
+  //   calcPreview() {
+  //     final handling = double.tryParse(handlingCtrl.text.trim()) ?? detail.handlingCharge;
+  //     final discountValue = double.tryParse(discountValueCtrl.text.trim()) ?? 0;
+  //     final beforeDiscount = detail.subtotal + handling;
+  //
+  //     double discount = 0;
+  //     if (discountType == 'percentage') {
+  //       discount = beforeDiscount * (discountValue / 100);
+  //     } else if (discountType == 'fixed') {
+  //       discount = discountValue;
+  //     }
+  //     if (discount > beforeDiscount) discount = beforeDiscount;
+  //
+  //     final payable = beforeDiscount - discount;
+  //     final received = double.tryParse(paymentAmountCtrl.text.trim()) ?? 0;
+  //     final balance = (payable - received).clamp(0, double.infinity).toDouble();
+  //
+  //     return (
+  //     handling: handling,
+  //     discount: discount,
+  //     payable: payable,
+  //     received: received,
+  //     balance: balance,
+  //     );
+  //   }
+  //
+  //   Widget previewRow(String label, String value, {bool bold = false, Color? color}) {
+  //     final valueStyle = bold
+  //         ? AppTextStyles.bodyBold(color: color ?? AppColors.textPrimary)
+  //         : AppTextStyles.body(color: color ?? AppColors.textPrimary);
+  //     return Padding(
+  //       padding: const EdgeInsets.symmetric(vertical: 2),
+  //       child: Row(
+  //         crossAxisAlignment: CrossAxisAlignment.center,
+  //         children: [
+  //           Text(label,
+  //               style: bold
+  //                   ? AppTextStyles.bodyBold()
+  //                   : AppTextStyles.body(color: AppColors.textSecondary)),
+  //           const SizedBox(width: 8),
+  //           Expanded(
+  //             child: Align(
+  //               alignment: Alignment.centerRight,
+  //               child: FittedBox(
+  //                 fit: BoxFit.scaleDown,
+  //                 alignment: Alignment.centerRight,
+  //                 child: Text(value, maxLines: 1, softWrap: false, style: valueStyle),
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //   }
+  //
+  //   await showDialog<void>(
+  //     context: context,
+  //     builder: (dialogContext) {
+  //       return StatefulBuilder(
+  //         builder: (dialogContext, setLocal) {
+  //           final preview = calcPreview();
+  //
+  //           return Theme(
+  //             data: Theme.of(dialogContext).copyWith(
+  //               inputDecorationTheme: InputDecorationTheme(
+  //                 labelStyle: labelStyle,
+  //                 floatingLabelStyle: labelStyle,
+  //                 hintStyle: labelStyle,
+  //                 prefixStyle: inputStyle,
+  //                 suffixStyle: inputStyle,
+  //                 errorStyle: errorStyle,
+  //                 filled: true,
+  //                 fillColor: AppColors.background,
+  //                 contentPadding: EdgeInsets.symmetric(
+  //                   horizontal: Responsive.w(14),
+  //                   vertical: Responsive.h(14),
+  //                 ),
+  //                 border: OutlineInputBorder(
+  //                   borderRadius: BorderRadius.circular(14),
+  //                   borderSide: BorderSide.none,
+  //                 ),
+  //               ),
+  //               textTheme: Theme.of(dialogContext).textTheme.copyWith(
+  //                 titleMedium: inputStyle, // typed text + dropdown value
+  //                 bodyLarge: inputStyle,
+  //               ),
+  //             ),
+  //             child: AlertDialog(
+  //               backgroundColor: Colors.white,
+  //               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  //               title: Text('Approve Estimate', style: headingStyle),
+  //               content: SizedBox(
+  //                 width: double.maxFinite,
+  //                 child: SingleChildScrollView(
+  //                   child: Form(
+  //                     key: formKey,
+  //                     child: Column(
+  //                       mainAxisSize: MainAxisSize.min,
+  //                       crossAxisAlignment: CrossAxisAlignment.start,
+  //                       children: [
+  //                         TextFormField(
+  //                           controller: handlingCtrl,
+  //                           style: inputStyle,
+  //                           keyboardType:
+  //                           const TextInputType.numberWithOptions(decimal: true),
+  //                           inputFormatters: [
+  //                             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+  //                           ],
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'Handling Charge (optional)',
+  //                             prefixText: '₹ ',
+  //                           ),
+  //                           onChanged: (_) => setLocal(() {}),
+  //                         ),
+  //                         const SizedBox(height: 16),
+  //                         Text('Discount', style: headingStyle),
+  //                         const SizedBox(height: 6),
+  //                         DropdownButtonFormField<String>(
+  //                           value: discountType,
+  //                           style: inputStyle,
+  //                           items: [
+  //                             DropdownMenuItem(
+  //                                 value: 'none',
+  //                                 child: Text('No discount', style: inputStyle)),
+  //                             DropdownMenuItem(
+  //                                 value: 'percentage',
+  //                                 child: Text('Percentage', style: inputStyle)),
+  //                             DropdownMenuItem(
+  //                                 value: 'fixed',
+  //                                 child: Text('Fixed', style: inputStyle)),
+  //                           ],
+  //                           onChanged: (v) => setLocal(() => discountType = v ?? 'none'),
+  //                         ),
+  //                         if (discountType != 'none') ...[
+  //                           const SizedBox(height: 12),
+  //                           TextFormField(
+  //                             controller: discountValueCtrl,
+  //                             style: inputStyle,
+  //                             keyboardType:
+  //                             const TextInputType.numberWithOptions(decimal: true),
+  //                             inputFormatters: [
+  //                               FilteringTextInputFormatter.allow(
+  //                                   RegExp(r'^\d*\.?\d{0,2}')),
+  //                             ],
+  //                             decoration: InputDecoration(
+  //                               labelText: discountType == 'percentage'
+  //                                   ? 'Discount %'
+  //                                   : 'Discount Amount',
+  //                               prefixText: discountType == 'fixed' ? '₹ ' : null,
+  //                               suffixText: discountType == 'percentage' ? '%' : null,
+  //                             ),
+  //                             onChanged: (_) => setLocal(() {}),
+  //                             validator: (v) {
+  //                               if (discountType == 'none') return null;
+  //                               if (v == null || v.trim().isEmpty) return 'Required';
+  //                               final parsed = double.tryParse(v.trim());
+  //                               if (parsed == null || parsed < 0) {
+  //                                 return 'Enter a valid value';
+  //                               }
+  //                               if (discountType == 'percentage' && parsed > 99) {
+  //                                 return 'Cannot exceed 99%';
+  //                               }
+  //                               return null;
+  //                             },
+  //                           ),
+  //                           const SizedBox(height: 12),
+  //                         ],
+  //
+  //                         // ---- PAYABLE AMOUNT: shown right before Amount Received ----
+  //                         const SizedBox(height: 16),
+  //                         Container(
+  //                           width: double.infinity,
+  //                           padding: const EdgeInsets.all(12),
+  //                           decoration: BoxDecoration(
+  //                             color: Colors.white,
+  //                             borderRadius: BorderRadius.circular(14),
+  //                             border: Border.all(color: AppColors.border),
+  //                           ),
+  //                           child: Column(
+  //                             crossAxisAlignment: CrossAxisAlignment.start,
+  //                             children: [
+  //                               previewRow('Subtotal', currencyFmt.f(detail.subtotal)),
+  //                               previewRow('Handling Charge',
+  //                                   '+ ${currencyFmt.f(preview.handling)}'),
+  //                               if (discountType != 'none')
+  //                                 previewRow(
+  //                                   discountType == 'percentage'
+  //                                       ? 'Discount (${discountValueCtrl.text.trim().isEmpty ? '0' : discountValueCtrl.text.trim()}%)'
+  //                                       : 'Discount',
+  //                                   '- ${currencyFmt.f(preview.discount)}',
+  //                                   color: _redColor,
+  //                                 ),
+  //                               const Divider(height: 14, color: AppColors.border),
+  //                               previewRow(
+  //                                 'Payable Amount',
+  //                                 currencyFmt.f(preview.payable),
+  //                                 bold: true,
+  //                                 color: AppColors.primary,
+  //                               ),
+  //                             ],
+  //                           ),
+  //                         ),
+  //
+  //                         const SizedBox(height: 16),
+  //                         Text('Initial Payment (optional)', style: headingStyle),
+  //                         const SizedBox(height: 6),
+  //                         TextFormField(
+  //                           controller: paymentAmountCtrl,
+  //                           style: inputStyle,
+  //                           keyboardType:
+  //                           const TextInputType.numberWithOptions(decimal: true),
+  //                           inputFormatters: [
+  //                             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+  //                           ],
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'Amount Received',
+  //                             prefixText: '₹ ',
+  //                           ),
+  //                           onChanged: (_) => setLocal(() {}),
+  //                           validator: (v) {
+  //                             if (v == null || v.trim().isEmpty) return null; // optional
+  //                             final parsed = double.tryParse(v.trim());
+  //                             if (parsed == null || parsed <= 0) {
+  //                               return 'Enter a valid amount';
+  //                             }
+  //                             final payable = calcPreview().payable;
+  //                             if (parsed > payable + 0.009) {
+  //                               return 'Cannot exceed payable amount (${currencyFmt.f(payable)})';
+  //                             }
+  //                             return null;
+  //                           },
+  //                         ),
+  //                         const SizedBox(height: 8),
+  //                         // Live balance after the amount received.
+  //                         Padding(
+  //                           padding: const EdgeInsets.symmetric(horizontal: 2),
+  //                           child: Row(
+  //                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                             children: [
+  //                               Text('Balance Due', style: AppTextStyles.bodyBold()),
+  //                               Text(
+  //                                 currencyFmt.f(preview.balance),
+  //                                 style: AppTextStyles.bodyBold(
+  //                                   color: preview.balance > 0
+  //                                       ? _redColor
+  //                                       : AppColors.success,
+  //                                 ),
+  //                               ),
+  //                             ],
+  //                           ),
+  //                         ),
+  //                         const SizedBox(height: 12),
+  //                         DropdownButtonFormField<String>(
+  //                           value: paymentMethod,
+  //                           style: inputStyle,
+  //                           decoration: const InputDecoration(labelText: 'Payment Method'),
+  //                           items: [
+  //                             DropdownMenuItem(
+  //                                 value: 'cash', child: Text('Cash', style: inputStyle)),
+  //                             DropdownMenuItem(
+  //                                 value: 'online',
+  //                                 child: Text('Online', style: inputStyle)),
+  //                             DropdownMenuItem(
+  //                                 value: 'cheque',
+  //                                 child: Text('Cheque', style: inputStyle)),
+  //                             DropdownMenuItem(
+  //                                 value: 'bank_transfer',
+  //                                 child: Text('Bank Transfer', style: inputStyle)),
+  //                           ],
+  //                           onChanged: (v) => setLocal(() => paymentMethod = v ?? 'cash'),
+  //                         ),
+  //                         const SizedBox(height: 12),
+  //                         TextFormField(
+  //                           controller: paymentRefCtrl,
+  //                           style: inputStyle,
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'Payment Reference (optional)',
+  //                           ),
+  //                         ),
+  //                         const SizedBox(height: 12),
+  //                         InkWell(
+  //                           borderRadius: BorderRadius.circular(14),
+  //                           onTap: () async {
+  //                             final picked = await showDatePicker(
+  //                               context: dialogContext,
+  //                               initialDate: DateTime.now(),
+  //                               firstDate: DateTime(2020),
+  //                               lastDate: DateTime(2100),
+  //                             );
+  //                             if (picked != null) setLocal(() => paymentDate = picked);
+  //                           },
+  //                           child: InputDecorator(
+  //                             decoration: const InputDecoration(
+  //                               labelText: 'Payment Date (optional)',
+  //                             ),
+  //                             child: Text(
+  //                               paymentDate == null
+  //                                   ? 'Select date'
+  //                                   : DateFormat('yyyy-MM-dd').format(paymentDate!),
+  //                               style: inputStyle,
+  //                             ),
+  //                           ),
+  //                         ),
+  //                         const SizedBox(height: 12),
+  //                         TextFormField(
+  //                           controller: paymentNotesCtrl,
+  //                           style: inputStyle,
+  //                           decoration: const InputDecoration(
+  //                             labelText: 'Payment Notes (optional)',
+  //                           ),
+  //                         ),
+  //                       ],
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ),
+  //               actions: [
+  //                 TextButton(
+  //                   onPressed: () => Navigator.of(dialogContext).pop(),
+  //                   child: Text('Cancel',
+  //                       style: AppTextStyles.bodyBold(color: AppColors.textSecondary)),
+  //                 ),
+  //                 ElevatedButton(
+  //                   style: ElevatedButton.styleFrom(
+  //                     backgroundColor: AppColors.primary,
+  //                     elevation: 0,
+  //                     shape: RoundedRectangleBorder(
+  //                         borderRadius: BorderRadius.circular(14)),
+  //                   ),
+  //                   onPressed: () {
+  //                     if (!formKey.currentState!.validate()) return;
+  //
+  //                     final request = OwnerApproveEstimateRequest(
+  //                       estimateId: detail.id,
+  //                       handlingCharge: handlingCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : double.tryParse(handlingCtrl.text.trim()),
+  //                       approvalNotes: notesCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : notesCtrl.text.trim(),
+  //                       discountType: discountType == 'none' ? null : discountType,
+  //                       discountValue: discountType == 'none'
+  //                           ? null
+  //                           : double.tryParse(discountValueCtrl.text.trim()),
+  //                       discountNotes: discountType == 'none' ||
+  //                           discountNotesCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : discountNotesCtrl.text.trim(),
+  //                       paymentAmount: paymentAmountCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : double.tryParse(paymentAmountCtrl.text.trim()),
+  //                       paymentMethod: paymentAmountCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : paymentMethod,
+  //                       paymentReference: paymentRefCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : paymentRefCtrl.text.trim(),
+  //                       paymentDate: paymentDate == null
+  //                           ? null
+  //                           : DateFormat('yyyy-MM-dd').format(paymentDate!),
+  //                       paymentNotes: paymentNotesCtrl.text.trim().isEmpty
+  //                           ? null
+  //                           : paymentNotesCtrl.text.trim(),
+  //                     );
+  //
+  //                     Navigator.of(dialogContext).pop();
+  //                     bloc.add(OwnerEstimateApproveRequested(request));
+  //                   },
+  //                   child: Text('Approve',
+  //                       style: AppTextStyles.bodyBold(color: Colors.white)),
+  //                 ),
+  //               ],
+  //             ),
+  //           );
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
+  // =====================================================================
+// 1) ADD THIS IMPORT at the top of the estimate detail screen file
+// =====================================================================
+// import '../../core/validator/validationfile.dart';
+
+// =====================================================================
+// 2) REPLACE the whole existing `showApproveDialog` method inside
+//    OwnerEstimateDetailViewState with this one.
+// =====================================================================
 
   Future<void> showApproveDialog(BuildContext context, EstimateDetailModel detail) async {
     final bloc = context.read<OwnerEstimateDetailBloc>();
@@ -676,20 +1091,33 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // ---------- Handling Charge ----------
                           TextFormField(
                             controller: handlingCtrl,
                             style: inputStyle,
                             keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                            ],
+                            inputFormatters: DValidator.priceNumber, // 8 digits + 2 decimals
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
                             decoration: const InputDecoration(
                               labelText: 'Handling Charge (optional)',
                               prefixText: '₹ ',
                             ),
                             onChanged: (_) => setLocal(() {}),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return null; // optional
+                              final parsed = double.tryParse(v.trim());
+                              if (parsed == null || parsed < 0) {
+                                return 'Enter a valid amount';
+                              }
+                              if (parsed > DValidator.maxPrice) {
+                                return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                              }
+                              return null;
+                            },
                           ),
+
+                          // ---------- Discount ----------
                           const SizedBox(height: 16),
                           Text('Discount', style: headingStyle),
                           const SizedBox(height: 6),
@@ -707,7 +1135,12 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                                   value: 'fixed',
                                   child: Text('Fixed', style: inputStyle)),
                             ],
-                            onChanged: (v) => setLocal(() => discountType = v ?? 'none'),
+                            // Clear the value when the type changes so "50%" doesn't
+                            // silently become a fixed ₹50 discount.
+                            onChanged: (v) => setLocal(() {
+                              discountType = v ?? 'none';
+                              discountValueCtrl.clear();
+                            }),
                           ),
                           if (discountType != 'none') ...[
                             const SizedBox(height: 12),
@@ -716,10 +1149,12 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                               style: inputStyle,
                               keyboardType:
                               const TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                    RegExp(r'^\d*\.?\d{0,2}')),
-                              ],
+                              inputFormatters: DValidator.decimalWithLimit(
+                                maxIntDigits: discountType == 'percentage'
+                                    ? 3
+                                    : DValidator.maxPriceDigits,
+                              ),
+                              autovalidateMode: AutovalidateMode.onUserInteraction,
                               decoration: InputDecoration(
                                 labelText: discountType == 'percentage'
                                     ? 'Discount %'
@@ -730,13 +1165,26 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                               onChanged: (_) => setLocal(() {}),
                               validator: (v) {
                                 if (discountType == 'none') return null;
-                                if (v == null || v.trim().isEmpty) return 'Required';
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Enter a value or choose "No discount"';
+                                }
                                 final parsed = double.tryParse(v.trim());
-                                if (parsed == null || parsed < 0) {
+                                if (parsed == null || parsed <= 0) {
                                   return 'Enter a valid value';
                                 }
-                                if (discountType == 'percentage' && parsed > 99) {
-                                  return 'Cannot exceed 99%';
+                                if (discountType == 'percentage') {
+                                  if (parsed > 99) return 'Cannot exceed 99%';
+                                } else {
+                                  if (parsed > DValidator.maxPrice) {
+                                    return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                  }
+                                  // Fixed discount can't be more than subtotal + handling
+                                  final beforeDiscount =
+                                      detail.subtotal + calcPreview().handling;
+                                  if ((parsed * 100).round() >
+                                      (beforeDiscount * 100).round()) {
+                                    return 'Cannot exceed ${currencyFmt.f(beforeDiscount)}';
+                                  }
                                 }
                                 return null;
                               },
@@ -779,6 +1227,7 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                             ),
                           ),
 
+                          // ---------- Initial Payment ----------
                           const SizedBox(height: 16),
                           Text('Initial Payment (optional)', style: headingStyle),
                           const SizedBox(height: 6),
@@ -787,12 +1236,12 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                             style: inputStyle,
                             keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                            ],
+                            inputFormatters: DValidator.paymentAmount, // 15 digits + 2 decimals
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
                             decoration: const InputDecoration(
                               labelText: 'Amount Received',
                               prefixText: '₹ ',
+                              errorMaxLines: 3,
                             ),
                             onChanged: (_) => setLocal(() {}),
                             validator: (v) {
@@ -801,8 +1250,13 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
                               if (parsed == null || parsed <= 0) {
                                 return 'Enter a valid amount';
                               }
+                              if (parsed.truncate().toString().length >
+                                  DValidator.maxPaymentDigits) {
+                                return 'Amount can have at most ${DValidator.maxPaymentDigits} digits';
+                              }
                               final payable = calcPreview().payable;
-                              if (parsed > payable + 0.009) {
+                              // Compare in paise to avoid floating-point issues
+                              if ((parsed * 100).round() > (payable * 100).round()) {
                                 return 'Cannot exceed payable amount (${currencyFmt.f(payable)})';
                               }
                               return null;

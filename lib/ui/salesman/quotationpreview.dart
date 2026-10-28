@@ -843,6 +843,8 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                   }
 
                   final estimate = state.detail!;
+                  debugPrint('CONTRACTOR: ${estimate.contractor.name} / ${estimate.contractor.mobile}');
+
                   final isOwner = _isOwner(estimate);
                   final isApproved = _isApproved(estimate);
                   // Only show these columns if at least one item has a value.

@@ -1,4 +1,5 @@
 
+
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -9,6 +10,7 @@ class DValidator {
   /// Default expected length for a plain (no country code) mobile number.
   static const int defaultPhoneLength = 10;
   static const int maxPasswordLength = 18;
+  static const int maxPaymentDigits = 15;
 
   static List<TextInputFormatter> get passwordLimit => [
     LengthLimitingTextInputFormatter(maxPasswordLength),
@@ -57,6 +59,9 @@ class DValidator {
   static List<TextInputFormatter> get unitAbbrText => [
     LengthLimitingTextInputFormatter(unitAbbrMaxLength),
   ];
+
+  static List<TextInputFormatter> get paymentAmount =>
+      decimalWithLimit(maxIntDigits: maxPaymentDigits);
 
   static String? validateUnitName(String? value) {
     final v = value?.trim() ?? '';
