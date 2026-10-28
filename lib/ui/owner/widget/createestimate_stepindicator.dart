@@ -982,11 +982,6 @@ class AddItemsStep extends StatelessWidget {
   }
 }
 
-// =====================================================================
-// PRODUCT SEARCH — inline suggestions (NO Overlay), so the list scrolls
-// with the page and never draws over the app bar / status bar.
-// =====================================================================
-
 class _ProductSearchField extends StatefulWidget {
   const _ProductSearchField({
     required this.products,
@@ -1011,7 +1006,13 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
   final FocusNode _focus = FocusNode();
   bool _open = false;
 
-  static String _label(ActiveProductModel p) => '${p.name} — ${p.company}';
+  /// Text shown in the search box after a product is picked.
+  static String _label(ActiveProductModel p) {
+    final size = p.size.trim();
+    return size.isEmpty
+        ? '${p.name} — ${p.company}'
+        : '${p.name} — ${p.company} — $size';
+  }
 
   @override
   void initState() {
@@ -1075,7 +1076,9 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
         : available
         .where((p) =>
     p.name.toLowerCase().contains(query) ||
-        p.company.toLowerCase().contains(query))
+        p.company.toLowerCase().contains(query) ||
+        p.size.toLowerCase().contains(query) ||
+        p.packing.toLowerCase().contains(query))
         .toList();
     final allAdded = widget.products.isNotEmpty &&
         widget.products.every((p) => widget.addedIds.contains(p.id));
@@ -1099,7 +1102,7 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
             setState(() => _open = true);
           },
           decoration: InputDecoration(
-            hintText: 'Search product by name',
+            hintText: 'Search product by name, company or size',
             hintStyle: AppTextStyles.body(color: AppColors.textHint),
             prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
             suffixIcon: _ctrl.text.isNotEmpty
@@ -1124,7 +1127,7 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
           SizedBox(height: Responsive.h(8)),
           Container(
             width: double.infinity,
-            constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+            constraints: BoxConstraints(maxHeight: Responsive.h(260)),
             decoration: createCardDecoration(radius: 14),
             clipBehavior: Clip.antiAlias,
             child: matches.isEmpty
@@ -1144,15 +1147,51 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
               const Divider(height: 1, color: AppColors.border),
               itemBuilder: (context, i) {
                 final p = matches[i];
+                final company = p.company.trim();
+                final size = p.size.trim();
+                final packing = p.packing.trim();
+
                 return ListTile(
                   dense: true,
+                  isThreeLine: true,
                   leading: const CreateIconBadge(Icons.inventory_2_outlined, size: 14),
-                  title: Text(p.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.bodyBold()),
-                  subtitle: Text(p.company,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.caption(color: AppColors.textSecondary)),
+                  title: Text(
+                    p.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyBold(),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (company.isNotEmpty)
+                        Text(
+                          company,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption(color: AppColors.textSecondary),
+                        ),
+                      if (size.isNotEmpty || packing.isNotEmpty) ...[
+                        SizedBox(height: Responsive.h(4)),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (size.isNotEmpty)
+                              CreatePill(
+                                label: 'Size: $size',
+                                color: AppColors.primary,
+                              ),
+                            if (packing.isNotEmpty)
+                              CreatePill(
+                                label: 'Packing: $packing',
+                                color: Colors.teal,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                   onTap: () => _pick(p),
                 );
               },
@@ -1164,7 +1203,6 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
     );
   }
 }
-
 class _AddedItemTile extends StatelessWidget {
   const _AddedItemTile({
     required this.serialNo,

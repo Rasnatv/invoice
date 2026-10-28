@@ -18,8 +18,16 @@ bool _parseBool(dynamic v) {
   return s == '1' || s == 'true';
 }
 
-String estimateProductDisplayString(EstimateActiveProduct p) =>
-    p.company.isEmpty ? p.name : '${p.name} — ${p.company}';
+String estimateProductDisplayString(EstimateActiveProduct p) {
+  final company = p.company.trim();
+  final size = p.size.trim();
+  final parts = <String>[
+    p.name,
+    if (company.isNotEmpty) company,
+    if (size.isNotEmpty) size,
+  ];
+  return parts.join(' — ');
+}
 
 // ---------------------------------------------------------------------------
 // Shared styles
@@ -213,6 +221,7 @@ class EstimateActiveProduct {
   final String name;
   final String company;
   final String size;
+  final String packing;
   final String unit;
   final double rate;
   final double mrp;
@@ -223,6 +232,7 @@ class EstimateActiveProduct {
     required this.name,
     this.company = '',
     this.size = '',
+    this.packing = '',
     this.unit = '',
     required this.rate,
     this.mrp = 0,
@@ -241,6 +251,7 @@ class EstimateActiveProduct {
       name: (json['name'] ?? json['product_name'] ?? '').toString(),
       company: (json['company'] ?? json['company_name'] ?? '').toString(),
       size: (json['size'] ?? json['product_size'] ?? '').toString(),
+      packing: (json['packing'] ?? json['product_packing'] ?? '').toString(),
       unit: (json['unit'] ?? json['product_unit'] ?? '').toString(),
       rate: parseNum(json['rate'] ?? json['default_rate'] ?? json['selling_rate']),
       mrp: parseNum(json['mrp']),
@@ -687,6 +698,11 @@ class EstimateItemFormFields extends StatelessWidget {
 // to the estimate) are hidden from the suggestion list. The screen leaves the
 // item currently being edited out of that set, so it still shows while editing.
 // ---------------------------------------------------------------------------
+// Product search (field + suggestion list)
+//
+// Products whose IDs are in [excludedProductIds] (already added to the
+// estimate) are hidden. Each row shows name, company, and Size / Packing pills.
+// ---------------------------------------------------------------------------
 class EstimateProductSearch extends StatelessWidget {
   const EstimateProductSearch({
     super.key,
@@ -741,7 +757,8 @@ class EstimateProductSearch extends StatelessWidget {
         : available.where((p) {
       return p.name.toLowerCase().contains(query) ||
           p.company.toLowerCase().contains(query) ||
-          p.size.toLowerCase().contains(query);
+          p.size.toLowerCase().contains(query) ||
+          p.packing.toLowerCase().contains(query);
     }).toList();
 
     return LabeledField(
@@ -754,7 +771,7 @@ class EstimateProductSearch extends StatelessWidget {
             focusNode: focusNode,
             style: _inputStyle,
             decoration: InputDecoration(
-              hintText: 'Search product by name',
+              hintText: 'Search product by name, company or size',
               hintStyle: _hintStyle,
               errorStyle: _errorStyle,
               prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
@@ -776,21 +793,24 @@ class EstimateProductSearch extends StatelessWidget {
                 borderSide: BorderSide.none,
               ),
             ),
-            validator: (v) => DValidator.validateDropdown('product', selectedProduct?.id),
+            validator: (v) =>
+                DValidator.validateDropdown('product', selectedProduct?.id),
             onTap: onFieldTap,
             onChanged: onTextChanged,
           ),
           if (showSuggestions) ...[
             SizedBox(height: Responsive.h(6)),
             Container(
-              constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+              constraints: BoxConstraints(maxHeight: Responsive.h(260)),
               decoration: estimateCardDecoration(radius: 14),
               clipBehavior: Clip.antiAlias,
               child: filtered.isEmpty
                   ? Padding(
                 padding: EdgeInsets.all(Responsive.w(14)),
                 child: Text(
-                  allAdded ? 'All products already added' : 'No matching products',
+                  allAdded
+                      ? 'All products already added'
+                      : 'No matching products',
                   style: _captionStyle,
                 ),
               )
@@ -802,9 +822,15 @@ class EstimateProductSearch extends StatelessWidget {
                 const Divider(height: 1, color: AppColors.border),
                 itemBuilder: (context, index) {
                   final p = filtered[index];
+                  final company = p.company.trim();
+                  final size = p.size.trim();
+                  final packing = p.packing.trim();
+
                   return ListTile(
                     dense: true,
-                    leading: const EstimateIconBadge(Icons.inventory_2_outlined,
+                    isThreeLine: true,
+                    leading: const EstimateIconBadge(
+                        Icons.inventory_2_outlined,
                         size: 14),
                     title: Text(
                       p.name,
@@ -812,11 +838,36 @@ class EstimateProductSearch extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: Text(
-                      '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
-                      style: _captionStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (company.isNotEmpty)
+                          Text(
+                            company,
+                            style: _captionStyle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        if (size.isNotEmpty || packing.isNotEmpty) ...[
+                          SizedBox(height: Responsive.h(4)),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (size.isNotEmpty)
+                                EstimatePill(
+                                  label: 'Size: $size',
+                                  color: AppColors.primary,
+                                ),
+                              if (packing.isNotEmpty)
+                                EstimatePill(
+                                  label: 'Packing: $packing',
+                                  color: Colors.teal,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                     onTap: () => onSelected(p),
                   );
@@ -829,8 +880,6 @@ class EstimateProductSearch extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
 // "Editing item #n" banner
 // ---------------------------------------------------------------------------
 class EstimateEditingBanner extends StatelessWidget {

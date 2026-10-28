@@ -16,6 +16,10 @@ import '../../models/owner_models/getproductmodel.dart';
 import '../../models/owner_models/updateproductmodel.dart';
 import '../../widgets/appsnackbar.dart';
 
+/// 5.0 -> "5", 2.5 -> "2.5"
+String _num(double v) =>
+    v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
+
 class AddIncentiveProductScreen extends StatelessWidget {
   const AddIncentiveProductScreen({super.key, this.product});
 
@@ -72,16 +76,23 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     final p = widget.product;
     _nameCtrl = TextEditingController(text: p?.name ?? '');
     _sizeCtrl = TextEditingController(text: p?.size ?? '');
-    _mrpCtrl = TextEditingController(text: p != null ? p.mrp.toString() : '');
-    _rateCtrl = TextEditingController(text: p != null ? p.rate.toString() : '');
-    _incentivePercentCtrl =
-        TextEditingController(text: p != null ? p.incentivePercentage.toString() : '');
-    _incentiveFixedCtrl =
-        TextEditingController(text: p != null ? p.incentiveAmount.toString() : '');
-    _minQuantityCtrl = TextEditingController(
-        text: (p != null && p.minQuantity.toString() != '0')
-            ? p.minQuantity.toString()
+
+    // Prices keep 2 decimals (450.00); percentage / quantity drop the
+    // trailing ".0" (5 instead of 5.0, but 2.5 stays 2.5).
+    _mrpCtrl =
+        TextEditingController(text: p != null ? p.mrp.toStringAsFixed(2) : '');
+    _rateCtrl =
+        TextEditingController(text: p != null ? p.rate.toStringAsFixed(2) : '');
+    _incentivePercentCtrl = TextEditingController(
+        text: (p != null && p.incentivePercentage > 0)
+            ? _num(p.incentivePercentage)
             : '');
+    _incentiveFixedCtrl = TextEditingController(
+        text: (p != null && p.incentiveAmount > 0)
+            ? p.incentiveAmount.toStringAsFixed(2)
+            : '');
+    _minQuantityCtrl = TextEditingController(
+        text: (p != null && p.minQuantity > 0) ? _num(p.minQuantity) : '');
 
     // Packing/pieces-per-box are prefilled straight from the saved product.
     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
@@ -184,15 +195,14 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     return null;
   }
 
-  // Bulk bonus: Minimum Quantity is required, must be a whole number
-  // between 2 and 100.
+  // Bulk bonus: Minimum Quantity is required. Decimals are allowed
+  // (e.g. 2.5), and the value must be at least 2.
   String? _minQuantityValidator(String? v) {
     final text = v?.trim() ?? '';
     if (text.isEmpty) return 'Minimum quantity is required';
-    final qty = int.tryParse(text);
+    final qty = double.tryParse(text);
     if (qty == null) return 'Enter a valid number';
     if (qty < 2) return 'Minimum quantity must be at least 2';
-    if (text.length > 5) return 'Maximum 5 digits allowed';
     return null;
   }
 
@@ -262,9 +272,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
             ? double.parse(_incentiveFixedCtrl.text.trim())
             : null,
         bonusType: effectiveBonusType,
+        // NOTE: ProductAddRequestModel.minQuantity must be a double now.
         minQuantity: effectiveBonusType == ProductBonusType.bulk
-            ? (int.tryParse(_minQuantityCtrl.text.trim()) ?? 0)
-            : 0,
+            ? (double.tryParse(_minQuantityCtrl.text.trim()) ?? 0)
+            : 0.0,
         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
         packing: packingValue,
         isBoxUnit: _isBoxUnit,
@@ -610,13 +621,15 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                           _FieldLabel('Minimum Quantity'),
                           TextFormField(
                             controller: _minQuantityCtrl,
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            // Up to 5 whole digits and 2 decimals (e.g. 12345.25)
                             inputFormatters: [
-                              ...DValidator.digitsOnly,
-                              LengthLimitingTextInputFormatter(5),
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d{0,5}\.?\d{0,2}')),
                             ],
                             decoration:
-                            const InputDecoration(hintText: 'Min 2, max 5 digits'),
+                            const InputDecoration(hintText: 'Min 2, e.g. 2.5'),
                             validator: _minQuantityValidator,
                           ),
                         ],

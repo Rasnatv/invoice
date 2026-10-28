@@ -14,11 +14,12 @@ import '../../../widgets/custom_text_field.dart'; // CustomTextField (+ LabeledF
 
 const Color _redColor = Color(0xFFDC2626);
 
-String ownerProductDisplayString(ActiveProductModel p) => '${p.name} — ${p.company}';
-
-// ---------------------------------------------------------------------------
-// Shared look (same as the Estimate / Quotation detail screens)
-// ---------------------------------------------------------------------------
+String ownerProductDisplayString(ActiveProductModel p) {
+  final size = p.size.trim();
+  return size.isEmpty
+      ? '${p.name} — ${p.company}'
+      : '${p.name} — ${p.company} — $size';
+}
 
 /// White card, radius 16, 1px border, no shadow.
 BoxDecoration ownerCardDecoration({double radius = 16}) => BoxDecoration(
@@ -558,13 +559,6 @@ class OwnerItemFormFields extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Product search dropdown
-//
-// UPDATED: products whose IDs are in [excludedProductIds] (i.e. already added
-// to the quotation) are hidden from the suggestion list. The screen leaves the
-// item currently being edited out of that set, so it still shows while editing.
-// ---------------------------------------------------------------------------
 class OwnerProductDropdown extends StatelessWidget {
   const OwnerProductDropdown({
     super.key,
@@ -649,7 +643,8 @@ class OwnerProductDropdown extends StatelessWidget {
             : available.where((p) {
           return p.name.toLowerCase().contains(query) ||
               p.company.toLowerCase().contains(query) ||
-              p.size.toLowerCase().contains(query);
+              p.size.toLowerCase().contains(query) ||
+              p.packing.toLowerCase().contains(query);
         }).toList();
 
         return LabeledField(
@@ -662,7 +657,7 @@ class OwnerProductDropdown extends StatelessWidget {
                 focusNode: focusNode,
                 style: AppTextStyles.body(),
                 decoration: InputDecoration(
-                  hintText: 'Search product by name',
+                  hintText: 'Search product by name, company or size',
                   hintStyle: AppTextStyles.body(color: AppColors.textHint),
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: searchCtrl.text.isEmpty
@@ -683,22 +678,26 @@ class OwnerProductDropdown extends StatelessWidget {
                     borderSide: BorderSide.none,
                   ),
                 ),
-                validator: (v) => DValidator.validateDropdown('product', selectedProduct?.id),
+                validator: (v) =>
+                    DValidator.validateDropdown('product', selectedProduct?.id),
                 onTap: onFieldTap,
                 onChanged: onTextChanged,
               ),
               if (showSuggestions) ...[
                 SizedBox(height: Responsive.h(6)),
                 Container(
-                  constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+                  constraints: BoxConstraints(maxHeight: Responsive.h(260)),
                   decoration: ownerCardDecoration(radius: 14),
                   clipBehavior: Clip.antiAlias,
                   child: filtered.isEmpty
                       ? Padding(
                     padding: EdgeInsets.all(Responsive.w(14)),
                     child: Text(
-                        allAdded ? 'All products already added' : 'No matching products',
-                        style: AppTextStyles.caption(color: AppColors.textSecondary)),
+                      allAdded
+                          ? 'All products already added'
+                          : 'No matching products',
+                      style: AppTextStyles.caption(color: AppColors.textSecondary),
+                    ),
                   )
                       : ListView.separated(
                     padding: EdgeInsets.zero,
@@ -708,16 +707,53 @@ class OwnerProductDropdown extends StatelessWidget {
                     const Divider(height: 1, color: AppColors.border),
                     itemBuilder: (context, index) {
                       final p = filtered[index];
+                      final company = p.company.trim();
+                      final size = p.size.trim();
+                      final packing = p.packing.trim();
+
                       return ListTile(
                         dense: true,
-                        leading: const OwnerIconBadge(Icons.inventory_2_outlined, size: 14),
-                        title: Text(p.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold()),
-                        subtitle: Text(
-                          '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
+                        isThreeLine: true,
+                        leading: const OwnerIconBadge(
+                            Icons.inventory_2_outlined,
+                            size: 14),
+                        title: Text(
+                          p.name,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.caption(color: AppColors.textSecondary),
+                          style: AppTextStyles.bodyBold(),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (company.isNotEmpty)
+                              Text(
+                                company,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.caption(
+                                    color: AppColors.textSecondary),
+                              ),
+                            if (size.isNotEmpty || packing.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(4)),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (size.isNotEmpty)
+                                    OwnerPill(
+                                      label: 'Size: $size',
+                                      color: AppColors.primary,
+                                    ),
+                                  if (packing.isNotEmpty)
+                                    OwnerPill(
+                                      label: 'Packing: $packing',
+                                      color: Colors.teal,
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                         onTap: () => onSelected(p),
                       );
@@ -732,7 +768,6 @@ class OwnerProductDropdown extends StatelessWidget {
     );
   }
 }
-
 // ---------------------------------------------------------------------------
 // "Editing item #n" banner
 // ---------------------------------------------------------------------------

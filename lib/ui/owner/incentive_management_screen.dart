@@ -32,8 +32,15 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
 
   late final ProductBloc _productBloc;
 
-  final _currency =
+  // Whole numbers show as ₹450, decimals show as ₹22.50
+  final _currencyWhole =
   NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+  final _currencyDecimal =
+  NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+
+  String _money(double v) => v == v.truncateToDouble()
+      ? _currencyWhole.format(v)
+      : _currencyDecimal.format(v);
 
   bool _isNavigating = false;
 
@@ -305,7 +312,7 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
           return _ProductIncentiveCard(
             key: ValueKey(p.id),
             product: p,
-            currency: _currency,
+            money: _money,
             onEdit: () => _openEditProduct(p),
             onDelete: () => _confirmDeleteProduct(p),
           );
@@ -562,17 +569,24 @@ class _ProductIncentiveCard extends StatelessWidget {
   const _ProductIncentiveCard({
     super.key,
     required this.product,
-    required this.currency,
+    required this.money,
     required this.onEdit,
     required this.onDelete,
   });
 
   final ProductModel product;
-  final NumberFormat currency;
+
+  /// Formats a rupee amount: no decimals for whole numbers, 2 for others.
+  final String Function(double) money;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// Percentage: 5 -> "5", 2.5 -> "2.50"
   String _pct(double v) => v.toStringAsFixed(v % 1 == 0 ? 0 : 2);
+
+  /// Quantity: 5 -> "5", 2.5 -> "2.5"
+  String _qty(double v) =>
+      v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
 
   String get _subtitle => [
     product.company,
@@ -679,7 +693,7 @@ class _ProductIncentiveCard extends StatelessWidget {
                     label: product.incentiveType ==
                         ProductIncentiveType.percentage
                         ? '${_pct(product.incentivePercentage)}% incentive'
-                        : '${currency.format(product.incentiveAmount)} incentive',
+                        : '${money(product.incentiveAmount)} incentive',
                     color: AppColors.primary,
                   ),
                 if (!product.isActive)
@@ -704,13 +718,13 @@ class _ProductIncentiveCard extends StatelessWidget {
                   runSpacing: 2,
                   children: [
                     Text(
-                      'MRP ${currency.format(product.mrp)}',
+                      'MRP ${money(product.mrp)}',
                       style:
                       AppTextStyles.caption(color: AppColors.textSecondary),
                     ),
                     if (product.minQuantity > 0)
                       Text(
-                        'Min. Qty: ${_pct(product.minQuantity)}',
+                        'Min. Qty: ${_qty(product.minQuantity)}',
                         style: AppTextStyles.caption(
                             color: AppColors.textSecondary),
                       ),
@@ -719,7 +733,7 @@ class _ProductIncentiveCard extends StatelessWidget {
               ),
               SizedBox(width: Responsive.w(8)),
               Text(
-                'Rate ${currency.format(product.rate)}',
+                'Rate ${money(product.rate)}',
                 style: AppTextStyles.amount(color: AppColors.primary),
               ),
             ],

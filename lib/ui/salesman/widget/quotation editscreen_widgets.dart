@@ -13,7 +13,12 @@ import '../../../core/validator/validationfile.dart';
 import '../../../models/salesmanmodels/estimate_activepdctmodel.dart';
 import '../../../widgets/custom_text_field.dart'; // CustomTextField (+ LabeledField if defined there)
 
-String qeProductDisplayString(ActiveProductModel p) => '${p.name} — ${p.company}';
+String qeProductDisplayString(ActiveProductModel p) {
+  final size = p.size.trim();
+  return size.isEmpty
+      ? '${p.name} — ${p.company}'
+      : '${p.name} — ${p.company} — $size';
+}
 
 class EditItem {
   const EditItem({
@@ -558,25 +563,7 @@ class QeItemFormFields extends StatelessWidget {
                 ),
               ],
             ),
-          // LabeledField(
-          //   label: 'Rate',
-          //   field: CustomTextField(
-          //     hint: 'Enter rate per unit',
-          //     icon: Icons.currency_rupee,
-          //     keyboardType: decimal,
-          //     controller: rateCtrl,
-          //     inputFormatters: DValidator.priceNumber,
-          //     validator: (v) {
-          //       final n = double.tryParse((v ?? '').trim());
-          //       if (n == null || n <= 0) return 'Enter a valid rate';
-          //       if (n > DValidator.maxPrice) {
-          //         return 'Rate can have at most ${DValidator.maxPriceDigits} digits';
-          //       }
-          //       return null;
-          //     },
-          //     onChanged: onRateChanged,
-          //   ),
-          //),
+
         ],
       ),
     );
@@ -589,6 +576,7 @@ class QeItemFormFields extends StatelessWidget {
 // [addedProductIds] are hidden from the suggestion list. The screen
 // passes the IDs of every item already in the quotation EXCEPT the one being
 // edited, so the edited item's product is still selectable.
+// Each row shows name, company, and Size / Packing pills.
 // ---------------------------------------------------------------------------
 class QeProductDropdown extends StatelessWidget {
   const QeProductDropdown({
@@ -678,7 +666,8 @@ class QeProductDropdown extends StatelessWidget {
             : available.where((p) {
           return p.name.toLowerCase().contains(query) ||
               p.company.toLowerCase().contains(query) ||
-              p.size.toLowerCase().contains(query);
+              p.size.toLowerCase().contains(query) ||
+              p.packing.toLowerCase().contains(query);
         }).toList();
 
         return LabeledField(
@@ -691,7 +680,7 @@ class QeProductDropdown extends StatelessWidget {
                 focusNode: focusNode,
                 style: AppTextStyles.body(),
                 decoration: InputDecoration(
-                  hintText: 'Search product by name',
+                  hintText: 'Search product by name, company or size',
                   hintStyle: AppTextStyles.body(color: AppColors.textHint),
                   prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
                   suffixIcon: searchCtrl.text.isEmpty
@@ -731,17 +720,18 @@ class QeProductDropdown extends StatelessWidget {
                 SizedBox(height: Responsive.h(6)),
                 Container(
                   width: double.infinity,
-                  constraints: BoxConstraints(maxHeight: Responsive.h(220)),
+                  constraints: BoxConstraints(maxHeight: Responsive.h(260)),
                   decoration: qeCardDecoration(radius: 14),
                   clipBehavior: Clip.antiAlias,
                   child: filtered.isEmpty
                       ? Padding(
                     padding: EdgeInsets.all(Responsive.w(14)),
                     child: Text(
-                        allAdded
-                            ? 'All products already added'
-                            : 'No matching products',
-                        style: AppTextStyles.caption(color: AppColors.textSecondary)),
+                      allAdded
+                          ? 'All products already added'
+                          : 'No matching products',
+                      style: AppTextStyles.caption(color: AppColors.textSecondary),
+                    ),
                   )
                       : ListView.separated(
                     padding: EdgeInsets.zero,
@@ -751,16 +741,53 @@ class QeProductDropdown extends StatelessWidget {
                     const Divider(height: 1, color: AppColors.border),
                     itemBuilder: (context, index) {
                       final p = filtered[index];
+                      final company = p.company.trim();
+                      final size = p.size.trim();
+                      final packing = p.packing.trim();
+
                       return ListTile(
                         dense: true,
-                        leading: const QeIconBadge(Icons.inventory_2_outlined, size: 14),
-                        title: Text(p.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyBold()),
-                        subtitle: Text(
-                          '${p.company}${p.size.isNotEmpty ? ' • ${p.size}' : ''}',
+                        isThreeLine: true,
+                        leading: const QeIconBadge(
+                            Icons.inventory_2_outlined,
+                            size: 14),
+                        title: Text(
+                          p.name,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.caption(color: AppColors.textSecondary),
+                          style: AppTextStyles.bodyBold(),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (company.isNotEmpty)
+                              Text(
+                                company,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.caption(
+                                    color: AppColors.textSecondary),
+                              ),
+                            if (size.isNotEmpty || packing.isNotEmpty) ...[
+                              SizedBox(height: Responsive.h(4)),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (size.isNotEmpty)
+                                    QePill(
+                                      label: 'Size: $size',
+                                      color: AppColors.primary,
+                                    ),
+                                  if (packing.isNotEmpty)
+                                    QePill(
+                                      label: 'Packing: $packing',
+                                      color: Colors.teal,
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                         onTap: () => onSelected(p),
                       );
@@ -776,7 +803,6 @@ class QeProductDropdown extends StatelessWidget {
     );
   }
 }
-
 // ---------------------------------------------------------------------------
 // "Editing item #n" banner
 // ---------------------------------------------------------------------------
