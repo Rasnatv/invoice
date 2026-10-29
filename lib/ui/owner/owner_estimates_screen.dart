@@ -714,7 +714,7 @@ class _OwnerEstimateCard extends StatelessWidget {
         return AppColors.success;
       case 'rejected':
         return const Color(0xFFDC2626);
-      case 'despatched':
+      case 'dispatched':
         return AppColors.primary;
       case 'pending_approval':
       default:

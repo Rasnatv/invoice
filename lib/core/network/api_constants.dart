@@ -79,31 +79,18 @@ class ApiConstants {
   static const String unitsActive = '/units/active';
 
   // =================== QUOTATIONS / ESTIMATES ===================
-  /// POST — creates a quotation/estimate. Body's `action` field controls
-  /// what happens server-side: 'save_quotation' (draft), 'submit'
-  /// (send for approval), or 'approve' (owner-only — estimate is created
-  /// and finalized in one call; this is what the Owner Create Estimate
-  /// screen uses, sending `salesman_id` plus optional discount/payment
-  /// fields along with it).
+
   static const String quotationsCreate = '/quotations/create';
 
-  /// POST — live incentive preview for a single line (product_id, quantity,
-  /// rate). Called while the salesman/owner is entering an item on the
-  /// Add Items step, before it's added to the estimate.
   static const String quotationsProductIncentive =
       '/quotations/product-incentive';
 
   /// GET — the logged-in salesman/owner's own quotations, newest first.
   static const String quotationsMy = '/quotations/my';
 
-  /// POST { "id": "..." } — full detail of a single quotation/estimate,
-  /// including items, customer, contractor, salesman and per-item
-  /// incentive snapshot.
   static const String quotationsShow = '/quotations/show';
 
-  /// POST — updates an existing (draft) quotation/estimate. Same body
-  /// shape as /quotations/create but requires "id" and only the fields
-  /// being changed need to be sent.
+
   static const String quotationsUpdate = '/quotations/update';
 
   /// POST { "id": "..." } — permanently deletes a draft quotation/estimate.
@@ -112,13 +99,6 @@ class ApiConstants {
   /// POST { "id": "..." } — sends a saved (draft) quotation/estimate to
   /// the admin/owner for approval.
   static const String quotationsSubmit = '/quotations/submit';
-
-  /// POST { "id": "...", ...optional fields } — owner-only. Approves an
-  /// already-submitted quotation/estimate (separate from creating one
-  /// directly as approved via /quotations/create with action=approve).
-  /// Only "id" is required; handling_charge override, discount
-  /// (type/value/notes) and an initial payment
-  /// (amount/method/reference/date/notes) are all optional.
   static const String quotationsApprove = '/quotations/approve';
 
   // Dashboard
@@ -148,21 +128,10 @@ class ApiConstants {
   static const String despatchesCreate = '/despatches/create';
 
 
-  // =================== PAYMENTS ===================
-  /// POST — records a new payment against an estimate.
-  /// Body: { estimate_id (required), amount (required),
-  /// payment_date (required, yyyy-MM-dd), payment_method (optional,
-  /// default 'cash': cash|cheque|online|credit|bank_transfer),
-  /// payment_reference (optional), notes (optional) }
   static const String paymentsCreate = '/payments';
 
-  /// POST { "estimate_id": ... } — full payment history + financial
-  /// summary + payment summary for a single estimate. Used to populate
-  /// the Payment History screen and the balance shown before "Pay Now".
   static const String paymentsDetails = '/payments/details';
 
-  /// POST { "id": ... } — deletes a single payment; balance is
-  /// recalculated server-side.
   static const String paymentsDelete = '/payments/delete';
 
   // =================== SALESMAN INCENTIVES ===================

@@ -245,7 +245,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
           ),
           if (d.despatchedAt != null)
             _infoRow(
-              'Despatched At',
+              'Dispatched At',
               dateFmt.format(d.despatchedAt!),
               isLast: d.deliveryNotes.isEmpty,
             ),
@@ -844,7 +844,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       addRow(['Contact Number', d.contactNumber]);
       addRow(['Delivery Address', d.deliveryAddress]);
       addRow(['Driver Name', d.driverName]);
-      if (d.despatchedAt != null) addRow(['Despatched At', dateFmt.format(d.despatchedAt!)]);
+      if (d.despatchedAt != null) addRow(['Dispatched At', dateFmt.format(d.despatchedAt!)]);
       if (d.deliveryNotes.isNotEmpty) addRow(['Delivery Notes', d.deliveryNotes]);
       addRow([]);
       addRow(['#', 'Item', 'Company', 'Size', 'Unit', 'Box', 'Pcs', 'Qty']);

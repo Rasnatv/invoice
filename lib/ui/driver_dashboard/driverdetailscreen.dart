@@ -156,7 +156,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
           _infoRow('Contact Number', b.contactNumber),
           _infoRow('Delivery Address', b.deliveryAddress),
           _infoRow('Salesman', b.salesmanName),
-          _infoRow('Despatched At', b.despatchedAtDisplay),
+          _infoRow('Dispatched At', b.despatchedAtDisplay),
           _infoRow('Driver Name', b.driverName),
           _infoRow('Driver Contact No', b.driverContact, isLast: true),
         ],

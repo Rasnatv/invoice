@@ -26,6 +26,57 @@ InputDecoration _dec(String label) => InputDecoration(
   errorStyle: AppTextStyles.caption(color: AppColors.error),
 );
 
+/// Last day of the selected month (calculated, not hard-coded).
+/// e.g. Oct 2026 -> 31 Oct 2026, Feb 2027 -> 28 Feb 2027.
+DateTime _lastDayOfMonth(DateTime month) =>
+    DateTime(month.year, month.month + 1, 0);
+
+/// True from the LAST DAY of the selected month onwards, with NO upper limit.
+/// So October payment is possible on 31 Oct, 1 Nov, 15 Nov, 10 Dec ...
+///
+/// To allow payment only from the 1st of the next month, change the return to:
+///   today.isAfter(last)
+bool _isMonthEnded(DateTime month) {
+  final last = _lastDayOfMonth(month);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  return !today.isBefore(last);
+}
+//bool _isMonthEnded(DateTime month) => true; // TEST ONLY
+/// Simple alert box (used for info / success messages).
+Future<void> _showInfoAlert(
+    BuildContext context, {
+      required String title,
+      required String message,
+      IconData icon = Icons.info_outline_rounded,
+      Color color = _amber,
+    }) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      icon: Icon(icon, color: color, size: 44),
+      title: Text(title, style: AppTextStyles.h6(), textAlign: TextAlign.center),
+      content: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: AppTextStyles.body(),
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(120, 40),
+            backgroundColor: AppColors.primary,
+          ),
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text('OK', style: AppTextStyles.bodyBold(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
 class OwnerSalesmanIncentiveScreen extends StatelessWidget {
   const OwnerSalesmanIncentiveScreen({
     super.key,
@@ -245,21 +296,63 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
     }
   }
 
-  /// [totalIncentive] is shown in the dialog so the owner can see that the
-  /// payment covers the whole incentive (product incentive + target bonus).
+  /// Payment is possible from MONTH END onwards (no upper limit), but only
+  /// ONE time per month. It covers product incentive + target bonus together.
+  ///
+  /// On tap:
+  ///  1. nothing to pay      -> alert
+  ///  2. already paid        -> alert (one time only)
+  ///  3. month end not yet   -> alert with the date payment opens
+  ///  4. otherwise           -> payment box. On OK the payment is marked and
+  ///                            the "Payment Updated" alert box is shown.
   Future<void> _openMarkPaidDialog(
-      BuildContext context, String totalIncentive) async {
-    // Safety guard: never allow a payment when there is nothing to pay.
-    final total = context
-        .read<OwnerIncentiveBloc>()
-        .state
-        .summary
-        ?.totalPayableValue ??
-        0;
+      BuildContext context,
+      String totalIncentive,
+      String productIncentive,
+      String? bonusAmount,
+      ) async {
+    final state = context.read<OwnerIncentiveBloc>().state;
+    final summary = state.summary;
+    final total = summary?.totalPayableValue ?? 0;
+
+    // 1. Nothing to pay.
     if (total <= 0) {
-      AppSnackbar.error('No incentive to pay for this period.');
+      await _showInfoAlert(
+        context,
+        title: 'No Incentive',
+        message: 'There is no incentive to pay for this period.',
+      );
       return;
     }
+
+    // 2. Already paid -> one time only, even if target amount is given again.
+    if (summary?.bonusStatus.isPaid == true) {
+      await _showInfoAlert(
+        context,
+        title: 'Already Paid',
+        message: 'Payment is already given for this month. It can be marked '
+            'only one time, even if the target amount is given again.',
+        icon: Icons.lock_outline_rounded,
+      );
+      return;
+    }
+
+    // 3. Month end not reached yet.
+    if (!_isMonthEnded(state.selectedMonth)) {
+      final lastDay = _lastDayOfMonth(state.selectedMonth);
+      await _showInfoAlert(
+        context,
+        title: 'Payment Not Possible Now',
+        message: 'Payment can be marked only at month end or later. For '
+            '${DateFormat('MMMM yyyy').format(state.selectedMonth)} it opens on '
+            '${DateFormat('dd MMM yyyy').format(lastDay)}. Product incentive '
+            'and target bonus are paid together in one entry.',
+        icon: Icons.event_busy_rounded,
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
 
     final refController = TextEditingController();
     final notesController = TextEditingController();
@@ -271,7 +364,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
         return StatefulBuilder(
           builder: (dialogCtx, setState) {
             return AlertDialog(
-              title: Text('Payment Given', style: AppTextStyles.h6()),
+              title: Text('Payment Given', style: AppTextStyles.h6(color: Colors.black)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -295,9 +388,13 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                               style:
                               AppTextStyles.amount(color: AppColors.success)),
                           const SizedBox(height: 2),
-                          Text('Product incentive + bonus',
-                              style: AppTextStyles.caption(
-                                  color: AppColors.textSecondary)),
+                          Text(
+                            bonusAmount == null
+                                ? 'Product incentive $productIncentive'
+                                : 'Product $productIncentive + Bonus $bonusAmount',
+                            style: AppTextStyles.caption(
+                                color: AppColors.textSecondary),
+                          ),
                         ],
                       ),
                     ),
@@ -352,7 +449,7 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                   onPressed: refController.text.trim().isEmpty
                       ? null
                       : () => Navigator.of(dialogCtx).pop(true),
-                  child: Text('Confirm',
+                  child: Text('OK',
                       style: AppTextStyles.bodyBold(color: Colors.white)),
                 ),
               ],
@@ -362,6 +459,8 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
       },
     );
 
+    // OK tapped -> payment is marked. The success alert box is shown by the
+    // BlocConsumer listener once the API call succeeds.
     if (confirmed == true && context.mounted) {
       context.read<OwnerIncentiveBloc>().add(
         MarkIncentiveAsPaid(
@@ -385,9 +484,18 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
       listenWhen: (prev, curr) => prev.markPaidStatus != curr.markPaidStatus,
       listener: (context, state) {
         if (state.markPaidStatus == MarkPaidStatus.success) {
-          AppSnackbar.success(
-              state.markPaidMessage ?? 'Incentive marked as paid.');
           context.read<OwnerIncentiveBloc>().add(const ClearMarkPaidStatus());
+          // Alert box after a successful payment update.
+          _showInfoAlert(
+            context,
+            title: 'Payment Updated',
+            message: state.markPaidMessage ??
+                'Incentive for '
+                    '${DateFormat('MMMM yyyy').format(state.selectedMonth)} '
+                    'has been marked as paid.',
+            icon: Icons.check_circle_rounded,
+            color: AppColors.success,
+          );
         } else if (state.markPaidStatus == MarkPaidStatus.error) {
           AppSnackbar.error(state.markPaidMessage ?? 'Failed to mark as paid.');
           context.read<OwnerIncentiveBloc>().add(const ClearMarkPaidStatus());
@@ -397,7 +505,6 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
         final summary = state.summary;
 
         // Designation of the currently selected salesman (owner mode).
-        // Empty until a salesman is selected, so nothing is shown before that.
         String designation = '';
         if (state.isOwner && (state.selectedSalesmanId?.isNotEmpty ?? false)) {
           for (final s in state.activeSalesmen) {
@@ -631,72 +738,96 @@ class _OwnerSalesmanIncentiveView extends StatelessWidget {
                               ),
                               SizedBox(height: Responsive.h(16)),
                               if (summary != null) ...[
-                                // Target / bonus card. The API can return target_amount = 0
-                                // and bonus_display = "None" even when a bonus was earned,
-                                // so the real bonus comes from bonus_status.month_bonus_amount.
-                                if (summary.target.targetAmountValue > 0 ||
-                                    summary.bonusAmountValue > 0) ...[
-                                  _TargetProgressCard(
-                                    title: 'Monthly Sales Target',
-                                    icon: Icons.track_changes_rounded,
-                                    color: AppColors.success,
-                                    headlineValue:
-                                    summary.target.targetAmountValue > 0
-                                        ? currency.format(
-                                        summary.target.targetAmountValue)
-                                        : 'Not set',
-                                    achievedAmount:
-                                    currency.format(summary.totalSalesValue),
-                                    targetTotal: currency.format(
-                                        summary.target.targetAmountValue),
-                                    fraction: summary.target.progressFraction,
-                                    achievedLabel: summary.target.achieved,
-                                    hasTarget:
-                                    summary.target.targetAmountValue > 0,
-                                    bonusDisplay: summary.bonusAmountValue > 0
-                                        ? currency
-                                        .format(summary.bonusAmountValue)
-                                        : summary.target.bonusDisplay,
-                                  ),
-                                  SizedBox(height: Responsive.h(16)),
-                                ],
-
-                                // total_incentive from the API already
-                                // = product incentive + bonus, so it is NOT added again.
                                 Builder(builder: (_) {
                                   final productIncentive =
                                       summary.productIncentiveValue;
                                   final bonusAmount = summary.bonusAmountValue;
                                   final totalPayable = summary.totalPayableValue;
 
-                                  // Payment / paid status is only meaningful
-                                  // when there is actually something to pay
-                                  // (product incentive and/or bonus).
                                   final hasIncentive = totalPayable > 0;
                                   final isPaid =
                                       hasIncentive && summary.bonusStatus.isPaid;
+                                  final monthEnded =
+                                  _isMonthEnded(state.selectedMonth);
 
-                                  return _IncentivePaymentCard(
-                                    productIncentive:
-                                    currency.format(productIncentive),
-                                    bonusAmount: bonusAmount > 0
-                                        ? currency.format(bonusAmount)
-                                        : null,
-                                    totalPayable: currency.format(totalPayable),
-                                    hasIncentive: hasIncentive,
-                                    isPaid: isPaid,
-                                    // Only meaningful once paid.
-                                    paidAmount: currency.format(isPaid
-                                        ? summary.bonusStatus.totalPaidValue
-                                        : 0),
-                                    paidAt: summary.bonusStatus.paidAt,
-                                    paymentReference:
-                                    summary.bonusStatus.paymentReference,
-                                    canMarkPaid: state.isOwner && hasIncentive,
-                                    markingPaid: state.markPaidStatus ==
-                                        MarkPaidStatus.submitting,
-                                    onTapMarkPaid: () => _openMarkPaidDialog(
-                                        context, currency.format(totalPayable)),
+                                  return Column(
+                                    children: [
+                                      // Target / bonus card. The API can return
+                                      // target_amount = 0 and bonus_display = "None"
+                                      // even when a bonus was earned, so the real
+                                      // bonus comes from
+                                      // bonus_status.month_bonus_amount.
+                                      if (summary.target.targetAmountValue > 0 ||
+                                          summary.bonusAmountValue > 0) ...[
+                                        _TargetProgressCard(
+                                          title: 'Monthly Sales Target',
+                                          icon: Icons.track_changes_rounded,
+                                          color: AppColors.success,
+                                          headlineValue:
+                                          summary.target.targetAmountValue > 0
+                                              ? currency.format(summary
+                                              .target.targetAmountValue)
+                                              : 'Not set',
+                                          achievedAmount: currency
+                                              .format(summary.totalSalesValue),
+                                          targetTotal: currency.format(
+                                              summary.target.targetAmountValue),
+                                          fraction:
+                                          summary.target.progressFraction,
+                                          achievedLabel: summary.target.achieved,
+                                          hasTarget:
+                                          summary.target.targetAmountValue > 0,
+                                          bonusDisplay: summary
+                                              .bonusAmountValue >
+                                              0
+                                              ? currency.format(
+                                              summary.bonusAmountValue)
+                                              : summary.target.bonusDisplay,
+                                          // After payment the month is locked.
+                                          paidLocked: isPaid,
+                                        ),
+                                        SizedBox(height: Responsive.h(16)),
+                                      ],
+
+                                      // total_incentive from the API already
+                                      // = product incentive + bonus, so it is NOT
+                                      // added again.
+                                      _IncentivePaymentCard(
+                                        productIncentive:
+                                        currency.format(productIncentive),
+                                        bonusAmount: bonusAmount > 0
+                                            ? currency.format(bonusAmount)
+                                            : null,
+                                        totalPayable:
+                                        currency.format(totalPayable),
+                                        hasIncentive: hasIncentive,
+                                        isPaid: isPaid,
+                                        // Only meaningful once paid.
+                                        paidAmount: currency.format(isPaid
+                                            ? summary.bonusStatus.totalPaidValue
+                                            : 0),
+                                        paidAt: summary.bonusStatus.paidAt,
+                                        paymentReference:
+                                        summary.bonusStatus.paymentReference,
+                                        // Button is ALWAYS shown for the owner when
+                                        // there is an unpaid incentive. Month-end
+                                        // and one-time rules are checked on tap.
+                                        canMarkPaid:
+                                        state.isOwner && hasIncentive && !isPaid,
+                                        // Hint text only, before month end.
+                                        waitingForMonthEnd: !monthEnded,
+                                        markingPaid: state.markPaidStatus ==
+                                            MarkPaidStatus.submitting,
+                                        onTapMarkPaid: () => _openMarkPaidDialog(
+                                          context,
+                                          currency.format(totalPayable),
+                                          currency.format(productIncentive),
+                                          bonusAmount > 0
+                                              ? currency.format(bonusAmount)
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
                                   );
                                 }),
                               ],
@@ -1004,6 +1135,9 @@ class _ProductIncentiveTile extends StatelessWidget {
 
 /// Monthly target card. The bonus badge shows only when there is a real bonus,
 /// and the progress / achieved status shows only when a target amount is set.
+///
+/// When [paidLocked] is true (month already paid) an info line explains that
+/// giving the target amount again will not allow another payment.
 class _TargetProgressCard extends StatelessWidget {
   const _TargetProgressCard({
     required this.title,
@@ -1016,6 +1150,7 @@ class _TargetProgressCard extends StatelessWidget {
     required this.achievedLabel,
     required this.hasTarget,
     this.bonusDisplay,
+    this.paidLocked = false,
   });
 
   final String title;
@@ -1028,6 +1163,7 @@ class _TargetProgressCard extends StatelessWidget {
   final String achievedLabel;
   final bool hasTarget;
   final String? bonusDisplay;
+  final bool paidLocked;
 
   bool get _hasBonus {
     final b = bonusDisplay?.trim() ?? '';
@@ -1120,6 +1256,25 @@ class _TargetProgressCard extends StatelessWidget {
                     ],
                   ),
                 ],
+                if (paidLocked) ...[
+                  SizedBox(height: Responsive.h(10)),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lock_outline_rounded,
+                          size: 14, color: AppColors.textSecondary),
+                      SizedBox(width: Responsive.w(6)),
+                      Expanded(
+                        child: Text(
+                          'Payment already given for this month. If the target '
+                              'amount is given again, payment cannot be done again.',
+                          style: AppTextStyles.caption(
+                              color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -1165,15 +1320,6 @@ class _Pill extends StatelessWidget {
   }
 }
 
-// =====================================================================
-// PAYMENT CARD
-// =====================================================================
-
-/// Bottom card: product incentive + bonus amount = total payable,
-/// with the paid / unpaid status and the "Payment Given" button.
-///
-/// When [hasIncentive] is false (total payable = 0) the card shows a neutral
-/// "No Incentive" status: no Paid / Unpaid pill and no "Payment Given" button.
 class _IncentivePaymentCard extends StatelessWidget {
   const _IncentivePaymentCard({
     required this.productIncentive,
@@ -1185,6 +1331,7 @@ class _IncentivePaymentCard extends StatelessWidget {
     this.paidAt,
     required this.paymentReference,
     required this.canMarkPaid,
+    this.waitingForMonthEnd = false,
     required this.markingPaid,
     this.onTapMarkPaid,
   });
@@ -1198,6 +1345,7 @@ class _IncentivePaymentCard extends StatelessWidget {
   final String? paidAt;
   final String paymentReference;
   final bool canMarkPaid;
+  final bool waitingForMonthEnd; // true -> hint under the button
   final bool markingPaid;
   final VoidCallback? onTapMarkPaid;
 
@@ -1288,11 +1436,18 @@ class _IncentivePaymentCard extends StatelessWidget {
                 style: AppTextStyles.caption(color: AppColors.textSecondary),
               ),
             ],
+            SizedBox(height: Responsive.h(10)),
+
+
+
+
           ] else if (canMarkPaid) ...[
             SizedBox(height: Responsive.h(14)),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
+                // Disabled only while a payment request is in progress, which
+                // also prevents a double tap.
                 onPressed: markingPaid ? null : onTapMarkPaid,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(0, 46),
@@ -1315,6 +1470,13 @@ class _IncentivePaymentCard extends StatelessWidget {
                   style: AppTextStyles.bodyBold(color: Colors.white),
                 ),
               ),
+            ),
+            SizedBox(height: Responsive.h(8)),
+            Text(
+              waitingForMonthEnd
+                  ? 'Payment can be marked at month end or later, one time only.'
+                  : 'Payment can be marked one time only for this month.',
+              style: AppTextStyles.caption(color: AppColors.textSecondary),
             ),
           ],
         ],

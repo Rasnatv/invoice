@@ -69,27 +69,6 @@ class AuthProvider {
     }
   }
 
-  /// ---------------------------------------------------------------------
-  /// Forgot-password flow
-  ///
-  /// NOTE: the three ApiClient methods below (forgotPassword, verifyOtp,
-  /// resetPassword) need to be added to ApiClient — mirroring the pattern
-  /// of userLogin already there. I don't have api_client.dart's contents,
-  /// so wire these in there:
-  ///
-  ///   Future<Response> forgotPassword(Map<String, dynamic> body) =>
-  ///       _dio.post('/forgot-password', data: body);
-  ///
-  ///   Future<Response> verifyOtp(Map<String, dynamic> body) =>
-  ///       _dio.post('/verify-otp', data: body);
-  ///
-  ///   Future<Response> resetPassword(Map<String, dynamic> body) =>
-  ///       _dio.post('/reset-password', data: body);
-  ///
-  /// (Paths assume ApiClient's base URL already includes
-  /// `https://neethu.astradevelops.in/ceramo/public/api` — adjust if not.)
-  /// ---------------------------------------------------------------------
-
   /// POST /forgot-password — body: { "email": "..." }
   Future<AuthActionResult> forgotPassword(String email) async {
     return _postAuthAction(

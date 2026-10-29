@@ -173,7 +173,7 @@ class _SalesmanDispatchDetailViewState
           ),
           if (d.despatchedAt != null)
             _infoRow(
-              'Despatched At',
+              'Dispatched At',
               dateFmt.format(d.despatchedAt!),
               isLast: d.deliveryNotes.isEmpty,
             ),

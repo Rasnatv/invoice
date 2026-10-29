@@ -1,5 +1,4 @@
-/// Request model for:
-/// POST https://neethu.astradevelops.in/ceramo/public/api/estimates/update-item
+
 class UpdateEstimateItemRequest {
   final int estimateId;
   final int estimateItemId;
