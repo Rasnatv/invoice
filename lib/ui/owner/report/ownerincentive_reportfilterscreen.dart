@@ -231,7 +231,7 @@ class _OwnerIncentiveReportFilterScreenState
 
   void _generate() {
     if (!_canGenerate) return;
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OwnerIncentiveReportScreen(
           type: _type,

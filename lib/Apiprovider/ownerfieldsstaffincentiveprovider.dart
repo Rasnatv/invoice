@@ -55,38 +55,7 @@ class IncentiveProvider {
 
   IncentiveProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
-  // ---------------- summary (+ embedded paged list) ----------------
 
-  /// POST /field-staff-incentives/summary?page=&per_page=
-  /// body: { date_from, date_to, field_staff_id?, status? }
-  ///
-  /// Confirmed real response shape:
-  /// {
-  ///   "data": {
-  ///     "field_staff_id": "",
-  ///     "summary": { "total_incentive": "165.50", "pending_count": "0",
-  ///                  "approved_count": "0", "paid_count": "1" },
-  ///     "list": [ {...incentive...} ]
-  ///   }
-  /// }
-  ///
-  /// IMPORTANT: this requires `_apiClient.fieldStaffIncentiveSummary` to
-  /// accept `page` and `perPage` as query parameters, e.g.:
-  ///
-  ///   Future<Response> fieldStaffIncentiveSummary(
-  ///     Map<String, dynamic> body, {
-  ///     int page = 1,
-  ///     int perPage = 20,
-  ///   }) {
-  ///     return _dio.post(
-  ///       '/field-staff-incentives/summary',
-  ///       queryParameters: {'page': page, 'per_page': perPage},
-  ///       data: body,
-  ///     );
-  ///   }
-  ///
-  /// If your ApiClient's current signature only takes the body, update it
-  /// to match the above before this compiles/runs correctly.
   Future<IncentiveSummaryResult> getSummary({
     required String dateFrom,
     required String dateTo,

@@ -245,7 +245,7 @@ class _OwnerEstimateReportFilterScreenState
 
   void _generate() {
     if (!_canGenerate) return;
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OwnerEstimateReportScreen(
           type: _type,

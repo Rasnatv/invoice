@@ -60,7 +60,8 @@ class FieldStaffIncentiveModel {
   final String notes;
   final String approvedBy;
   final String approvedAt;
-  final SiteVisitInfo siteVisit;
+  final SiteVisitInfo
+  siteVisit;
 
   const FieldStaffIncentiveModel({
     required this.id,

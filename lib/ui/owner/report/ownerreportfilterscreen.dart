@@ -183,7 +183,7 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
     final name = match.isNotEmpty ? match.first.name : '';
 
     if (_isSalesman) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => OwnerSalesmanReportScreen(
             salesmanId: id,
@@ -194,7 +194,7 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
         ),
       );
     } else {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => OwnerContractorReportScreen(
             contractorId: id,

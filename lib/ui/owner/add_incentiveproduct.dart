@@ -1,4 +1,711 @@
-
+//
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
+// import 'package:flutter_bloc/flutter_bloc.dart';
+// import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
+// import '../../../core/constants/app_colors.dart';
+// import '../../../core/constants/app_text_styles.dart';
+// import '../../../core/utils/responsive.dart';
+// import '../../../core/validator/validationfile.dart';
+// import '../../Apiprovider/product_enums.dart';
+// import '../../bloc/ownerbloc/product/product_bloc.dart';
+// import '../../bloc/ownerbloc/product/product_event.dart';
+// import '../../bloc/ownerbloc/product/product_state.dart';
+// import '../../models/owner_models/addproductmodel.dart';
+// import '../../models/owner_models/getproductmodel.dart';
+// import '../../models/owner_models/updateproductmodel.dart';
+// import '../../widgets/appsnackbar.dart';
+//
+// /// 5.0 -> "5", 2.5 -> "2.5"
+// String _num(double v) =>
+//     v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
+//
+// class AddIncentiveProductScreen extends StatelessWidget {
+//   const AddIncentiveProductScreen({super.key, this.product});
+//
+//   final ProductModel? product;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return BlocProvider(
+//       create: (_) => ProductBloc()..add(const LoadProductDropdowns()),
+//       child: _AddIncentiveProductForm(product: product),
+//     );
+//   }
+// }
+//
+// class _AddIncentiveProductForm extends StatefulWidget {
+//   const _AddIncentiveProductForm({this.product});
+//
+//   final ProductModel? product;
+//
+//   @override
+//   State<_AddIncentiveProductForm> createState() => _AddIncentiveProductFormState();
+// }
+//
+// class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
+//   final _formKey = GlobalKey<FormState>();
+//
+//   late final TextEditingController _nameCtrl;
+//   late final TextEditingController _sizeCtrl;
+//   late final TextEditingController _mrpCtrl;
+//   late final TextEditingController _rateCtrl;
+//   late final TextEditingController _incentivePercentCtrl;
+//   late final TextEditingController _incentiveFixedCtrl;
+//   late final TextEditingController _minQuantityCtrl;
+//   late final TextEditingController _piecesPerBoxCtrl;
+//   late final TextEditingController _packingCtrl;
+//
+//   String? _selectedCompanyId;
+//   String? _selectedUnitId;
+//
+//   ProductIncentiveType _incentiveType = ProductIncentiveType.none;
+//   ProductBonusType _bonusType = ProductBonusType.none;
+//
+//   bool _dropdownSelectionSynced = false;
+//
+//   bool _isBoxUnit = false;
+//
+//   bool _syncingPiecesFromPacking = false;
+//
+//   bool get _isEditing => widget.product != null;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     final p = widget.product;
+//     _nameCtrl = TextEditingController(text: p?.name ?? '');
+//     _sizeCtrl = TextEditingController(text: p?.size ?? '');
+//
+//     // Prices keep 2 decimals (450.00); percentage / quantity drop the
+//     // trailing ".0" (5 instead of 5.0, but 2.5 stays 2.5).
+//     _mrpCtrl =
+//         TextEditingController(text: p != null ? p.mrp.toStringAsFixed(2) : '');
+//     _rateCtrl =
+//         TextEditingController(text: p != null ? p.rate.toStringAsFixed(2) : '');
+//     _incentivePercentCtrl = TextEditingController(
+//         text: (p != null && p.incentivePercentage > 0)
+//             ? _num(p.incentivePercentage)
+//             : '');
+//     _incentiveFixedCtrl = TextEditingController(
+//         text: (p != null && p.incentiveAmount > 0)
+//             ? p.incentiveAmount.toStringAsFixed(2)
+//             : '');
+//     _minQuantityCtrl = TextEditingController(
+//         text: (p != null && p.minQuantity > 0) ? _num(p.minQuantity) : '');
+//
+//     // Packing/pieces-per-box are prefilled straight from the saved product.
+//     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
+//     _packingCtrl = TextEditingController(text: p?.packing ?? '');
+//
+//     // Auto-fill Pieces per Box from the number typed into Packing
+//     // (e.g. "8pcs/box" -> "8"), only for box / sq-ft type units.
+//     _packingCtrl.addListener(_onPackingChanged);
+//
+//     _selectedCompanyId = p?.companyId;
+//     _selectedUnitId = p?.unitId;
+//
+//     _incentiveType = p == null ? ProductIncentiveType.none : p.incentiveType;
+//
+//     // Bonus only exists when an incentive (fixed / percentage) is selected.
+//     _bonusType = _incentiveType == ProductIncentiveType.none
+//         ? ProductBonusType.none
+//         : (p?.bonusType ?? ProductBonusType.none);
+//
+//     _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
+//   }
+//
+//   @override
+//   void dispose() {
+//     _nameCtrl.dispose();
+//     _sizeCtrl.dispose();
+//     _mrpCtrl.dispose();
+//     _rateCtrl.dispose();
+//     _incentivePercentCtrl.dispose();
+//     _incentiveFixedCtrl.dispose();
+//     _minQuantityCtrl.dispose();
+//     _piecesPerBoxCtrl.dispose();
+//     _packingCtrl.removeListener(_onPackingChanged);
+//     _packingCtrl.dispose();
+//     super.dispose();
+//   }
+//
+//   // Pulls the first number out of the Packing text and mirrors it into
+//   // Pieces per Box, e.g. "8pcs/box" -> "8". Only runs for box/sq-ft units.
+//   void _onPackingChanged() {
+//     if (_syncingPiecesFromPacking) return;
+//     if (!_isBoxUnit) return;
+//
+//     final match = RegExp(r'\d+').firstMatch(_packingCtrl.text);
+//     final extracted = match?.group(0) ?? '';
+//
+//     if (_piecesPerBoxCtrl.text != extracted) {
+//       _syncingPiecesFromPacking = true;
+//       _piecesPerBoxCtrl.text = extracted;
+//       _syncingPiecesFromPacking = false;
+//     }
+//   }
+//
+//   bool _computeIsBoxUnit(ProductState state) {
+//     if (_selectedUnitId == null) return false;
+//     final matches = state.units.where((u) => u.id == _selectedUnitId);
+//     if (matches.isEmpty) return false;
+//     return matches.first.showPiecesPerBox;
+//   }
+//
+//   void _onUnitChanged(String? unitId, ProductState state) {
+//     setState(() {
+//       _selectedUnitId = unitId;
+//       _isBoxUnit = _computeIsBoxUnit(state);
+//       if (!_isBoxUnit) {
+//         // Packing stays for every unit; Pieces per Box is cleared when the
+//         // new unit doesn't use it.
+//         _piecesPerBoxCtrl.clear();
+//       } else {
+//         // Switched into a box/sq-ft unit — derive Pieces per Box from Packing.
+//         _onPackingChanged();
+//       }
+//     });
+//   }
+//
+//   void _syncDropdownSelectionsIfNeeded(ProductState state) {
+//     if (_dropdownSelectionSynced) return;
+//     if (state.dropdownStatus != DropdownStatus.loaded) return;
+//
+//     final companyExists = state.companies.any((c) => c.id == _selectedCompanyId);
+//     final unitExists = state.units.any((u) => u.id == _selectedUnitId);
+//
+//     setState(() {
+//       if (!companyExists) _selectedCompanyId = null;
+//       if (!unitExists) _selectedUnitId = null;
+//       _dropdownSelectionSynced = true;
+//
+//       // Only upgrade _isBoxUnit to true here, never silently downgrade it.
+//       if (unitExists) {
+//         final dropdownSaysBox = _computeIsBoxUnit(state);
+//         _isBoxUnit = _isBoxUnit || dropdownSaysBox;
+//       }
+//     });
+//   }
+//
+//   String? _requiredNumberValidator(String? v) {
+//     final requiredError = DValidator.validateRequired(v, message: 'Required');
+//     if (requiredError != null) return requiredError;
+//     if (double.tryParse(v!.trim()) == null) return 'Enter a valid number';
+//     return null;
+//   }
+//
+//   // Bulk bonus: Minimum Quantity is required. Decimals are allowed
+//   // (e.g. 2.5), and the value must be at least 2.
+//   String? _minQuantityValidator(String? v) {
+//     final text = v?.trim() ?? '';
+//     if (text.isEmpty) return 'Minimum quantity is required';
+//     final qty = double.tryParse(text);
+//     if (qty == null) return 'Enter a valid number';
+//     if (qty < 2) return 'Minimum quantity must be at least 2';
+//     return null;
+//   }
+//
+//   // For box / sq-ft units, at least one of Packing or Pieces per Box is required.
+//   String? _packingOrPiecesValidator(String? _) {
+//     if (!_isBoxUnit) return null;
+//     if (_packingCtrl.text.trim().isEmpty &&
+//         _piecesPerBoxCtrl.text.trim().isEmpty) {
+//       return 'Enter Packing or Pieces per Box';
+//     }
+//     return null;
+//   }
+//
+//   void _save(BuildContext context) {
+//     if (!_formKey.currentState!.validate()) return;
+//     if (_selectedCompanyId == null || _selectedUnitId == null) {
+//       AppSnackbar.error('Please select a company and a unit.');
+//       return;
+//     }
+//
+//     final bloc = context.read<ProductBloc>();
+//     final packingValue =
+//     _packingCtrl.text.trim().isEmpty ? null : _packingCtrl.text.trim();
+//
+//     // Never send a bonus when the incentive is none.
+//     final effectiveBonusType = _incentiveType == ProductIncentiveType.none
+//         ? ProductBonusType.none
+//         : _bonusType;
+//
+//     if (_isEditing) {
+//       bloc.add(UpdateProduct(ProductUpdateRequestModel(
+//         id: widget.product!.id,
+//         name: _nameCtrl.text.trim(),
+//         companyId: _selectedCompanyId!,
+//         size: _sizeCtrl.text.trim(),
+//         unitId: _selectedUnitId!,
+//         mrp: double.parse(_mrpCtrl.text.trim()),
+//         rate: double.parse(_rateCtrl.text.trim()),
+//         incentiveType: _incentiveType,
+//         incentivePercentage: _incentiveType == ProductIncentiveType.percentage
+//             ? double.parse(_incentivePercentCtrl.text.trim())
+//             : null,
+//         incentiveAmount: _incentiveType == ProductIncentiveType.fixed
+//             ? double.parse(_incentiveFixedCtrl.text.trim())
+//             : null,
+//         bonusType: effectiveBonusType,
+//         minQuantity: effectiveBonusType == ProductBonusType.bulk
+//             ? _minQuantityCtrl.text.trim()
+//             : '0',
+//         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
+//         packing: packingValue,
+//         isBoxUnit: _isBoxUnit,
+//       )));
+//     } else {
+//       bloc.add(CreateProduct(ProductAddRequestModel(
+//         name: _nameCtrl.text.trim(),
+//         companyId: _selectedCompanyId!,
+//         size: _sizeCtrl.text.trim(),
+//         unitId: _selectedUnitId!,
+//         mrp: double.parse(_mrpCtrl.text.trim()),
+//         rate: double.parse(_rateCtrl.text.trim()),
+//         incentiveType: _incentiveType,
+//         incentivePercentage: _incentiveType == ProductIncentiveType.percentage
+//             ? double.parse(_incentivePercentCtrl.text.trim())
+//             : null,
+//         incentiveAmount: _incentiveType == ProductIncentiveType.fixed
+//             ? double.parse(_incentiveFixedCtrl.text.trim())
+//             : null,
+//         bonusType: effectiveBonusType,
+//         // NOTE: ProductAddRequestModel.minQuantity must be a double now.
+//         minQuantity: effectiveBonusType == ProductBonusType.bulk
+//             ? (double.tryParse(_minQuantityCtrl.text.trim()) ?? 0)
+//             : 0.0,
+//         piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
+//         packing: packingValue,
+//         isBoxUnit: _isBoxUnit,
+//       )));
+//     }
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     Responsive.init(context);
+//
+//     return NetworkAwareWrapper(
+//       child: Scaffold(
+//         backgroundColor: AppColors.background,
+//         appBar: AppBar(
+//           title: Text(_isEditing ? 'Edit Product' : 'Add Product',
+//               style: AppTextStyles.h6()),
+//         ),
+//         body: SafeArea(
+//           child: BlocConsumer<ProductBloc, ProductState>(
+//             listenWhen: (previous, current) =>
+//             previous.status != current.status ||
+//                 previous.errorMessage != current.errorMessage ||
+//                 previous.dropdownStatus != current.dropdownStatus,
+//             listener: (context, state) {
+//               if (state.status == ProductStatus.actionSuccess) {
+//                 AppSnackbar.success(state.actionMessage ?? 'Saved successfully.');
+//                 Navigator.of(context).pop(true);
+//               } else if (state.status == ProductStatus.error &&
+//                   state.errorMessage != null) {
+//                 AppSnackbar.error(state.errorMessage!);
+//               }
+//
+//               if (state.dropdownStatus == DropdownStatus.loaded) {
+//                 _syncDropdownSelectionsIfNeeded(state);
+//               }
+//             },
+//             builder: (context, state) {
+//               final isSaving = state.status == ProductStatus.actionInProgress;
+//               final dropdownsLoading = state.dropdownStatus == DropdownStatus.loading;
+//               final dropdownsFailed = state.dropdownStatus == DropdownStatus.error;
+//
+//               if (state.dropdownStatus == DropdownStatus.loaded &&
+//                   !_dropdownSelectionSynced) {
+//                 WidgetsBinding.instance.addPostFrameCallback((_) {
+//                   if (mounted) _syncDropdownSelectionsIfNeeded(state);
+//                 });
+//               }
+//
+//               // ---- Smaller, responsive text styles ----
+//               final baseTheme = Theme.of(context);
+//               final fieldTextStyle = AppTextStyles.body().copyWith(
+//                 fontSize: Responsive.sp(12),
+//                 fontWeight: FontWeight.w400,
+//               );
+//               final hintStyle =
+//               AppTextStyles.caption().copyWith(fontSize: Responsive.sp(11));
+//               final sectionStyle =
+//               AppTextStyles.bodyBold().copyWith(fontSize: Responsive.sp(13));
+//
+//               return Theme(
+//                 data: baseTheme.copyWith(
+//                   textTheme: baseTheme.textTheme.copyWith(
+//                     titleMedium: fieldTextStyle,
+//                     bodyLarge: fieldTextStyle,
+//                   ),
+//                   inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
+//                     isDense: true,
+//                     hintStyle: hintStyle,
+//                     errorStyle: TextStyle(fontSize: Responsive.sp(10)),
+//                     contentPadding: EdgeInsets.symmetric(
+//                       horizontal: Responsive.w(12),
+//                       vertical: Responsive.h(11),
+//                     ),
+//                   ),
+//                 ),
+//                 child: Form(
+//                   key: _formKey,
+//                   child: ListView(
+//                     padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(16),
+//                         Responsive.w(16), Responsive.h(24)),
+//                     children: [
+//                       Text('Product Details', style: sectionStyle),
+//                       SizedBox(height: Responsive.h(12)),
+//
+//                       _FieldLabel('Product Name'),
+//                       TextFormField(
+//                         controller: _nameCtrl,
+//                         inputFormatters: DValidator.textWithLimit,
+//                         validator: (v) => DValidator.validateRequired(v,
+//                             message: 'Product name is required'),
+//                       ),
+//                       SizedBox(height: Responsive.h(14)),
+//
+//                       _FieldLabel('Company'),
+//                       if (dropdownsFailed)
+//                         _DropdownRetry(
+//                           message: state.errorMessage ?? 'Failed to load companies.',
+//                           onRetry: () => context
+//                               .read<ProductBloc>()
+//                               .add(const LoadProductDropdowns()),
+//                         )
+//                       else
+//                         DropdownButtonFormField<String>(
+//                           isExpanded: true,
+//                           initialValue: _selectedCompanyId,
+//                           decoration: InputDecoration(
+//                             hintText: dropdownsLoading ? 'Loading...' : 'Select brand',
+//                           ),
+//                           items: state.companies
+//                               .map((c) => DropdownMenuItem(
+//                             value: c.id,
+//                             child: Text(c.label,
+//                                 overflow: TextOverflow.ellipsis),
+//                           ))
+//                               .toList(),
+//                           onChanged: dropdownsLoading
+//                               ? null
+//                               : (v) => setState(() => _selectedCompanyId = v),
+//                           validator: (v) => DValidator.validateDropdown('Brand', v),
+//                         ),
+//                       SizedBox(height: Responsive.h(14)),
+//
+//                       Row(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Expanded(
+//                             flex: 3,
+//                             child: Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: [
+//                                 _FieldLabel('Size'),
+//                                 TextFormField(
+//                                   controller: _sizeCtrl,
+//                                   inputFormatters: DValidator.sizeText,
+//                                 ),
+//                               ],
+//                             ),
+//                           ),
+//                           SizedBox(width: Responsive.w(12)),
+//                           Expanded(
+//                             flex: 2,
+//                             child: Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: [
+//                                 _FieldLabel('Unit'),
+//                                 if (dropdownsFailed)
+//                                   const SizedBox.shrink()
+//                                 else
+//                                   DropdownButtonFormField<String>(
+//                                     isExpanded: true,
+//                                     initialValue: _selectedUnitId,
+//                                     decoration: InputDecoration(
+//                                       hintText:
+//                                       dropdownsLoading ? 'Loading...' : 'Select',
+//                                     ),
+//                                     items: state.units
+//                                         .map((u) => DropdownMenuItem(
+//                                       value: u.id,
+//                                       child: Text(u.label,
+//                                           overflow: TextOverflow.ellipsis),
+//                                     ))
+//                                         .toList(),
+//                                     onChanged: dropdownsLoading
+//                                         ? null
+//                                         : (v) => _onUnitChanged(v, state),
+//                                     validator: (v) =>
+//                                         DValidator.validateDropdown('unit', v),
+//                                   ),
+//                               ],
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                       SizedBox(height: Responsive.h(14)),
+//
+//                       // Packing is shown for every unit. Pieces per Box appears
+//                       // alongside it (auto-filled from Packing) for box / sq-ft
+//                       // units, where at least one of the two is required.
+//                       Row(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Expanded(
+//                             child: Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: [
+//                                 _FieldLabel(_isBoxUnit ? 'Packing *' : 'Packing'),
+//                                 TextFormField(
+//                                   controller: _packingCtrl,
+//                                   inputFormatters: DValidator.packingText,
+//                                   validator: _packingOrPiecesValidator,
+//                                 ),
+//                               ],
+//                             ),
+//                           ),
+//                           if (_isBoxUnit) ...[
+//                             SizedBox(width: Responsive.w(12)),
+//                             Expanded(
+//                               child: Column(
+//                                 crossAxisAlignment: CrossAxisAlignment.start,
+//                                 children: [
+//                                   _FieldLabel('Pieces per Box *'),
+//                                   TextFormField(
+//                                     controller: _piecesPerBoxCtrl,
+//                                     keyboardType: TextInputType.number,
+//                                     inputFormatters: DValidator.digitsOnly,
+//                                     decoration:
+//                                     const InputDecoration(hintText: 'e.g. 8'),
+//                                     validator: _packingOrPiecesValidator,
+//                                   ),
+//                                 ],
+//                               ),
+//                             ),
+//                           ],
+//                         ],
+//                       ),
+//                       SizedBox(height: Responsive.h(14)),
+//
+//                       // MRP and Selling Rate: max 7 digits + 2 decimals.
+//                       // Selling rate cannot be higher than MRP.
+//                       Row(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Expanded(
+//                             child: Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: [
+//                                 _FieldLabel('MRP (₹)'),
+//                                 TextFormField(
+//                                   controller: _mrpCtrl,
+//                                   keyboardType: const TextInputType.numberWithOptions(
+//                                       decimal: true),
+//                                   inputFormatters: DValidator.mrpNumber,
+//                                   validator: DValidator.validateMrp,
+//                                 ),
+//                               ],
+//                             ),
+//                           ),
+//                           SizedBox(width: Responsive.w(12)),
+//                           Expanded(
+//                             child: Column(
+//                               crossAxisAlignment: CrossAxisAlignment.start,
+//                               children: [
+//                                 _FieldLabel('Selling Rate (₹)'),
+//                                 TextFormField(
+//                                   controller: _rateCtrl,
+//                                   keyboardType: const TextInputType.numberWithOptions(
+//                                       decimal: true),
+//                                   inputFormatters: DValidator.mrpNumber,
+//                                   validator: (v) => DValidator.validateRate(v,
+//                                       mrpText: _mrpCtrl.text),
+//                                 ),
+//                               ],
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                       SizedBox(height: Responsive.h(20)),
+//
+//                       Text('Incentive', style: sectionStyle),
+//                       SizedBox(height: Responsive.h(10)),
+//
+//                       _FieldLabel('Incentive Type'),
+//                       DropdownButtonFormField<ProductIncentiveType>(
+//                         isExpanded: true,
+//                         initialValue: _incentiveType,
+//                         decoration:
+//                         const InputDecoration(hintText: 'Select incentive type'),
+//                         items: ProductIncentiveType.values
+//                             .map((t) =>
+//                             DropdownMenuItem(value: t, child: Text(t.label)))
+//                             .toList(),
+//                         onChanged: (v) {
+//                           if (v == null) return;
+//                           setState(() {
+//                             _incentiveType = v;
+//                             // No incentive -> no bonus.
+//                             if (v == ProductIncentiveType.none) {
+//                               _bonusType = ProductBonusType.none;
+//                               _minQuantityCtrl.clear();
+//                             }
+//                           });
+//                         },
+//                       ),
+//                       SizedBox(height: Responsive.h(12)),
+//
+//                       // `none` matches neither branch below, so no incentive
+//                       // field is built (or validated) when Incentive Type is "None".
+//                       if (_incentiveType == ProductIncentiveType.percentage) ...[
+//                         _FieldLabel('Incentive (%)'),
+//                         TextFormField(
+//                           controller: _incentivePercentCtrl,
+//                           keyboardType:
+//                           const TextInputType.numberWithOptions(decimal: true),
+//                           inputFormatters: DValidator.decimalNumber,
+//                           decoration: const InputDecoration(hintText: 'e.g. 5'),
+//                           validator: _requiredNumberValidator,
+//                         ),
+//                       ] else if (_incentiveType == ProductIncentiveType.fixed) ...[
+//                         _FieldLabel('Incentive Amount (₹)'),
+//                         TextFormField(
+//                           controller: _incentiveFixedCtrl,
+//                           keyboardType:
+//                           const TextInputType.numberWithOptions(decimal: true),
+//                           inputFormatters: DValidator.decimalNumber,
+//                           decoration: const InputDecoration(hintText: 'e.g. 20'),
+//                           validator: _requiredNumberValidator,
+//                         ),
+//                       ],
+//
+//                       // Bonus is only available when an incentive
+//                       // (fixed / percentage) is selected.
+//                       if (_incentiveType != ProductIncentiveType.none) ...[
+//                         SizedBox(height: Responsive.h(20)),
+//                         Text('Bonus', style: sectionStyle),
+//                         SizedBox(height: Responsive.h(10)),
+//
+//                         _FieldLabel('Bonus Type'),
+//                         // Required when an incentive is selected, and "None"
+//                         // is not offered, so the user must pick a real bonus.
+//                         DropdownButtonFormField<ProductBonusType>(
+//                           isExpanded: true,
+//                           initialValue: _bonusType == ProductBonusType.none
+//                               ? null
+//                               : _bonusType,
+//                           decoration:
+//                           const InputDecoration(hintText: 'Select bonus type'),
+//                           items: ProductBonusType.values
+//                               .where((t) => t != ProductBonusType.none)
+//                               .map((t) =>
+//                               DropdownMenuItem(value: t, child: Text(t.label)))
+//                               .toList(),
+//                           onChanged: (v) {
+//                             if (v != null) setState(() => _bonusType = v);
+//                           },
+//                           validator: (v) => (v == null || v == ProductBonusType.none)
+//                               ? 'Bonus type is required'
+//                               : null,
+//                         ),
+//                         if (_bonusType == ProductBonusType.bulk) ...[
+//                           SizedBox(height: Responsive.h(12)),
+//                           _FieldLabel('Minimum Quantity'),
+//                           TextFormField(
+//                             controller: _minQuantityCtrl,
+//                             keyboardType: const TextInputType.numberWithOptions(
+//                                 decimal: true),
+//                             // Up to 5 whole digits and 2 decimals (e.g. 12345.25)
+//                             inputFormatters: [
+//                               FilteringTextInputFormatter.allow(
+//                                   RegExp(r'^\d{0,5}\.?\d{0,2}')),
+//                             ],
+//                             decoration:
+//                             const InputDecoration(hintText: 'Min 2, e.g. 2.5'),
+//                             validator: _minQuantityValidator,
+//                           ),
+//                         ],
+//                       ],
+//                       SizedBox(height: Responsive.h(28)),
+//
+//                       SizedBox(
+//                         width: double.infinity,
+//                         child: ElevatedButton(
+//                           style: ElevatedButton.styleFrom(
+//                             backgroundColor: AppColors.primary,
+//                             padding: EdgeInsets.symmetric(vertical: Responsive.h(14)),
+//                           ),
+//                           onPressed: isSaving ? null : () => _save(context),
+//                           child: isSaving
+//                               ? const SizedBox(
+//                             height: 20,
+//                             width: 20,
+//                             child: CircularProgressIndicator(
+//                               strokeWidth: 2,
+//                               valueColor: AlwaysStoppedAnimation(Colors.white),
+//                             ),
+//                           )
+//                               : Text(
+//                             _isEditing ? 'Save Changes' : 'Add Product',
+//                             style: TextStyle(
+//                               color: Colors.white,
+//                               fontWeight: FontWeight.w600,
+//                               fontSize: Responsive.sp(13),
+//                             ),
+//                           ),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               );
+//             },
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// class _FieldLabel extends StatelessWidget {
+//   const _FieldLabel(this.text);
+//   final String text;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Padding(
+//       padding: EdgeInsets.only(bottom: Responsive.h(6)),
+//       child: Text(text, style: AppTextStyles.caption()),
+//     );
+//   }
+// }
+//
+// class _DropdownRetry extends StatelessWidget {
+//   const _DropdownRetry({required this.message, required this.onRetry});
+//
+//   final String message;
+//   final VoidCallback onRetry;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Row(
+//       children: [
+//         Expanded(
+//           child: Text(message,
+//               style: AppTextStyles.caption().copyWith(color: AppColors.error)),
+//         ),
+//         TextButton(onPressed: onRetry, child: const Text('Retry')),
+//       ],
+//     );
+//   }
+// }
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -206,13 +913,13 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     return null;
   }
 
-  // For box / sq-ft units, at least one of Packing or Pieces per Box is required.
-  String? _packingOrPiecesValidator(String? _) {
+  // For box / sq-ft units, Pieces per Box is required.
+  String? _piecesPerBoxValidator(String? v) {
     if (!_isBoxUnit) return null;
-    if (_packingCtrl.text.trim().isEmpty &&
-        _piecesPerBoxCtrl.text.trim().isEmpty) {
-      return 'Enter Packing or Pieces per Box';
-    }
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'Pieces per Box is required';
+    final n = int.tryParse(text);
+    if (n == null || n <= 0) return 'Enter a valid number';
     return null;
   }
 
@@ -237,7 +944,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         id: widget.product!.id,
         name: _nameCtrl.text.trim(),
         companyId: _selectedCompanyId!,
-        size: _sizeCtrl.text.trim(),
+        size: _sizeCtrl.text.trim(), // optional -> may be empty
         unitId: _selectedUnitId!,
         mrp: double.parse(_mrpCtrl.text.trim()),
         rate: double.parse(_rateCtrl.text.trim()),
@@ -260,7 +967,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
       bloc.add(CreateProduct(ProductAddRequestModel(
         name: _nameCtrl.text.trim(),
         companyId: _selectedCompanyId!,
-        size: _sizeCtrl.text.trim(),
+        size: _sizeCtrl.text.trim(), // optional -> may be empty
         unitId: _selectedUnitId!,
         mrp: double.parse(_mrpCtrl.text.trim()),
         rate: double.parse(_rateCtrl.text.trim()),
@@ -408,10 +1115,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _FieldLabel('Size'),
+                                // Size is optional: no validator.
                                 TextFormField(
                                   controller: _sizeCtrl,
                                   inputFormatters: DValidator.sizeText,
-                                  validator: DValidator.validateSize,
                                 ),
                               ],
                             ),
@@ -453,9 +1160,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       ),
                       SizedBox(height: Responsive.h(14)),
 
-                      // Packing is shown for every unit. Pieces per Box appears
-                      // alongside it (auto-filled from Packing) for box / sq-ft
-                      // units, where at least one of the two is required.
+                      // Packing is shown for every unit and is optional.
+                      // Pieces per Box appears alongside it (auto-filled from
+                      // Packing) for box / sq-ft units, and is required there.
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -463,11 +1170,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _FieldLabel(_isBoxUnit ? 'Packing *' : 'Packing'),
+                                _FieldLabel('Packing'),
                                 TextFormField(
                                   controller: _packingCtrl,
                                   inputFormatters: DValidator.packingText,
-                                  validator: _packingOrPiecesValidator,
                                 ),
                               ],
                             ),
@@ -485,7 +1191,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                                     inputFormatters: DValidator.digitsOnly,
                                     decoration:
                                     const InputDecoration(hintText: 'e.g. 8'),
-                                    validator: _packingOrPiecesValidator,
+                                    validator: _piecesPerBoxValidator,
                                   ),
                                 ],
                               ),
