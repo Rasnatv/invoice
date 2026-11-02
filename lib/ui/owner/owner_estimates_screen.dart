@@ -355,7 +355,6 @@ class _OwnerEstimatesViewState extends State<_OwnerEstimatesView> {
   }
 }
 
-
 class _SearchField extends StatelessWidget {
   const _SearchField({
     required this.controller,
@@ -431,9 +430,6 @@ class _FilterChip extends StatelessWidget {
               ),
             ),
             SizedBox(width: Responsive.w(6)),
-
-
-
           ],
         ),
       ),
@@ -708,7 +704,18 @@ class _OwnerEstimateCard extends StatelessWidget {
   final VoidCallback onPayNow;
   final VoidCallback onHistoryTap;
 
+  /// True when the estimate is cancelled (handles both spellings and
+  /// falls back to the label in case the key differs).
+  bool get _isCancelled {
+    final key = estimate.statusKey.toLowerCase();
+    final label = estimate.statusLabel.toLowerCase();
+    return key == 'cancelled' ||
+        key == 'canceled' ||
+        label.contains('cancel');
+  }
+
   Color get _statusColor {
+    if (_isCancelled) return AppColors.textSecondary;
     switch (estimate.statusKey) {
       case 'approved':
         return AppColors.success;
@@ -724,6 +731,8 @@ class _OwnerEstimateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool cancelled = _isCancelled;
+
     return _ListCard(
       onTap: onTap,
       child: Column(
@@ -797,16 +806,21 @@ class _OwnerEstimateCard extends StatelessWidget {
                   style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
-              InkWell(
-                onTap: onHistoryTap,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Icon(Icons.history_rounded,
-                      size: 25, color: AppColors.textSecondary),
+
+              // History icon is hidden for cancelled estimates.
+              if (!cancelled) ...[
+                InkWell(
+                  onTap: onHistoryTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(Icons.history_rounded,
+                        size: 25, color: AppColors.textSecondary),
+                  ),
                 ),
-              ),
-              SizedBox(width: Responsive.w(6)),
+                SizedBox(width: Responsive.w(6)),
+              ],
+
               Text(
                 estimate.grandTotalFormatted,
                 style: AppTextStyles.amount(color: AppColors.primary),
@@ -814,8 +828,8 @@ class _OwnerEstimateCard extends StatelessWidget {
             ],
           ),
 
-          // ---- balance ----
-          if (estimate.hasBalance) ...[
+          // ---- balance / Pay Now (hidden for cancelled estimates) ----
+          if (!cancelled && estimate.hasBalance) ...[
             SizedBox(height: Responsive.h(10)),
             _BalanceBar(
               amountText: estimate.balanceAmountFormatted,

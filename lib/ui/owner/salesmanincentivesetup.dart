@@ -545,12 +545,12 @@ class _SalesmanIncentiveSetupScreenState
     return s.endsWith('.00') ? s.substring(0, s.length - 3) : s;
   }
 
-  /// Calendar picker for the month/year. Only last year and this year
-  /// are selectable (no future years like 2028). Opens in year view;
-  /// only the month and year of the tapped date are used.
   Future<void> _pickPeriod() async {
     final now = DateTime.now();
-    final firstDate = DateTime(now.year - 1, 1, 1);
+
+    // Start of the current month: earlier months are disabled.
+    final firstDate = DateTime(now.year, now.month, 1);
+    // End of this year (no future years).
     final lastDate = DateTime(now.year, 12, 31);
 
     DateTime initial = DateTime(_year, _month, 1);
