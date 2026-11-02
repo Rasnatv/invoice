@@ -29,7 +29,7 @@ class OwnerDespatchSheetBloc
       emit(state.copyWith(
         status: OwnerDespatchSheetStatus.failure,
         errorMessage:
-        suggestionResult.errorMessage ?? 'Failed to load despatch suggestions.',
+        suggestionResult.errorMessage ?? 'Failed to load dispatch suggestions.',
       ));
       return;
     }

@@ -651,6 +651,7 @@ class _QuotationCard extends StatelessWidget {
           SizedBox(height: Responsive.h(12)),
           const Divider(height: 1, color: AppColors.border),
           SizedBox(height: Responsive.h(10)),
+
           Row(
             children: [
               Icon(Icons.calendar_today_rounded,
@@ -661,21 +662,14 @@ class _QuotationCard extends StatelessWidget {
                   '${quotation.date}  •  ${quotation.totalItemsValue} items',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                  AppTextStyles.caption(color: AppColors.textSecondary),
+                  style: AppTextStyles.caption(color: AppColors.textSecondary),
                 ),
               ),
-              SizedBox(width: Responsive.w(6)),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    currency.format(quotation.grandTotalValue),
-                    maxLines: 1,
-                    style: AppTextStyles.amount(color: AppColors.primary),
-                  ),
-                ),
+              SizedBox(width: Responsive.w(10)),
+              Text(
+                currency.format(quotation.grandTotalValue),
+                maxLines: 1,
+                style: AppTextStyles.amount(color: AppColors.primary),
               ),
             ],
           ),
@@ -684,3 +678,5 @@ class _QuotationCard extends StatelessWidget {
     );
   }
 }
+
+ 

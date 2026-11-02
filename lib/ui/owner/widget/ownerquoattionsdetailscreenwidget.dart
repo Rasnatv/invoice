@@ -1035,6 +1035,7 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 12), // <-- add this
                   child: Form(
                     key: formKey,
                     child: Column(

@@ -199,10 +199,10 @@ class _OwnerContractorReportViewState
                         color: const Color(0xFFDC2626),
                       ),
                       ReportStat(
-                        value: lastOrderDate != null
-                            ? DateFormat('dd MMM yyyy').format(lastOrderDate)
-                            : '-',
-                        label: 'Last Order Date',
+                        value: (summary.lastOrderRaw.isEmpty || summary.lastOrderRaw == '0')
+                            ? '-'
+                            : summary.lastOrderRaw,
+                        label: 'Last Order',
                       ),
                     ]),
                     SizedBox(height: Responsive.h(18)),

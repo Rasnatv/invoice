@@ -56,7 +56,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
 
         // ---------- APPBAR (same as Owner dispatch detail) ----------
         appBar: AppBar(
-          title: Text('Despatch Details', style: AppTextStyles.h6()),
+          title: Text('Dispatch Details', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
         ),
@@ -89,7 +89,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
             if (state.status == DriverDespatchDetailStatus.failure &&
                 state.dispatch == null) {
               return _ErrorView(
-                message: state.errorMessage ?? 'Failed to load despatch bill',
+                message: state.errorMessage ?? 'Failed to load dispatch bill',
                 onRetry: () => context
                     .read<DriverDespatchDetailBloc>()
                     .add(FetchDriverDespatchDetail(widget.billId)),
@@ -573,7 +573,7 @@ class _DriverBillDetailViewState extends State<_DriverBillDetailView> {
     final confirmed = await showConfirmDialog(
       context,
       title: 'Mark as In Transit?',
-      message: 'This confirms you have picked up this despatch for delivery.',
+      message: 'This confirms you have picked up this dispatch for delivery.',
       confirmText: 'Confirm',
     );
     if (confirmed && context.mounted) {

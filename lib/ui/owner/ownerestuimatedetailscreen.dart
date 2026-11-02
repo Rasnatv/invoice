@@ -506,7 +506,7 @@ class OwnerEstimateDetailViewState extends State<OwnerEstimateDetailView> {
             shape: buttonShape,
           ),
           onPressed: () => openDespatchSheet(context, detail),
-          child: Text('Send to Despatch',
+          child: Text('Send to Dispatch',
               style: AppTextStyles.bodyBold(color: Colors.white)),
         ),
       );

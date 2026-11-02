@@ -354,7 +354,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                   borderRadius: BorderRadius.circular(14)),
             ),
             icon: const Icon(Icons.local_shipping_outlined, size: 18),
-            label: Text('Create Despatch Sheet',
+            label: Text('Create Dispatch Sheet',
                 style: AppTextStyles.bodyBold(color: Colors.white)),
           ),
         ),

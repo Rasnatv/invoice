@@ -732,7 +732,7 @@ class _IncentiveCard extends StatelessWidget {
               SizedBox(width: Responsive.w(6)),
               Expanded(
                 child: Text(
-                  'Est: ${incentive.estimateNumber}',
+                  'Ref: ${incentive.estimateNumber}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption(color: AppColors.textSecondary),

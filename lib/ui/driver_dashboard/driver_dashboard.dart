@@ -184,7 +184,7 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
                   _BillSliver(
                     bills: all,
                     emptyIcon: Icons.receipt_long_outlined,
-                    emptyLabel: 'No despatch sheets yet',
+                    emptyLabel: 'No dispatch sheets yet',
                     emptySubLabel: 'Bills assigned to you will be listed here.',
                     onTapBill: _openDetail,
                   ),

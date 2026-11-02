@@ -15,11 +15,6 @@ import '../../models/owner_models/ownerdespatchsheetpreparemodel.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../widgets/primary_button.dart';
 
-// ---------------------------------------------------------------------
-// Shared look (mirrors the Estimate Detail screen styling).
-// If you already export these from the estimate detail widgets file,
-// you can delete these private copies and import that file instead.
-// ---------------------------------------------------------------------
 
 /// Standard column widths for the items grid.
 class _DsCol {
@@ -146,7 +141,7 @@ class _OwnerDespatchSheetView extends StatelessWidget {
         previous.submitStatus != current.submitStatus,
         listener: (context, state) {
           if (state.submitStatus == OwnerDespatchSubmitStatus.success) {
-            AppSnackbar.success(state.submitMessage ?? 'Despatch sheet created');
+            AppSnackbar.success(state.submitMessage ?? 'Dispatch sheet created');
             // Single place this screen is popped from; the back button is
             // fully blocked while a submit is in progress.
             if (context.mounted && Navigator.of(context).canPop()) {
@@ -154,7 +149,7 @@ class _OwnerDespatchSheetView extends StatelessWidget {
             }
           } else if (state.submitStatus == OwnerDespatchSubmitStatus.failure) {
             AppSnackbar.error(
-                state.submitMessage ?? 'Failed to create despatch sheet');
+                state.submitMessage ?? 'Failed to create dispatch sheet');
           }
         },
         builder: (context, state) {
@@ -166,13 +161,13 @@ class _OwnerDespatchSheetView extends StatelessWidget {
             onPopInvokedWithResult: (didPop, result) {
               if (!didPop && isSubmitting) {
                 AppSnackbar.error(
-                    'Please wait until the despatch sheet finishes saving.');
+                    'Please wait until the dispatch sheet finishes saving.');
               }
             },
             child: Scaffold(
               backgroundColor: AppColors.background,
               appBar: AppBar(
-                title: Text('Create Despatch Sheet', style: AppTextStyles.h6()),
+                title: Text('Create Dispatch Sheet', style: AppTextStyles.h6()),
                 automaticallyImplyLeading: !isSubmitting,
               ),
               body: SafeArea(
@@ -189,7 +184,7 @@ class _OwnerDespatchSheetView extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(state.errorMessage ??
-                                'Failed to load despatch details.'),
+                                'Failed to load dispatch details.'),
                             SizedBox(height: Responsive.h(10)),
                             ElevatedButton(
                               onPressed: () => context
@@ -500,7 +495,7 @@ class _DespatchFormState extends State<_DespatchForm> {
                           }
                         },
                         child: InputDecorator(
-                          decoration: _decor('Despatch Date',
+                          decoration: _decor('Dispatch Date',
                               icon: Icons.event_outlined),
                           child: Text(
                             DateFormat('yyyy-MM-dd').format(_despatchDate),
@@ -591,7 +586,7 @@ class _DespatchFormState extends State<_DespatchForm> {
           ),
           child: PrimaryButton(
             label:
-            widget.isSubmitting ? 'Please wait...' : 'Create Despatch Sheet',
+            widget.isSubmitting ? 'Please wait...' : 'Create Dispatch Sheet',
             height: 48,
             onPressed: widget.isSubmitting ? null : _submit,
           ),
