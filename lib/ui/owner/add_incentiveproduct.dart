@@ -70,10 +70,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
 
   bool _syncingPiecesFromPacking = false;
 
-  // Packing text used by non-box units. Remembered while a box / sq-ft unit
-  // is selected so it can be shown again when the user switches back.
-  String _otherUnitPacking = '';
-
   bool get _isEditing => widget.product != null;
 
   @override
@@ -103,7 +99,6 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     // Packing/pieces-per-box are prefilled straight from the saved product.
     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
     _packingCtrl = TextEditingController(text: p?.packing ?? '');
-    _otherUnitPacking = p?.packing ?? '';
 
     // Auto-fill Pieces per Box from the number typed into Packing
     // (e.g. "8pcs/box" -> "8"), only for box / sq-ft type units.
@@ -164,23 +159,13 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
 
   void _onUnitChanged(String? unitId, ProductState state) {
     setState(() {
-      final wasBoxUnit = _isBoxUnit;
       _selectedUnitId = unitId;
       _isBoxUnit = _computeIsBoxUnit(state);
 
-      if (_isBoxUnit) {
-        // Box / sq-ft unit: remember the current packing (if it came from a
-        // non-box unit), then clear Packing so the user enters it fresh.
-        // Pieces per Box then fills from Packing.
-        if (!wasBoxUnit) _otherUnitPacking = _packingCtrl.text;
-        _packingCtrl.clear();
-        _piecesPerBoxCtrl.clear();
-      } else {
-        // Other unit: Pieces per Box is not used. Packing shows its previous
-        // value again when coming back from a box / sq-ft unit.
-        _piecesPerBoxCtrl.clear();
-        if (wasBoxUnit) _packingCtrl.text = _otherUnitPacking;
-      }
+      // Whichever unit is selected, Packing and Pieces per Box are cleared
+      // so the user enters them again for the new unit.
+      _packingCtrl.clear();
+      _piecesPerBoxCtrl.clear();
     });
   }
 
