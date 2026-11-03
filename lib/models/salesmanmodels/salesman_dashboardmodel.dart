@@ -188,7 +188,7 @@ class DashboardHomeRecentEstimate {
       dateFormatted: json['date_formatted']?.toString() ?? '',
       statusLabel: json['status_label']?.toString() ?? '',
       grandTotal: num.tryParse(json['grand_total']?.toString() ?? '') ?? 0,
-      grandTotalFormatted: json['grand_total_formatted']?.toString() ?? '₹0.00',
+      grandTotalFormatted: json['grand_total_formatted']?.toString() ?? '₹0',
     );
   }
 }

@@ -64,9 +64,15 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
 
   bool _dropdownSelectionSynced = false;
 
+  // True for box / sq-ft type units. Pieces per Box is REQUIRED only then;
+  // for every other unit the field is shown but optional.
   bool _isBoxUnit = false;
 
   bool _syncingPiecesFromPacking = false;
+
+  // Packing text used by non-box units. Remembered while a box / sq-ft unit
+  // is selected so it can be shown again when the user switches back.
+  String _otherUnitPacking = '';
 
   bool get _isEditing => widget.product != null;
 
@@ -97,6 +103,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     // Packing/pieces-per-box are prefilled straight from the saved product.
     _piecesPerBoxCtrl = TextEditingController(text: p?.piecesPerBox ?? '');
     _packingCtrl = TextEditingController(text: p?.packing ?? '');
+    _otherUnitPacking = p?.packing ?? '';
 
     // Auto-fill Pieces per Box from the number typed into Packing
     // (e.g. "8pcs/box" -> "8"), only for box / sq-ft type units.
@@ -112,7 +119,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         ? ProductBonusType.none
         : (p?.bonusType ?? ProductBonusType.none);
 
-    _isBoxUnit = (p?.isBoxUnit ?? false) || (p?.hasBoxPacking ?? false);
+    // Initial guess only; corrected from the real unit once dropdowns load.
+    _isBoxUnit = p?.isBoxUnit ?? false;
   }
 
   @override
@@ -131,7 +139,8 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
   }
 
   // Pulls the first number out of the Packing text and mirrors it into
-  // Pieces per Box, e.g. "8pcs/box" -> "8". Only runs for box/sq-ft units.
+  // Pieces per Box, e.g. "8pcs/box" -> "8". Only runs for box/sq-ft units
+  // (otherwise "500ml" would put 500 into Pieces per Box).
   void _onPackingChanged() {
     if (_syncingPiecesFromPacking) return;
     if (!_isBoxUnit) return;
@@ -155,15 +164,22 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
 
   void _onUnitChanged(String? unitId, ProductState state) {
     setState(() {
+      final wasBoxUnit = _isBoxUnit;
       _selectedUnitId = unitId;
       _isBoxUnit = _computeIsBoxUnit(state);
-      if (!_isBoxUnit) {
-        // Packing stays for every unit; Pieces per Box is cleared when the
-        // new unit doesn't use it.
+
+      if (_isBoxUnit) {
+        // Box / sq-ft unit: remember the current packing (if it came from a
+        // non-box unit), then clear Packing so the user enters it fresh.
+        // Pieces per Box then fills from Packing.
+        if (!wasBoxUnit) _otherUnitPacking = _packingCtrl.text;
+        _packingCtrl.clear();
         _piecesPerBoxCtrl.clear();
       } else {
-        // Switched into a box/sq-ft unit — derive Pieces per Box from Packing.
-        _onPackingChanged();
+        // Other unit: Pieces per Box is not used. Packing shows its previous
+        // value again when coming back from a box / sq-ft unit.
+        _piecesPerBoxCtrl.clear();
+        if (wasBoxUnit) _packingCtrl.text = _otherUnitPacking;
       }
     });
   }
@@ -180,11 +196,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
       if (!unitExists) _selectedUnitId = null;
       _dropdownSelectionSynced = true;
 
-      // Only upgrade _isBoxUnit to true here, never silently downgrade it.
-      if (unitExists) {
-        final dropdownSaysBox = _computeIsBoxUnit(state);
-        _isBoxUnit = _isBoxUnit || dropdownSaysBox;
-      }
+      // The selected unit decides whether Pieces per Box is shown.
+      _isBoxUnit = unitExists ? _computeIsBoxUnit(state) : false;
+      if (!_isBoxUnit) _piecesPerBoxCtrl.clear();
     });
   }
 
@@ -206,7 +220,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     return null;
   }
 
-  // For box / sq-ft units, Pieces per Box is required.
+  // Pieces per Box exists only for box / sq-ft units, and is required there.
   String? _piecesPerBoxValidator(String? v) {
     if (!_isBoxUnit) return null;
     final text = v?.trim() ?? '';
@@ -226,6 +240,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
     final bloc = context.read<ProductBloc>();
     final packingValue =
     _packingCtrl.text.trim().isEmpty ? null : _packingCtrl.text.trim();
+
+    // Only box / sq-ft units send Pieces per Box.
+    final piecesValue = _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null;
 
     // Never send a bonus when the incentive is none.
     final effectiveBonusType = _incentiveType == ProductIncentiveType.none
@@ -252,7 +269,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         minQuantity: effectiveBonusType == ProductBonusType.bulk
             ? _minQuantityCtrl.text.trim()
             : '0',
-        piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
+        piecesPerBox: piecesValue,
         packing: packingValue,
         isBoxUnit: _isBoxUnit,
       )));
@@ -276,7 +293,7 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
         minQuantity: effectiveBonusType == ProductBonusType.bulk
             ? (double.tryParse(_minQuantityCtrl.text.trim()) ?? 0)
             : 0.0,
-        piecesPerBox: _isBoxUnit ? _piecesPerBoxCtrl.text.trim() : null,
+        piecesPerBox: piecesValue,
         packing: packingValue,
         isBoxUnit: _isBoxUnit,
       )));
