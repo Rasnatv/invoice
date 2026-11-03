@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -16,6 +17,13 @@ import '../../bloc/ownerbloc/ownerdespatchdetail/ownerdespatchdetail_state.dart'
 import '../../core/utils/confirmation_dialogue.dart';
 import '../../models/owner_models/owner_despatchdetailmodel.dart';
 import '../../widgets/appsnackbar.dart';
+
+// PDF generation + native share sheet (WhatsApp, Email, Drive, etc.)
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart'; // gives us a Unicode font (Noto Sans) that has the ₹ glyph
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 class SalesmanDispatchDetailScreen extends StatelessWidget {
   const SalesmanDispatchDetailScreen({super.key, required this.dispatchId});
@@ -50,6 +58,15 @@ class _SalesmanDispatchDetailViewState
   File? _driverSigFile;
   final _picker = ImagePicker();
 
+  // spinner state while the PDF is being built + handed to the share sheet.
+  bool _isGeneratingPdf = false;
+
+  static const _appBarSpinner = SizedBox(
+    height: 20,
+    width: 20,
+    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+  );
+
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
@@ -63,6 +80,26 @@ class _SalesmanDispatchDetailViewState
           title: Text('Dispatch Details', style: AppTextStyles.h6()),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
+          actions: [
+            // Share as PDF -> native share sheet -> WhatsApp/etc.
+            IconButton(
+              tooltip: 'Share as PDF',
+              icon: _isGeneratingPdf
+                  ? _appBarSpinner
+                  : const Icon(Icons.picture_as_pdf_rounded),
+              onPressed: _isGeneratingPdf
+                  ? null
+                  : () {
+                final dispatch =
+                    context.read<DispatchDetailBloc>().state.dispatch;
+                if (dispatch == null) {
+                  AppSnackbar.error('Dispatch data not loaded yet');
+                  return;
+                }
+                _generateAndSharePdf(dispatch);
+              },
+            ),
+          ],
         ),
         body: BlocConsumer<DispatchDetailBloc, DispatchDetailState>(
           listenWhen: (prev, curr) => prev.actionStatus != curr.actionStatus,
@@ -621,6 +658,152 @@ class _SalesmanDispatchDetailViewState
   String _currency(double value) =>
       NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0)
           .format(value);
+
+  // ---------- PDF export + share ----------
+
+  /// Builds a PDF mirroring the on-screen info card + items table + grand
+  /// total, saves it to a temp file, then hands it to the OS share sheet.
+  /// WhatsApp shows up there directly (if installed) alongside Email,
+  /// Drive, Bluetooth, etc. — no print dialog is shown anywhere in this
+  /// flow, this purely shares the generated file.
+  Future<void> _generateAndSharePdf(DispatchDetail d) async {
+    setState(() => _isGeneratingPdf = true);
+    try {
+      final dateFmt = DateFormat('dd MMM yyyy, hh:mm a');
+
+      // Noto Sans includes the ₹ glyph, unlike the default Helvetica
+      // font — without this the rupee symbol renders as a blank box.
+      final baseFont = await PdfGoogleFonts.notoSansRegular();
+      final boldFont = await PdfGoogleFonts.notoSansBold();
+
+      final pdf = pw.Document(
+        theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
+      );
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          header: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Dispatch Bill Details',
+                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              pw.Divider(color: PdfColors.grey400),
+            ],
+          ),
+          build: (context) => [
+            _pdfInfoSection(d, dateFmt),
+            pw.SizedBox(height: 18),
+            pw.Text('Items',
+                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 8),
+            _pdfItemsTable(d),
+            pw.SizedBox(height: 14),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Grand Total: ${_currency(d.grandTotal)}',
+                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      final bytes = await pdf.save();
+
+      final safeDs =
+      d.dsNumber.isNotEmpty ? d.dsNumber.replaceAll(RegExp(r'[^\w\-]'), '_') : d.id;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/Dispatch_$safeDs.pdf');
+      await file.writeAsBytes(bytes, flush: true);
+
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/pdf')],
+        text: 'Dispatch Bill - ${d.dsNumber}',
+      );
+    } catch (e) {
+      if (mounted) AppSnackbar.error('Failed to generate PDF: $e');
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+  pw.Widget _pdfInfoSection(DispatchDetail d, DateFormat dateFmt) {
+    final rows = <List<String>>[
+      ['DS Number', d.dsNumber],
+      ['Ref. No.', d.refNo],
+      ['Customer Name', d.partyName],
+      ['Contact Number', d.contactNumber],
+      ['Delivery Address', d.deliveryAddress],
+      ['Driver Name', d.driverName],
+      if (d.despatchedAt != null) ['Despatched At', dateFmt.format(d.despatchedAt!)],
+      if (d.deliveryNotes.isNotEmpty) ['Delivery Notes', d.deliveryNotes],
+    ];
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: rows
+          .map((r) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.Row(
+          children: [
+            pw.SizedBox(
+              width: 120,
+              child: pw.Text(r[0],
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                r[1].isEmpty ? '-' : r[1],
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ))
+          .toList(),
+    );
+  }
+
+  /// PDF items table — includes the "Unit" column (from `packing`)
+  /// alongside Box/Pcs/Qty, matching the on-screen table.
+  pw.Widget _pdfItemsTable(DispatchDetail d) {
+    final headers = ['#', 'Item', 'Company', 'Size', 'Unit', 'Box', 'Pcs', 'Qty'];
+    final data = <List<String>>[
+      for (var i = 0; i < d.items.length; i++)
+        [
+          '${i + 1}',
+          d.items[i].productName,
+          d.items[i].companyName.isEmpty ? '-' : d.items[i].companyName,
+          d.items[i].productSize,
+          d.items[i].packing.isEmpty ? '-' : d.items[i].packing,
+          d.items[i].boxes.toStringAsFixed(0),
+          d.items[i].pieces.toStringAsFixed(0),
+          d.items[i].quantity.toStringAsFixed(0),
+        ],
+    ];
+
+    return pw.TableHelper.fromTextArray(
+      headers: headers,
+      data: data,
+      headerStyle:
+      pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
+      cellStyle: const pw.TextStyle(fontSize: 9),
+      cellAlignments: {
+        0: pw.Alignment.center,
+        5: pw.Alignment.centerRight,
+        6: pw.Alignment.centerRight,
+        7: pw.Alignment.centerRight,
+      },
+      border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+      oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+    );
+  }
 }
 
 // =====================================================================
