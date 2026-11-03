@@ -36,7 +36,10 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
   late final TextEditingController _salaryCtrl;
 
   DateTime? _joiningDate;
-  bool _isActive = true;
+
+  // Initialised from the existing salesman in initState (edit mode).
+  // New salesmen default to active.
+  late bool _isActive;
   bool _isSubmitting = false;
 
   // Use DesignationProvider directly
@@ -66,6 +69,12 @@ class _OwnerAddSalesmanScreenState extends State<OwnerAddSalesmanScreen> {
       text: s != null ? s.salary.toStringAsFixed(0) : '',
     );
     _joiningDate = s?.joiningDate;
+
+    // FIX: use the salesman's real status instead of always starting
+    // as active. Otherwise saving an inactive salesman without touching
+    // the switch would silently re-activate them.
+    _isActive = s?.isActive ?? true;
+
     _loadDesignations();
   }
 
