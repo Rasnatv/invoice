@@ -3,7 +3,9 @@ class ApiConstants {
   ApiConstants._();
 
   static const String baseUrl =
-      'https://neethu.astradevelops.in/ceramo/public/api';
+      'https://dreamsceramics.in/billing/api';
+
+     // 'https://neethu.astradevelops.in/ceramo/public/api';
 
   static const String login = '/login';
 

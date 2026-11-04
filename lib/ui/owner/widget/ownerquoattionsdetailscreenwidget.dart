@@ -909,8 +909,7 @@ class PaymentsCard extends StatelessWidget {
 
 
 
-/// Shows the approve dialog. Returns the request to send, or null if the
-/// owner cancelled.
+
 Future<QuotationApproveRequest?> showApproveQuotationDialog(
     BuildContext context,
     QuotationDetailModel q,
@@ -932,7 +931,7 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
   final discountNotesCtrl = TextEditingController();
 
   final paymentAmountCtrl = TextEditingController();
-  String paymentMethod = 'cash'; // cash | online | cheque | credit | bank_transfer
+  String? paymentMethod; // null = nothing selected; cash | online | cheque | credit | bank_transfer
   final paymentReferenceCtrl = TextEditingController();
   DateTime? paymentDate;
   final paymentNotesCtrl = TextEditingController();
@@ -1035,7 +1034,7 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(top: 12), // <-- add this
+                  padding: const EdgeInsets.only(top: 12),
                   child: Form(
                     key: formKey,
                     child: Column(
@@ -1189,10 +1188,9 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                           inputFormatters: DValidator.paymentAmount, // 15 digits + 2 decimals
                           autovalidateMode: AutovalidateMode.onUserInteraction,
                           decoration: const InputDecoration(
-                            labelText: 'Amount Received',
-                            prefixText: '₹ ',
-                            errorMaxLines: 2
-                          ),
+                              labelText: 'Amount Received',
+                              prefixText: '₹ ',
+                              errorMaxLines: 2),
                           onChanged: (_) => setDialogState(() {}),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return null; // optional
@@ -1211,6 +1209,37 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Payment Method: directly under Amount Received, nothing selected by default
+                        DropdownButtonFormField<String>(
+                          value: paymentMethod,
+                          style: inputStyle,
+                          hint: Text('Select payment method', style: labelStyle),
+                          decoration: const InputDecoration(labelText: 'Payment Method'),
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          validator: (v) {
+                            // Required only when an amount is entered
+                            final hasAmount =
+                                (double.tryParse(paymentAmountCtrl.text.trim()) ?? 0) > 0;
+                            if (hasAmount && v == null) return 'Select a payment method';
+                            return null;
+                          },
+                          items: [
+                            DropdownMenuItem(
+                                value: 'cash', child: Text('Cash', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'online', child: Text('Online', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'cheque', child: Text('Cheque', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'credit', child: Text('Credit', style: inputStyle)),
+                            DropdownMenuItem(
+                                value: 'bank_transfer',
+                                child: Text('Bank Transfer', style: inputStyle)),
+                          ],
+                          onChanged: (v) => setDialogState(() => paymentMethod = v),
                         ),
                         const SizedBox(height: 8),
 
@@ -1232,66 +1261,49 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          value: paymentMethod,
-                          style: inputStyle,
-                          decoration: const InputDecoration(labelText: 'Payment Method'),
-                          items: [
-                            DropdownMenuItem(
-                                value: 'cash', child: Text('Cash', style: inputStyle)),
-                            DropdownMenuItem(
-                                value: 'online', child: Text('Online', style: inputStyle)),
-                            DropdownMenuItem(
-                                value: 'cheque', child: Text('Cheque', style: inputStyle)),
-                            DropdownMenuItem(
-                                value: 'credit', child: Text('Credit', style: inputStyle)),
-                            DropdownMenuItem(
-                                value: 'bank_transfer',
-                                child: Text('Bank Transfer', style: inputStyle)),
-                          ],
-                          onChanged: (v) =>
-                              setDialogState(() => paymentMethod = v ?? 'cash'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: paymentReferenceCtrl,
-                          style: inputStyle,
-                          decoration: const InputDecoration(
-                              labelText: 'Payment Reference (optional)'),
-                        ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: dialogContext,
-                              initialDate: paymentDate ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => paymentDate = picked);
-                            }
-                          },
-                          child: InputDecorator(
+
+                        // Reference, Date and Notes: shown only when an amount is entered
+                        if (preview.received > 0) ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: paymentReferenceCtrl,
+                            style: inputStyle,
                             decoration: const InputDecoration(
-                                labelText: 'Payment Date (optional)'),
-                            child: Text(
-                              paymentDate == null
-                                  ? 'Select date'
-                                  : DateFormat('yyyy-MM-dd').format(paymentDate!),
-                              style: inputStyle,
+                                labelText: 'Payment Reference (optional)'),
+                          ),
+                          const SizedBox(height: 12),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: dialogContext,
+                                initialDate: paymentDate ?? DateTime.now(),
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) {
+                                setDialogState(() => paymentDate = picked);
+                              }
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                  labelText: 'Payment Date (optional)'),
+                              child: Text(
+                                paymentDate == null
+                                    ? 'Select date'
+                                    : DateFormat('yyyy-MM-dd').format(paymentDate!),
+                                style: inputStyle,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: paymentNotesCtrl,
-                          style: inputStyle,
-                          decoration: const InputDecoration(
-                              labelText: 'Payment Notes (optional)'),
-                        ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: paymentNotesCtrl,
+                            style: inputStyle,
+                            decoration: const InputDecoration(
+                                labelText: 'Payment Notes (optional)'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1331,6 +1343,9 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
   final paymentAmount = double.tryParse(paymentAmountCtrl.text.trim());
   final hasDiscount = discountType != 'none';
 
+  // Payment fields are sent only when an amount was entered.
+  final hasPayment = (paymentAmount ?? 0) > 0;
+
   return QuotationApproveRequest(
     id: quotationId,
     handlingCharge: handlingCharge,
@@ -1339,15 +1354,15 @@ Future<QuotationApproveRequest?> showApproveQuotationDialog(
     discountNotes: hasDiscount && discountNotesCtrl.text.trim().isNotEmpty
         ? discountNotesCtrl.text.trim()
         : null,
-    paymentAmount: paymentAmount,
-    paymentMethod: paymentAmount != null ? paymentMethod : null,
-    paymentReference: paymentAmount != null && paymentReferenceCtrl.text.trim().isNotEmpty
+    paymentAmount: hasPayment ? paymentAmount : null,
+    paymentMethod: hasPayment ? paymentMethod : null,
+    paymentReference: hasPayment && paymentReferenceCtrl.text.trim().isNotEmpty
         ? paymentReferenceCtrl.text.trim()
         : null,
-    paymentDate: paymentAmount != null && paymentDate != null
+    paymentDate: hasPayment && paymentDate != null
         ? DateFormat('yyyy-MM-dd').format(paymentDate!)
         : null,
-    paymentNotes: paymentAmount != null && paymentNotesCtrl.text.trim().isNotEmpty
+    paymentNotes: hasPayment && paymentNotesCtrl.text.trim().isNotEmpty
         ? paymentNotesCtrl.text.trim()
         : null,
   );

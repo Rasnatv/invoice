@@ -221,14 +221,6 @@ class OwnerQuotationDetailsViewState extends State<OwnerQuotationDetailsView> {
     detailBloc.add(OwnerQuotationApproveRequested(request));
   }
 
-  // ---------------------------------------------------------------------
-  // Reject dialog  (POST /quotations/reject { id, rejection_notes })
-  //
-  // The TextEditingController lives inside _RejectDialog (a
-  // StatefulWidget), so Flutter disposes it only after the dialog's
-  // closing animation has finished. This avoids
-  // "A TextEditingController was used after being disposed".
-  // ---------------------------------------------------------------------
 
   Future<void> showRejectDialog() async {
     final reason = await showDialog<String>(

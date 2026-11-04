@@ -1,5 +1,4 @@
 
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
@@ -105,7 +104,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
   String? _discountNotes;
 
   double? _paymentAmount;
-  String _paymentMethod = QuotationPaymentMethod.cash;
+  String? _paymentMethod; // null = nothing selected
   String? _paymentReference;
   DateTime? _paymentDate;
   String? _paymentNotes;
@@ -672,7 +671,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
     );
     final payRefCtrl = TextEditingController(text: _paymentReference ?? '');
     final payNotesCtrl = TextEditingController(text: _paymentNotes ?? '');
-    String payMethod = _paymentMethod;
+    String? payMethod = _paymentMethod; // null = nothing selected
     DateTime payDate = _paymentDate ?? DateTime.now();
 
     final formKey = GlobalKey<FormState>();
@@ -810,7 +809,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                 )
                               else
                                 DropdownButtonFormField<SalesmanActiveModel?>(
-                                  value: dialogSelection,
+                                  initialValue: dialogSelection,
                                   isExpanded: true,
                                   style: inputStyle,
                                   decoration:
@@ -839,7 +838,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                               Text('Discount', style: headingStyle),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String?>(
-                                value: discType,
+                                initialValue: discType,
                                 style: inputStyle,
                                 items: [
                                   DropdownMenuItem<String?>(
@@ -856,51 +855,57 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                               ),
                               if (discType != null) ...[
                                 const SizedBox(height: 12),
-
-                TextFormField(
-                controller: discValueCtrl,
-                style: inputStyle,
-                onChanged: (_) => setDialogState(() {}),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                inputFormatters: DValidator.decimalWithLimit(
-                maxIntDigits: discType == QuotationDiscountType.percentage
-                ? 3
-                    : DValidator.maxPriceDigits,
-                ),
-                decoration: InputDecoration(
-                labelText: discType == QuotationDiscountType.percentage
-                ? 'Discount %'
-                    : 'Discount Amount',
-                prefixText:
-                discType == QuotationDiscountType.percentage ? null : '₹ ',
-                suffixText:
-                discType == QuotationDiscountType.percentage ? '%' : null,
-                ),
-                validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                return 'Enter a value or choose "No discount"';
-                }
-                final parsed = double.tryParse(value.trim());
-                if (parsed == null || parsed <= 0) {
-                return 'Enter a valid value';
-                }
-                if (discType == QuotationDiscountType.percentage) {
-                if (parsed > 99) return 'Cannot exceed 99%';
-                } else {
-                if (parsed > DValidator.maxPrice) {
-                return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
-                }
-                // Fixed discount cannot exceed the grand total
-                // (compare in paise to avoid floating-point issues)
-                if ((parsed * 100).round() > (grandTotal * 100).round()) {
-                return 'Cannot exceed grand total (${money.format(grandTotal)})';
-                }
-                }
-                return null;
-                },
-                ),
-
+                                TextFormField(
+                                  controller: discValueCtrl,
+                                  style: inputStyle,
+                                  onChanged: (_) => setDialogState(() {}),
+                                  keyboardType: const TextInputType.numberWithOptions(
+                                      decimal: true),
+                                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                                  inputFormatters: DValidator.decimalWithLimit(
+                                    maxIntDigits:
+                                    discType == QuotationDiscountType.percentage
+                                        ? 3
+                                        : DValidator.maxPriceDigits,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText:
+                                    discType == QuotationDiscountType.percentage
+                                        ? 'Discount %'
+                                        : 'Discount Amount',
+                                    prefixText:
+                                    discType == QuotationDiscountType.percentage
+                                        ? null
+                                        : '₹ ',
+                                    suffixText:
+                                    discType == QuotationDiscountType.percentage
+                                        ? '%'
+                                        : null,
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Enter a value or choose "No discount"';
+                                    }
+                                    final parsed = double.tryParse(value.trim());
+                                    if (parsed == null || parsed <= 0) {
+                                      return 'Enter a valid value';
+                                    }
+                                    if (discType == QuotationDiscountType.percentage) {
+                                      if (parsed > 99) return 'Cannot exceed 99%';
+                                    } else {
+                                      if (parsed > DValidator.maxPrice) {
+                                        return 'Amount can have at most ${DValidator.maxPriceDigits} digits';
+                                      }
+                                      // Fixed discount cannot exceed the grand total
+                                      // (compare in paise to avoid floating-point issues)
+                                      if ((parsed * 100).round() >
+                                          (grandTotal * 100).round()) {
+                                        return 'Cannot exceed grand total (${money.format(grandTotal)})';
+                                      }
+                                    }
+                                    return null;
+                                  },
+                                ),
                                 const SizedBox(height: 12),
                               ],
 
@@ -944,16 +949,16 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                               TextFormField(
                                 controller: payAmountCtrl,
                                 style: inputStyle,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
                                 // 15 integer digits + 2 decimals
                                 inputFormatters: DValidator.paymentAmount,
                                 autovalidateMode: AutovalidateMode.onUserInteraction,
                                 onChanged: (_) => setDialogState(() {}),
                                 decoration: const InputDecoration(
-                                  labelText: 'Amount Received',
-                                  prefixText: '₹ ',
-                                  errorMaxLines: 2
-                                ),
+                                    labelText: 'Amount Received',
+                                    prefixText: '₹ ',
+                                    errorMaxLines: 2),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
                                     return null; // optional
@@ -962,7 +967,8 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                   if (parsed == null || parsed < 0) {
                                     return 'Enter a valid amount';
                                   }
-                                  if (parsed.truncate().toString().length > DValidator.maxPaymentDigits) {
+                                  if (parsed.truncate().toString().length >
+                                      DValidator.maxPaymentDigits) {
                                     return 'Amount can have at most ${DValidator.maxPaymentDigits} digits';
                                   }
                                   // Compare in paise to avoid floating-point issues
@@ -974,7 +980,47 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                   return null;
                                 },
                               ),
+                              const SizedBox(height: 12),
+
+                              // Payment Method: directly under Amount Received,
+                              // nothing selected by default
+                              DropdownButtonFormField<String>(
+                                initialValue: payMethod,
+                                style: inputStyle,
+                                hint: Text('Select payment method', style: labelStyle),
+                                decoration:
+                                const InputDecoration(labelText: 'Payment Method'),
+                                autovalidateMode: AutovalidateMode.onUserInteraction,
+                                validator: (v) {
+                                  // Required only when an amount is entered
+                                  final hasAmount =
+                                      (double.tryParse(payAmountCtrl.text.trim()) ?? 0) > 0;
+                                  if (hasAmount && v == null) {
+                                    return 'Select a payment method';
+                                  }
+                                  return null;
+                                },
+                                items: [
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.cash,
+                                      child: Text('Cash', style: inputStyle)),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.cheque,
+                                      child: Text('Cheque', style: inputStyle)),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.online,
+                                      child: Text('Online', style: inputStyle)),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.credit,
+                                      child: Text('Credit', style: inputStyle)),
+                                  DropdownMenuItem(
+                                      value: QuotationPaymentMethod.bankTransfer,
+                                      child: Text('Bank Transfer', style: inputStyle)),
+                                ],
+                                onChanged: (v) => setDialogState(() => payMethod = v),
+                              ),
                               const SizedBox(height: 8),
+
                               // Live balance after the amount received.
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -993,72 +1039,50 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                value: payMethod,
-                                style: inputStyle,
-                                decoration:
-                                const InputDecoration(labelText: 'Payment Method'),
-                                items: [
-                                  DropdownMenuItem(
-                                      value: QuotationPaymentMethod.cash,
-                                      child: Text('Cash', style: inputStyle)),
-                                  DropdownMenuItem(
-                                      value: QuotationPaymentMethod.cheque,
-                                      child: Text('Cheque', style: inputStyle)),
-                                  DropdownMenuItem(
-                                      value: QuotationPaymentMethod.online,
-                                      child: Text('Online', style: inputStyle)),
-                                  DropdownMenuItem(
-                                      value: QuotationPaymentMethod.credit,
-                                      child: Text('Credit', style: inputStyle)),
-                                  DropdownMenuItem(
-                                      value: QuotationPaymentMethod.bankTransfer,
-                                      child: Text('Bank Transfer', style: inputStyle)),
-                                ],
-                                onChanged: (v) =>
-                                    setDialogState(() => payMethod = v ?? payMethod),
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: payRefCtrl,
-                                style: inputStyle,
-                                decoration: const InputDecoration(
-                                  labelText: 'Payment Reference (optional)',
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              InkWell(
-                                borderRadius: BorderRadius.circular(14),
-                                onTap: () async {
-                                  final picked = await showDatePicker(
-                                    context: dialogContext,
-                                    initialDate: payDate,
-                                    firstDate: DateTime(2020),
-                                    lastDate: DateTime(2030),
-                                  );
-                                  if (picked != null) {
-                                    setDialogState(() => payDate = picked);
-                                  }
-                                },
-                                child: InputDecorator(
+
+                              // Reference, Date and Notes: shown only when an amount is entered
+                              if (received > 0) ...[
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: payRefCtrl,
+                                  style: inputStyle,
                                   decoration: const InputDecoration(
-                                    labelText: 'Payment Date',
-                                  ),
-                                  child: Text(
-                                    DateFormat('dd-MM-yyyy').format(payDate),
-                                    style: inputStyle,
+                                    labelText: 'Payment Reference (optional)',
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: payNotesCtrl,
-                                style: inputStyle,
-                                decoration: const InputDecoration(
-                                  labelText: 'Payment Notes (optional)',
+                                const SizedBox(height: 12),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: dialogContext,
+                                      initialDate: payDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => payDate = picked);
+                                    }
+                                  },
+                                  child: InputDecorator(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Payment Date (optional)',
+                                    ),
+                                    child: Text(
+                                      DateFormat('dd-MM-yyyy').format(payDate),
+                                      style: inputStyle,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: payNotesCtrl,
+                                  style: inputStyle,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Payment Notes (optional)',
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -1112,11 +1136,12 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
         _discountNotes = null;
       }
 
-      // Payment: only if an amount is entered
+      // Payment: only if an amount greater than 0 is entered
       final payAmt = double.tryParse(payAmountCtrl.text.trim());
-      if (payAmt != null) {
+      final hasPayment = (payAmt ?? 0) > 0;
+      if (hasPayment) {
         _paymentAmount = payAmt;
-        _paymentMethod = payMethod;
+        _paymentMethod = payMethod; // validated: not null when an amount is entered
         _paymentReference =
         payRefCtrl.text.trim().isEmpty ? null : payRefCtrl.text.trim();
         _paymentDate = payDate;
@@ -1124,7 +1149,7 @@ class _OwnerCreateEstimateViewState extends State<_OwnerCreateEstimateView> {
         payNotesCtrl.text.trim().isEmpty ? null : payNotesCtrl.text.trim();
       } else {
         _paymentAmount = null;
-        _paymentMethod = QuotationPaymentMethod.cash;
+        _paymentMethod = null;
         _paymentReference = null;
         _paymentDate = null;
         _paymentNotes = null;
