@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -91,100 +90,106 @@ class _OwnerProfileViewState extends State<_OwnerProfileView> {
   @override
   Widget build(BuildContext context) {
     Responsive.init(context);
-    return NetworkAwareWrapper(child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Profile', style: AppTextStyles.h6())),
-      body: SafeArea(
-        child: BlocBuilder<ProfileBloc, ProfileState>(
-          builder: (context, state) {
-            // First load, nothing to show yet.
-            if (state.isLoading && state.profile == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
+    return NetworkAwareWrapper(
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: Text('Profile', style: AppTextStyles.h6())),
+        body: SafeArea(
+          child: BlocBuilder<ProfileBloc, ProfileState>(
+            builder: (context, state) {
+              // First load, nothing to show yet.
+              if (state.isLoading && state.profile == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            // First load failed outright.
-            if (state.errorMessage != null && state.profile == null) {
-              return _ProfileErrorState(
-                message: state.errorMessage!,
-                onRetry: () =>
+              // First load failed outright.
+              if (state.errorMessage != null && state.profile == null) {
+                return _ProfileErrorState(
+                  message: state.errorMessage!,
+                  onRetry: () =>
+                      context.read<ProfileBloc>().add(const LoadProfile()),
+                );
+              }
+
+              final profile = state.profile;
+
+              return RefreshIndicator(
+                onRefresh: () async =>
                     context.read<ProfileBloc>().add(const LoadProfile()),
-              );
-            }
-
-            final profile = state.profile;
-
-            return RefreshIndicator(
-              onRefresh: () async =>
-                  context.read<ProfileBloc>().add(const LoadProfile()),
-              child: ListView(
-                padding: EdgeInsets.all(Responsive.w(20)),
-                children: [
-                  Center(
-                    child: Column(
-                      children: [
-                        Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: Responsive.w(46),
-                              backgroundColor: AppColors.primarySoft,
-                              child: Icon(Icons.person,
-                                  size: Responsive.w(46),
-                                  color: AppColors.primary),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: GestureDetector(
-                                onTap: () => _openEditProfile(context, profile),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle),
-                                  child: const Icon(Icons.edit,
-                                      color: Colors.white, size: 14),
+                child: ListView(
+                  // Lets pull-to-refresh work even when the content is short.
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.all(Responsive.w(20)),
+                  children: [
+                    Center(
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: Responsive.w(46),
+                                backgroundColor: AppColors.primarySoft,
+                                child: Icon(Icons.person,
+                                    size: Responsive.w(46),
+                                    color: AppColors.primary),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      _openEditProfile(context, profile),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle),
+                                    child: const Icon(Icons.edit,
+                                        color: Colors.white, size: 14),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: Responsive.h(14)),
-                        // Only render what the API actually returned —
-                        // no placeholder/dummy text for missing fields.
-                        if (profile?.name != null)
-                          Text(profile!.name!, style: AppTextStyles.h2()),
-                        if (profile?.mobile != null)
-                          Text(profile!.mobile!, style: AppTextStyles.body()),
-                        if (profile?.email != null)
-                          Text(profile!.email!,
-                              style: AppTextStyles.caption()),
-                      ],
+                            ],
+                          ),
+                          SizedBox(height: Responsive.h(14)),
+                          // Only render what the API actually returned —
+                          // no placeholder/dummy text for missing fields.
+                          if (profile?.name != null)
+                            Text(profile!.name!, style: AppTextStyles.h2()),
+                          if (profile?.mobile != null)
+                            Text(profile!.mobile!,
+                                style: AppTextStyles.body()),
+                          if (profile?.email != null)
+                            Text(profile!.email!,
+                                style: AppTextStyles.caption()),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: Responsive.h(28)),
-                  _ProfileTile(
-                    icon: Icons.person_outline_rounded,
-                    label: 'Edit Profile',
-                    onTap: () => _openEditProfile(context, profile),
-                  ),
-                  _ProfileTile(
-                    icon: Icons.lock_outline_rounded,
-                    label: 'Change Password',
-                    onTap: () => _openChangePassword(context),
-                  ),
-                  _ProfileTile(
-                    icon: Icons.logout_rounded,
-                    label: 'Logout',
-                    color: AppColors.error,
-                    onTap: () => logout(context),
-                  ),
-                ],
-              ),
-            );
-          },
+                    SizedBox(height: Responsive.h(28)),
+                    _ProfileTile(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Edit Profile',
+                      onTap: () => _openEditProfile(context, profile),
+                    ),
+                    _ProfileTile(
+                      icon: Icons.lock_outline_rounded,
+                      label: 'Change Password',
+                      onTap: () => _openChangePassword(context),
+                    ),
+                    _ProfileTile(
+                      icon: Icons.logout_rounded,
+                      label: 'Logout',
+                      color: AppColors.error,
+                      onTap: () => logout(context),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
-    ));
+    );
   }
 }
 
@@ -221,28 +226,37 @@ class _ProfileTile extends StatelessWidget {
   final String label;
   final Color? color;
   final VoidCallback onTap;
-  const _ProfileTile(
-      {required this.icon,
-        required this.label,
-        required this.onTap,
-        this.color});
+
+  const _ProfileTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppColors.textPrimary;
-    return Container(
-      margin: EdgeInsets.only(bottom: Responsive.h(10)),
-      decoration: BoxDecoration(
+
+    // Material (not a decorated Container) so the ListTile's ink ripple is
+    // visible and Flutter doesn't throw the "ink splashes may be invisible"
+    // assertion.
+    return Padding(
+      padding: EdgeInsets.only(bottom: Responsive.h(10)),
+      child: Material(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: c),
-        title: Text(label, style: AppTextStyles.bodyBold(color: c)),
-        trailing:
-        const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onTap,
+          leading: Icon(icon, color: c),
+          title: Text(label, style: AppTextStyles.bodyBold(color: c)),
+          trailing: const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textHint),
+        ),
       ),
     );
   }

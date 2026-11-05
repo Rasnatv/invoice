@@ -22,10 +22,20 @@ String ownerProductDisplayString(ActiveProductModel p) {
 }
 
 /// White card, radius 16, 1px border, no shadow.
+///
+/// NOTE: don't put a ListTile / InkWell directly inside a Container that uses
+/// this decoration — the white fill hides the ink. For tappable lists use
+/// [ownerCardShape] on a Material instead.
 BoxDecoration ownerCardDecoration({double radius = 16}) => BoxDecoration(
   color: Colors.white,
   borderRadius: BorderRadius.circular(radius),
   border: Border.all(color: AppColors.border),
+);
+
+/// Same look as [ownerCardDecoration], as a Material shape.
+ShapeBorder ownerCardShape({double radius = 16}) => RoundedRectangleBorder(
+  borderRadius: BorderRadius.circular(radius),
+  side: const BorderSide(color: AppColors.border),
 );
 
 /// Small rounded icon badge used in card titles.
@@ -41,7 +51,7 @@ class OwnerIconBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.10),
+        color: c.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, size: size, color: c),
@@ -60,7 +70,7 @@ class OwnerPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -559,6 +569,9 @@ class OwnerItemFormFields extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Product search (field + suggestion list)
+// ---------------------------------------------------------------------------
 class OwnerProductDropdown extends StatelessWidget {
   const OwnerProductDropdown({
     super.key,
@@ -601,9 +614,9 @@ class OwnerProductDropdown extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: _redColor.withOpacity(0.06),
+              color: _redColor.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _redColor.withOpacity(0.25)),
+              border: Border.all(color: _redColor.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [
@@ -685,79 +698,84 @@ class OwnerProductDropdown extends StatelessWidget {
               ),
               if (showSuggestions) ...[
                 SizedBox(height: Responsive.h(6)),
-                Container(
-                  constraints: BoxConstraints(maxHeight: Responsive.h(260)),
-                  decoration: ownerCardDecoration(radius: 14),
+                // The Material is the card surface (white + border), so the
+                // ListTiles can paint their ink on it.
+                Material(
+                  color: Colors.white,
+                  shape: ownerCardShape(radius: 14),
                   clipBehavior: Clip.antiAlias,
-                  child: filtered.isEmpty
-                      ? Padding(
-                    padding: EdgeInsets.all(Responsive.w(14)),
-                    child: Text(
-                      allAdded
-                          ? 'All products already added'
-                          : 'No matching products',
-                      style: AppTextStyles.caption(color: AppColors.textSecondary),
-                    ),
-                  )
-                      : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) =>
-                    const Divider(height: 1, color: AppColors.border),
-                    itemBuilder: (context, index) {
-                      final p = filtered[index];
-                      final company = p.company.trim();
-                      final size = p.size.trim();
-                      final packing = p.packing.trim();
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: Responsive.h(260)),
+                    child: filtered.isEmpty
+                        ? Padding(
+                      padding: EdgeInsets.all(Responsive.w(14)),
+                      child: Text(
+                        allAdded
+                            ? 'All products already added'
+                            : 'No matching products',
+                        style: AppTextStyles.caption(color: AppColors.textSecondary),
+                      ),
+                    )
+                        : ListView.separated(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: AppColors.border),
+                      itemBuilder: (context, index) {
+                        final p = filtered[index];
+                        final company = p.company.trim();
+                        final size = p.size.trim();
+                        final packing = p.packing.trim();
 
-                      return ListTile(
-                        dense: true,
-                        isThreeLine: true,
-                        leading: const OwnerIconBadge(
-                            Icons.inventory_2_outlined,
-                            size: 14),
-                        title: Text(
-                          p.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodyBold(),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (company.isNotEmpty)
-                              Text(
-                                company,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.caption(
-                                    color: AppColors.textSecondary),
-                              ),
-                            if (size.isNotEmpty || packing.isNotEmpty) ...[
-                              SizedBox(height: Responsive.h(4)),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: [
-                                  if (size.isNotEmpty)
-                                    OwnerPill(
-                                      label: 'Size: $size',
-                                      color: AppColors.primary,
-                                    ),
-                                  if (packing.isNotEmpty)
-                                    OwnerPill(
-                                      label: 'Packing: $packing',
-                                      color: Colors.teal,
-                                    ),
-                                ],
-                              ),
+                        return ListTile(
+                          dense: true,
+                          isThreeLine: true,
+                          leading: const OwnerIconBadge(
+                              Icons.inventory_2_outlined,
+                              size: 14),
+                          title: Text(
+                            p.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyBold(),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (company.isNotEmpty)
+                                Text(
+                                  company,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.caption(
+                                      color: AppColors.textSecondary),
+                                ),
+                              if (size.isNotEmpty || packing.isNotEmpty) ...[
+                                SizedBox(height: Responsive.h(4)),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    if (size.isNotEmpty)
+                                      OwnerPill(
+                                        label: 'Size: $size',
+                                        color: AppColors.primary,
+                                      ),
+                                    if (packing.isNotEmpty)
+                                      OwnerPill(
+                                        label: 'Packing: $packing',
+                                        color: Colors.teal,
+                                      ),
+                                  ],
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        onTap: () => onSelected(p),
-                      );
-                    },
+                          ),
+                          onTap: () => onSelected(p),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -768,6 +786,7 @@ class OwnerProductDropdown extends StatelessWidget {
     );
   }
 }
+
 // ---------------------------------------------------------------------------
 // "Editing item #n" banner
 // ---------------------------------------------------------------------------
@@ -784,9 +803,9 @@ class OwnerEditingBanner extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: Responsive.w(12), vertical: Responsive.h(10)),
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.08),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -935,9 +954,9 @@ class OwnerIncentiveTotalCard extends StatelessWidget {
       padding: EdgeInsets.symmetric(
           horizontal: Responsive.w(14), vertical: Responsive.h(14)),
       decoration: BoxDecoration(
-        color: AppColors.success.withOpacity(0.08),
+        color: AppColors.success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1003,9 +1022,9 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
           return Container(
             padding: EdgeInsets.all(Responsive.w(12)),
             decoration: BoxDecoration(
-              color: _redColor.withOpacity(0.06),
+              color: _redColor.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _redColor.withOpacity(0.25)),
+              border: Border.all(color: _redColor.withValues(alpha: 0.25)),
             ),
             child: Text(
               state.incentiveError ?? 'Couldn\'t fetch incentive for this item.',
@@ -1041,9 +1060,9 @@ class OwnerIncentivePreviewCard extends StatelessWidget {
         return Container(
           padding: EdgeInsets.all(Responsive.w(12)),
           decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.08),
+            color: AppColors.success.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.success.withOpacity(0.3)),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1107,7 +1126,7 @@ class OwnerEditItemTile extends StatelessWidget {
       margin: EdgeInsets.only(bottom: Responsive.h(10)),
       padding: EdgeInsets.all(Responsive.w(14)),
       decoration: BoxDecoration(
-        color: isEditing ? AppColors.primary.withOpacity(0.05) : Colors.white,
+        color: isEditing ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isEditing ? AppColors.primary : AppColors.border),
       ),
@@ -1119,7 +1138,7 @@ class OwnerEditItemTile extends StatelessWidget {
             height: 30,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.10),
+              color: AppColors.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text('$serialNo',
