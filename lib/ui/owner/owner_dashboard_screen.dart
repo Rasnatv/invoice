@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -65,6 +66,7 @@ const List<_ActionGroup> _actionGroups = [
     _ActionItem(Icons.bar_chart_rounded, 'Reports', '/owner/reports'),
   ]),
   _ActionGroup('Field Operations', [
+    // NOTE: every other route starts with /owner/ — confirm this one is intended.
     _ActionItem(Icons.assignment_ind_rounded, 'Field Staff', '/field-staff'),
     _ActionItem(Icons.paid_outlined, 'Field Staff Incentive',
         '/owner/fieldstaff-incentive'),
@@ -115,9 +117,25 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
     context.read<OwnerDashboardBloc>().add(const OwnerDashboardRefreshed());
   }
 
+  /// Pull-to-refresh: fires the event and waits until the bloc leaves the
+  /// `refreshing` state. Safe against closed streams and hangs.
+  Future<void> _onPullRefresh() async {
+    final bloc = context.read<OwnerDashboardBloc>();
+    bloc.add(const OwnerDashboardRefreshed());
+    try {
+      await bloc.stream
+          .firstWhere((s) => s.status != OwnerDashboardStatus.refreshing)
+          .timeout(const Duration(seconds: 15));
+    } on TimeoutException {
+      // Give up waiting; the indicator just closes.
+    } on StateError {
+      // Stream closed before emitting a matching state.
+    }
+  }
+
   bool _hasSalesData(List<dynamic> monthlySales) {
     if (monthlySales.isEmpty) return false;
-    return monthlySales.any((m) => (m.total as num) > 0);
+    return monthlySales.any((m) => ((m.total as num?) ?? 0) > 0);
   }
 
   @override
@@ -142,15 +160,10 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
               return const OwnerDashboardFullShimmer();
             }
 
+            final failed = state.status == OwnerDashboardStatus.failure;
+
             return RefreshIndicator(
-              onRefresh: () async {
-                context
-                    .read<OwnerDashboardBloc>()
-                    .add(const OwnerDashboardRefreshed());
-                await context.read<OwnerDashboardBloc>().stream.firstWhere(
-                      (s) => s.status != OwnerDashboardStatus.refreshing,
-                );
-              },
+              onRefresh: _onPullRefresh,
               child: state.status == OwnerDashboardStatus.refreshing
                   ? const OwnerDashboardRefreshShimmer()
                   : CustomScrollView(
@@ -200,12 +213,7 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                         SizedBox(height: Responsive.h(6)),
                         const _SectionTitle(title: 'Sales Overview'),
                         SizedBox(height: Responsive.h(12)),
-                        if (!_hasSalesData(state.monthlySales))
-                          const _EmptyState(
-                            icon: Icons.bar_chart_rounded,
-                            message: 'No sales yet this year',
-                          )
-                        else
+                        if (_hasSalesData(state.monthlySales))
                           _CardWrapper(
                             child: MonthlySalesSection(
                               monthlySales: state.monthlySales
@@ -216,6 +224,19 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                                   .toList(),
                               currency: currency,
                             ),
+                          )
+                        else if (failed)
+                          _ErrorState(
+                            message: state.errorMessage ??
+                                'Could not load the dashboard.',
+                            onRetry: () => context
+                                .read<OwnerDashboardBloc>()
+                                .add(const OwnerDashboardRequested()),
+                          )
+                        else
+                          const _EmptyState(
+                            icon: Icons.bar_chart_rounded,
+                            message: 'No sales yet this year',
                           ),
                         SizedBox(height: Responsive.h(26)),
                         _SectionTitle(
@@ -225,7 +246,7 @@ class _OwnerDashboardViewState extends State<_OwnerDashboardView> {
                               _pushAndRefresh('/owner/estimates'),
                         ),
                         SizedBox(height: Responsive.h(12)),
-                        if (state.status == OwnerDashboardStatus.failure)
+                        if (failed && state.recentEstimates.isEmpty)
                           _ErrorState(
                             message: state.errorMessage ??
                                 'Could not load the dashboard.',
@@ -309,9 +330,9 @@ class _OwnerHeader extends StatelessWidget {
             Responsive.w(20),
             Responsive.h(54),
           ),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.primary,
-            borderRadius: const BorderRadius.only(
+            borderRadius: BorderRadius.only(
               bottomLeft: Radius.circular(28),
               bottomRight: Radius.circular(28),
             ),
@@ -324,7 +345,7 @@ class _OwnerHeader extends StatelessWidget {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
+                    color: Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(Icons.storefront_rounded,
@@ -339,7 +360,7 @@ class _OwnerHeader extends StatelessWidget {
                       Text(
                         greeting,
                         style: AppTextStyles.caption(
-                            color: Colors.white.withOpacity(0.8)),
+                            color: Colors.white.withValues(alpha: 0.8)),
                       ),
                       SizedBox(height: Responsive.h(2)),
                       Text(
@@ -356,13 +377,13 @@ class _OwnerHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Icon(Icons.calendar_today_rounded,
-                        size: 14, color: Colors.white.withOpacity(0.8)),
+                        size: 14, color: Colors.white.withValues(alpha: 0.8)),
                     SizedBox(height: Responsive.h(4)),
                     // Date (10.5 / w400)
                     Text(
                       dateLabel,
                       style: AppTextStyles.captionnew(
-                          color: Colors.white.withOpacity(0.8))
+                          color: Colors.white.withValues(alpha: 0.8))
                           .copyWith(fontSize: Responsive.sp(10.5)),
                     ),
                   ],
@@ -384,7 +405,7 @@ class _OwnerHeader extends StatelessWidget {
               border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -438,7 +459,7 @@ class _OwnerHeader extends StatelessWidget {
   Widget _statDivider() => Container(
     width: 1,
     height: 34,
-    color: AppColors.textSecondary.withOpacity(0.14),
+    color: AppColors.textSecondary.withValues(alpha: 0.14),
   );
 }
 
@@ -538,69 +559,75 @@ class _QuickAccessPanelState extends State<_QuickAccessPanel> {
         ? _quickActions
         : _quickActions.take(_collapsedCount).toList();
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-          horizontal: Responsive.w(6), vertical: Responsive.h(8)),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    // Material (not a decorated Container) so InkWell ripples are visible.
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        side: const BorderSide(color: AppColors.border),
       ),
-      child: Column(
-        children: [
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            alignment: Alignment.topCenter,
-            child: GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 0,
-              crossAxisSpacing: 0,
-              childAspectRatio: 0.9,
-              children: [
-                for (final a in visible)
-                  _ActionTile(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: Responsive.w(6), vertical: Responsive.h(8)),
+        child: Column(
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              // Fixed row height (instead of childAspectRatio) so two-line
+              // labels don't overflow with larger text scales.
+              child: GridView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: visible.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisExtent: Responsive.h(96),
+                ),
+                itemBuilder: (context, i) {
+                  final a = visible[i];
+                  return _ActionTile(
                     icon: a.icon,
                     label: a.label,
                     onTap: () => widget.onOpen(a.route),
-                  ),
-              ],
-            ),
-          ),
-          if (canExpand) ...[
-            const Divider(height: 1, color: AppColors.border),
-            InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: Responsive.h(6)),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      _expanded ? 'Show less' : 'More',
-                      style: AppTextStyles.link(),
-                    ),
-                    SizedBox(width: Responsive.w(4)),
-                    AnimatedRotation(
-                      turns: _expanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 250),
-                      child: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 22,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
+            if (canExpand) ...[
+              const Divider(height: 1, color: AppColors.border),
+              InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: Responsive.h(6)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _expanded ? 'Show less' : 'More',
+                        style: AppTextStyles.link(),
+                      ),
+                      SizedBox(width: Responsive.w(4)),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 250),
+                        child: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 22,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -632,7 +659,7 @@ class _ActionTile extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: AppColors.primary, size: 22),
@@ -691,7 +718,8 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           children: [
             Icon(icon,
-                size: 38, color: AppColors.textSecondary.withOpacity(0.4)),
+                size: 38,
+                color: AppColors.textSecondary.withValues(alpha: 0.4)),
             SizedBox(height: Responsive.h(10)),
             Text(message,
                 textAlign: TextAlign.center, style: AppTextStyles.subtitle()),
@@ -715,7 +743,8 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           children: [
             Icon(Icons.error_outline_rounded,
-                size: 36, color: AppColors.textSecondary.withOpacity(0.5)),
+                size: 36,
+                color: AppColors.textSecondary.withValues(alpha: 0.5)),
             SizedBox(height: Responsive.h(10)),
             Text(
               message,
@@ -762,10 +791,10 @@ class _RecentEstimateCard extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.10),
+                  color: AppColors.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.description_outlined,
+                child: const Icon(Icons.description_outlined,
                     color: AppColors.primary, size: 20),
               ),
               SizedBox(width: Responsive.w(12)),
