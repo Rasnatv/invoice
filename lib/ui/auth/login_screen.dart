@@ -126,7 +126,7 @@ class _LoginViewState extends State<_LoginView>
                     ),
                     SizedBox(height: Responsive.h(20)),
                     Text(
-                      'Ceramo · Inventory & Sales Console',
+                      'Dreams Ceramics · Inventory & Sales Console',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.caption(
                         color: AppColors.textHint,
@@ -193,7 +193,7 @@ class _Brand extends StatelessWidget {
         ),
         SizedBox(height: Responsive.h(14)),
         Text(
-          'CERAMO',
+          'Dreams Ceramics',
           style: AppTextStyles.h1(color: AppColors.white).copyWith(
             fontSize: 19,
             fontWeight: FontWeight.w800,
