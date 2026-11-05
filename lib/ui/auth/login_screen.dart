@@ -280,11 +280,6 @@ class _FormCard extends StatelessWidget {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: DValidator.validateEmail,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                        LengthLimitingTextInputFormatter(
-                            DValidator.maxTextLength),
-                      ],
                       onSubmitted: (_) => passwordFocus.requestFocus(),
                       onChanged: (v) =>
                           context.read<AuthBloc>().add(AuthEmailChanged(v)),
@@ -304,7 +299,7 @@ class _FormCard extends StatelessWidget {
                           textInputAction: TextInputAction.done,
                           validator: (v) =>
                               DValidator.validateEmptyText('Password', v),
-                          inputFormatters: DValidator.passwordLimit,
+                          // inputFormatters removed (was DValidator.passwordLimit)
                           onSubmitted: (_) => _submit(context),
                           onChanged: (v) => context
                               .read<AuthBloc>()
@@ -421,6 +416,7 @@ class _BrandField extends StatefulWidget {
 class _BrandFieldState extends State<_BrandField> {
   static const _errorColor = Color(0xFFDC2626); // or AppColors.error if you have it
   bool _focused = false;
+  final TextEditingController _ctrl = TextEditingController(); // NEW
 
   @override
   void initState() {
@@ -433,6 +429,7 @@ class _BrandFieldState extends State<_BrandField> {
   @override
   void dispose() {
     widget.focusNode.removeListener(_onFocusChange);
+    _ctrl.dispose(); // NEW
     super.dispose();
   }
 
@@ -462,6 +459,8 @@ class _BrandFieldState extends State<_BrandField> {
                 ),
               ),
               child: TextField(
+                controller: _ctrl, // NEW
+                enableInteractiveSelection: true, // NEW
                 focusNode: widget.focusNode,
                 obscureText: widget.obscureText,
                 keyboardType: widget.keyboardType,
