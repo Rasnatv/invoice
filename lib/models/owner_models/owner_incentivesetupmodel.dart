@@ -256,7 +256,7 @@ class SalesmanIncentiveSetupSaveRequest {
     'target_amount': hasTarget ? targetAmount.toStringAsFixed(0) : '0',
     'bonus_type': bonusTypeToApi(bonusType),
     'bonus_value': bonusValue.toStringAsFixed(2),
-    'has_target': hasTarget.toString(), // API expects "true"/"false"
+    'has_target': hasTarget ? '1' : '0',
   };
 }
 
