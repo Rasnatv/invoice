@@ -156,9 +156,7 @@ class _OwnerQuotationReportFilterScreenState
       ? _salesmen.map((s) => s.id).toList()
       : _contractors.map((c) => c.id.toString()).toList();
 
-  /// Unique dropdown labels: "rasna", "rasna (2)", ... so two people with the
-  /// same name never produce duplicate DropdownMenuItem values.
-  /// Inactive salesmen get an " (Inactive)" suffix.
+
   List<String> get _peopleNames {
     final seen = <String, int>{};
     final raw = _rawNames;
@@ -169,7 +167,16 @@ class _OwnerQuotationReportFilterScreenState
       final count = (seen[n] ?? 0) + 1;
       seen[n] = count;
       var label = count == 1 ? n : '$n ($count)';
-      if (isSalesman && !_salesmen[i].isActive) label += ' (Inactive)';
+
+      if (isSalesman) {
+        final s = _salesmen[i];
+        final status = s.statusLabel.trim();
+        if (status.isNotEmpty && status.toLowerCase() != 'active') {
+          label += ' ($status)';
+        } else if (!s.isActive) {
+          label += ' (Inactive)'; // fallback if the API sends no label
+        }
+      }
       return label;
     });
   }

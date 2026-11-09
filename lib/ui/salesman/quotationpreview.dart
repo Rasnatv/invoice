@@ -1175,7 +1175,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen>
                                               ? 'This quotation has been approved.'
                                               : cancelled
                                               ? 'This quotation has been cancelled.'
-                                              : 'This quotation has already been submitted and can no longer be edited or deleted.',
+                                              : 'This quotation has already been submitted and can no longer be edited.',
                                           textAlign: TextAlign.center,
                                           style: (isApproved || cancelled)
                                               ? AppTextStyles.bodyBold(

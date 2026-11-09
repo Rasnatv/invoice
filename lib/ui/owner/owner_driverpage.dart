@@ -715,7 +715,173 @@ class _DriverCardSkeleton extends StatelessWidget {
 // =====================================================================
 // DRIVER CARD
 // =====================================================================
-
+//
+// class _DriverCard extends StatelessWidget {
+//   const _DriverCard({
+//     super.key,
+//     required this.driver,
+//     required this.joiningDate,
+//     required this.onEdit,
+//     required this.onDelete,
+//   });
+//
+//   final DriverGetModel driver;
+//   final String joiningDate;
+//   final VoidCallback onEdit;
+//   final VoidCallback onDelete;
+//
+//   String get _initial =>
+//       driver.name.isNotEmpty ? driver.name[0].toUpperCase() : '?';
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return _ListCard(
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           // ---- top: avatar, name + vehicle/licence, status, menu ----
+//           Row(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               Container(
+//                 width: 42,
+//                 height: 42,
+//                 alignment: Alignment.center,
+//                 decoration: BoxDecoration(
+//                   color: AppColors.primary.withOpacity(0.10),
+//                   borderRadius: BorderRadius.circular(12),
+//                 ),
+//                 child: Text(
+//                   _initial,
+//                   style: TextStyle(
+//                     fontFamily: AppTextStyles.fontFamily,
+//                     color: AppColors.primary,
+//                     fontSize: Responsive.sp(16),
+//                     fontWeight: FontWeight.w700,
+//                   ),
+//                 ),
+//               ),
+//               SizedBox(width: Responsive.w(12)),
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Text(
+//                       driver.name,
+//                       maxLines: 1,
+//                       overflow: TextOverflow.ellipsis,
+//                       style: AppTextStyles.bodyBold(),
+//                     ),
+//                     SizedBox(height: Responsive.h(2)),
+//                     Text(
+//                       '${driver.vehicleNumber} • ${driver.licenseNumber}',
+//                       maxLines: 1,
+//                       overflow: TextOverflow.ellipsis,
+//                       style:
+//                       AppTextStyles.caption(color: AppColors.textSecondary),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//               SizedBox(width: Responsive.w(8)),
+//               _StatusPill(
+//                 label: driver.isActive ? 'Active' : 'Inactive',
+//                 color: driver.isActive ? AppColors.success : _inactiveColor,
+//               ),
+//               SizedBox(
+//                 width: 30,
+//                 height: 24,
+//                 child: PopupMenuButton<String>(
+//                   padding: EdgeInsets.zero,
+//                   icon: Icon(Icons.more_vert,
+//                       size: 20, color: AppColors.textSecondary),
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                   onSelected: (value) {
+//                     if (value == 'edit') {
+//                       onEdit();
+//                     } else if (value == 'delete') {
+//                       onDelete();
+//                     }
+//                   },
+//                   itemBuilder: (context) => [
+//                     PopupMenuItem(
+//                       value: 'edit',
+//                       child: Row(
+//                         children: [
+//                           Icon(Icons.edit_outlined,
+//                               size: 18, color: AppColors.primary),
+//                           SizedBox(width: Responsive.w(8)),
+//                           Text('Edit', style: AppTextStyles.body()),
+//                         ],
+//                       ),
+//                     ),
+//                     PopupMenuItem(
+//                       value: 'delete',
+//                       child: Row(
+//                         children: [
+//                           const Icon(Icons.delete_outline,
+//                               size: 18, color: AppColors.error),
+//                           const SizedBox(width: 8),
+//                           Text('Delete',
+//                               style:
+//                               AppTextStyles.body(color: AppColors.error)),
+//                         ],
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+// //               ),
+// //             ],
+// //           ),
+//
+//           SizedBox(height: Responsive.h(12)),
+//           const Divider(height: 1, color: AppColors.border),
+//           SizedBox(height: Responsive.h(10)),
+//
+//           // ---- bottom: joining date, phone ----
+//           Row(
+//             children: [
+//               Icon(Icons.event_outlined,
+//                   size: 13, color: AppColors.textSecondary),
+//               SizedBox(width: Responsive.w(6)),
+//               Expanded(
+//                 child: Text(
+//                   joiningDate,
+//                   maxLines: 1,
+//                   overflow: TextOverflow.ellipsis,
+//                   style: AppTextStyles.caption(color: AppColors.textSecondary),
+//                 ),
+//               ),
+//               InkWell(
+//                 onTap: () {
+//                   // TODO: launch dialer or copy number
+//                 },
+//                 borderRadius: BorderRadius.circular(10),
+//                 child: Padding(
+//                   padding: const EdgeInsets.symmetric(vertical: 2),
+//                   child: Row(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       Icon(Icons.call_outlined,
+//                           size: 15, color: AppColors.primary),
+//                       SizedBox(width: Responsive.w(4)),
+//                       Text(
+//                         driver.mobile,
+//                         style: AppTextStyles.bodyBold(color: AppColors.primary),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 class _DriverCard extends StatelessWidget {
   const _DriverCard({
     super.key,
@@ -732,6 +898,32 @@ class _DriverCard extends StatelessWidget {
 
   String get _initial =>
       driver.name.isNotEmpty ? driver.name[0].toUpperCase() : '?';
+
+  /// NEW: self-deleted drivers can't be edited or deleted.
+  bool get _canManage =>
+      driver.statusLabel.trim().toLowerCase() != 'self-deleted by user';
+
+  /// NEW: maps the API's status_color string to a real colour.
+  Color get _statusColor {
+    switch (driver.statusColor.toLowerCase()) {
+      case 'success':
+        return AppColors.success;
+      case 'danger':
+        return _inactiveColor;
+      case 'warning':
+        return const Color(0xFFF59E0B);
+      case 'info':
+      case 'primary':
+        return AppColors.primary;
+      default:
+        return driver.isActive ? AppColors.success : _inactiveColor;
+    }
+  }
+
+  /// NEW: API label, with the old Active/Inactive text as fallback.
+  String get _statusText => driver.statusLabel.isNotEmpty
+      ? driver.statusLabel
+      : (driver.isActive ? 'Active' : 'Inactive');
 
   @override
   Widget build(BuildContext context) {
@@ -784,55 +976,62 @@ class _DriverCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: Responsive.w(8)),
-              _StatusPill(
-                label: driver.isActive ? 'Active' : 'Inactive',
-                color: driver.isActive ? AppColors.success : _inactiveColor,
-              ),
-              SizedBox(
-                width: 30,
-                height: 24,
-                child: PopupMenuButton<String>(
-                  padding: EdgeInsets.zero,
-                  icon: Icon(Icons.more_vert,
-                      size: 20, color: AppColors.textSecondary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      onEdit();
-                    } else if (value == 'delete') {
-                      onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_outlined,
-                              size: 18, color: AppColors.primary),
-                          SizedBox(width: Responsive.w(8)),
-                          Text('Edit', style: AppTextStyles.body()),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete_outline,
-                              size: 18, color: AppColors.error),
-                          const SizedBox(width: 8),
-                          Text('Delete',
-                              style:
-                              AppTextStyles.body(color: AppColors.error)),
-                        ],
-                      ),
-                    ),
-                  ],
+
+              // CHANGED: pill shows statusLabel + statusColor (width capped)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: Responsive.w(130)),
+                child: _StatusPill(
+                  label: _statusText,
+                  color: _statusColor,
                 ),
               ),
+
+              if (_canManage) // NEW: no menu at all for self-deleted drivers
+                SizedBox(
+                  width: 30,
+                  height: 24,
+                  child: PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.more_vert,
+                        size: 20, color: AppColors.textSecondary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        onEdit();
+                      } else if (value == 'delete') {
+                        onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                size: 18, color: AppColors.primary),
+                            SizedBox(width: Responsive.w(8)),
+                            Text('Edit', style: AppTextStyles.body()),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline,
+                                size: 18, color: AppColors.error),
+                            const SizedBox(width: 8),
+                            Text('Delete',
+                                style:
+                                AppTextStyles.body(color: AppColors.error)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
 

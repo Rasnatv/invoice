@@ -29,8 +29,6 @@ class FieldStaffListResponse {
   bool get isSuccess => status == '1';
 }
 
-/// Core field staff entity — used for display, list items, and prefilling
-/// the edit form. Not tied to any single API's request/response shape.
 class FieldStaffModel {
   FieldStaffModel({
     required this.id,
@@ -41,6 +39,8 @@ class FieldStaffModel {
     required this.employeeCode,
     required this.joiningDate,
     required this.isActive,
+    this.statusLabel = '', // NEW: "Active", "Self-Deleted by User", ...
+    this.statusColor = '', // NEW: "success", "danger", ...
   });
 
   final int id;
@@ -49,8 +49,10 @@ class FieldStaffModel {
   final String mobile;
   final String address;
   final String employeeCode;
-  final String joiningDate; // "yyyy-MM-dd"
+  final String joiningDate; // "dd-MM-yyyy" as returned by the API
   final bool isActive;
+  final String statusLabel; // NEW
+  final String statusColor; // NEW
 
   factory FieldStaffModel.fromJson(Map<String, dynamic> json) {
     return FieldStaffModel(
@@ -64,6 +66,8 @@ class FieldStaffModel {
       employeeCode: json['employee_code']?.toString() ?? '',
       joiningDate: json['joining_date']?.toString() ?? '',
       isActive: json['is_active']?.toString() == '1',
+      statusLabel: json['status_label']?.toString() ?? '', // NEW
+      statusColor: json['status_color']?.toString() ?? '', // NEW
     );
   }
 
@@ -75,6 +79,8 @@ class FieldStaffModel {
     String? employeeCode,
     String? joiningDate,
     bool? isActive,
+    String? statusLabel, // NEW
+    String? statusColor, // NEW
   }) {
     return FieldStaffModel(
       id: id,
@@ -85,6 +91,8 @@ class FieldStaffModel {
       employeeCode: employeeCode ?? this.employeeCode,
       joiningDate: joiningDate ?? this.joiningDate,
       isActive: isActive ?? this.isActive,
+      statusLabel: statusLabel ?? this.statusLabel, // NEW
+      statusColor: statusColor ?? this.statusColor, // NEW
     );
   }
 
@@ -99,10 +107,12 @@ class FieldStaffModel {
         other.address == address &&
         other.employeeCode == employeeCode &&
         other.joiningDate == joiningDate &&
-        other.isActive == isActive;
+        other.isActive == isActive &&
+        other.statusLabel == statusLabel && // NEW
+        other.statusColor == statusColor; // NEW
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, name, email, mobile, address, employeeCode, joiningDate, isActive);
+  int get hashCode => Object.hash(id, name, email, mobile, address,
+      employeeCode, joiningDate, isActive, statusLabel, statusColor);
 }

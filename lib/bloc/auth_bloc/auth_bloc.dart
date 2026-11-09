@@ -48,18 +48,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(status: AuthStatus.submitting, errorMessage: null));
 
     try {
-      final result = await _authProvider.login(
-        LoginRequest(email: email, password: password),
+      // CHANGED: build the request with device info filled in automatically
+      final request = await LoginRequest.create(
+        email: email,
+        password: password,
       );
+
+      final result = await _authProvider.login(request);
 
       final user = result.response?.data;
 
       if (result.success && user != null) {
         final role = roleFromStoredString(user.designation);
 
-        await TokenStorage.save(token: user.token, tokenType: user.tokenType);
-        await TokenStorage.saveRole(user.designation);
-
+        // CHANGED: check the role BEFORE saving the token
         if (role == null) {
           emit(state.copyWith(
             status: AuthStatus.failure,
@@ -67,6 +69,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ));
           return;
         }
+
+        await TokenStorage.save(token: user.token, tokenType: user.tokenType);
+        await TokenStorage.saveRole(user.designation);
 
         emit(state.copyWith(
           status: AuthStatus.success,

@@ -323,7 +323,7 @@ class _QuotationTile extends StatelessWidget {
           onTap: isDeleting ? null : onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            width: double.infinity,
+            // width: double.infinity,
             padding: EdgeInsets.all(Responsive.w(14)),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),

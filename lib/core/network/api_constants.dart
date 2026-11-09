@@ -202,4 +202,6 @@ static const String quotationsCancel='/quotations/cancel';
   // Estimates
   static const String estimatesReject = '/estimates/reject';
 
+  static const String accountdelete='/delete-account';
+
 }

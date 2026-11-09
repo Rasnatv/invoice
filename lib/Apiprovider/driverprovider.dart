@@ -57,18 +57,35 @@ class DriverProvider {
   DriverProvider({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
   /// GET /drivers
+  /// GET /drivers
   Future<DriverListResult> getDrivers() async {
     try {
       final response = await _apiClient.drivers();
+      final body = response.data;
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final parsed = DriverGetResponseModel.fromJson(response.data);
-        return DriverListResult.success(parsed.data);
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          body is Map<String, dynamic>) {
+        final parsed = DriverGetResponseModel.fromJson(body);
+
+        // NEW: honour the body's status flag, not just the HTTP code
+        if (parsed.isSuccess) {
+          return DriverListResult.success(parsed.data);
+        }
+        return DriverListResult.failure(
+          parsed.message.isNotEmpty ? parsed.message : 'Failed to load drivers.',
+        );
       }
-      return DriverListResult.failure(response.statusCode.toString());
+      return DriverListResult.failure(
+        'Unexpected response: ${response.statusCode}',
+      );
     } on DioException catch (e) {
       final message = await ApiErrorHandler.handleDioError(e);
       return DriverListResult.failure(message);
+    } catch (_) {
+      // NEW: parsing errors no longer crash the screen
+      return const DriverListResult.failure(
+        'Something went wrong. Please try again.',
+      );
     }
   }
 

@@ -7,6 +7,7 @@ import '../../../bloc/profile/profile_state.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/responsive.dart';
+import '../../core/utils/delete_account dialoge.dart';
 import '../../core/utils/logout_helper.dart';
 import 'changepassword.dart';
 import 'viewprofile.dart';
@@ -98,6 +99,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           builder: (_) => const ChangePasswordScreen()),
                     );
                   },
+                ),
+                _ProfileTile(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete Account',
+                  color: AppColors.error,
+                  onTap: () => showDeleteAccountDialog(context),
                 ),
                 _ProfileTile(
                   icon: Icons.logout_rounded,

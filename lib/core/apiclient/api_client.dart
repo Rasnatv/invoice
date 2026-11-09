@@ -790,5 +790,10 @@ class ApiClient {
     data: data,
     options: await _authOptions(),
   );
+  Future<Response> DeleteAccount(Map<String, dynamic> data) async => dio.delete(
+    ApiConstants.accountdelete,
+    data: data,
+    options: await _authOptions(),
+  );
 
 }

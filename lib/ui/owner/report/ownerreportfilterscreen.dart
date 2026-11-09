@@ -78,10 +78,6 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
     _loadOptions();
   }
 
-  // ---------------------------------------------------------------------------
-  // Data loading
-  // ---------------------------------------------------------------------------
-
   Future<void> _loadOptions() async {
     setState(() {
       _loading = true;
@@ -100,6 +96,7 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
         id: s.id,
         name: s.name.trim(),
         inactive: !s.isActive,
+        status: s.statusLabel.trim(), // NEW
         ))
             .toList();
         _applyOptions(people);
@@ -119,6 +116,7 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
         id: c.id.toString(),
         name: c.name.trim(),
         inactive: false,
+        status: '', // NEW: contractors have no status label
         ))
             .toList();
         _applyOptions(people);
@@ -134,14 +132,21 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
   /// Builds unique dropdown labels ("rasna", "rasna (2)", ...) so duplicate
   /// names never create duplicate DropdownMenuItem values, and clears a
   /// previously selected id that is no longer in the list.
+  /// Salesmen who aren't plain "Active" get their status label as a suffix,
+  /// e.g. "Salesman One (Self-Deleted by User)".
   void _applyOptions(
-      List<({String id, String name, bool inactive})> people) {
+      List<({String id, String name, bool inactive, String status})> people) {
     final seen = <String, int>{};
     final entries = people.map((p) {
       final count = (seen[p.name] ?? 0) + 1;
       seen[p.name] = count;
       var label = count == 1 ? p.name : '${p.name} ($count)';
-      if (p.inactive) label += ' (Inactive)';
+
+      if (p.status.isNotEmpty && p.status.toLowerCase() != 'active') {
+        label += ' (${p.status})'; // NEW
+      } else if (p.inactive) {
+        label += ' (Inactive)'; // fallback if the API sends no label
+      }
       return _DropdownEntry(id: p.id, label: label, name: p.name);
     }).toList();
 
@@ -153,7 +158,6 @@ class _OwnerReportFilterScreenState extends State<OwnerReportFilterScreen> {
       }
     });
   }
-
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ import '../../../core/utils/logout_helper.dart';
 import '../../bloc/profile/profile_bloc.dart';
 import '../../bloc/profile/profile_event.dart';
 import '../../bloc/profile/profile_state.dart';
+import '../../core/utils/delete_account dialoge.dart';
 import '../../models/profilemodel.dart';
 import 'editprofile.dart';
 import 'owner_changepassword.dart';
@@ -172,6 +173,13 @@ class _OwnerProfileViewState extends State<_OwnerProfileView> {
                     label: 'Change Password',
                     onTap: () => _openChangePassword(context),
                   ),
+                  _ProfileTile(
+                    icon: Icons.lock_outline_rounded,
+                    label: 'Delete Account',
+                    onTap: () => showDeleteAccountDialog(context),
+                  ),
+
+
                   _ProfileTile(
                     icon: Icons.logout_rounded,
                     label: 'Logout',
