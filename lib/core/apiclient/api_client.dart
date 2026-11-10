@@ -16,8 +16,8 @@ class ApiClient {
     dio = Dio(
       BaseOptions(
         baseUrl: ApiConstants.baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: 3000),
+        receiveTimeout: const Duration(seconds: 3000),
         followRedirects: true,
         headers: {
           HttpHeaders.contentTypeHeader: 'application/json',
@@ -786,6 +786,11 @@ class ApiClient {
   );
   Future<Response> updateQuotationItem(Map<String, dynamic> data) async => dio.put(
     ApiConstants.quotationsUpdateItem,
+    data: data,
+    options: await _authOptions(),
+  );
+  Future<Response> DeleteAccount(Map<String, dynamic> data) async => dio.delete(
+    ApiConstants.accountdelete,
     data: data,
     options: await _authOptions(),
   );

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tileshop/ui/no%20internetconnection/no_connection.dart';
@@ -158,20 +159,30 @@ class _OwnerIncentiveReportFilterScreenState
       ? _salesmen.map((s) => !s.isActive).toList()
       : _fieldStaff.map((f) => !f.isActive).toList();
 
-  /// Unique dropdown labels: "rasna", "rasna (2)", ... so two people with the
-  /// same name never produce duplicate DropdownMenuItem values or resolve to
-  /// the wrong id. Inactive people get an " (Inactive)" suffix.
+  /// Status text from the API (e.g. "Active", "Self-Deleted by User"),
+  /// for both salesmen and field staff.
+  List<String> get _statusLabels => _isSalesman
+      ? _salesmen.map((s) => s.statusLabel.trim()).toList()
+      : _fieldStaff.map((f) => f.statusLabel.trim()).toList();
+
   List<String> get _peopleNames {
     final seen = <String, int>{};
     final raw = _rawNames;
     final inactive = _inactiveFlags;
+    final statuses = _statusLabels;
 
     return List.generate(raw.length, (i) {
       final n = raw[i];
       final count = (seen[n] ?? 0) + 1;
       seen[n] = count;
       var label = count == 1 ? n : '$n ($count)';
-      if (inactive[i]) label += ' (Inactive)';
+
+      final status = statuses[i];
+      if (status.isNotEmpty && status.toLowerCase() != 'active') {
+        label += ' ($status)';
+      } else if (inactive[i]) {
+        label += ' (Inactive)'; // no status label from API
+      }
       return label;
     });
   }
@@ -297,8 +308,9 @@ class _OwnerIncentiveReportFilterScreenState
                           ],
                         ),
                         SizedBox(height: Responsive.h(16)),
-                        _FieldLabel(
-                            isSalesman ? 'Select Salesman' : 'Select Field Staff'),
+                        _FieldLabel(isSalesman
+                            ? 'Select Salesman'
+                            : 'Select Field Staff'),
                         SizedBox(height: Responsive.h(8)),
                         _buildPersonDropdown(),
                         SizedBox(height: Responsive.h(16)),
@@ -526,8 +538,8 @@ class _OptionChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border:
-          Border.all(color: selected ? AppColors.primary : AppColors.border),
+          border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border),
         ),
         child: Text(
           label,

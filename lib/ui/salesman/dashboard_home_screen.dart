@@ -228,7 +228,7 @@ class _DashboardHomeView extends StatelessWidget {
                         if (state.recentEstimates.isEmpty)
                           const _EmptyState(
                             icon: Icons.description_outlined,
-                            message: 'No estimates yet. Create your first one.',
+                            message: 'No Recent estimates yet. Create one.',
                           )
                         else
                           Column(

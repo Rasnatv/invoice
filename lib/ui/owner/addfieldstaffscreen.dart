@@ -569,6 +569,34 @@ class _FieldStaffTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// NEW: self-deleted staff can't be edited or deleted.
+  bool get _canManage =>
+      staff.statusLabel.trim().toLowerCase() != 'self-deleted by user';
+
+  /// NEW: the badge shows for anything that isn't plain "Active".
+  bool get _showBadge =>
+      (staff.statusLabel.isNotEmpty &&
+          staff.statusLabel.trim().toLowerCase() != 'active') ||
+          (staff.statusLabel.isEmpty && !staff.isActive);
+
+  String get _badgeText =>
+      staff.statusLabel.isNotEmpty ? staff.statusLabel : 'Inactive';
+
+  Color get _badgeColor {
+    switch (staff.statusColor.toLowerCase()) {
+      case 'success':
+        return AppColors.success;
+      case 'warning':
+        return const Color(0xFFF59E0B);
+      case 'info':
+      case 'primary':
+        return AppColors.primary;
+      case 'danger':
+      default:
+        return Colors.red;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -612,23 +640,30 @@ class _FieldStaffTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (!staff.isActive) ...[
+                    if (_showBadge) ...[
                       SizedBox(width: Responsive.w(6)),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: Responsive.w(8),
-                          vertical: Responsive.h(3),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'Inactive',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: Responsive.sp(9.5),
-                            fontWeight: FontWeight.w600,
+                      // CHANGED: shows API label + colour, width capped
+                      ConstrainedBox(
+                        constraints:
+                        BoxConstraints(maxWidth: Responsive.w(120)),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.w(8),
+                            vertical: Responsive.h(3),
+                          ),
+                          decoration: BoxDecoration(
+                            color: _badgeColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _badgeText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _badgeColor,
+                              fontSize: Responsive.sp(9.5),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
@@ -638,7 +673,8 @@ class _FieldStaffTile extends StatelessWidget {
                 SizedBox(height: Responsive.h(4)),
                 Row(
                   children: [
-                    Icon(Icons.call_outlined, size: 14, color: AppColors.primary),
+                    Icon(Icons.call_outlined,
+                        size: 14, color: AppColors.primary),
                     SizedBox(width: Responsive.w(4)),
                     Text(
                       staff.mobile,
@@ -654,7 +690,8 @@ class _FieldStaffTile extends StatelessWidget {
                 Text(
                   staff.email,
                   style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: Responsive.sp(11)),
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.sp(11)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -662,7 +699,8 @@ class _FieldStaffTile extends StatelessWidget {
                 Text(
                   staff.address,
                   style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: Responsive.sp(11)),
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.sp(11)),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -670,45 +708,53 @@ class _FieldStaffTile extends StatelessWidget {
                 Text(
                   'Joined: ${staff.joiningDate}',
                   style: TextStyle(
-                      color: AppColors.textSecondary, fontSize: Responsive.sp(10.5)),
+                      color: AppColors.textSecondary,
+                      fontSize: Responsive.sp(10.5)),
                 ),
               ],
             ),
           ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            onSelected: (value) {
-              if (value == 'edit') {
-                onEdit();
-              } else if (value == 'delete') {
-                onDelete();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
-                    SizedBox(width: Responsive.w(8)),
-                    Text('Edit', style: TextStyle(fontSize: Responsive.sp(12))),
-                  ],
+          if (_canManage) // NEW: no menu at all for self-deleted staff
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  onEdit();
+                } else if (value == 'delete') {
+                  onDelete();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined,
+                          size: 16, color: AppColors.primary),
+                      SizedBox(width: Responsive.w(8)),
+                      Text('Edit',
+                          style: TextStyle(fontSize: Responsive.sp(12))),
+                    ],
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                    SizedBox(width: Responsive.w(8)),
-                    Text('Delete',
-                        style: TextStyle(color: Colors.red, fontSize: Responsive.sp(12))),
-                  ],
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline,
+                          size: 16, color: Colors.red),
+                      SizedBox(width: Responsive.w(8)),
+                      Text('Delete',
+                          style: TextStyle(
+                              color: Colors.red,
+                              fontSize: Responsive.sp(12))),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

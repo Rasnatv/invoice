@@ -122,7 +122,7 @@ class ApiErrorHandler {
   static Future<String> _connectionErrorMessage() async {
     try {
       final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 60));
       if (result.isNotEmpty && result.first.rawAddress.isNotEmpty) {
         return "Unable to reach the server. Please try again later.";
       }

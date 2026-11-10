@@ -35,6 +35,8 @@ class DriverGetResponseModel {
   }
 }
 
+
+
 /// A single driver.
 class DriverGetModel {
   DriverGetModel({
@@ -47,6 +49,8 @@ class DriverGetModel {
     required this.joiningDate,
     required this.isActive,
     this.createdAt = '',
+    this.statusLabel = '', // NEW: "Active", "Deactivated", ...
+    this.statusColor = '', // NEW: "success", "warning", ...
   });
 
   final int id;
@@ -60,6 +64,8 @@ class DriverGetModel {
   final String joiningDate;
   final bool isActive;
   final String createdAt; // not returned by this API, kept for UI compatibility
+  final String statusLabel; // NEW
+  final String statusColor; // NEW
 
   factory DriverGetModel.fromJson(Map<String, dynamic> json) {
     return DriverGetModel(
@@ -72,6 +78,8 @@ class DriverGetModel {
       joiningDate: json['joining_date']?.toString() ?? '',
       isActive: _asBool(json['is_active']),
       createdAt: json['created_at']?.toString() ?? '',
+      statusLabel: json['status_label']?.toString() ?? '', // NEW
+      statusColor: json['status_color']?.toString() ?? '', // NEW
     );
   }
 
@@ -97,6 +105,8 @@ class DriverGetModel {
     String? joiningDate,
     bool? isActive,
     String? createdAt,
+    String? statusLabel, // NEW
+    String? statusColor, // NEW
   }) {
     return DriverGetModel(
       id: id ?? this.id,
@@ -108,6 +118,8 @@ class DriverGetModel {
       joiningDate: joiningDate ?? this.joiningDate,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      statusLabel: statusLabel ?? this.statusLabel, // NEW
+      statusColor: statusColor ?? this.statusColor, // NEW
     );
   }
 

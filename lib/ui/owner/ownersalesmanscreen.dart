@@ -18,7 +18,6 @@ import '../../bloc/ownerbloc/ownersalesman/salesman_state.dart';
 import 'owner_designationlist.dart';
 import 'owneraddsalesmanscreen.dart';
 
-
 class OwnerSalesmenScreen extends StatelessWidget {
   const OwnerSalesmenScreen({super.key});
 
@@ -62,6 +61,7 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
           s.mobile.toLowerCase().contains(q) ||
           s.email.toLowerCase().contains(q) ||
           s.designationName.toLowerCase().contains(q) ||
+          s.statusLabel.toLowerCase().contains(q) || // NEW
           s.id.toString().contains(q);
     }).toList();
   }
@@ -238,7 +238,6 @@ class _OwnerSalesmenViewState extends State<_OwnerSalesmenView> {
                       },
                       child: ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        // FAB is gone, so no extra bottom space needed.
                         padding: EdgeInsets.fromLTRB(Responsive.w(20), 0,
                             Responsive.w(20), Responsive.h(24)),
                         itemCount: items.length,
@@ -504,6 +503,30 @@ class _OwnerSalesmanCard extends StatelessWidget {
     );
   }
 
+  /// NEW: self-deleted accounts can't be edited.
+  bool get _canEdit =>
+      salesman.statusLabel.trim().toLowerCase() != 'self-deleted by user';
+
+  /// NEW: maps the API's status_color string to a real colour.
+  /// Falls back to the old isActive logic if the API sends nothing/unknown.
+  Color _statusColor() {
+    switch (salesman.statusColor.toLowerCase()) {
+      case 'success':
+        return AppColors.success;
+      case 'danger':
+        return const Color(0xFFDC2626);
+      case 'warning':
+        return const Color(0xFFF59E0B);
+      case 'info':
+      case 'primary':
+        return AppColors.primary;
+      default:
+        return salesman.isActive
+            ? AppColors.success
+            : const Color(0xFFDC2626);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final salary = NumberFormat.currency(
@@ -512,8 +535,10 @@ class _OwnerSalesmanCard extends StatelessWidget {
       decimalDigits: 0,
     ).format(salesman.salary);
 
-    final statusColor =
-    salesman.isActive ? AppColors.success : const Color(0xFFDC2626);
+    final statusColor = _statusColor(); // CHANGED
+    final statusText = salesman.statusLabel.isNotEmpty // NEW
+        ? salesman.statusLabel
+        : (salesman.isActive ? 'Active' : 'Inactive');
     final initial =
     salesman.name.isNotEmpty ? salesman.name[0].toUpperCase() : '?';
 
@@ -570,61 +595,72 @@ class _OwnerSalesmanCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: Responsive.w(8)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  salesman.isActive ? 'Active' : 'Inactive',
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontFamily,
-                    fontSize: Responsive.sp(10.5),
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
+
+              // CHANGED: badge shows statusLabel + statusColor
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: Responsive.w(130)),
+                child: Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFamily,
+                      fontSize: Responsive.sp(10.5),
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
                   ),
                 ),
               ),
-              SizedBox(
-                width: 28,
-                height: 24,
-                child: PopupMenuButton<String>(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.more_vert,
-                      size: 18, color: AppColors.textSecondary),
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.edit_outlined,
-                              size: 18, color: AppColors.textPrimary),
-                          const SizedBox(width: 8),
-                          Text('Edit', style: AppTextStyles.body()),
-                        ],
+
+              if (_canEdit) // NEW: no menu at all for self-deleted users
+                SizedBox(
+                  width: 28,
+                  height: 24,
+                  child: PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_vert,
+                        size: 18, color: AppColors.textSecondary),
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (context) => [
+                      if (_canEdit) // NEW: Edit hidden for self-deleted users
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.edit_outlined,
+                                  size: 18, color: AppColors.textPrimary),
+                              const SizedBox(width: 8),
+                              Text('Edit', style: AppTextStyles.body()),
+                            ],
+                          ),
+                        ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline,
+                                size: 18, color: AppColors.error),
+                            const SizedBox(width: 8),
+                            Text('Delete',
+                                style:
+                                AppTextStyles.body(color: AppColors.error)),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete_outline,
-                              size: 18, color: AppColors.error),
-                          const SizedBox(width: 8),
-                          Text('Delete',
-                              style:
-                              AppTextStyles.body(color: AppColors.error)),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
 

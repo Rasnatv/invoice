@@ -12,6 +12,7 @@ import '../../bloc/fieldstaffbloc/sitevist/sitevisit_state.dart';
 import '../../bloc/profile/profile_bloc.dart';
 import '../../bloc/profile/profile_event.dart';
 import '../../bloc/profile/profile_state.dart';
+import '../../core/utils/delete_account dialoge.dart';
 import '../../core/utils/logout_helper.dart';
 import '../../models/fieldstaffmodels/fieldstaffsitevisitmodel.dart';
 import '../../widgets/appsnackbar.dart';
@@ -123,6 +124,7 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
     }
   }
 
+
   void _openAccountSheet() {
     final staffName = context.read<ProfileBloc>().state.profile?.name ?? 'Field Staff';
     showModalBottomSheet(
@@ -134,6 +136,10 @@ class _FieldStaffDashboardScreenState extends State<FieldStaffDashboardScreen>
         onChangePassword: () {
           Navigator.of(ctx).pop();
           _openChangePassword();
+        },
+        onDeleteAccount: () {            // NEW
+          Navigator.of(ctx).pop();       // closes the bottom sheet
+          showDeleteAccountDialog(context); // opens the password dialog
         },
         onLogout: () {
           Navigator.of(ctx).pop();
@@ -622,11 +628,13 @@ class _AccountSheet extends StatelessWidget {
   const _AccountSheet({
     required this.staffName,
     required this.onChangePassword,
+    required this.onDeleteAccount, // NEW
     required this.onLogout,
   });
 
   final String staffName;
   final VoidCallback onChangePassword;
+  final VoidCallback onDeleteAccount; // NEW
   final VoidCallback onLogout;
 
   @override
@@ -659,13 +667,22 @@ class _AccountSheet extends StatelessWidget {
               label: 'Change Password',
               onTap: onChangePassword,
             ),
+            _AccountTile( // NEW
+              icon: Icons.delete_outline_rounded,
+              iconColor: Colors.red,
+              label: 'Delete Account',
+              labelColor: Colors.red,
+              onTap: onDeleteAccount,
+            ),
+
             _AccountTile(
               icon: Icons.logout_rounded,
-              iconColor: Colors.red,
+              iconColor:Colors.red,
               label: 'Logout',
               labelColor: Colors.red,
               onTap: onLogout,
             ),
+
           ],
         ),
       ),

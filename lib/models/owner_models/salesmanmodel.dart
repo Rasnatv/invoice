@@ -12,6 +12,8 @@ class HSalesmanModel {
   final String employeeCode;
   final double salary;
   final bool isActive;
+  final String statusLabel; // NEW: "Active", "Self-Deleted by User", ...
+  final String statusColor; // NEW: "success", "danger", ...
 
   HSalesmanModel({
     required this.id,
@@ -23,10 +25,11 @@ class HSalesmanModel {
     this.employeeCode = '',
     required this.salary,
     required this.isActive,
+    this.statusLabel = '', // NEW
+    this.statusColor = '', // NEW
   });
 
   factory HSalesmanModel.fromJson(Map<String, dynamic> json) {
-    // Fix: Properly parse isActive
     bool isActive = false;
     final isActiveValue = json['is_active'];
     if (isActiveValue != null) {
@@ -39,7 +42,6 @@ class HSalesmanModel {
       }
     }
 
-    // Parse salary
     double salary = 0.0;
     final salaryValue = json['salary'];
     if (salaryValue != null) {
@@ -56,12 +58,15 @@ class HSalesmanModel {
       mobile: json['mobile']?.toString() ?? '',
       designationName: json['designation_name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      joiningDate: json['joining_date'] != null && json['joining_date'].toString().isNotEmpty
+      joiningDate: json['joining_date'] != null &&
+          json['joining_date'].toString().isNotEmpty
           ? DateTime.tryParse(json['joining_date'].toString())
           : null,
       employeeCode: json['employee_code']?.toString() ?? '',
       salary: salary,
       isActive: isActive,
+      statusLabel: json['status_label']?.toString() ?? '', // NEW
+      statusColor: json['status_color']?.toString() ?? '', // NEW
     );
   }
 
@@ -78,6 +83,8 @@ class HSalesmanModel {
       'employee_code': employeeCode,
       'salary': salary.toString(),
       'is_active': isActive ? '1' : '0',
+      'status_label': statusLabel, // NEW
+      'status_color': statusColor, // NEW
     };
   }
 }

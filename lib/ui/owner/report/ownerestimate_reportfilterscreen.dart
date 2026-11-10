@@ -156,7 +156,8 @@ class _OwnerEstimateReportFilterScreenState
 
   /// Unique dropdown labels: "rasna", "rasna (2)", ... so two people with the
   /// same name never produce duplicate DropdownMenuItem values or resolve
-  /// to the wrong id. Inactive salesmen get an " (Inactive)" suffix.
+  /// to the wrong id. Salesmen who aren't plain "Active" get their status
+  /// label as a suffix, e.g. "Salesman One (Self-Deleted by User)".
   List<String> get _peopleNames {
     final seen = <String, int>{};
     final raw = _rawNames;
@@ -167,7 +168,16 @@ class _OwnerEstimateReportFilterScreenState
       final count = (seen[n] ?? 0) + 1;
       seen[n] = count;
       var label = count == 1 ? n : '$n ($count)';
-      if (isSalesman && !_salesmen[i].isActive) label += ' (Inactive)';
+
+      if (isSalesman) {
+        final s = _salesmen[i];
+        final status = s.statusLabel.trim();
+        if (status.isNotEmpty && status.toLowerCase() != 'active') {
+          label += ' ($status)';
+        } else if (!s.isActive) {
+          label += ' (Inactive)'; // fallback if the API sends no label
+        }
+      }
       return label;
     });
   }
@@ -403,7 +413,7 @@ class _OwnerEstimateReportFilterScreenState
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       disabledBackgroundColor:
-                      AppColors.primary.withOpacity(0.4),
+                      AppColors.primary.withValues(alpha: 0.4),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -458,7 +468,7 @@ class _FilterCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.10),
+                      color: AppColors.primary.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(icon, size: 16, color: AppColors.primary),

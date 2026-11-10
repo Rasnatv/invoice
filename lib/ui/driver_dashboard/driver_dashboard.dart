@@ -9,6 +9,7 @@ import '../../Apiprovider/driverdespatchprovider.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_bloc.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_event.dart';
 import '../../bloc/driverbloc/driverdashboard/driverdashboard_state.dart';
+import '../../core/utils/delete_account dialoge.dart';
 import '../../core/utils/logout_helper.dart';
 import '../../models/drivermodels/driverdashboardmodel.dart';
 
@@ -97,6 +98,10 @@ class _DriverDashboardViewState extends State<_DriverDashboardView> {
           } else {
             logout(context);
           }
+        },
+        onDeleteAccount: () {            // NEW
+          Navigator.of(ctx).pop();       // closes the bottom sheet
+          showDeleteAccountDialog(context); // opens the password dialog
         },
       ),
     );
@@ -437,10 +442,12 @@ class _AccountSheet extends StatelessWidget {
   const _AccountSheet({
     required this.onChangePassword,
     required this.onLogout,
+    required this.onDeleteAccount, // N
   });
 
   final VoidCallback onChangePassword;
   final VoidCallback onLogout;
+  final VoidCallback onDeleteAccount; // NEW
 
   @override
   Widget build(BuildContext context) {
@@ -498,13 +505,21 @@ class _AccountSheet extends StatelessWidget {
               label: 'Change Password',
               onTap: onChangePassword,
             ),
+            _AccountTile( // NEW
+              icon: Icons.delete_outline_rounded,
+              iconColor: Colors.red,
+              label: 'Delete Account',
+              labelColor: Colors.red,
+              onTap: onDeleteAccount,
+            ),
             _AccountTile(
               icon: Icons.logout_rounded,
               iconColor: Colors.red,
-              label: 'Logout',
               labelColor: Colors.red,
+              label: 'Logout',
               onTap: onLogout,
             ),
+
           ],
         ),
       ),

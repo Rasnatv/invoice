@@ -1466,7 +1466,7 @@ class _IncentivePaymentCard extends StatelessWidget {
                 )
                     : const Icon(Icons.paid_rounded, size: 18),
                 label: Text(
-                  'Payment Given • $totalPayable',
+                  'Payment Now • $totalPayable',
                   style: AppTextStyles.bodyBold(color: Colors.white),
                 ),
               ),
