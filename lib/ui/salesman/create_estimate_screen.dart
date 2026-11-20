@@ -1,4 +1,5 @@
 
+
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,11 @@ import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../models/salesmanmodels/salesman_qtnpreviewmodel.dart';
 import '../../widgets/appsnackbar.dart';
 import 'package:tileshop/ui/salesman/widget/esalesmanestimatetype.dart';
+
+// NOTE: adjust this path to where your owner product add screen really is.
+import 'package:tileshop/ui/owner/add_incentiveproduct.dart'; // AddIncentiveProductScreen
+import 'package:tileshop/ui/owner/company_addscreen.dart'; // CompanySetupScreen
+import 'package:tileshop/ui/owner/owner_unitaddscreen.dart'; // UnitSetupScreen
 
 class CreateEstimateScreen extends StatelessWidget {
   const CreateEstimateScreen({super.key});
@@ -80,6 +86,11 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   final _itemPieceQtyCtrl = TextEditingController();
 
   ActiveProductModel? _selectedProduct;
+
+  // Bumped when the selected product is cleared with the X button. Used as
+  // the key of AddItemsSteps so the product field is rebuilt from scratch
+  // (list closed, no focus) and only opens again when the field is tapped.
+  int _productFieldResetCount = 0;
 
   final List<AddedItem> _items = [];
   int _itemCounter = 0;
@@ -290,6 +301,24 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
     setState(() => _step = EstimateStep.addItems);
   }
 
+  /// Opens the product add screen. When a product is saved (the screen
+  /// pops with `true`), the products are reloaded so the new product
+  /// shows up in the product dropdown.
+  ///
+  /// Items already added stay safe: `_items` lives in this State, not
+  /// in the bloc.
+  Future<void> _openAddNewProduct() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddIncentiveProductScreen()),
+    );
+
+    if (saved == true && mounted) {
+      // NOTE: if SalesmanEstimateStarted also resets other state, create a
+      // small event in the bloc that reloads only `products` and use it here.
+      context.read<SalesmanEstimateBloc>().add(const SalesmanEstimateStarted());
+    }
+  }
+
   /// Fires on every phone edit. If a site visit was auto-filled and the
   /// phone number no longer matches it, clear the auto-filled name and
   /// address and drop the selected visit from the bloc so a stale
@@ -323,8 +352,21 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   String _formatPrice(double value) =>
       value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
 
+  /// Closes the keyboard and any open product list.
+  void _closeProductList() => FocusManager.instance.primaryFocus?.unfocus();
+
   void _onProductSelected(ActiveProductModel? product) {
+    // Product picked OR cleared with the X button -> close the list.
+    // It opens again ONLY when the user taps the product field.
+    _closeProductList();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _closeProductList();
+    });
+
+    final wasCleared = product == null && _selectedProduct != null;
+
     setState(() {
+      if (wasCleared) _productFieldResetCount++;
       _selectedProduct = product;
       if (product != null) {
         _itemCompanyCtrl.text = product.company;
@@ -787,33 +829,68 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
                         onSelectSiteVisit: _selectSiteVisit,
                         onNext: _goToAddItems,
                       ),
-                      EstimateStep.addItems => AddItemsSteps(
-                        selectedProduct: _selectedProduct,
-                        onProductSelected: _onProductSelected,
-                        itemCompanyCtrl: _itemCompanyCtrl,
-                        itemSizeCtrl: _itemSizeCtrl,
-                        itemUnitCtrl: _itemUnitCtrl,
-                        itemPackingCtrl: _itemPackingCtrl,
-                        itemMrpCtrl: _itemMrpCtrl,
-                        itemQtyCtrl: _itemQtyCtrl,
-                        itemBoxQtyCtrl: _itemBoxQtyCtrl,
-                        itemPieceQtyCtrl: _itemPieceQtyCtrl,
-                        itemRateCtrl: _itemRateCtrl,
-                        isAdding: _isAddingItem,
-                        onQuantityChanged: _onQuantityChanged,
-                        onQtyRateChanged: _scheduleIncentiveFetch,
-                        items: _items,
-                        editingIndex: _editingItemIndex,
-                        onAddItem: _addItemToList,
-                        onEditItem: _editItem,
-                        onCancelEdit: _cancelEditItem,
-                        onRemoveItem: _removeItem,
-                        onCancel: () => setState(() {
-                          _editingItemIndex = null;
-                          _resetItemFields();
-                          _step = EstimateStep.details;
-                        }),
-                        onSaveItems: _goToPreview,
+                      EstimateStep.addItems => Column(
+                        children: [
+                          // ---- Add New Product (opens product add screen) ----
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              Responsive.w(16),
+                              Responsive.h(10),
+                              Responsive.w(16),
+                              0,
+                            ),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _openAddNewProduct,
+                                icon: const Icon(
+                                    Icons.add_circle_outline_rounded,
+                                    size: 18),
+                                label: Text(
+                                  'Add New Product',
+                                  style: AppTextStyles.bodyBold(
+                                      color: AppColors.primary),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            // Tap anywhere outside the field -> list closes.
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTap: _closeProductList,
+                              child: AddItemsSteps(
+                                key: ValueKey('add_items_$_productFieldResetCount'),
+                                selectedProduct: _selectedProduct,
+                                onProductSelected: _onProductSelected,
+                                itemCompanyCtrl: _itemCompanyCtrl,
+                                itemSizeCtrl: _itemSizeCtrl,
+                                itemUnitCtrl: _itemUnitCtrl,
+                                itemPackingCtrl: _itemPackingCtrl,
+                                itemMrpCtrl: _itemMrpCtrl,
+                                itemQtyCtrl: _itemQtyCtrl,
+                                itemBoxQtyCtrl: _itemBoxQtyCtrl,
+                                itemPieceQtyCtrl: _itemPieceQtyCtrl,
+                                itemRateCtrl: _itemRateCtrl,
+                                isAdding: _isAddingItem,
+                                onQuantityChanged: _onQuantityChanged,
+                                onQtyRateChanged: _scheduleIncentiveFetch,
+                                items: _items,
+                                editingIndex: _editingItemIndex,
+                                onAddItem: _addItemToList,
+                                onEditItem: _editItem,
+                                onCancelEdit: _cancelEditItem,
+                                onRemoveItem: _removeItem,
+                                onCancel: () => setState(() {
+                                  _editingItemIndex = null;
+                                  _resetItemFields();
+                                  _step = EstimateStep.details;
+                                }),
+                                onSaveItems: _goToPreview,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       EstimateStep.preview => PreviewStep(
                         date: _date,

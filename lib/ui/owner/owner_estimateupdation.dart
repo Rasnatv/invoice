@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,6 +20,10 @@ import '../../widgets/primary_button.dart';
 import '../../../models/salesmanmodels/estimatedetail.model.dart';
 import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../Apiprovider/salesman_quotationprovider.dart';
+
+// NEW: product add screen (same one used by the create estimate screen).
+// NOTE: adjust this path if add_incentiveproduct.dart is in another folder.
+import 'add_incentiveproduct.dart'; // AddIncentiveProductScreen
 
 class OwnerEstimateUpdateScreen extends StatefulWidget {
   const OwnerEstimateUpdateScreen({super.key, required this.detail});
@@ -71,6 +76,9 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
   final QuotationProvider _quotationProvider = QuotationProvider();
   bool _isAddingItem = false;
 
+  // NEW: prevents double taps on the Add New Product button.
+  bool _isOpeningAddProduct = false;
+
   bool get _isBoxUnitProduct {
     if (_editingItemIndex != null) {
       final item = _items[_editingItemIndex!];
@@ -83,7 +91,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
 
   double get _computedQuantity => double.tryParse(_itemQtyCtrl.text.trim()) ?? 0;
 
-  /// NEW: product IDs already added to the estimate, EXCLUDING the item that
+  /// Product IDs already added to the estimate, EXCLUDING the item that
   /// is currently being edited (so its product still shows while editing).
   /// Used to hide those products from the "Select Product" suggestions.
   Set<String> get _addedProductIds => <String>{
@@ -214,6 +222,32 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     } catch (e, st) {
       debugPrint('OwnerEstimateUpdateScreen: failed to load active products: $e\n$st');
       if (mounted) setState(() => _loadingProducts = false);
+    }
+  }
+
+  /// NEW: Opens the product add screen. When a product is saved (the screen
+  /// pops with `true`), the product list is reloaded so the new product
+  /// shows up in the suggestions.
+  ///
+  /// Items already in the estimate stay safe: `_items` lives in this State.
+  /// `_loadProducts()` doesn't touch `_items`, and `_backfilledFromCatalog`
+  /// is already true, so existing rows are not modified.
+  Future<void> _openAddNewProduct() async {
+    if (_isOpeningAddProduct) return;
+    _isOpeningAddProduct = true;
+
+    // Close keyboard + suggestion list before leaving.
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _showProductSuggestions = false);
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddIncentiveProductScreen()),
+    );
+
+    _isOpeningAddProduct = false;
+
+    if (saved == true && mounted) {
+      await _loadProducts();
     }
   }
 
@@ -415,7 +449,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
       return;
     }
 
-    // NEW: block duplicates (ignore the item currently being edited)
+    // Block duplicates (ignore the item currently being edited)
     final alreadyAdded = _items.asMap().entries.any(
           (e) => e.key != editingIndex && e.value.productId == productIdStr,
     );
@@ -584,7 +618,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     return null;
   }
 
-  /// NEW: runs before Save Changes.
+  /// Runs before Save Changes.
   /// If the owner picked a product (or started editing an item) but never
   /// tapped "Add Item" / "Update Item", ask what to do instead of silently
   /// dropping it. Returns true when it is OK to continue saving.
@@ -651,7 +685,7 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
     // Read the bloc before any await so we don't use a stale context later.
     final bloc = context.read<OwnerEstimateDetailBloc>();
 
-    // NEW: handle a forgotten Add Item / Update Item first.
+    // Handle a forgotten Add Item / Update Item first.
     final canContinue = await _resolvePendingItem();
     if (!mounted || !canContinue) return;
 
@@ -825,12 +859,33 @@ class _OwnerEstimateUpdateScreenState extends State<OwnerEstimateUpdateScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // ---- NEW: Add New Product (opens product add screen) ----
+                                // Hidden while editing an existing item so the product
+                                // can't be swapped mid-edit. Remove `if (!isEditing)`
+                                // to show it always.
+                                if (!isEditing)
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton.icon(
+                                      onPressed: _openAddNewProduct,
+                                      icon: const Icon(
+                                        Icons.add_circle_outline_rounded,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        'Add New Product',
+                                        style: AppTextStyles.bodyBold(
+                                            color: AppColors.primary),
+                                      ),
+                                    ),
+                                  ),
+
                                 EstimateItemFormFields(
                                   formKey: _itemFormKey,
                                   productField: EstimateProductSearch(
                                     loading: _loadingProducts,
                                     products: _products,
-                                    // NEW: hide products already added
+                                    // Hide products already added
                                     excludedProductIds: _addedProductIds,
                                     searchCtrl: _productSearchCtrl,
                                     focusNode: _productSearchFocus,

@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -22,6 +23,9 @@ import '../../models/salesmanmodels/quotationupdatemodel.dart';
 import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 
 import '../../Apiprovider/salesman_quotationprovider.dart';
+
+// NOTE: adjust this path if add_incentiveproduct.dart is in another folder.
+import 'add_incentiveproduct.dart'; // AddIncentiveProductScreen
 
 class OwnerQuotationEditScreen extends StatelessWidget {
   const OwnerQuotationEditScreen({super.key, required this.estimate});
@@ -103,6 +107,9 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
 
   OwnerEditItem? pendingItemUpdate;
 
+  // Prevents double taps on the Add New Product button.
+  bool isOpeningAddProduct = false;
+
   bool get isBoxUnitProduct {
     if (editingItemIndex != null) {
       final item = items[editingItemIndex!];
@@ -127,7 +134,7 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
 
   bool isUnsavedItem(OwnerEditItem item) => item.id.startsWith('new_');
 
-  /// NEW: product IDs already added to the quotation, EXCLUDING the item that
+  /// Product IDs already added to the quotation, EXCLUDING the item that
   /// is currently being edited (so its product still shows while editing).
   /// Used to hide those products from the "Select Product" suggestions.
   Set<String> get addedProductIds => <String>{
@@ -297,6 +304,35 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
     }
   }
 
+  // ---------------- Add New Product ----------------
+
+  /// Opens the product add screen. When a product is saved (the screen
+  /// pops with `true`), the active products are reloaded so the new
+  /// product shows up in the "Select Product" list.
+  ///
+  /// Items already added stay safe: `items` lives in this State, and the
+  /// product search box stays closed until the field is tapped.
+  Future<void> openAddNewProduct() async {
+    if (isOpeningAddProduct) return;
+    isOpeningAddProduct = true;
+
+    // Make sure the suggestions list is closed while leaving this page.
+    productSearchFocus.unfocus();
+    setState(() => showProductSuggestions = false);
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddIncentiveProductScreen()),
+    );
+
+    isOpeningAddProduct = false;
+
+    if (saved == true && mounted) {
+      context
+          .read<OwnerQuotationEditBloc>()
+          .add(const OwnerEditActiveProductsRequested());
+    }
+  }
+
   // ---------------- Field-level validators ----------------
 
   String? validatePartyName(String? v) => DValidator.validateName('Customer name', v);
@@ -366,8 +402,12 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
   }
 
   /// Clears the product search box itself (clear button / form reset).
+  /// The suggestions list stays CLOSED after clearing: it opens again only
+  /// when the user taps the product field.
   void clearProductSelection() {
     productSearchCtrl.clear();
+    productSearchFocus.unfocus();
+    setState(() => showProductSuggestions = false);
     onProductSelected(null);
   }
 
@@ -439,7 +479,7 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
       return;
     }
 
-    // NEW: block duplicates (ignore the item currently being edited)
+    // Block duplicates (ignore the item currently being edited)
     final alreadyAdded = items.asMap().entries.any(
           (e) => e.key != editingItemIndex && e.value.productId == productIdStr,
     );
@@ -635,7 +675,7 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
 
   // ---- Submit ----
 
-  /// NEW: runs before Save Changes.
+  /// Runs before Save Changes.
   /// If the owner picked a product (or started editing an item) but never
   /// tapped "Add Item" / "Update Item", ask what to do instead of silently
   /// dropping it. Returns true when it is OK to continue saving.
@@ -720,7 +760,7 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
     // Read the bloc before any await so we don't use a stale context later.
     final bloc = context.read<OwnerQuotationEditBloc>();
 
-    // NEW: handle a forgotten Add Item / Update Item first.
+    // Handle a forgotten Add Item / Update Item first.
     final canContinue = await resolvePendingItem();
     if (!mounted || !canContinue) return;
 
@@ -872,13 +912,34 @@ class OwnerQuotationEditViewState extends State<OwnerQuotationEditView> {
                           icon: editingItemIndex != null
                               ? Icons.edit_outlined
                               : Icons.add_box_outlined,
+                          // Add New Product button (top right of the card)
+                          trailing: editingItemIndex == null
+                              ? TextButton.icon(
+                            onPressed: openAddNewProduct,
+                            icon: const Icon(
+                                Icons.add_circle_outline_rounded,
+                                size: 16),
+                            label: Text(
+                              'New Product',
+                              style: AppTextStyles.bodyBold(
+                                  color: AppColors.primary),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: Responsive.w(8)),
+                              minimumSize: Size.zero,
+                              tapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          )
+                              : null,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               OwnerItemFormFields(
                                 formKey: itemFormKey,
                                 productField: OwnerProductDropdown(
-                                  // NEW: hide products already added
+                                  // hide products already added
                                   excludedProductIds: addedProductIds,
                                   searchCtrl: productSearchCtrl,
                                   focusNode: productSearchFocus,

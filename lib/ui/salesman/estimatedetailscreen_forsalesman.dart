@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +12,9 @@ import '../../bloc/salemanbloc/estimatedetail/estimate_detail_state.dart';
 import '../../bloc/salemanbloc/estimatedetail/estimatedetail_bloc.dart';
 import '../../models/salesmanmodels/estimatedetail.model.dart';
 import '../../widgets/owner_estimateshimmer.dart';
+import '../owner/owner_estimateupdation.dart';
 import '../owner/ownerdespatchsheet.dart';
+import '../../bloc/ownerbloc/estimatedetail/ownerviewestimatedetail_bloc.dart'; // OwnerEstimateDetailBloc
 
 class SalesmanEstimateDetailsScreen extends StatefulWidget {
   const SalesmanEstimateDetailsScreen({super.key, required this.id});
@@ -102,6 +105,28 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
       // Pop this screen too, returning to the screen that opened it
       // (e.g. Approved Bills) instead of the dashboard.
       Navigator.of(context).pop(true);
+    }
+  }
+
+  /// NEW: opens the shared update screen for the salesman.
+  /// The update screen reads OwnerEstimateDetailBloc from the context, so a
+  /// fresh bloc is provided for it here. When it pops with `true` (saved),
+  /// this screen reloads the estimate.
+  Future<void> _openUpdateScreen(
+      BuildContext context, EstimateDetailModel estimate) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          // ASSUMPTION: OwnerEstimateDetailBloc has a no-argument constructor.
+          // If yours needs arguments (or an initial event), change it here.
+          create: (_) => OwnerEstimateDetailBloc(),
+          child: OwnerEstimateUpdateScreen(detail: estimate),
+        ),
+      ),
+    );
+
+    if (updated == true && mounted) {
+      _bloc.add(EstimateDetailRequested(widget.id));
     }
   }
 
@@ -317,8 +342,12 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                       ),
                     ),
                   ),
+                  // Approved & not yet delivered -> Send to Dispatch
                   if (estimate.isApproved && !_isDelivered(estimate))
-                    _buildBottomBar(context, estimate),
+                    _buildBottomBar(context, estimate)
+                  // NEW: not approved yet -> Edit Estimate
+                  else if (!estimate.isApproved)
+                    _buildEditBar(context, estimate),
                 ],
               );
             },
@@ -329,8 +358,39 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
   }
 
   // ---------------------------------------------------------------------
-  // Bottom bar (same container as the owner screen)
+  // Bottom bars (same container as the owner screen)
   // ---------------------------------------------------------------------
+
+  /// NEW: "Edit Estimate" bar, shown while the estimate is not approved.
+  Widget _buildEditBar(BuildContext context, EstimateDetailModel estimate) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(Responsive.w(20), Responsive.h(10),
+            Responsive.w(20), Responsive.h(14)),
+        child: SizedBox(
+          width: double.infinity,
+          height: Responsive.h(48),
+          child: ElevatedButton.icon(
+            onPressed: () => _openUpdateScreen(context, estimate),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: Text('Edit Estimate',
+                style: AppTextStyles.bodyBold(color: Colors.white)),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildBottomBar(BuildContext context, EstimateDetailModel estimate) {
     return Container(

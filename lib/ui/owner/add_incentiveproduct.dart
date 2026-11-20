@@ -15,6 +15,8 @@ import '../../models/owner_models/addproductmodel.dart';
 import '../../models/owner_models/getproductmodel.dart';
 import '../../models/owner_models/updateproductmodel.dart';
 import '../../widgets/appsnackbar.dart';
+import 'company_addscreen.dart'; // CompanySetupScreen
+import 'owner_unitaddscreen.dart'; // UnitSetupScreen
 
 /// 5.0 -> "5", 2.5 -> "2.5"
 String _num(double v) =>
@@ -69,6 +71,9 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
   bool _isBoxUnit = false;
 
   bool _syncingPiecesFromPacking = false;
+
+  // Prevents double taps on the Unit / Brand set-up buttons.
+  bool _isNavigating = false;
 
   bool get _isEditing => widget.product != null;
 
@@ -185,6 +190,34 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
       _isBoxUnit = unitExists ? _computeIsBoxUnit(state) : false;
       if (!_isBoxUnit) _piecesPerBoxCtrl.clear();
     });
+  }
+
+  // ---------------- Unit / Brand set-up ----------------
+
+  /// Opens the Unit Set Up screen. When the user comes back, the unit and
+  /// company dropdowns are reloaded so any newly added unit shows up.
+  Future<void> _openUnitSetup(BuildContext context) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const UnitSetupScreen()));
+    _isNavigating = false;
+    if (mounted) {
+      context.read<ProductBloc>().add(const LoadProductDropdowns());
+    }
+  }
+
+  /// Opens the Add Brand (company) screen. When the user comes back, the
+  /// dropdowns are reloaded so any newly added brand shows up.
+  Future<void> _openBrandSetup(BuildContext context) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const CompanySetupScreen()));
+    _isNavigating = false;
+    if (mounted) {
+      context.read<ProductBloc>().add(const LoadProductDropdowns());
+    }
   }
 
   String? _requiredNumberValidator(String? v) {
@@ -360,6 +393,28 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                     padding: EdgeInsets.fromLTRB(Responsive.w(16), Responsive.h(16),
                         Responsive.w(16), Responsive.h(24)),
                     children: [
+                      // ---- Unit Set Up / Add Brand (top of the page) ----
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ActionChip(
+                              icon: Icons.inventory_outlined,
+                              label: 'Unit Set Up',
+                              onTap: () => _openUnitSetup(context),
+                            ),
+                          ),
+                          SizedBox(width: Responsive.w(10)),
+                          Expanded(
+                            child: _ActionChip(
+                              icon: Icons.business_outlined,
+                              label: 'Add Brand',
+                              onTap: () => _openBrandSetup(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: Responsive.h(18)),
+
                       Text('Product Details', style: sectionStyle),
                       SizedBox(height: Responsive.h(12)),
 
@@ -705,6 +760,57 @@ class _DropdownRetry extends StatelessWidget {
         ),
         TextButton(onPressed: onRetry, child: const Text('Retry')),
       ],
+    );
+  }
+}
+
+/// Outlined chip button used for "Unit Set Up" and "Add Brand".
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: Responsive.h(11)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primary),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: AppColors.primary),
+              SizedBox(width: Responsive.w(6)),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontSize: Responsive.sp(12),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

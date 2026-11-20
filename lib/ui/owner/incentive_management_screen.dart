@@ -199,30 +199,6 @@ class _IncentiveManagementScreenState extends State<IncentiveManagementScreen> {
                       ),
                     ),
                     SizedBox(height: Responsive.h(12)),
-                    Padding(
-                      padding:
-                      EdgeInsets.symmetric(horizontal: Responsive.w(20)),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _ActionChip(
-                              icon: Icons.inventory_outlined,
-                              label: 'Unit Set Up',
-                              onTap: _openUnitSetup,
-                            ),
-                          ),
-                          SizedBox(width: Responsive.w(10)),
-                          Expanded(
-                            child: _ActionChip(
-                              icon: Icons.business_outlined,
-                              label: 'Add Brand',
-                              onTap: _openBrandSetup,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: Responsive.h(12)),
                     Expanded(child: _buildBody(context, state)),
                   ],
                 );

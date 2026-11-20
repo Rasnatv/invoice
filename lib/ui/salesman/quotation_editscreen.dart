@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -26,6 +27,9 @@ import '../../models/salesmanmodels/quotationupdatemodel.dart';
 import '../../models/salesmanmodels/estimatesectionproductincentive.dart';
 import '../../widgets/appsnackbar.dart';
 import '../../Apiprovider/salesman_quotationprovider.dart';
+
+// NOTE: adjust this path to where your product add screen really is.
+import 'package:tileshop/ui/owner/add_incentiveproduct.dart'; // AddIncentiveProductScreen
 
 /// Salesman quotation edit screen — same structure CreateEstimateScreen uses.
 class QuotationEditScreen extends StatelessWidget {
@@ -108,6 +112,9 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   // /quotations/update-item is in flight (existing items only).
   // Applied on success, discarded on failure.
   EditItem? _pendingItemUpdate;
+
+  // Prevents double taps on the Add New Product button.
+  bool _isOpeningAddProduct = false;
 
   bool get _isBoxUnitProduct {
     if (_editingItemIndex != null) {
@@ -293,6 +300,33 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     }
   }
 
+  // ---------------- Add New Product ----------------
+
+  /// Opens the product add screen. When a product is saved (the screen
+  /// pops with `true`), the active products are reloaded so the new
+  /// product shows up in the "Select Product" list.
+  ///
+  /// Items already added stay safe: `_items` lives in this State, and the
+  /// product list stays closed until the field is tapped.
+  Future<void> _openAddNewProduct() async {
+    if (_isOpeningAddProduct) return;
+    _isOpeningAddProduct = true;
+
+    // Make sure the suggestions list is closed while leaving this page.
+    _productSearchFocus.unfocus();
+    setState(() => _showProductSuggestions = false);
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AddIncentiveProductScreen()),
+    );
+
+    _isOpeningAddProduct = false;
+
+    if (saved == true && mounted) {
+      context.read<SalesmanEstimateBloc>().add(const ActiveProductsRequested());
+    }
+  }
+
   // ---------------- Validators ----------------
 
   String? _validatePartyName(String? v) => DValidator.validateName('Party name', v);
@@ -359,8 +393,12 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
   }
 
   /// Clears the product search box itself (clear button).
+  /// The suggestions list stays CLOSED after clearing: it opens again only
+  /// when the user taps the product field.
   void _clearProductSelection() {
     _productSearchCtrl.clear();
+    _productSearchFocus.unfocus();
+    setState(() => _showProductSuggestions = false);
     _onProductSelected(null);
   }
 
@@ -634,7 +672,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
   // ---------------- Submit ----------------
 
-  /// NEW: runs before Save Changes.
+  /// Runs before Save Changes.
   /// If the salesman picked a product (or started editing an item) but never
   /// tapped "Add Item" / "Update Item", ask what to do instead of silently
   /// dropping it. Returns true when it is OK to continue saving.
@@ -717,7 +755,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
     // Read the bloc before any await so we don't use a stale context later.
     final bloc = context.read<SalesmanQuotationBloc>();
 
-    // NEW: handle a forgotten Add Item / Update Item first.
+    // Handle a forgotten Add Item / Update Item first.
     final canContinue = await _resolvePendingItem();
     if (!mounted || !canContinue) return;
 
@@ -867,6 +905,30 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // ---- Add New Product (opens product add screen) ----
+                              if (_editingItemIndex == null)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: _openAddNewProduct,
+                                    icon: const Icon(
+                                        Icons.add_circle_outline_rounded,
+                                        size: 18),
+                                    label: Text(
+                                      'Add New Product',
+                                      style: AppTextStyles.bodyBold(
+                                          color: AppColors.primary),
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: Responsive.w(8)),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                ),
+
                               QeItemFormFields(
                                 formKey: _itemFormKey,
                                 productField: QeProductDropdown(
