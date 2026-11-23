@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -35,6 +36,8 @@ class _QuotationListView extends StatefulWidget {
 
 class _QuotationListViewState extends State<_QuotationListView> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
@@ -46,7 +49,18 @@ class _QuotationListViewState extends State<_QuotationListView> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  bool get _searching => _query.trim().isNotEmpty;
+
+  /// Client-side match on quotation number, party name and status.
+  bool _matches(QuotationListItem q) {
+    final s = _query.trim().toLowerCase();
+    return q.quotationNumber.toLowerCase().contains(s) ||
+        q.customerName.toLowerCase().contains(s) ||
+        q.status.toLowerCase().contains(s);
   }
 
   void _onScroll() {
@@ -57,9 +71,10 @@ class _QuotationListViewState extends State<_QuotationListView> {
     }
   }
 
-  /// If the list is too short to scroll (e.g. after deleting items), the
-  /// scroll listener never fires - so fetch the next page ourselves until
-  /// the list fills the screen or there is nothing more to load.
+  /// If the list is too short to scroll (e.g. after deleting items or when a
+  /// search filters most rows out), the scroll listener never fires - so fetch
+  /// the next page ourselves until the list fills the screen or there is
+  /// nothing more to load.
   void _scheduleAutoLoadMore(SalesmanQuotationState state) {
     if (!state.listHasMore || state.isLoadingMore || state.loadMoreFailed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,6 +82,16 @@ class _QuotationListViewState extends State<_QuotationListView> {
       if (_scrollController.position.maxScrollExtent <= 0) {
         context.read<SalesmanQuotationBloc>().add(const QuotationLoadMoreRequested());
       }
+    });
+  }
+
+  /// Search is client-side, so while a search has no matches keep pulling
+  /// pages until everything has been searched. Dispatched after the frame
+  /// (never inside build()); the bloc ignores it if a page is already loading.
+  void _requestNextPage() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SalesmanQuotationBloc>().add(const QuotationLoadMoreRequested());
     });
   }
 
@@ -94,145 +119,241 @@ class _QuotationListViewState extends State<_QuotationListView> {
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
-          child: BlocListener<SalesmanQuotationBloc, SalesmanQuotationState>(
-            listenWhen: (prev, curr) =>
-            prev.deleteStatus != curr.deleteStatus ||
-                prev.submitStatus != curr.submitStatus,
-            listener: (context, state) {
-              if (state.deleteStatus == QuotationActionStatus.success) {
-                AppSnackbar.success('Quotation deleted.');
-                context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
-              } else if (state.deleteStatus == QuotationActionStatus.failure) {
-                AppSnackbar.error(state.deleteError ?? 'Failed to delete quotation.');
-                context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
-              } else if (state.submitStatus == QuotationActionStatus.success) {
-                AppSnackbar.success(state.submitMessage ?? 'Submitted for approval.');
-                context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
-              } else if (state.submitStatus == QuotationActionStatus.failure) {
-                AppSnackbar.error(state.submitError ?? 'Failed to submit for approval.');
-                context.read<SalesmanQuotationBloc>().add(const QuotationActionResultConsumed());
-              }
-            },
-            child: BlocBuilder<SalesmanQuotationBloc, SalesmanQuotationState>(
-              buildWhen: (prev, curr) =>
-              prev.listStatus != curr.listStatus ||
-                  prev.list != curr.list ||
-                  prev.deletingId != curr.deletingId ||
+          child: Column(
+            children: [
+              // ---------- SEARCH FIELD ----------
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    Responsive.w(20), Responsive.h(14), Responsive.w(20), 0),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: 'Search quotations...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searching
+                        ? IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _query = '');
+                      },
+                    )
+                        : null,
+                  ),
+                ),
+              ),
+              SizedBox(height: Responsive.h(4)),
+
+              Expanded(
+                child: BlocListener<SalesmanQuotationBloc, SalesmanQuotationState>(
+                  listenWhen: (prev, curr) =>
                   prev.deleteStatus != curr.deleteStatus ||
-                  prev.listHasMore != curr.listHasMore ||
-                  prev.isLoadingMore != curr.isLoadingMore ||
-                  prev.loadMoreFailed != curr.loadMoreFailed,
-              builder: (context, state) {
-                // ---- loading skeleton ----
-                if (state.listStatus == QuotationLoadStatus.loading && state.list.isEmpty) {
-                  return ShimmerListPlaceholder(
-                    itemCount: 6,
-                    padding: listPadding,
-                    separatorHeight: Responsive.h(10),
-                    itemBuilder: (context, i) => const _QuotationCardSkeleton(),
-                  );
-                }
-
-                // ---- error ----
-                if (state.listStatus == QuotationLoadStatus.failure && state.list.isEmpty) {
-                  return _ErrorView(
-                    message: state.listError ?? 'Failed to load quotations.',
-                    onRetry: () => context
-                        .read<SalesmanQuotationBloc>()
-                        .add(const QuotationListRequested()),
-                  );
-                }
-
-                // ---- empty (still pull-to-refresh) ----
-                if (state.list.isEmpty) {
-                  return RefreshIndicator(
-                    color: AppColors.primary,
-                    onRefresh: () => _refresh(context),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.request_quote_outlined,
-                                  size: 44,
-                                  color: AppColors.textSecondary.withOpacity(0.4),
-                                ),
-                                SizedBox(height: Responsive.h(10)),
-                                Text('No quotations yet', style: AppTextStyles.subtitle()),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                _scheduleAutoLoadMore(state);
-
-                final showFooter =
-                    state.listHasMore || state.isLoadingMore || state.loadMoreFailed;
-
-                return RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: () => _refresh(context),
-                  child: ListView.separated(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: listPadding,
-                    itemCount: state.list.length + (showFooter ? 1 : 0),
-                    separatorBuilder: (_, __) => SizedBox(height: Responsive.h(10)),
-                    itemBuilder: (context, index) {
-                      // Footer: spinner or retry button.
-                      if (index >= state.list.length) {
-                        if (state.loadMoreFailed) {
-                          return Center(
-                            child: TextButton(
-                              onPressed: () => context
-                                  .read<SalesmanQuotationBloc>()
-                                  .add(const QuotationLoadMoreRequested()),
-                              child: Text('Failed to load more. Tap to retry',
-                                  style: AppTextStyles.link()),
-                            ),
-                          );
-                        }
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
+                      prev.submitStatus != curr.submitStatus,
+                  listener: (context, state) {
+                    if (state.deleteStatus == QuotationActionStatus.success) {
+                      AppSnackbar.success('Quotation deleted.');
+                      context
+                          .read<SalesmanQuotationBloc>()
+                          .add(const QuotationActionResultConsumed());
+                    } else if (state.deleteStatus == QuotationActionStatus.failure) {
+                      AppSnackbar.error(state.deleteError ?? 'Failed to delete quotation.');
+                      context
+                          .read<SalesmanQuotationBloc>()
+                          .add(const QuotationActionResultConsumed());
+                    } else if (state.submitStatus == QuotationActionStatus.success) {
+                      AppSnackbar.success(state.submitMessage ?? 'Submitted for approval.');
+                      context
+                          .read<SalesmanQuotationBloc>()
+                          .add(const QuotationActionResultConsumed());
+                    } else if (state.submitStatus == QuotationActionStatus.failure) {
+                      AppSnackbar.error(state.submitError ?? 'Failed to submit for approval.');
+                      context
+                          .read<SalesmanQuotationBloc>()
+                          .add(const QuotationActionResultConsumed());
+                    }
+                  },
+                  child: BlocBuilder<SalesmanQuotationBloc, SalesmanQuotationState>(
+                    buildWhen: (prev, curr) =>
+                    prev.listStatus != curr.listStatus ||
+                        prev.list != curr.list ||
+                        prev.deletingId != curr.deletingId ||
+                        prev.deleteStatus != curr.deleteStatus ||
+                        prev.listHasMore != curr.listHasMore ||
+                        prev.isLoadingMore != curr.isLoadingMore ||
+                        prev.loadMoreFailed != curr.loadMoreFailed,
+                    builder: (context, state) {
+                      // ---- loading skeleton ----
+                      if (state.listStatus == QuotationLoadStatus.loading &&
+                          state.list.isEmpty) {
+                        return ShimmerListPlaceholder(
+                          itemCount: 6,
+                          padding: listPadding,
+                          separatorHeight: Responsive.h(10),
+                          itemBuilder: (context, i) => const _QuotationCardSkeleton(),
                         );
                       }
 
-                      final quotation = state.list[index];
-                      final isDeleting = state.deletingId == quotation.id &&
-                          state.deleteStatus == QuotationActionStatus.inProgress;
+                      // ---- error ----
+                      if (state.listStatus == QuotationLoadStatus.failure &&
+                          state.list.isEmpty) {
+                        return _ErrorView(
+                          message: state.listError ?? 'Failed to load quotations.',
+                          onRetry: () => context
+                              .read<SalesmanQuotationBloc>()
+                              .add(const QuotationListRequested()),
+                        );
+                      }
 
-                      return _QuotationTile(
-                        quotation: quotation,
-                        currency: currency,
-                        isDeleting: isDeleting,
-                        onTap: () {
-                          final bloc = context.read<SalesmanQuotationBloc>();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => BlocProvider.value(
-                                value: bloc,
-                                child: QuotationPreviewScreen(id: quotation.id),
+                      // ---- empty (still pull-to-refresh) ----
+                      if (state.list.isEmpty) {
+                        return RefreshIndicator(
+                          color: AppColors.primary,
+                          onRefresh: () => _refresh(context),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) => SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: ConstrainedBox(
+                                constraints:
+                                BoxConstraints(minHeight: constraints.maxHeight),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.request_quote_outlined,
+                                        size: 44,
+                                        color: AppColors.textSecondary.withOpacity(0.4),
+                                      ),
+                                      SizedBox(height: Responsive.h(10)),
+                                      Text('No quotations yet',
+                                          style: AppTextStyles.subtitle()),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          );
-                        },
-                        onDelete: () => _confirmDelete(context, quotation),
+                          ),
+                        );
+                      }
+
+                      // ---- apply search filter ----
+                      final list = _searching
+                          ? state.list.where(_matches).toList()
+                          : state.list;
+
+                      // ---- search has no matches (yet) ----
+                      if (list.isEmpty) {
+                        final canLoadMore = state.listHasMore &&
+                            !state.isLoadingMore &&
+                            !state.loadMoreFailed;
+                        if (canLoadMore) _requestNextPage();
+                        final stillSearching =
+                            state.listHasMore && !state.loadMoreFailed;
+
+                        return RefreshIndicator(
+                          color: AppColors.primary,
+                          onRefresh: () => _refresh(context),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) => SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: ConstrainedBox(
+                                constraints:
+                                BoxConstraints(minHeight: constraints.maxHeight),
+                                child: Center(
+                                  child: stillSearching
+                                      ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5),
+                                  )
+                                      : Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.search_off_rounded,
+                                        size: 44,
+                                        color: AppColors.textSecondary
+                                            .withOpacity(0.4),
+                                      ),
+                                      SizedBox(height: Responsive.h(10)),
+                                      Text('No quotations found',
+                                          style: AppTextStyles.subtitle()),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      _scheduleAutoLoadMore(state);
+
+                      final showFooter = state.listHasMore ||
+                          state.isLoadingMore ||
+                          state.loadMoreFailed;
+
+                      return RefreshIndicator(
+                        color: AppColors.primary,
+                        onRefresh: () => _refresh(context),
+                        child: ListView.separated(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: listPadding,
+                          itemCount: list.length + (showFooter ? 1 : 0),
+                          separatorBuilder: (_, __) =>
+                              SizedBox(height: Responsive.h(10)),
+                          itemBuilder: (context, index) {
+                            // Footer: spinner or retry button.
+                            if (index >= list.length) {
+                              if (state.loadMoreFailed) {
+                                return Center(
+                                  child: TextButton(
+                                    onPressed: () => context
+                                        .read<SalesmanQuotationBloc>()
+                                        .add(const QuotationLoadMoreRequested()),
+                                    child: Text('Failed to load more. Tap to retry',
+                                        style: AppTextStyles.link()),
+                                  ),
+                                );
+                              }
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+
+                            final quotation = list[index];
+                            final isDeleting = state.deletingId == quotation.id &&
+                                state.deleteStatus == QuotationActionStatus.inProgress;
+
+                            return _QuotationTile(
+                              quotation: quotation,
+                              currency: currency,
+                              isDeleting: isDeleting,
+                              onTap: () {
+                                final bloc = context.read<SalesmanQuotationBloc>();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => BlocProvider.value(
+                                      value: bloc,
+                                      child: QuotationPreviewScreen(id: quotation.id),
+                                    ),
+                                  ),
+                                );
+                              },
+                              onDelete: () => _confirmDelete(context, quotation),
+                            );
+                          },
+                        ),
                       );
                     },
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -323,7 +444,6 @@ class _QuotationTile extends StatelessWidget {
           onTap: isDeleting ? null : onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            // width: double.infinity,
             padding: EdgeInsets.all(Responsive.w(14)),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
