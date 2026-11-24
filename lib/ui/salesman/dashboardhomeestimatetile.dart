@@ -67,7 +67,7 @@ class DashboardRecentEstimateTile extends StatelessWidget {
                       ),
                       SizedBox(height: Responsive.h(2)),
                       Text(
-                        customer.isEmpty ? 'No party name' : customer,
+                        customer.isEmpty ? 'No Customer Name' : customer,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.caption(color: AppColors.textSecondary),

@@ -427,10 +427,10 @@ class _AddIncentiveProductFormState extends State<_AddIncentiveProductForm> {
                       ),
                       SizedBox(height: Responsive.h(14)),
 
-                      _FieldLabel('Company'),
+                      _FieldLabel('Brand'),
                       if (dropdownsFailed)
                         _DropdownRetry(
-                          message: state.errorMessage ?? 'Failed to load companies.',
+                          message: state.errorMessage ?? 'Failed to load Brand.',
                           onRetry: () => context
                               .read<ProductBloc>()
                               .add(const LoadProductDropdowns()),

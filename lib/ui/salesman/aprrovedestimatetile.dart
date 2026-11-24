@@ -70,7 +70,7 @@ class ApprovedEstimateTile extends StatelessWidget {
                           SizedBox(height: Responsive.h(2)),
                           Text(
                             estimate.customerName.isEmpty
-                                ? 'No party name'
+                                ? 'No Customer Name'
                                 : estimate.customerName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

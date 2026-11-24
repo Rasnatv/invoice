@@ -286,9 +286,9 @@ class QeCustomerSection extends StatelessWidget {
           ),
         ),
         LabeledField(
-          label: 'Party Name',
+          label: 'Customer Name',
           field: CustomTextField(
-            hint: 'Enter party name',
+            hint: 'Customer Name',
             icon: Icons.groups_2_outlined,
             controller: name,
             validator: nameValidator,

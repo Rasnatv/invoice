@@ -161,7 +161,7 @@ class _CreateEstimateViewState extends State<_CreateEstimateView> {
   }
 
   bool _validateDetails() {
-    final partyNameError = DValidator.validateName('Party name', _partyNameCtrl.text);
+    final partyNameError = DValidator.validateName('Customer name', _partyNameCtrl.text);
     if (partyNameError != null) {
       _showError(partyNameError);
       return false;

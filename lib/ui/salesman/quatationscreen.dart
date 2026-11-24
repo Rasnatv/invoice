@@ -473,7 +473,7 @@ class _QuotationTile extends StatelessWidget {
                           SizedBox(height: Responsive.h(2)),
                           Text(
                             quotation.customerName.isEmpty
-                                ? 'No party name'
+                                ? 'No Customer Name'
                                 : quotation.customerName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

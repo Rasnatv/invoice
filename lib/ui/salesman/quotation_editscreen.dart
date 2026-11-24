@@ -329,7 +329,7 @@ class _QuotationEditViewState extends State<_QuotationEditView> {
 
   // ---------------- Validators ----------------
 
-  String? _validatePartyName(String? v) => DValidator.validateName('Party name', v);
+  String? _validatePartyName(String? v) => DValidator.validateName('Customer Name', v);
 
   String? _validateCustomerPhone(String? v) => DValidator.validatePhoneNumber(v);
 

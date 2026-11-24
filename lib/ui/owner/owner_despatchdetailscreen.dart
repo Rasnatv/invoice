@@ -840,7 +840,7 @@ class _OwnerDispatchDetailViewState extends State<_OwnerDispatchDetailView> {
       addRow([]);
       addRow(['DS Number', d.dsNumber]);
       addRow(['Ref. No.', d.refNo]);
-      addRow(['Party Name', d.partyName]);
+      addRow(['Customer Name', d.partyName]);
       addRow(['Contact Number', d.contactNumber]);
       addRow(['Delivery Address', d.deliveryAddress]);
       addRow(['Driver Name', d.driverName]);

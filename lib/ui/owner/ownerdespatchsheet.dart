@@ -395,9 +395,9 @@ class _DespatchFormState extends State<_DespatchForm> {
                         style: _fieldStyle,
                         inputFormatters: DValidator.lettersOnly,
                         decoration:
-                        _decor('Party Name', icon: Icons.groups_2_outlined),
+                        _decor('Customer Name', icon: Icons.groups_2_outlined),
                         validator: (v) =>
-                            DValidator.validateName('Party Name', v),
+                            DValidator.validateName('Customer Name', v),
                       ),
                       _gap(),
                       TextFormField(

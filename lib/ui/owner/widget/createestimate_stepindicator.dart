@@ -395,9 +395,9 @@ class DetailsStep extends StatelessWidget {
                       onSelectSiteVisit: onSelectSiteVisit,
                     ),
                     LabeledField(
-                      label: 'Party Name',
+                      label: 'Customer Name',
                       field: CustomTextField(
-                        hint: 'Enter party name',
+                        hint: 'Enter Customer Name',
                         icon: Icons.groups_2_outlined,
                         controller: partyNameCtrl,
                         inputFormatters: DValidator.lettersOnly,
@@ -587,7 +587,7 @@ class _PhoneSiteVisitField extends StatelessWidget {
                   SizedBox(height: Responsive.h(4)),
                   Padding(
                     padding: EdgeInsets.only(bottom: Responsive.h(12)),
-                    child: Text('Tap a match to fill party name and address',
+                    child: Text('Tap a match to fill Customer Name and address',
                         style: AppTextStyles.caption(color: AppColors.textSecondary)),
                   ),
                 ],
@@ -1422,7 +1422,7 @@ class PreviewStep extends StatelessWidget {
                     title: 'Customer Details',
                     icon: Icons.groups_2_outlined,
                     rows: [
-                      _PreviewRow('Party Name', partyName.isEmpty ? '-' : partyName),
+                      _PreviewRow('Customer Name', partyName.isEmpty ? '-' : partyName),
                       _PreviewRow('Address', address.isEmpty ? '-' : address),
                       _PreviewRow('Contact No.', phone.isEmpty ? '-' : phone),
                       _PreviewRow('Email', customerEmail.isEmpty ? '-' : customerEmail),
