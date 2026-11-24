@@ -88,9 +88,23 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
     return estimate.createdByDetails.roleLabel.trim().toLowerCase() == 'owner';
   }
 
+  /// True once the bill has been sent to dispatch / delivered.
+  /// Uses "contains" so variants like "Despatched", "dispatched_to_site"
+  /// or "Delivered" are all caught.
   bool _isDelivered(EstimateDetailModel estimate) {
     final s = estimate.status.trim().toLowerCase();
-    return s == 'delivered' || s == 'despatched' || s == 'dispatched';
+    return s.contains('dispatch') ||
+        s.contains('despatch') ||
+        s.contains('deliver');
+  }
+
+  /// Edit is shown for every estimate that is not approved (including
+  /// pending approval). It is hidden only once the bill is dispatched
+  /// or delivered.
+  bool _canEdit(EstimateDetailModel estimate) {
+    if (estimate.isApproved) return false;
+    if (_isDelivered(estimate)) return false;
+    return true;
   }
 
   void _openDespatchSheet(
@@ -108,7 +122,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
     }
   }
 
-  /// NEW: opens the shared update screen for the salesman.
+  /// Opens the shared update screen for the salesman.
   /// The update screen reads OwnerEstimateDetailBloc from the context, so a
   /// fresh bloc is provided for it here. When it pops with `true` (saved),
   /// this screen reloads the estimate.
@@ -345,8 +359,9 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                   // Approved & not yet delivered -> Send to Dispatch
                   if (estimate.isApproved && !_isDelivered(estimate))
                     _buildBottomBar(context, estimate)
-                  // NEW: not approved yet -> Edit Estimate
-                  else if (!estimate.isApproved)
+                  // Still pending -> Edit Estimate
+                  // (hidden once approved, dispatched, delivered, etc.)
+                  else if (_canEdit(estimate))
                     _buildEditBar(context, estimate),
                 ],
               );
@@ -361,7 +376,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
   // Bottom bars (same container as the owner screen)
   // ---------------------------------------------------------------------
 
-  /// NEW: "Edit Estimate" bar, shown while the estimate is not approved.
+  /// "Edit Estimate" bar, shown only while the estimate is still pending.
   Widget _buildEditBar(BuildContext context, EstimateDetailModel estimate) {
     return Container(
       decoration: const BoxDecoration(
@@ -414,7 +429,7 @@ class _EstimateDetailsViewState extends State<_EstimateDetailsView>
                   borderRadius: BorderRadius.circular(14)),
             ),
             icon: const Icon(Icons.local_shipping_outlined, size: 18),
-            label: Text('Send to Dispatch ',
+            label: Text('Send to Dispatch',
                 style: AppTextStyles.bodyBold(color: Colors.white)),
           ),
         ),
